@@ -104,7 +104,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">영업 퍼널</h3>
         <div className="text-sm text-muted-foreground">
@@ -112,137 +112,136 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         </div>
       </div>
 
-      {/* Main Flow - Horizontal with flex-wrap for responsiveness */}
-      <div className="flex flex-wrap items-start gap-2">
+      {/* Fixed 7-column Grid Layout */}
+      <div className="grid grid-cols-7 gap-2 w-full">
         {MAIN_STAGES.map((stage, index) => {
           const isExpanded = expandedStages.has(stage.id);
           const hasSubStatuses = SUB_STATUSES[stage.id] && SUB_STATUSES[stage.id].length > 0;
 
           return (
-            <div key={stage.id} className="flex items-start">
-              {/* Stage Column */}
-              <div className="flex flex-col">
-                {/* Main Stage Box */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => onStageClick(stage.id === 'all' ? null : stage.id)}
-                    className={cn(
-                      "min-w-[80px] px-3 py-2 rounded-md border-2 transition-all text-center",
-                      stage.color,
-                      stage.borderColor,
-                      stage.textColor,
-                      selectedStage === stage.id && "ring-2 ring-primary ring-offset-1",
-                      stage.id === 'all' && selectedStage === null && "ring-2 ring-primary ring-offset-1"
-                    )}
-                    data-testid={`button-funnel-${stage.id}`}
-                  >
-                    <div className="font-semibold text-xs whitespace-nowrap">{stage.label}</div>
-                    <div className="text-lg font-bold tabular-nums">
-                      {getStageCount(stage.id)}
-                    </div>
-                  </button>
-                  
-                  {/* Expand/Collapse button */}
-                  {hasSubStatuses && (
-                    <button
-                      onClick={() => toggleStage(stage.id)}
-                      className="p-1 rounded hover:bg-muted transition-colors"
-                      data-testid={`button-toggle-${stage.id}`}
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )}
-                    </button>
+            <div key={stage.id} className="flex flex-col min-w-0">
+              {/* Main Stage Box - Full width of column */}
+              <div className="flex items-stretch gap-1">
+                <button
+                  onClick={() => onStageClick(stage.id === 'all' ? null : stage.id)}
+                  className={cn(
+                    "flex-1 min-h-[56px] px-2 py-3 rounded-md border-2 transition-all text-center flex flex-col justify-center",
+                    stage.color,
+                    stage.borderColor,
+                    stage.textColor,
+                    selectedStage === stage.id && "ring-2 ring-primary ring-offset-1",
+                    stage.id === 'all' && selectedStage === null && "ring-2 ring-primary ring-offset-1"
                   )}
-                </div>
-
-                {/* Sub-statuses - Accordion Content */}
-                {hasSubStatuses && isExpanded && (
-                  <div className="mt-2 pl-2 border-l-2 border-muted ml-2">
-                    {stage.id === '1' ? (
-                      // 상담대기: 가로 배치 + 중첩 아코디언
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                          {SUB_STATUSES['1'].map((sub) => (
-                            <button
-                              key={sub.id}
-                              onClick={() => {
-                                if (sub.id === '1-1') {
-                                  setExpandedTrash(!expandedTrash);
-                                } else {
-                                  onStageClick(sub.id);
-                                }
-                              }}
-                              className={cn(
-                                "px-2 py-1 rounded-md border text-xs transition-all flex items-center gap-1",
-                                sub.color,
-                                "border-gray-300 dark:border-gray-600",
-                                selectedStage === sub.id && "ring-2 ring-primary"
-                              )}
-                              data-testid={`button-funnel-${sub.id}`}
-                            >
-                              <span className="font-semibold">{sub.label}</span>
-                              <span className="text-muted-foreground">({getSubStatusCount(sub.id)})</span>
-                              {sub.id === '1-1' && (
-                                expandedTrash ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                        
-                        {/* 쓰레기통 상세사유 - 중첩 아코디언 */}
-                        {expandedTrash && NESTED_STATUSES['1-1'] && (
-                          <div className="grid grid-cols-2 gap-1 pl-2 border-l-2 border-red-200 dark:border-red-800 ml-2">
-                            {NESTED_STATUSES['1-1'].map((nested) => (
-                              <button
-                                key={nested.id}
-                                onClick={() => onStageClick(nested.id)}
-                                className={cn(
-                                  "px-2 py-1 rounded text-xs text-left transition-all",
-                                  "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800",
-                                  selectedStage === nested.id && "ring-1 ring-primary"
-                                )}
-                                data-testid={`button-funnel-${nested.id}`}
-                              >
-                                <span className="font-medium text-red-700 dark:text-red-400">{nested.id}</span>
-                                <span className="ml-1">{nested.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                  data-testid={`button-funnel-${stage.id}`}
+                >
+                  <div className="font-bold text-sm whitespace-nowrap truncate">{stage.label}</div>
+                  <div className="text-xl font-bold tabular-nums">
+                    {getStageCount(stage.id)}
+                  </div>
+                </button>
+                
+                {/* Expand/Collapse button */}
+                {hasSubStatuses && (
+                  <button
+                    onClick={() => toggleStage(stage.id)}
+                    className="px-1 rounded hover:bg-muted transition-colors flex items-center"
+                    data-testid={`button-toggle-${stage.id}`}
+                  >
+                    {isExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
                     ) : (
-                      // 나머지 단계: 세로 스택
-                      <div className="flex flex-col gap-1">
-                        {SUB_STATUSES[stage.id].map((sub) => (
-                          <button
-                            key={sub.id}
-                            onClick={() => onStageClick(sub.id)}
-                            className={cn(
-                              "px-2 py-1 rounded-md border text-xs text-left transition-all",
-                              sub.color,
-                              "border-gray-300 dark:border-gray-600",
-                              selectedStage === sub.id && "ring-1 ring-primary"
-                            )}
-                            data-testid={`button-funnel-${sub.id}`}
-                          >
-                            <span className="font-semibold text-muted-foreground">{sub.id}</span>
-                            <span className="ml-1">{sub.label}</span>
-                            <span className="ml-1 text-muted-foreground">({getSubStatusCount(sub.id)})</span>
-                          </button>
-                        ))}
-                      </div>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     )}
+                  </button>
+                )}
+                
+                {/* Arrow to next stage (except last) */}
+                {index < MAIN_STAGES.length - 1 && !hasSubStatuses && (
+                  <div className="flex items-center">
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
                 )}
               </div>
 
-              {/* Arrow between stages */}
-              {index < MAIN_STAGES.length - 1 && (
-                <div className="flex items-center px-1 pt-2">
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              {/* Sub-statuses - Accordion Content (stays within column) */}
+              {hasSubStatuses && isExpanded && (
+                <div className="mt-2 w-full">
+                  {stage.id === '1' ? (
+                    // 상담대기: 유연한 가로 배치 + 중첩 아코디언
+                    <div className="space-y-2 w-full">
+                      <div className="flex flex-wrap gap-1">
+                        {SUB_STATUSES['1'].map((sub) => (
+                          <button
+                            key={sub.id}
+                            onClick={() => {
+                              if (sub.id === '1-1') {
+                                setExpandedTrash(!expandedTrash);
+                              } else {
+                                onStageClick(sub.id);
+                              }
+                            }}
+                            className={cn(
+                              "px-2 py-1.5 rounded-md border text-xs transition-all flex items-center gap-1 flex-shrink-0",
+                              sub.color,
+                              "border-gray-300 dark:border-gray-600",
+                              selectedStage === sub.id && "ring-2 ring-primary"
+                            )}
+                            data-testid={`button-funnel-${sub.id}`}
+                          >
+                            <span className="font-semibold whitespace-nowrap">{sub.label}</span>
+                            <span className="text-muted-foreground">({getSubStatusCount(sub.id)})</span>
+                            {sub.id === '1-1' && (
+                              expandedTrash ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      
+                      {/* 쓰레기통 상세사유 - 중첩 아코디언 */}
+                      {expandedTrash && NESTED_STATUSES['1-1'] && (
+                        <div className="flex flex-col gap-1 pl-2 border-l-2 border-red-200 dark:border-red-800">
+                          {NESTED_STATUSES['1-1'].map((nested) => (
+                            <button
+                              key={nested.id}
+                              onClick={() => onStageClick(nested.id)}
+                              className={cn(
+                                "px-2 py-1 rounded text-xs text-left transition-all truncate",
+                                "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800",
+                                selectedStage === nested.id && "ring-1 ring-primary"
+                              )}
+                              data-testid={`button-funnel-${nested.id}`}
+                              title={`${nested.id} ${nested.label}`}
+                            >
+                              <span className="font-medium text-red-700 dark:text-red-400">{nested.id}</span>
+                              <span className="ml-1">{nested.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // 나머지 단계: 세로 스택
+                    <div className="flex flex-col gap-1 w-full">
+                      {SUB_STATUSES[stage.id].map((sub) => (
+                        <button
+                          key={sub.id}
+                          onClick={() => onStageClick(sub.id)}
+                          className={cn(
+                            "w-full px-2 py-1.5 rounded-md border text-xs text-left transition-all truncate",
+                            sub.color,
+                            "border-gray-300 dark:border-gray-600",
+                            selectedStage === sub.id && "ring-1 ring-primary"
+                          )}
+                          data-testid={`button-funnel-${sub.id}`}
+                          title={`${sub.id} ${sub.label}`}
+                        >
+                          <div className="font-semibold text-muted-foreground">{sub.id}</div>
+                          <div className="truncate">{sub.label}</div>
+                          <div className="text-muted-foreground">({getSubStatusCount(sub.id)})</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
