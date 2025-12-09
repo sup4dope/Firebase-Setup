@@ -9,53 +9,53 @@ interface FunnelChartProps {
   onStageClick: (stage: string | null) => void;
 }
 
-// Main stages with bottom border accent colors
+// Main stages with border accent colors
 const MAIN_STAGES = [
-  { id: 'all', label: '전체', accent: 'border-b-gray-400' },
-  { id: '1', label: '상담대기', accent: 'border-b-purple-500' },
-  { id: 'target', label: '희망타겟', accent: 'border-b-yellow-500' },
-  { id: '2', label: '계약완료', accent: 'border-b-green-500' },
-  { id: '3', label: '서류취합', accent: 'border-b-blue-500' },
-  { id: '4', label: '신청완료', accent: 'border-b-orange-500' },
-  { id: '5', label: '집행완료', accent: 'border-b-teal-500' },
+  { id: 'all', label: '전체', borderColor: 'border-gray-500' },
+  { id: '1', label: '상담대기', borderColor: 'border-purple-500' },
+  { id: 'target', label: '희망타겟', borderColor: 'border-yellow-500' },
+  { id: '2', label: '계약완료', borderColor: 'border-green-500' },
+  { id: '3', label: '서류취합', borderColor: 'border-blue-500' },
+  { id: '4', label: '신청완료', borderColor: 'border-orange-500' },
+  { id: '5', label: '집행완료', borderColor: 'border-teal-500' },
 ];
 
-// Sub-statuses with accent colors
-const SUB_STATUSES: Record<string, { id: string; label: string; accent: string }[]> = {
+// Sub-statuses with left border accent colors
+const SUB_STATUSES: Record<string, { id: string; label: string; accentColor: string }[]> = {
   '1': [
-    { id: '1-1', label: '쓰레기통', accent: 'border-b-red-500' },
-    { id: '0-1', label: '단기부재', accent: 'border-b-gray-400' },
-    { id: '0-2', label: '장기부재', accent: 'border-b-gray-400' },
+    { id: '1-1', label: '쓰레기통', accentColor: 'border-l-red-500' },
+    { id: '0-1', label: '단기부재', accentColor: 'border-l-gray-400' },
+    { id: '0-2', label: '장기부재', accentColor: 'border-l-gray-400' },
   ],
   'target': [
-    { id: '1-2-1', label: '업력미달', accent: 'border-b-yellow-400' },
-    { id: '1-2-2', label: '최근대출', accent: 'border-b-yellow-400' },
-    { id: '1-2-3', label: '인증미동의(국세청)', accent: 'border-b-yellow-400' },
-    { id: '1-2-4', label: '인증미동의(공여내역)', accent: 'border-b-yellow-400' },
-    { id: '1-3-1', label: '진행기간 미동의', accent: 'border-b-yellow-400' },
-    { id: '1-3-2', label: '자문료 미동의', accent: 'border-b-yellow-400' },
-    { id: '1-3-3', label: '계약금미동의(선불)', accent: 'border-b-yellow-400' },
-    { id: '1-3-4', label: '계약금미동의(후불)', accent: 'border-b-yellow-400' },
+    { id: '1-2-1', label: '업력미달', accentColor: 'border-l-yellow-400' },
+    { id: '1-2-2', label: '최근대출', accentColor: 'border-l-yellow-400' },
+    { id: '1-2-3', label: '인증미동의(국세청)', accentColor: 'border-l-yellow-400' },
+    { id: '1-2-4', label: '인증미동의(공여내역)', accentColor: 'border-l-yellow-400' },
+    { id: '1-3-1', label: '진행기간 미동의', accentColor: 'border-l-yellow-400' },
+    { id: '1-3-2', label: '자문료 미동의', accentColor: 'border-l-yellow-400' },
+    { id: '1-3-3', label: '계약금미동의(선불)', accentColor: 'border-l-yellow-400' },
+    { id: '1-3-4', label: '계약금미동의(후불)', accentColor: 'border-l-yellow-400' },
   ],
   '2': [
-    { id: '2-1', label: '계약완료(선불)', accent: 'border-b-green-400' },
-    { id: '2-2', label: '계약완료(외주)', accent: 'border-b-green-400' },
-    { id: '2-3', label: '계약완료(후불)', accent: 'border-b-green-400' },
+    { id: '2-1', label: '계약완료(선불)', accentColor: 'border-l-green-400' },
+    { id: '2-2', label: '계약완료(외주)', accentColor: 'border-l-green-400' },
+    { id: '2-3', label: '계약완료(후불)', accentColor: 'border-l-green-400' },
   ],
   '3': [
-    { id: '3-1', label: '서류취합완료(선불)', accent: 'border-b-blue-400' },
-    { id: '3-2', label: '서류취합완료(외주)', accent: 'border-b-blue-400' },
-    { id: '3-3', label: '서류취합완료(후불)', accent: 'border-b-blue-400' },
+    { id: '3-1', label: '서류취합완료(선불)', accentColor: 'border-l-blue-400' },
+    { id: '3-2', label: '서류취합완료(외주)', accentColor: 'border-l-blue-400' },
+    { id: '3-3', label: '서류취합완료(후불)', accentColor: 'border-l-blue-400' },
   ],
   '4': [
-    { id: '4-1', label: '신청완료(선불)', accent: 'border-b-orange-400' },
-    { id: '4-2', label: '신청완료(외주)', accent: 'border-b-orange-400' },
-    { id: '4-3', label: '신청완료(후불)', accent: 'border-b-orange-400' },
+    { id: '4-1', label: '신청완료(선불)', accentColor: 'border-l-orange-400' },
+    { id: '4-2', label: '신청완료(외주)', accentColor: 'border-l-orange-400' },
+    { id: '4-3', label: '신청완료(후불)', accentColor: 'border-l-orange-400' },
   ],
   '5': [
-    { id: '5-1', label: '집행완료', accent: 'border-b-teal-400' },
-    { id: '5-2', label: '집행완료(외주)', accent: 'border-b-teal-400' },
-    { id: '5-3', label: '최종부결', accent: 'border-b-red-500' },
+    { id: '5-1', label: '집행완료', accentColor: 'border-l-teal-400' },
+    { id: '5-2', label: '집행완료(외주)', accentColor: 'border-l-teal-400' },
+    { id: '5-3', label: '최종부결', accentColor: 'border-l-red-500' },
   ],
 };
 
@@ -77,7 +77,8 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [expandedTrash, setExpandedTrash] = useState(false);
 
-  const toggleStage = (stageId: string) => {
+  const toggleStage = (stageId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     setExpandedStages(prev => {
       const next = new Set(prev);
       if (next.has(stageId)) {
@@ -119,86 +120,96 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         </div>
       </div>
 
-      {/* Fixed 7-column Grid - Full Width, No padding */}
-      <div className="grid grid-cols-7 gap-1 w-full">
+      {/* Fixed 7-column Grid - Full Width */}
+      <div className="grid grid-cols-7 gap-2 w-full">
         {MAIN_STAGES.map((stage) => {
           const isExpanded = expandedStages.has(stage.id);
           const hasSubStatuses = SUB_STATUSES[stage.id] && SUB_STATUSES[stage.id].length > 0;
           const count = getStageCount(stage.id);
+          const isAlwaysExpanded = stage.id === '1';
 
           return (
             <div key={stage.id} className="flex flex-col w-full">
-              {/* Main Stage Box - Solid style with bottom accent */}
-              <button
-                onClick={() => {
-                  onStageClick(stage.id === 'all' ? null : stage.id);
-                  if (hasSubStatuses) toggleStage(stage.id);
-                }}
-                className={cn(
-                  "w-full h-16 rounded-md border-b-4 transition-all",
-                  "flex flex-col items-center justify-center",
-                  "bg-slate-800 dark:bg-slate-900 text-white",
-                  "hover:bg-slate-700 dark:hover:bg-slate-800",
-                  stage.accent,
-                  selectedStage === stage.id && "ring-2 ring-primary ring-offset-2",
-                  stage.id === 'all' && selectedStage === null && "ring-2 ring-primary ring-offset-2"
-                )}
-                data-testid={`button-funnel-${stage.id}`}
-              >
-                <div className="font-bold text-sm">{stage.label}</div>
-                <div className="text-xs">
-                  {count}건 ({getPercentage(count)})
-                </div>
-                {hasSubStatuses && (
-                  <div className="absolute top-1 right-1">
-                    {isExpanded ? (
-                      <ChevronUp className="w-3 h-3 opacity-50" />
-                    ) : (
-                      <ChevronDown className="w-3 h-3 opacity-50" />
-                    )}
+              {/* Main Stage Box - Glassmorphism Dark Style */}
+              <div className="relative w-full">
+                <button
+                  onClick={() => onStageClick(stage.id === 'all' ? null : stage.id)}
+                  className={cn(
+                    "w-full h-16 rounded-md border-2 transition-all",
+                    "flex flex-col items-center justify-center",
+                    "bg-slate-900/50 backdrop-blur-sm text-white",
+                    "hover:bg-slate-800/70",
+                    stage.borderColor,
+                    selectedStage === stage.id && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                    stage.id === 'all' && selectedStage === null && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                  )}
+                  data-testid={`button-funnel-${stage.id}`}
+                >
+                  <div className="font-bold text-sm">{stage.label}</div>
+                  <div className="text-xs text-gray-300">
+                    {count}건 ({getPercentage(count)})
                   </div>
+                </button>
+                
+                {/* Accordion Toggle Button - Only for non-상담대기 stages */}
+                {hasSubStatuses && !isAlwaysExpanded && (
+                  <button
+                    onClick={(e) => toggleStage(stage.id, e)}
+                    className={cn(
+                      "absolute bottom-1 right-1 p-1 rounded transition-all",
+                      "bg-white/10 hover:bg-white/20"
+                    )}
+                    data-testid={`button-toggle-${stage.id}`}
+                  >
+                    {isExpanded ? (
+                      <ChevronUp className="w-3 h-3 text-white" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-white" />
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
 
               {/* Sub-statuses - Vertical Stack, 100% width */}
-              {hasSubStatuses && isExpanded && (
-                <div className="mt-1 flex flex-col gap-1 w-full">
+              {/* 상담대기(id='1')는 항상 펼쳐짐, 나머지는 토글 */}
+              {hasSubStatuses && (isAlwaysExpanded || isExpanded) && (
+                <div className="mt-2 flex flex-col gap-1 w-full">
                   {SUB_STATUSES[stage.id].map((sub) => {
                     const subCount = getSubStatusCount(sub.id);
+                    const isTrash = sub.id === '1-1';
                     
                     return (
                       <div key={sub.id} className="flex flex-col gap-1 w-full">
-                        {/* Sub-status Button - 100% width */}
+                        {/* Sub-status Button - 100% width, left border accent */}
                         <button
                           onClick={() => {
-                            if (sub.id === '1-1') {
+                            if (isTrash) {
                               setExpandedTrash(!expandedTrash);
-                            } else {
-                              onStageClick(sub.id);
                             }
+                            onStageClick(sub.id);
                           }}
                           className={cn(
-                            "w-full h-12 rounded-md border-b-4 transition-all",
-                            "flex items-center justify-between px-2",
-                            "bg-gray-700 dark:bg-gray-800 text-white",
-                            "hover:bg-gray-600 dark:hover:bg-gray-700",
-                            sub.accent,
+                            "w-full h-11 rounded-md border-l-4 transition-all",
+                            "flex items-center justify-between px-3",
+                            "bg-gray-800 text-white",
+                            "hover:bg-gray-700",
+                            sub.accentColor,
                             selectedStage === sub.id && "ring-2 ring-primary"
                           )}
                           data-testid={`button-funnel-${sub.id}`}
                         >
                           <span className="font-medium text-xs truncate">{sub.label}</span>
-                          <span className="text-xs flex items-center gap-1 flex-shrink-0">
+                          <span className="text-xs text-gray-300 flex items-center gap-1 flex-shrink-0">
                             {subCount} ({getPercentage(subCount)})
-                            {sub.id === '1-1' && (
+                            {isTrash && (
                               expandedTrash ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                             )}
                           </span>
                         </button>
                         
-                        {/* 쓰레기통 상세사유 - Nested Vertical Stack */}
-                        {sub.id === '1-1' && expandedTrash && NESTED_STATUSES['1-1'] && (
-                          <div className="flex flex-col gap-1 w-full pl-1">
+                        {/* 쓰레기통 상세사유 - Nested Accordion */}
+                        {isTrash && expandedTrash && NESTED_STATUSES['1-1'] && (
+                          <div className="flex flex-col gap-1 w-full pl-2">
                             {NESTED_STATUSES['1-1'].map((nested) => {
                               const nestedCount = getSubStatusCount(nested.id);
                               return (
@@ -206,16 +217,16 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                                   key={nested.id}
                                   onClick={() => onStageClick(nested.id)}
                                   className={cn(
-                                    "w-full h-10 rounded-md border-b-2 border-b-red-400 transition-all",
-                                    "flex items-center justify-between px-2",
-                                    "bg-gray-600 dark:bg-gray-700 text-white text-xs",
-                                    "hover:bg-gray-500 dark:hover:bg-gray-600",
+                                    "w-full h-9 rounded-md border-l-4 border-l-red-400 transition-all",
+                                    "flex items-center justify-between px-3",
+                                    "bg-gray-700 text-white text-xs",
+                                    "hover:bg-gray-600",
                                     selectedStage === nested.id && "ring-2 ring-primary"
                                   )}
                                   data-testid={`button-funnel-${nested.id}`}
                                 >
                                   <span className="truncate">{nested.label}</span>
-                                  <span className="font-semibold flex-shrink-0 ml-1">{nestedCount}</span>
+                                  <span className="text-gray-300 flex-shrink-0 ml-1">{nestedCount}</span>
                                 </button>
                               );
                             })}
