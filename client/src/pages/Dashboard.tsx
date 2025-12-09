@@ -331,57 +331,87 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6 w-full">
-      {/* KPI Widgets */}
-      <KPIWidgets kpi={kpi} />
-
-      {/* Funnel Chart */}
-      <FunnelChart
-        customers={customers}
-        selectedStage={selectedStage}
-        onStageClick={setSelectedStage}
-      />
-
-      {/* Customer List Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold">고객 목록</h2>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="이름, 회사명, ID 검색..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9"
-              data-testid="input-search"
-            />
+    <div className="flex flex-col h-full w-full overflow-hidden">
+      {/* Top Header - Stats Summary + Filters */}
+      <div className="flex-shrink-0 p-4 border-b border-gray-800 bg-gray-900/30">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          {/* Left: KPI Summary */}
+          <div className="flex items-center gap-6">
+            <KPIWidgets kpi={kpi} compact />
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={fetchData}
-            data-testid="button-refresh"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-          <Button onClick={handleNewCustomerModal} data-testid="button-add-customer">
-            <Plus className="w-4 h-4 mr-2" />
-            고객 추가
-          </Button>
+          
+          {/* Right: Search & Actions */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="이름, 회사명, ID 검색..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-9 bg-gray-800 border-gray-700"
+                data-testid="input-search"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={fetchData}
+              className="border-gray-700"
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+            <Button onClick={handleNewCustomerModal} data-testid="button-add-customer">
+              <Plus className="w-4 h-4 mr-2" />
+              고객 추가
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Customer Table */}
-      <CustomerTable
-        customers={filteredCustomers}
-        userRole={user?.role || 'staff'}
-        selectedStage={selectedStage}
-        onStatusChange={handleStatusChange}
-        onEdit={handleEdit}
-        onDelete={handleDeleteCustomer}
-        onViewHistory={handleViewHistory}
-        onCustomerClick={handleCustomerClick}
-      />
+      {/* Main Content Area - Scrollable */}
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        {/* Funnel Chart - Wide and centered */}
+        <FunnelChart
+          customers={customers}
+          selectedStage={selectedStage}
+          onStageClick={setSelectedStage}
+        />
+
+        {/* Customer List Section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-200">
+              고객 목록 
+              <span className="text-sm font-normal text-gray-500 ml-2">
+                ({filteredCustomers.length}명)
+              </span>
+            </h2>
+            {selectedStage && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setSelectedStage(null)}
+                className="text-gray-400"
+              >
+                필터 초기화
+              </Button>
+            )}
+          </div>
+
+          {/* Customer Table */}
+          <CustomerTable
+            customers={filteredCustomers}
+            userRole={user?.role || 'staff'}
+            selectedStage={selectedStage}
+            onStatusChange={handleStatusChange}
+            onEdit={handleEdit}
+            onDelete={handleDeleteCustomer}
+            onViewHistory={handleViewHistory}
+            onCustomerClick={handleCustomerClick}
+          />
+        </div>
+      </div>
 
       {/* Customer Form Dialog */}
       <CustomerForm

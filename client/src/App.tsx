@@ -154,8 +154,8 @@ function AuthenticatedApp() {
   };
 
   const sidebarStyle = {
-    '--sidebar-width': '18rem',
-    '--sidebar-width-icon': '3rem',
+    '--sidebar-width': '20rem',
+    '--sidebar-width-icon': '4rem',
   };
 
   if (loading) {
