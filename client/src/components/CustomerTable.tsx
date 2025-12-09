@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -19,10 +20,18 @@ import {
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { MemoModal } from './MemoModal';
 import { MoreHorizontal, ChevronRight, Edit, Trash2, History, Check, X, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { STATUS_LABELS, FUNNEL_STAGES } from '@shared/types';
@@ -37,7 +46,11 @@ interface CustomerTableProps {
   onDelete: (customerId: string) => void;
   onViewHistory: (customerId: string) => void;
   onCustomerClick?: (customer: Customer) => void;
+  onProcessingOrgChange?: (customerId: string, newOrg: string) => void;
+  onAddMemo?: (customerId: string, content: string) => void;
 }
+
+const PROCESSING_ORGS = ['중진공', '신보', '기보', '소진공', '기타'];
 
 // Dummy data for display
 const DUMMY_CUSTOMERS: Customer[] = [
@@ -57,9 +70,14 @@ const DUMMY_CUSTOMERS: Customer[] = [
     credit_score: 780,
     over_7_years: true,
     avg_revenue_3y: 15.5,
+    recent_sales: 18.2,
     industry: '제조업',
     processing_org: '중진공',
     latest_memo: '서류 준비 중, 다음 주 화요일 방문 예정',
+    memo_history: [
+      { date: '2024-12-01', content: '첫 상담 진행, 관심도 높음' },
+      { date: '2024-12-05', content: '서류 준비 중, 다음 주 화요일 방문 예정' },
+    ],
   },
   {
     id: '2',
@@ -77,9 +95,13 @@ const DUMMY_CUSTOMERS: Customer[] = [
     credit_score: 650,
     over_7_years: false,
     avg_revenue_3y: 3.2,
+    recent_sales: 2.8,
     industry: '도소매',
     processing_org: '기보',
     latest_memo: '신용점수 미달로 상담 보류',
+    memo_history: [
+      { date: '2024-12-02', content: '신용점수 미달로 상담 보류' },
+    ],
   },
   {
     id: '3',
@@ -97,9 +119,15 @@ const DUMMY_CUSTOMERS: Customer[] = [
     credit_score: 820,
     over_7_years: true,
     avg_revenue_3y: 45.0,
+    recent_sales: 52.3,
     industry: 'IT서비스',
     processing_org: '신보',
     latest_memo: '계약 완료, 집행 대기 중',
+    memo_history: [
+      { date: '2024-11-15', content: '상담 시작' },
+      { date: '2024-11-20', content: '서류 제출 완료' },
+      { date: '2024-12-01', content: '계약 완료, 집행 대기 중' },
+    ],
   },
   {
     id: '4',
@@ -117,9 +145,14 @@ const DUMMY_CUSTOMERS: Customer[] = [
     credit_score: 720,
     over_7_years: true,
     avg_revenue_3y: 28.7,
+    recent_sales: 31.5,
     industry: '물류/운송',
     processing_org: '중진공',
     latest_memo: '심사 진행 중, 추가 서류 요청됨',
+    memo_history: [
+      { date: '2024-11-20', content: '상담 완료' },
+      { date: '2024-12-03', content: '심사 진행 중, 추가 서류 요청됨' },
+    ],
   },
   {
     id: '5',
@@ -137,9 +170,15 @@ const DUMMY_CUSTOMERS: Customer[] = [
     credit_score: 850,
     over_7_years: true,
     avg_revenue_3y: 62.3,
+    recent_sales: 71.0,
     industry: '디자인',
     processing_org: '기보',
     latest_memo: '집행 완료. 수수료 정산 대기',
+    memo_history: [
+      { date: '2024-10-05', content: '첫 상담' },
+      { date: '2024-11-01', content: '계약 체결' },
+      { date: '2024-12-01', content: '집행 완료. 수수료 정산 대기' },
+    ],
   },
   {
     id: '6',
@@ -157,9 +196,13 @@ const DUMMY_CUSTOMERS: Customer[] = [
     credit_score: 680,
     over_7_years: false,
     avg_revenue_3y: 8.5,
+    recent_sales: 7.2,
     industry: '건설',
-    processing_org: '-',
+    processing_org: '기타',
     latest_memo: '통화 불가, 재연락 필요',
+    memo_history: [
+      { date: '2024-12-03', content: '통화 불가, 재연락 필요' },
+    ],
   },
   {
     id: '7',
@@ -177,9 +220,14 @@ const DUMMY_CUSTOMERS: Customer[] = [
     credit_score: 740,
     over_7_years: false,
     avg_revenue_3y: 12.1,
+    recent_sales: 14.5,
     industry: '요식업',
     processing_org: '신보',
     latest_memo: '서류 완료, 심사 접수 예정',
+    memo_history: [
+      { date: '2024-11-25', content: '상담 완료' },
+      { date: '2024-12-05', content: '서류 완료, 심사 접수 예정' },
+    ],
   },
   {
     id: '8',
@@ -194,27 +242,19 @@ const DUMMY_CUSTOMERS: Customer[] = [
     approved_amount: 0,
     commission_rate: 0,
     created_at: new Date(),
-    credit_score: 690,
+    credit_score: 810,
     over_7_years: true,
     avg_revenue_3y: 22.4,
+    recent_sales: 25.8,
     industry: '전자/통신',
-    processing_org: '중진공',
+    processing_org: '소진공',
     latest_memo: '상담 진행 중, 조건 검토 필요. 고객이 금리에 대해 문의함. 다음 미팅에서 상세 설명 예정.',
+    memo_history: [
+      { date: '2024-12-04', content: '첫 상담 시작' },
+      { date: '2024-12-06', content: '상담 진행 중, 조건 검토 필요. 고객이 금리에 대해 문의함. 다음 미팅에서 상세 설명 예정.' },
+    ],
   },
 ];
-
-const getStatusColor = (statusCode: StatusCode): string => {
-  const prefix = statusCode.charAt(0);
-  switch (prefix) {
-    case '0': return 'bg-destructive/10 text-destructive border-destructive/20';
-    case '1': return 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20';
-    case '2': return 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20';
-    case '3': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20';
-    case '4': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20';
-    case '5': return 'bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20';
-    default: return '';
-  }
-};
 
 const getSubStatuses = (stageCode: string): StatusCode[] => {
   switch (stageCode) {
@@ -254,11 +294,71 @@ export function CustomerTable({
   onDelete,
   onViewHistory,
   onCustomerClick,
+  onProcessingOrgChange,
+  onAddMemo,
 }: CustomerTableProps) {
   const canDelete = userRole === 'super_admin';
   
+  // Memo modal state
+  const [memoModalOpen, setMemoModalOpen] = useState(false);
+  const [selectedCustomerForMemo, setSelectedCustomerForMemo] = useState<Customer | null>(null);
+  
+  // Local state for dummy data updates
+  const [localCustomers, setLocalCustomers] = useState<Customer[]>(DUMMY_CUSTOMERS);
+  
   // Use dummy data if no real customers
-  const displayCustomers = customers.length > 0 ? customers : DUMMY_CUSTOMERS;
+  const displayCustomers = customers.length > 0 ? customers : localCustomers;
+
+  const handleMemoDoubleClick = (customer: Customer) => {
+    setSelectedCustomerForMemo(customer);
+    setMemoModalOpen(true);
+  };
+
+  const handleAddMemo = (content: string) => {
+    if (!selectedCustomerForMemo) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const newMemo = { date: today, content };
+    
+    // Update local state for demo
+    setLocalCustomers(prev => 
+      prev.map(c => {
+        if (c.id === selectedCustomerForMemo.id) {
+          const updatedHistory = [...(c.memo_history || []), newMemo];
+          return {
+            ...c,
+            memo_history: updatedHistory,
+            latest_memo: content,
+          };
+        }
+        return c;
+      })
+    );
+    
+    // Update selected customer for modal
+    setSelectedCustomerForMemo(prev => {
+      if (!prev) return null;
+      const updatedHistory = [...(prev.memo_history || []), newMemo];
+      return {
+        ...prev,
+        memo_history: updatedHistory,
+        latest_memo: content,
+      };
+    });
+    
+    // Call external handler if provided
+    onAddMemo?.(selectedCustomerForMemo.id, content);
+  };
+
+  const handleProcessingOrgChange = (customerId: string, newOrg: string) => {
+    // Update local state for demo
+    setLocalCustomers(prev =>
+      prev.map(c => c.id === customerId ? { ...c, processing_org: newOrg } : c)
+    );
+    
+    // Call external handler if provided
+    onProcessingOrgChange?.(customerId, newOrg);
+  };
 
   if (displayCustomers.length === 0) {
     return (
@@ -294,15 +394,16 @@ export function CustomerTable({
             <TableRow className="bg-muted/50">
               <TableHead className="w-[50px] font-semibold text-center">No</TableHead>
               <TableHead className="w-[100px] font-semibold">유입일자</TableHead>
-              <TableHead className="w-[100px] font-semibold">고객명</TableHead>
-              <TableHead className="w-[80px] font-semibold text-center">신용점수</TableHead>
-              <TableHead className="w-[140px] font-semibold">상호명</TableHead>
-              <TableHead className="w-[70px] font-semibold text-center">7년초과</TableHead>
-              <TableHead className="w-[100px] font-semibold text-right">3년평균매출</TableHead>
-              <TableHead className="w-[100px] font-semibold">업종</TableHead>
-              <TableHead className="w-[80px] font-semibold">진행기관</TableHead>
-              <TableHead className="w-[180px] font-semibold">최근 메모</TableHead>
-              <TableHead className="w-[80px] font-semibold">담당자</TableHead>
+              <TableHead className="w-[90px] font-semibold">고객명</TableHead>
+              <TableHead className="w-[70px] font-semibold text-center">신용점수</TableHead>
+              <TableHead className="w-[130px] font-semibold">상호명</TableHead>
+              <TableHead className="w-[60px] font-semibold text-center">7년초과</TableHead>
+              <TableHead className="w-[90px] font-semibold text-right">3년평균</TableHead>
+              <TableHead className="w-[90px] font-semibold text-right">최근매출</TableHead>
+              <TableHead className="w-[90px] font-semibold">업종</TableHead>
+              <TableHead className="w-[100px] font-semibold">진행기관</TableHead>
+              <TableHead className="w-[160px] font-semibold">최근 메모</TableHead>
+              <TableHead className="w-20 font-semibold">담당자</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -334,18 +435,20 @@ export function CustomerTable({
                   </button>
                 </TableCell>
                 
-                {/* 신용점수 */}
+                {/* 신용점수 - 800+ yellow pulse, 700- red */}
                 <TableCell className="text-center">
                   <span className={cn(
                     "font-semibold tabular-nums",
-                    (customer.credit_score || 0) < 700 ? "text-red-500" : "text-foreground"
+                    (customer.credit_score || 0) >= 800 && "text-yellow-400 animate-pulse",
+                    (customer.credit_score || 0) < 700 && (customer.credit_score || 0) > 0 && "text-red-500",
+                    (customer.credit_score || 0) >= 700 && (customer.credit_score || 0) < 800 && "text-foreground"
                   )}>
                     {customer.credit_score || '-'}
                   </span>
                 </TableCell>
                 
                 {/* 상호명 */}
-                <TableCell className="text-muted-foreground">
+                <TableCell className="text-muted-foreground truncate max-w-[130px]">
                   {customer.company_name}
                 </TableCell>
                 
@@ -364,39 +467,66 @@ export function CustomerTable({
                 
                 {/* 3년 평균 매출 */}
                 <TableCell className="text-right tabular-nums">
-                  {customer.avg_revenue_3y ? `${customer.avg_revenue_3y.toFixed(1)}억원` : '-'}
+                  {customer.avg_revenue_3y ? `${customer.avg_revenue_3y.toFixed(1)}억` : '-'}
+                </TableCell>
+                
+                {/* 최근 매출(작년) */}
+                <TableCell className="text-right tabular-nums">
+                  {customer.recent_sales ? `${customer.recent_sales.toFixed(1)}억` : '-'}
                 </TableCell>
                 
                 {/* 업종 */}
-                <TableCell className="text-muted-foreground">
+                <TableCell className="text-muted-foreground text-sm">
                   {customer.industry || '-'}
                 </TableCell>
                 
-                {/* 진행기관 */}
-                <TableCell className="text-muted-foreground">
-                  {customer.processing_org || '-'}
+                {/* 진행기관 - Dropdown */}
+                <TableCell>
+                  <Select
+                    value={customer.processing_org || '기타'}
+                    onValueChange={(value) => handleProcessingOrgChange(customer.id, value)}
+                  >
+                    <SelectTrigger 
+                      className="h-8 text-xs w-[90px]"
+                      data-testid={`select-org-${customer.id}`}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROCESSING_ORGS.map(org => (
+                        <SelectItem key={org} value={org}>
+                          {org}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </TableCell>
                 
-                {/* 최근 메모 - truncate with tooltip */}
-                <TableCell>
+                {/* 최근 메모 - truncate with tooltip, double-click to open modal */}
+                <TableCell
+                  onDoubleClick={() => handleMemoDoubleClick(customer)}
+                  className="cursor-pointer"
+                  data-testid={`cell-memo-${customer.id}`}
+                >
                   {customer.latest_memo ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="text-sm text-muted-foreground truncate block max-w-[160px] cursor-help">
+                        <span className="text-sm text-muted-foreground truncate block max-w-[140px]">
                           {customer.latest_memo}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
                         <p className="text-sm">{customer.latest_memo}</p>
+                        <p className="text-xs text-muted-foreground mt-1">더블클릭하여 메모 추가</p>
                       </TooltipContent>
                     </Tooltip>
                   ) : (
-                    <span className="text-muted-foreground">-</span>
+                    <span className="text-muted-foreground text-sm">-</span>
                   )}
                 </TableCell>
                 
-                {/* 담당자 */}
-                <TableCell className="text-muted-foreground">
+                {/* 담당자 - narrow width */}
+                <TableCell className="text-muted-foreground text-sm w-20">
                   {customer.manager_name || '-'}
                 </TableCell>
                 
@@ -488,6 +618,15 @@ export function CustomerTable({
           </TableBody>
         </Table>
       </div>
+
+      {/* Memo Modal */}
+      <MemoModal
+        open={memoModalOpen}
+        onOpenChange={setMemoModalOpen}
+        customerName={selectedCustomerForMemo?.name || ''}
+        memoHistory={selectedCustomerForMemo?.memo_history || []}
+        onAddMemo={handleAddMemo}
+      />
     </div>
   );
 }

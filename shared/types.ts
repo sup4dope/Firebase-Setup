@@ -88,9 +88,11 @@ export interface Customer {
   credit_score?: number; // 신용점수
   over_7_years?: boolean; // 7년 초과 여부
   avg_revenue_3y?: number; // 3년 평균 매출 (억원)
+  recent_sales?: number; // 최근 매출(작년) (억원)
   industry?: string; // 업종
   processing_org?: string; // 진행기관
   latest_memo?: string; // 최근 메모
+  memo_history?: { date: string; content: string }[]; // 메모 이력
 }
 
 // Status change log (Firestore: status_logs collection)
