@@ -8,6 +8,7 @@ import { KPIWidgets } from '@/components/KPIWidgets';
 import { CustomerTable } from '@/components/CustomerTable';
 import { CustomerForm } from '@/components/CustomerForm';
 import { StatusHistoryDialog } from '@/components/StatusHistoryDialog';
+import { CustomerDetailModal } from '@/components/CustomerDetailModal';
 import { useToast } from '@/hooks/use-toast';
 import { calculateKPI } from '@/lib/kpi';
 import {
@@ -46,6 +47,11 @@ export default function Dashboard() {
   const [selectedCustomerLogs, setSelectedCustomerLogs] = useState<StatusLog[]>([]);
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
   const [formLoading, setFormLoading] = useState(false);
+
+  // Detail modal states
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isNewCustomerModal, setIsNewCustomerModal] = useState(false);
 
   // Fetch data
   const fetchData = async () => {
@@ -224,6 +230,89 @@ export default function Dashboard() {
     setCustomerFormOpen(true);
   };
 
+  // Open detail modal when clicking on customer name
+  const handleCustomerClick = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsNewCustomerModal(false);
+    setDetailModalOpen(true);
+  };
+
+  // Open detail modal for new customer
+  const handleNewCustomerModal = () => {
+    setSelectedCustomer(null);
+    setIsNewCustomerModal(true);
+    setDetailModalOpen(true);
+  };
+
+  // Save customer from detail modal
+  const handleDetailModalSave = async (data: Partial<Customer>) => {
+    if (isNewCustomerModal) {
+      // Create new customer
+      setFormLoading(true);
+      try {
+        const newCustomer = await createCustomer(data as InsertCustomer);
+        setCustomers(prev => [newCustomer, ...prev]);
+        toast({
+          title: '성공',
+          description: '고객이 등록되었습니다.',
+        });
+      } catch (error) {
+        console.error('Error creating customer:', error);
+        toast({
+          title: '오류',
+          description: '고객 등록 중 오류가 발생했습니다.',
+          variant: 'destructive',
+        });
+        throw error;
+      } finally {
+        setFormLoading(false);
+      }
+    } else if (selectedCustomer) {
+      // Update existing customer
+      setFormLoading(true);
+      try {
+        await updateCustomer(selectedCustomer.id, data);
+        setCustomers(prev =>
+          prev.map(c => c.id === selectedCustomer.id ? { ...c, ...data } : c)
+        );
+        toast({
+          title: '성공',
+          description: '고객 정보가 수정되었습니다.',
+        });
+      } catch (error) {
+        console.error('Error updating customer:', error);
+        toast({
+          title: '오류',
+          description: '고객 수정 중 오류가 발생했습니다.',
+          variant: 'destructive',
+        });
+        throw error;
+      } finally {
+        setFormLoading(false);
+      }
+    }
+  };
+
+  // Delete customer from detail modal
+  const handleDetailModalDelete = async (customerId: string) => {
+    try {
+      await deleteCustomer(customerId);
+      setCustomers(prev => prev.filter(c => c.id !== customerId));
+      toast({
+        title: '성공',
+        description: '고객이 삭제되었습니다.',
+      });
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      toast({
+        title: '오류',
+        description: '고객 삭제 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 space-y-6">
@@ -275,7 +364,7 @@ export default function Dashboard() {
           >
             <RefreshCw className="w-4 h-4" />
           </Button>
-          <Button onClick={() => { setEditingCustomer(null); setCustomerFormOpen(true); }} data-testid="button-add-customer">
+          <Button onClick={handleNewCustomerModal} data-testid="button-add-customer">
             <Plus className="w-4 h-4 mr-2" />
             고객 추가
           </Button>
@@ -291,6 +380,7 @@ export default function Dashboard() {
         onEdit={handleEdit}
         onDelete={handleDeleteCustomer}
         onViewHistory={handleViewHistory}
+        onCustomerClick={handleCustomerClick}
       />
 
       {/* Customer Form Dialog */}
@@ -315,6 +405,22 @@ export default function Dashboard() {
         onOpenChange={setHistoryDialogOpen}
         logs={selectedCustomerLogs}
         customerName={selectedCustomerName}
+      />
+
+      {/* Customer Detail Modal */}
+      <CustomerDetailModal
+        isOpen={detailModalOpen}
+        onClose={() => {
+          setDetailModalOpen(false);
+          setSelectedCustomer(null);
+          setIsNewCustomerModal(false);
+        }}
+        customer={selectedCustomer}
+        isNewCustomer={isNewCustomerModal}
+        currentUser={user}
+        users={users}
+        onSave={handleDetailModalSave}
+        onDelete={isSuperAdmin ? handleDetailModalDelete : undefined}
       />
     </div>
   );

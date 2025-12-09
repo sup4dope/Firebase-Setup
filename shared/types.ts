@@ -71,6 +71,7 @@ export interface Customer {
   readable_id: string; // YYMMDD-XXX format
   name: string;
   company_name: string;
+  business_registration_number?: string; // 사업자등록번호 (필수, 중복 체크용)
   phone?: string;
   email?: string;
   status_code: StatusCode;
@@ -79,6 +80,9 @@ export interface Customer {
   team_id: string;
   team_name?: string;
   entry_date: string; // YYYY-MM-DD
+  founding_date?: string; // 설립일 YYYY-MM-DD
+  address?: string; // 기본 주소
+  address_detail?: string; // 상세 주소
   approved_amount: number; // 승인 금액
   commission_rate: number; // 수수료율 (총관리자만 열람)
   contract_completion_date?: string; // 최초 계약 도달일
@@ -92,7 +96,32 @@ export interface Customer {
   industry?: string; // 업종
   processing_org?: string; // 진행기관
   latest_memo?: string; // 최근 메모
-  memo_history?: { date: string; content: string }[]; // 메모 이력
+  memo_history?: { date: string; content: string; author: string; author_id: string }[]; // 메모 이력
+}
+
+// Customer Document (Firebase Storage)
+export interface CustomerDocument {
+  id: string;
+  customer_id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  uploaded_by: string;
+  uploaded_by_name?: string;
+  uploaded_at: Date;
+}
+
+// Customer History Log
+export interface CustomerHistoryLog {
+  id: string;
+  customer_id: string;
+  action_type: 'status_change' | 'manager_change' | 'info_update' | 'document_upload' | 'memo_added';
+  description: string;
+  changed_by: string;
+  changed_by_name?: string;
+  changed_at: Date;
+  old_value?: string;
+  new_value?: string;
 }
 
 // Status change log (Firestore: status_logs collection)
