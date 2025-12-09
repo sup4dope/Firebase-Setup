@@ -1,0 +1,105 @@
+# 정책자금 컨설팅 CRM 시스템
+
+## 프로젝트 개요
+Firebase 기반의 정책자금 컨설팅 CRM 시스템입니다. 고객 관리, 영업 퍼널 추적, KPI 분석, 팀 관리 기능을 제공합니다.
+
+## 기술 스택
+- **Frontend**: React + TypeScript + Vite
+- **Backend**: Express.js (개발 서버)
+- **Database**: Firebase Firestore
+- **Authentication**: Firebase Auth (Google Sign-in)
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Fonts**: Inter (UI), JetBrains Mono (코드)
+
+## 프로젝트 구조
+```
+client/
+├── src/
+│   ├── components/       # 재사용 가능한 UI 컴포넌트
+│   │   ├── AppSidebar.tsx      # 메인 사이드바
+│   │   ├── CustomerForm.tsx    # 고객 등록/수정 폼
+│   │   ├── CustomerTable.tsx   # 고객 목록 테이블
+│   │   ├── FunnelChart.tsx     # 영업 퍼널 차트
+│   │   ├── HolidayManagement.tsx  # 공휴일 관리
+│   │   ├── KPIWidgets.tsx      # KPI 위젯들
+│   │   ├── StatusHistoryDialog.tsx  # 상태 변경 이력
+│   │   ├── TeamManagement.tsx  # 팀/사용자 관리
+│   │   ├── ThemeToggle.tsx     # 다크모드 토글
+│   │   ├── TodoForm.tsx        # 할 일 추가 폼
+│   │   └── TodoList.tsx        # 할 일 목록
+│   ├── contexts/
+│   │   └── AuthContext.tsx     # Firebase 인증 상태
+│   ├── lib/
+│   │   ├── firebase.ts         # Firebase 설정
+│   │   ├── firestore.ts        # Firestore CRUD 함수
+│   │   └── kpi.ts              # KPI 계산 유틸리티
+│   ├── pages/
+│   │   ├── Dashboard.tsx       # 메인 대시보드
+│   │   ├── Holidays.tsx        # 공휴일 관리 페이지
+│   │   ├── Login.tsx           # 로그인 페이지
+│   │   ├── Settings.tsx        # 설정 페이지
+│   │   └── Teams.tsx           # 팀 관리 페이지
+│   └── App.tsx                 # 앱 진입점
+shared/
+└── types.ts                    # 공유 타입 정의
+server/
+└── ...                         # Express 서버
+```
+
+## 주요 기능
+
+### 1. 권한 기반 접근 제어 (RBAC)
+- **staff**: 본인 담당 고객만 조회/수정, 개인 TO-DO 관리
+- **team_leader**: 팀 전체 데이터 조회, 팀원 TO-DO 할당
+- **super_admin**: 모든 데이터 관리, 팀/공휴일 설정, 수수료율 열람
+
+### 2. 고객 관리
+- 고유 ID: YYMMDD-XXX 형식 (예: 241209-001)
+- 6단계 영업 퍼널: 상담 → 서류 → 심사 → 계약 → 집행 (+ 드롭아웃)
+- 상태 변경 이력 추적
+
+### 3. KPI 시스템
+- 영업일 기준 계산 (주말/공휴일 제외)
+- 예상 계약 건수: (현재 계약 / 경과 영업일) × 월 전체 영업일
+- 예상 매출액: (현재 매출 / 경과 영업일) × 월 전체 영업일
+
+### 4. TO-DO 관리
+- 팀장/관리자가 팀원에게 할 일 할당
+- 고객 연결 기능
+- 마감일 기반 우선순위 표시
+
+## 환경 변수 (Secrets)
+- `VITE_FIREBASE_API_KEY`: Firebase API 키
+- `VITE_FIREBASE_PROJECT_ID`: Firebase 프로젝트 ID
+- `VITE_FIREBASE_APP_ID`: Firebase 앱 ID
+
+## Firebase 설정 (필수)
+1. Firebase Console에서 프로젝트 생성
+2. Authentication > Google 로그인 활성화
+3. Firestore Database 생성
+4. 보안 규칙 설정 필요
+
+## Firestore 컬렉션
+- `users`: 사용자 정보
+- `teams`: 팀 정보
+- `customers`: 고객 데이터
+- `status_logs`: 상태 변경 로그
+- `todos`: 할 일 목록
+- `holidays`: 공휴일 목록
+- `meta`: 메타데이터 (사용자 수 등)
+
+## 개발 서버 실행
+```bash
+npm run dev
+```
+- 프론트엔드: http://localhost:5000
+
+## 최근 변경사항
+- 2024-12-09: 초기 프로젝트 설정 및 모든 컴포넌트 구현
+  - Firebase 인증 (Google Sign-in)
+  - 고객 관리 (CRUD + 상태 변경)
+  - 퍼널 차트 및 KPI 위젯
+  - TO-DO 관리
+  - 팀/사용자 관리
+  - 공휴일 관리
+  - 다크모드 지원
