@@ -286,3 +286,13 @@
     inset: -1px;
   }
 }
+
+/* Force dropdown submenus to open LEFT - override Radix Popper inline styles */
+/* Target the Radix popper wrapper that contains our left-opening submenu */
+[data-radix-popper-content-wrapper]:has(> .dropdown-sub-left) {
+  transform: translateX(-100%) translateX(-8px) !important;
+}
+
+.dropdown-sub-left {
+  --radix-dropdown-menu-content-transform-origin: right center !important;
+}
