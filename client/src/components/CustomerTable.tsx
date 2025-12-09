@@ -32,10 +32,70 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { MemoModal } from './MemoModal';
-import { MoreHorizontal, ChevronRight, Edit, Trash2, History, Check, X, FolderOpen } from 'lucide-react';
+import { MoreHorizontal, ChevronLeft, Edit, Trash2, History, Check, X, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { STATUS_LABELS, FUNNEL_STAGES } from '@shared/types';
-import type { Customer, StatusCode, UserRole } from '@shared/types';
+import type { Customer, UserRole } from '@shared/types';
+
+// Funnel stages synced with FunnelChart (excluding 'all')
+const MENU_STAGES = [
+  { id: '1', label: '상담대기' },
+  { id: 'target', label: '희망타겟' },
+  { id: '2', label: '계약완료' },
+  { id: '3', label: '서류취합' },
+  { id: '4', label: '신청완료' },
+  { id: '5', label: '집행완료' },
+];
+
+// Sub-statuses synced with FunnelChart
+const MENU_SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
+  '1': [
+    { id: '1-1', label: '쓰레기통' },
+    { id: '0-1', label: '단기부재' },
+    { id: '0-2', label: '장기부재' },
+  ],
+  'target': [
+    { id: '1-2-1', label: '업력미달' },
+    { id: '1-2-2', label: '최근대출' },
+    { id: '1-2-3', label: '인증미동의(국세청)' },
+    { id: '1-2-4', label: '인증미동의(공여내역)' },
+    { id: '1-3-1', label: '진행기간 미동의' },
+    { id: '1-3-2', label: '자문료 미동의' },
+    { id: '1-3-3', label: '계약금미동의(선불)' },
+    { id: '1-3-4', label: '계약금미동의(후불)' },
+  ],
+  '2': [
+    { id: '2-1', label: '계약완료(선불)' },
+    { id: '2-2', label: '계약완료(외주)' },
+    { id: '2-3', label: '계약완료(후불)' },
+  ],
+  '3': [
+    { id: '3-1', label: '서류취합완료(선불)' },
+    { id: '3-2', label: '서류취합완료(외주)' },
+    { id: '3-3', label: '서류취합완료(후불)' },
+  ],
+  '4': [
+    { id: '4-1', label: '신청완료(선불)' },
+    { id: '4-2', label: '신청완료(외주)' },
+    { id: '4-3', label: '신청완료(후불)' },
+  ],
+  '5': [
+    { id: '5-1', label: '집행완료' },
+    { id: '5-2', label: '집행완료(외주)' },
+    { id: '5-3', label: '최종부결' },
+  ],
+};
+
+// Nested statuses for 1-1 (쓰레기통 상세사유)
+const TRASH_REASONS = [
+  { id: '1-1-1', label: '거절사유 미파악' },
+  { id: '1-1-2', label: '인증불가' },
+  { id: '1-1-3', label: '정부기관 오인' },
+  { id: '1-1-4', label: '기타자금 오인' },
+  { id: '1-1-5', label: '불가업종' },
+  { id: '1-1-6', label: '매출없음' },
+  { id: '1-1-7', label: '신용점수 미달' },
+  { id: '1-1-8', label: '차입금초과' },
+];
 
 interface CustomerTableProps {
   customers: Customer[];
@@ -256,17 +316,6 @@ const DUMMY_CUSTOMERS: Customer[] = [
   },
 ];
 
-const getSubStatuses = (stageCode: string): StatusCode[] => {
-  switch (stageCode) {
-    case '0': return ['0-1', '0-2', '0-3'];
-    case '1': return ['1-1', '1-2', '1-3'];
-    case '2': return ['2-1', '2-2', '2-3'];
-    case '3': return ['3-1', '3-2', '3-3'];
-    case '4': return ['4-1', '4-2', '4-3'];
-    case '5': return ['5-1', '5-2'];
-    default: return [];
-  }
-};
 
 const getStageName = (stageId: string | null): string => {
   if (!stageId) return '전체';
@@ -554,47 +603,57 @@ export function CustomerTable({
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       
-                      {/* Status change submenu */}
+                      {/* Status change submenu - opens to left */}
                       <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
-                          <ChevronRight className="w-4 h-4 mr-2" />
-                          상태 변경
+                        <DropdownMenuSubTrigger className="flex-row-reverse justify-end gap-2">
+                          <ChevronLeft className="w-4 h-4" />
+                          <span>상태 변경</span>
                         </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-40">
-                          {FUNNEL_STAGES.map(stage => (
-                            <DropdownMenuSub key={stage.code}>
-                              <DropdownMenuSubTrigger>{stage.label}</DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent>
-                                {getSubStatuses(stage.code).map(status => (
-                                  <DropdownMenuItem
-                                    key={status}
-                                    onClick={() => onStatusChange(customer.id, customer.status_code, status)}
-                                    disabled={customer.status_code === status}
-                                  >
-                                    {STATUS_LABELS[status]}
-                                  </DropdownMenuItem>
-                                ))}
+                        <DropdownMenuSubContent side="left" className="w-48">
+                          {MENU_STAGES.map(stage => (
+                            <DropdownMenuSub key={stage.id}>
+                              <DropdownMenuSubTrigger className="flex-row-reverse justify-end gap-2">
+                                <ChevronLeft className="w-4 h-4" />
+                                <span>{stage.label}</span>
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent side="left" className="w-52">
+                                {MENU_SUB_STATUSES[stage.id]?.map(sub => {
+                                  const isTrash = sub.id === '1-1';
+                                  if (isTrash) {
+                                    return (
+                                      <DropdownMenuSub key={sub.id}>
+                                        <DropdownMenuSubTrigger className="flex-row-reverse justify-end gap-2 text-destructive">
+                                          <ChevronLeft className="w-4 h-4" />
+                                          <span>{sub.label}</span>
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuSubContent side="left" className="w-44">
+                                          {TRASH_REASONS.map(reason => (
+                                            <DropdownMenuItem
+                                              key={reason.id}
+                                              onClick={() => onStatusChange(customer.id, customer.status_code, reason.id as any)}
+                                              disabled={customer.status_code === reason.id}
+                                              className="text-destructive"
+                                            >
+                                              {reason.label}
+                                            </DropdownMenuItem>
+                                          ))}
+                                        </DropdownMenuSubContent>
+                                      </DropdownMenuSub>
+                                    );
+                                  }
+                                  return (
+                                    <DropdownMenuItem
+                                      key={sub.id}
+                                      onClick={() => onStatusChange(customer.id, customer.status_code, sub.id as any)}
+                                      disabled={customer.status_code === sub.id}
+                                    >
+                                      {sub.label}
+                                    </DropdownMenuItem>
+                                  );
+                                })}
                               </DropdownMenuSubContent>
                             </DropdownMenuSub>
                           ))}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuSub>
-                            <DropdownMenuSubTrigger className="text-destructive">
-                              드롭아웃
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                              {getSubStatuses('0').map(status => (
-                                <DropdownMenuItem
-                                  key={status}
-                                  onClick={() => onStatusChange(customer.id, customer.status_code, status)}
-                                  disabled={customer.status_code === status}
-                                  className="text-destructive"
-                                >
-                                  {STATUS_LABELS[status]}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuSubContent>
-                          </DropdownMenuSub>
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
 
