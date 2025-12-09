@@ -1,17 +1,36 @@
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Building2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, Building2, AlertCircle } from 'lucide-react';
 import { SiGoogle } from 'react-icons/si';
 
 export default function Login() {
   const { signInWithGoogle, loading } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   const handleGoogleSignIn = async () => {
+    setError(null);
+    setIsSigningIn(true);
     try {
       await signInWithGoogle();
-    } catch (error) {
-      console.error('Login failed:', error);
+    } catch (err: any) {
+      console.error('Login failed:', err);
+      
+      // Handle specific Firebase errors
+      if (err?.code === 'auth/unauthorized-domain') {
+        setError('이 도메인이 Firebase에 등록되지 않았습니다. Firebase Console > Authentication > Settings > Authorized domains에서 현재 도메인을 추가해주세요.');
+      } else if (err?.code === 'auth/popup-closed-by-user') {
+        setError('로그인 팝업이 닫혔습니다. 다시 시도해주세요.');
+      } else if (err?.code === 'auth/popup-blocked') {
+        setError('팝업이 차단되었습니다. 팝업 차단을 해제하고 다시 시도해주세요.');
+      } else {
+        setError(`로그인 실패: ${err?.message || '알 수 없는 오류'}`);
+      }
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
@@ -35,15 +54,23 @@ export default function Login() {
             <p>영업일 기준 정교한 KPI 예측</p>
             <p>팀별 권한 관리 및 협업 지원</p>
           </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>로그인 오류</AlertTitle>
+              <AlertDescription className="text-sm">{error}</AlertDescription>
+            </Alert>
+          )}
           
           <Button
             className="w-full gap-3"
             size="lg"
             onClick={handleGoogleSignIn}
-            disabled={loading}
+            disabled={loading || isSigningIn}
             data-testid="button-google-login"
           >
-            {loading ? (
+            {(loading || isSigningIn) ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
