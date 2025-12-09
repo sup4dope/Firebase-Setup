@@ -296,3 +296,27 @@
 .dropdown-sub-left {
   --radix-dropdown-menu-content-transform-origin: right center !important;
 }
+
+/* Status dropdown dark mode styling */
+.status-dropdown-content {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+.status-dropdown-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.status-dropdown-content::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+.status-dropdown-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+
+.status-dropdown-content::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}

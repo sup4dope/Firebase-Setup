@@ -19,7 +19,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -579,57 +581,140 @@ export function CustomerTable({
                   </button>
                 </TableCell>
                 
-                {/* 상태 - Color-coded badge with dropdown for change */}
+                {/* 상태 - Custom dark dropdown with grouped options */}
                 <TableCell>
                   {(() => {
                     const badgeInfo = getStatusBadgeInfo(customer.status_code || '');
                     return (
-                      <div className="relative group/status">
-                        {/* Badge display */}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span 
-                              className={cn(
-                                "inline-block px-2 py-1 text-xs font-medium rounded-md truncate max-w-[130px] cursor-pointer",
-                                badgeInfo.colorClass
-                              )}
-                              data-testid={`badge-status-${customer.id}`}
-                            >
-                              {badgeInfo.label}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            <p className="text-xs">{badgeInfo.category} &gt; {badgeInfo.label}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                        
-                        {/* Select for status change - dark mode styling */}
-                        <select
-                          value={customer.status_code || ''}
-                          onChange={(e) => {
-                            const newStatus = e.target.value as StatusCode;
-                            if (newStatus && newStatus !== customer.status_code) {
-                              onStatusChange(customer.id, customer.status_code, newStatus);
-                            }
-                          }}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer bg-slate-800 text-gray-100"
-                          style={{
-                            colorScheme: 'dark',
-                          }}
+                      <Select
+                        value={customer.status_code || ''}
+                        onValueChange={(newStatus) => {
+                          if (newStatus && newStatus !== customer.status_code) {
+                            onStatusChange(customer.id, customer.status_code, newStatus as StatusCode);
+                          }
+                        }}
+                      >
+                        <SelectTrigger 
+                          className="h-auto p-0 border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 w-auto min-w-0"
                           data-testid={`select-status-${customer.id}`}
                         >
-                          <option value="" disabled className="bg-slate-800 text-gray-100">상태 선택</option>
-                          {STATUS_OPTIONS.map((opt) => (
-                            <option 
-                              key={opt.value} 
-                              value={opt.value}
-                              className="bg-slate-800 text-gray-100 hover:bg-slate-700"
-                            >
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span 
+                                className={cn(
+                                  "inline-block px-2 py-1 text-xs font-medium rounded-md truncate max-w-[130px]",
+                                  badgeInfo.colorClass
+                                )}
+                                data-testid={`badge-status-${customer.id}`}
+                              >
+                                {badgeInfo.label || '상태 선택'}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p className="text-xs">{badgeInfo.category} &gt; {badgeInfo.label}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </SelectTrigger>
+                        <SelectContent 
+                          className="bg-gray-900 border-gray-700 shadow-xl max-h-[300px] overflow-y-auto status-dropdown-content"
+                          position="popper"
+                          sideOffset={5}
+                        >
+                          {/* 상담대기 그룹 */}
+                          <SelectGroup>
+                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1">상담대기</SelectLabel>
+                            {MENU_SUB_STATUSES['1']?.filter(s => s.id !== '1-1').map(sub => (
+                              <SelectItem 
+                                key={sub.id} 
+                                value={sub.id}
+                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
+                              >
+                                {sub.label}
+                              </SelectItem>
+                            ))}
+                            {/* 쓰레기통 하위 사유들 */}
+                            {TRASH_REASONS.map(reason => (
+                              <SelectItem 
+                                key={reason.id} 
+                                value={reason.id}
+                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-6 text-xs"
+                              >
+                                {reason.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+
+                          {/* 희망타겟 그룹 */}
+                          <SelectGroup>
+                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">희망타겟</SelectLabel>
+                            {MENU_SUB_STATUSES['target']?.map(sub => (
+                              <SelectItem 
+                                key={sub.id} 
+                                value={sub.id}
+                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
+                              >
+                                {sub.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+
+                          {/* 계약완료 그룹 */}
+                          <SelectGroup>
+                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">계약완료</SelectLabel>
+                            {MENU_SUB_STATUSES['2']?.map(sub => (
+                              <SelectItem 
+                                key={sub.id} 
+                                value={sub.id}
+                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
+                              >
+                                {sub.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+
+                          {/* 서류취합 그룹 */}
+                          <SelectGroup>
+                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">서류취합</SelectLabel>
+                            {MENU_SUB_STATUSES['3']?.map(sub => (
+                              <SelectItem 
+                                key={sub.id} 
+                                value={sub.id}
+                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
+                              >
+                                {sub.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+
+                          {/* 신청완료 그룹 */}
+                          <SelectGroup>
+                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">신청완료</SelectLabel>
+                            {MENU_SUB_STATUSES['4']?.map(sub => (
+                              <SelectItem 
+                                key={sub.id} 
+                                value={sub.id}
+                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
+                              >
+                                {sub.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+
+                          {/* 집행완료 그룹 */}
+                          <SelectGroup>
+                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">집행완료</SelectLabel>
+                            {MENU_SUB_STATUSES['5']?.map(sub => (
+                              <SelectItem 
+                                key={sub.id} 
+                                value={sub.id}
+                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
+                              >
+                                {sub.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
                     );
                   })()}
                 </TableCell>
