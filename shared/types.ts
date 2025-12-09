@@ -84,6 +84,13 @@ export interface Customer {
   contract_completion_date?: string; // 최초 계약 도달일
   notes?: string;
   created_at: Date;
+  // New fields for updated schema
+  credit_score?: number; // 신용점수
+  over_7_years?: boolean; // 7년 초과 여부
+  avg_revenue_3y?: number; // 3년 평균 매출 (억원)
+  industry?: string; // 업종
+  processing_org?: string; // 진행기관
+  latest_memo?: string; // 최근 메모
 }
 
 // Status change log (Firestore: status_logs collection)

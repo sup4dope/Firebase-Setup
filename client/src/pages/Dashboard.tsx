@@ -286,6 +286,7 @@ export default function Dashboard() {
       <CustomerTable
         customers={filteredCustomers}
         userRole={user?.role || 'staff'}
+        selectedStage={selectedStage}
         onStatusChange={handleStatusChange}
         onEdit={handleEdit}
         onDelete={handleDeleteCustomer}
