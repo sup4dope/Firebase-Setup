@@ -9,53 +9,53 @@ interface FunnelChartProps {
   onStageClick: (stage: string | null) => void;
 }
 
-// Main stages definition with colors
+// Main stages with bottom border accent colors
 const MAIN_STAGES = [
-  { id: 'all', label: '전체', color: 'bg-gray-600 dark:bg-gray-700', textColor: 'text-white', borderColor: 'border-gray-700' },
-  { id: '1', label: '상담대기', color: 'bg-purple-600 dark:bg-purple-700', textColor: 'text-white', borderColor: 'border-purple-700' },
-  { id: 'target', label: '희망타겟', color: 'bg-yellow-500 dark:bg-yellow-600', textColor: 'text-white', borderColor: 'border-yellow-600' },
-  { id: '2', label: '계약완료', color: 'bg-green-600 dark:bg-green-700', textColor: 'text-white', borderColor: 'border-green-700' },
-  { id: '3', label: '서류취합', color: 'bg-blue-600 dark:bg-blue-700', textColor: 'text-white', borderColor: 'border-blue-700' },
-  { id: '4', label: '신청완료', color: 'bg-orange-500 dark:bg-orange-600', textColor: 'text-white', borderColor: 'border-orange-600' },
-  { id: '5', label: '집행완료', color: 'bg-teal-600 dark:bg-teal-700', textColor: 'text-white', borderColor: 'border-teal-700' },
+  { id: 'all', label: '전체', accent: 'border-b-gray-400' },
+  { id: '1', label: '상담대기', accent: 'border-b-purple-500' },
+  { id: 'target', label: '희망타겟', accent: 'border-b-yellow-500' },
+  { id: '2', label: '계약완료', accent: 'border-b-green-500' },
+  { id: '3', label: '서류취합', accent: 'border-b-blue-500' },
+  { id: '4', label: '신청완료', accent: 'border-b-orange-500' },
+  { id: '5', label: '집행완료', accent: 'border-b-teal-500' },
 ];
 
-// Sub-statuses for each main stage
-const SUB_STATUSES: Record<string, { id: string; label: string; color: string }[]> = {
+// Sub-statuses with accent colors
+const SUB_STATUSES: Record<string, { id: string; label: string; accent: string }[]> = {
   '1': [
-    { id: '1-1', label: '쓰레기통', color: 'bg-red-500 dark:bg-red-600' },
-    { id: '0-1', label: '단기부재', color: 'bg-gray-500 dark:bg-gray-600' },
-    { id: '0-2', label: '장기부재', color: 'bg-gray-500 dark:bg-gray-600' },
+    { id: '1-1', label: '쓰레기통', accent: 'border-b-red-500' },
+    { id: '0-1', label: '단기부재', accent: 'border-b-gray-400' },
+    { id: '0-2', label: '장기부재', accent: 'border-b-gray-400' },
   ],
   'target': [
-    { id: '1-2-1', label: '업력미달', color: 'bg-yellow-400 dark:bg-yellow-500' },
-    { id: '1-2-2', label: '최근대출', color: 'bg-yellow-400 dark:bg-yellow-500' },
-    { id: '1-2-3', label: '인증미동의(국세청)', color: 'bg-yellow-400 dark:bg-yellow-500' },
-    { id: '1-2-4', label: '인증미동의(공여내역)', color: 'bg-yellow-400 dark:bg-yellow-500' },
-    { id: '1-3-1', label: '진행기간 미동의', color: 'bg-yellow-400 dark:bg-yellow-500' },
-    { id: '1-3-2', label: '자문료 미동의', color: 'bg-yellow-400 dark:bg-yellow-500' },
-    { id: '1-3-3', label: '계약금미동의(선불)', color: 'bg-yellow-400 dark:bg-yellow-500' },
-    { id: '1-3-4', label: '계약금미동의(후불)', color: 'bg-yellow-400 dark:bg-yellow-500' },
+    { id: '1-2-1', label: '업력미달', accent: 'border-b-yellow-400' },
+    { id: '1-2-2', label: '최근대출', accent: 'border-b-yellow-400' },
+    { id: '1-2-3', label: '인증미동의(국세청)', accent: 'border-b-yellow-400' },
+    { id: '1-2-4', label: '인증미동의(공여내역)', accent: 'border-b-yellow-400' },
+    { id: '1-3-1', label: '진행기간 미동의', accent: 'border-b-yellow-400' },
+    { id: '1-3-2', label: '자문료 미동의', accent: 'border-b-yellow-400' },
+    { id: '1-3-3', label: '계약금미동의(선불)', accent: 'border-b-yellow-400' },
+    { id: '1-3-4', label: '계약금미동의(후불)', accent: 'border-b-yellow-400' },
   ],
   '2': [
-    { id: '2-1', label: '계약완료(선불)', color: 'bg-green-500 dark:bg-green-600' },
-    { id: '2-2', label: '계약완료(외주)', color: 'bg-green-500 dark:bg-green-600' },
-    { id: '2-3', label: '계약완료(후불)', color: 'bg-green-500 dark:bg-green-600' },
+    { id: '2-1', label: '계약완료(선불)', accent: 'border-b-green-400' },
+    { id: '2-2', label: '계약완료(외주)', accent: 'border-b-green-400' },
+    { id: '2-3', label: '계약완료(후불)', accent: 'border-b-green-400' },
   ],
   '3': [
-    { id: '3-1', label: '서류취합완료(선불)', color: 'bg-blue-500 dark:bg-blue-600' },
-    { id: '3-2', label: '서류취합완료(외주)', color: 'bg-blue-500 dark:bg-blue-600' },
-    { id: '3-3', label: '서류취합완료(후불)', color: 'bg-blue-500 dark:bg-blue-600' },
+    { id: '3-1', label: '서류취합완료(선불)', accent: 'border-b-blue-400' },
+    { id: '3-2', label: '서류취합완료(외주)', accent: 'border-b-blue-400' },
+    { id: '3-3', label: '서류취합완료(후불)', accent: 'border-b-blue-400' },
   ],
   '4': [
-    { id: '4-1', label: '신청완료(선불)', color: 'bg-orange-400 dark:bg-orange-500' },
-    { id: '4-2', label: '신청완료(외주)', color: 'bg-orange-400 dark:bg-orange-500' },
-    { id: '4-3', label: '신청완료(후불)', color: 'bg-orange-400 dark:bg-orange-500' },
+    { id: '4-1', label: '신청완료(선불)', accent: 'border-b-orange-400' },
+    { id: '4-2', label: '신청완료(외주)', accent: 'border-b-orange-400' },
+    { id: '4-3', label: '신청완료(후불)', accent: 'border-b-orange-400' },
   ],
   '5': [
-    { id: '5-1', label: '집행완료', color: 'bg-teal-500 dark:bg-teal-600' },
-    { id: '5-2', label: '집행완료(외주)', color: 'bg-teal-500 dark:bg-teal-600' },
-    { id: '5-3', label: '최종부결', color: 'bg-red-600 dark:bg-red-700' },
+    { id: '5-1', label: '집행완료', accent: 'border-b-teal-400' },
+    { id: '5-2', label: '집행완료(외주)', accent: 'border-b-teal-400' },
+    { id: '5-3', label: '최종부결', accent: 'border-b-red-500' },
   ],
 };
 
@@ -119,7 +119,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         </div>
       </div>
 
-      {/* Fixed 7-column Grid - Full Width */}
+      {/* Fixed 7-column Grid - Full Width, No padding */}
       <div className="grid grid-cols-7 gap-1 w-full">
         {MAIN_STAGES.map((stage) => {
           const isExpanded = expandedStages.has(stage.id);
@@ -127,51 +127,48 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
           const count = getStageCount(stage.id);
 
           return (
-            <div key={stage.id} className="flex flex-col">
-              {/* Main Stage Box - Full column width */}
-              <div className="flex items-stretch">
-                <button
-                  onClick={() => onStageClick(stage.id === 'all' ? null : stage.id)}
-                  className={cn(
-                    "flex-1 h-16 px-2 py-2 rounded-md transition-all flex flex-col items-center justify-center text-center",
-                    stage.color,
-                    stage.textColor,
-                    selectedStage === stage.id && "ring-2 ring-white ring-offset-2 ring-offset-background",
-                    stage.id === 'all' && selectedStage === null && "ring-2 ring-white ring-offset-2 ring-offset-background"
-                  )}
-                  data-testid={`button-funnel-${stage.id}`}
-                >
-                  <div className="font-bold text-sm">{stage.label}</div>
-                  <div className="text-sm font-semibold">
-                    {count}건 ({getPercentage(count)})
-                  </div>
-                </button>
-                
-                {/* Expand/Collapse button */}
-                {hasSubStatuses && (
-                  <button
-                    onClick={() => toggleStage(stage.id)}
-                    className="px-1 rounded-r-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors flex items-center"
-                    data-testid={`button-toggle-${stage.id}`}
-                  >
-                    {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </button>
+            <div key={stage.id} className="flex flex-col w-full">
+              {/* Main Stage Box - Solid style with bottom accent */}
+              <button
+                onClick={() => {
+                  onStageClick(stage.id === 'all' ? null : stage.id);
+                  if (hasSubStatuses) toggleStage(stage.id);
+                }}
+                className={cn(
+                  "w-full h-16 rounded-md border-b-4 transition-all",
+                  "flex flex-col items-center justify-center",
+                  "bg-slate-800 dark:bg-slate-900 text-white",
+                  "hover:bg-slate-700 dark:hover:bg-slate-800",
+                  stage.accent,
+                  selectedStage === stage.id && "ring-2 ring-primary ring-offset-2",
+                  stage.id === 'all' && selectedStage === null && "ring-2 ring-primary ring-offset-2"
                 )}
-              </div>
+                data-testid={`button-funnel-${stage.id}`}
+              >
+                <div className="font-bold text-sm">{stage.label}</div>
+                <div className="text-xs">
+                  {count}건 ({getPercentage(count)})
+                </div>
+                {hasSubStatuses && (
+                  <div className="absolute top-1 right-1">
+                    {isExpanded ? (
+                      <ChevronUp className="w-3 h-3 opacity-50" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 opacity-50" />
+                    )}
+                  </div>
+                )}
+              </button>
 
-              {/* Sub-statuses - Vertical Stack within column */}
+              {/* Sub-statuses - Vertical Stack, 100% width */}
               {hasSubStatuses && isExpanded && (
-                <div className="mt-2 flex flex-col gap-1 w-full">
+                <div className="mt-1 flex flex-col gap-1 w-full">
                   {SUB_STATUSES[stage.id].map((sub) => {
                     const subCount = getSubStatusCount(sub.id);
                     
                     return (
-                      <div key={sub.id} className="flex flex-col gap-1">
-                        {/* Sub-status Button */}
+                      <div key={sub.id} className="flex flex-col gap-1 w-full">
+                        {/* Sub-status Button - 100% width */}
                         <button
                           onClick={() => {
                             if (sub.id === '1-1') {
@@ -181,24 +178,27 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                             }
                           }}
                           className={cn(
-                            "w-full h-10 px-2 py-1 rounded-md transition-all flex items-center justify-between text-white",
-                            sub.color,
-                            selectedStage === sub.id && "ring-2 ring-white ring-offset-1"
+                            "w-full h-12 rounded-md border-b-4 transition-all",
+                            "flex items-center justify-between px-2",
+                            "bg-gray-700 dark:bg-gray-800 text-white",
+                            "hover:bg-gray-600 dark:hover:bg-gray-700",
+                            sub.accent,
+                            selectedStage === sub.id && "ring-2 ring-primary"
                           )}
                           data-testid={`button-funnel-${sub.id}`}
                         >
                           <span className="font-medium text-xs truncate">{sub.label}</span>
-                          <span className="text-xs font-semibold flex-shrink-0 ml-1">
+                          <span className="text-xs flex items-center gap-1 flex-shrink-0">
                             {subCount} ({getPercentage(subCount)})
                             {sub.id === '1-1' && (
-                              expandedTrash ? <ChevronUp className="w-3 h-3 inline ml-1" /> : <ChevronDown className="w-3 h-3 inline ml-1" />
+                              expandedTrash ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                             )}
                           </span>
                         </button>
                         
-                        {/* 쓰레기통 상세사유 - Nested Accordion */}
+                        {/* 쓰레기통 상세사유 - Nested Vertical Stack */}
                         {sub.id === '1-1' && expandedTrash && NESTED_STATUSES['1-1'] && (
-                          <div className="flex flex-col gap-1 pl-2 border-l-2 border-red-400">
+                          <div className="flex flex-col gap-1 w-full pl-1">
                             {NESTED_STATUSES['1-1'].map((nested) => {
                               const nestedCount = getSubStatusCount(nested.id);
                               return (
@@ -206,9 +206,11 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                                   key={nested.id}
                                   onClick={() => onStageClick(nested.id)}
                                   className={cn(
-                                    "w-full h-8 px-2 py-1 rounded text-xs text-left transition-all flex items-center justify-between",
-                                    "bg-red-400 dark:bg-red-500 text-white",
-                                    selectedStage === nested.id && "ring-2 ring-white ring-offset-1"
+                                    "w-full h-10 rounded-md border-b-2 border-b-red-400 transition-all",
+                                    "flex items-center justify-between px-2",
+                                    "bg-gray-600 dark:bg-gray-700 text-white text-xs",
+                                    "hover:bg-gray-500 dark:hover:bg-gray-600",
+                                    selectedStage === nested.id && "ring-2 ring-primary"
                                   )}
                                   data-testid={`button-funnel-${nested.id}`}
                                 >
