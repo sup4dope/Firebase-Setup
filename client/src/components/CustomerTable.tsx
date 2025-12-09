@@ -94,23 +94,22 @@ const TRASH_REASONS = [
   { id: '1-1-8', label: '차입금초과' },
 ];
 
-// Build flat list of all status options for native select
-const buildStatusOptions = (): { value: string; label: string; indent: number }[] => {
-  const options: { value: string; label: string; indent: number }[] = [];
+// Build flat list of all status options for native select - SHORT NAMES ONLY
+const buildStatusOptions = (): { value: string; label: string; category: string }[] => {
+  const options: { value: string; label: string; category: string }[] = [];
   
   MENU_STAGES.forEach(stage => {
-    // Add stage as header (non-selectable, but we'll show it)
     const subs = MENU_SUB_STATUSES[stage.id] || [];
     
     subs.forEach(sub => {
       if (sub.id === '1-1') {
-        // 쓰레기통 has nested reasons
-        options.push({ value: sub.id, label: `${stage.label} > ${sub.label}`, indent: 1 });
+        // 쓰레기통 has nested reasons - add only the leaf nodes
         TRASH_REASONS.forEach(reason => {
-          options.push({ value: reason.id, label: `└ ${reason.label}`, indent: 2 });
+          options.push({ value: reason.id, label: reason.label, category: stage.label });
         });
       } else {
-        options.push({ value: sub.id, label: `${stage.label} > ${sub.label}`, indent: 1 });
+        // Regular sub-status - show only the short label
+        options.push({ value: sub.id, label: sub.label, category: stage.label });
       }
     });
   });
@@ -604,7 +603,7 @@ export function CustomerTable({
                           </TooltipContent>
                         </Tooltip>
                         
-                        {/* Hidden select for status change - appears on hover */}
+                        {/* Select for status change - dark mode styling */}
                         <select
                           value={customer.status_code || ''}
                           onChange={(e) => {
@@ -613,12 +612,19 @@ export function CustomerTable({
                               onStatusChange(customer.id, customer.status_code, newStatus);
                             }
                           }}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer bg-slate-800 text-gray-100"
+                          style={{
+                            colorScheme: 'dark',
+                          }}
                           data-testid={`select-status-${customer.id}`}
                         >
-                          <option value="" disabled>상태 선택</option>
+                          <option value="" disabled className="bg-slate-800 text-gray-100">상태 선택</option>
                           {STATUS_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
+                            <option 
+                              key={opt.value} 
+                              value={opt.value}
+                              className="bg-slate-800 text-gray-100 hover:bg-slate-700"
+                            >
                               {opt.label}
                             </option>
                           ))}
