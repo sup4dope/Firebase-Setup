@@ -135,6 +135,63 @@ const getStatusDisplayLabel = (statusCode: string): string => {
   return statusCode;
 };
 
+// Color mapping for status badges based on top-level category
+const STAGE_COLORS: Record<string, string> = {
+  '1': 'bg-purple-600 text-white',      // 상담대기
+  'target': 'bg-yellow-600 text-white', // 희망타겟
+  '2': 'bg-green-600 text-white',       // 계약완료
+  '3': 'bg-blue-600 text-white',        // 서류취합
+  '4': 'bg-orange-600 text-white',      // 신청완료
+  '5': 'bg-teal-600 text-white',        // 집행완료
+};
+
+// Get status badge info: short label + color class
+const getStatusBadgeInfo = (statusCode: string): { label: string; colorClass: string; category: string } => {
+  // Determine the top-level category from status code
+  let category = '';
+  let label = statusCode;
+  
+  // Check trash reasons (1-1-X format)
+  if (statusCode.startsWith('1-1-')) {
+    const reason = TRASH_REASONS.find(r => r.id === statusCode);
+    if (reason) {
+      label = reason.label;
+      category = '1'; // 상담대기
+    }
+  }
+  // Check sub-statuses
+  else {
+    for (const [stageId, subs] of Object.entries(MENU_SUB_STATUSES)) {
+      const sub = subs.find(s => s.id === statusCode);
+      if (sub) {
+        label = sub.label;
+        category = stageId;
+        break;
+      }
+    }
+  }
+  
+  // Special cases for absence statuses
+  if (statusCode === '0-1' || statusCode === '0-2') {
+    const sub = MENU_SUB_STATUSES['1']?.find(s => s.id === statusCode);
+    if (sub) {
+      label = sub.label;
+      category = '1'; // 상담대기
+    }
+  }
+  
+  // 1-1 (쓰레기통) without specific reason
+  if (statusCode === '1-1') {
+    label = '쓰레기통';
+    category = '1';
+  }
+  
+  const colorClass = STAGE_COLORS[category] || 'bg-gray-600 text-white';
+  const categoryName = MENU_STAGES.find(s => s.id === category)?.label || '기타';
+  
+  return { label, colorClass, category: categoryName };
+};
+
 interface CustomerTableProps {
   customers: Customer[];
   userRole: UserRole;
@@ -523,30 +580,52 @@ export function CustomerTable({
                   </button>
                 </TableCell>
                 
-                {/* 상태 - Native select for instant status change */}
+                {/* 상태 - Color-coded badge with dropdown for change */}
                 <TableCell>
-                  <select
-                    value={customer.status_code || ''}
-                    onChange={(e) => {
-                      const newStatus = e.target.value as StatusCode;
-                      if (newStatus && newStatus !== customer.status_code) {
-                        onStatusChange(customer.id, customer.status_code, newStatus);
-                      }
-                    }}
-                    className="w-full h-8 px-2 text-xs bg-background border border-border rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
-                    data-testid={`select-status-${customer.id}`}
-                  >
-                    <option value="" disabled>상태 선택</option>
-                    {STATUS_OPTIONS.map((opt) => (
-                      <option 
-                        key={opt.value} 
-                        value={opt.value}
-                        style={{ paddingLeft: opt.indent === 2 ? '16px' : '0px' }}
-                      >
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  {(() => {
+                    const badgeInfo = getStatusBadgeInfo(customer.status_code || '');
+                    return (
+                      <div className="relative group/status">
+                        {/* Badge display */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span 
+                              className={cn(
+                                "inline-block px-2 py-1 text-xs font-medium rounded-md truncate max-w-[130px] cursor-pointer",
+                                badgeInfo.colorClass
+                              )}
+                              data-testid={`badge-status-${customer.id}`}
+                            >
+                              {badgeInfo.label}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">{badgeInfo.category} &gt; {badgeInfo.label}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        {/* Hidden select for status change - appears on hover */}
+                        <select
+                          value={customer.status_code || ''}
+                          onChange={(e) => {
+                            const newStatus = e.target.value as StatusCode;
+                            if (newStatus && newStatus !== customer.status_code) {
+                              onStatusChange(customer.id, customer.status_code, newStatus);
+                            }
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          data-testid={`select-status-${customer.id}`}
+                        >
+                          <option value="" disabled>상태 선택</option>
+                          {STATUS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })()}
                 </TableCell>
                 
                 {/* 신용점수 - 800+ yellow pulse, 700- red */}
