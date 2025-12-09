@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import type { Customer } from '@shared/types';
 
 interface FunnelChartProps {
@@ -130,7 +130,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
 
           return (
             <div key={stage.id} className="flex flex-col w-full">
-              {/* Main Stage Box - Glassmorphism Dark Style */}
+              {/* Main Stage Box - Glassmorphism Dark Style with relative positioning */}
               <div className="relative w-full">
                 <button
                   onClick={() => onStageClick(stage.id === 'all' ? null : stage.id)}
@@ -151,27 +151,31 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                   </div>
                 </button>
                 
-                {/* Accordion Toggle Button - Only for non-상담대기 stages */}
+                {/* Accordion Toggle Button - Center Right, with hover effects */}
                 {hasSubStatuses && !isAlwaysExpanded && (
                   <button
                     onClick={(e) => toggleStage(stage.id, e)}
                     className={cn(
-                      "absolute bottom-1 right-1 p-1 rounded transition-all",
-                      "bg-white/10 hover:bg-white/20"
+                      "absolute right-1 top-1/2 -translate-y-1/2",
+                      "w-6 h-6 rounded-full",
+                      "flex items-center justify-center",
+                      "transition-all duration-200",
+                      "text-gray-400 hover:text-white",
+                      "hover:bg-white/20"
                     )}
                     data-testid={`button-toggle-${stage.id}`}
                   >
-                    {isExpanded ? (
-                      <ChevronUp className="w-3 h-3 text-white" />
-                    ) : (
-                      <ChevronDown className="w-3 h-3 text-white" />
-                    )}
+                    <ChevronDown 
+                      className={cn(
+                        "w-4 h-4 transition-transform duration-200",
+                        isExpanded && "rotate-180"
+                      )} 
+                    />
                   </button>
                 )}
               </div>
 
               {/* Sub-statuses - Vertical Stack, 100% width */}
-              {/* 상담대기(id='1')는 항상 펼쳐짐, 나머지는 토글 */}
               {hasSubStatuses && (isAlwaysExpanded || isExpanded) && (
                 <div className="mt-2 flex flex-col gap-1 w-full">
                   {SUB_STATUSES[stage.id].map((sub) => {
@@ -202,7 +206,12 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                           <span className="text-xs text-gray-300 flex items-center gap-1 flex-shrink-0">
                             {subCount} ({getPercentage(subCount)})
                             {isTrash && (
-                              expandedTrash ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                              <ChevronDown 
+                                className={cn(
+                                  "w-3 h-3 transition-transform duration-200",
+                                  expandedTrash && "rotate-180"
+                                )} 
+                              />
                             )}
                           </span>
                         </button>
