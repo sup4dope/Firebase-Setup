@@ -596,6 +596,7 @@ export function CustomerTable({
                       >
                         <SelectTrigger 
                           className="h-auto p-0 border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 w-auto min-w-0"
+                          hideIcon={true}
                           data-testid={`select-status-${customer.id}`}
                         >
                           <Tooltip>
