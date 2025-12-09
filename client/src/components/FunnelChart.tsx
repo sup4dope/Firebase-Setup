@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Customer } from '@shared/types';
 
 interface FunnelChartProps {
@@ -120,130 +120,140 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         </div>
       </div>
 
-      {/* Fixed 7-column Grid - Full Width */}
-      <div className="grid grid-cols-7 gap-2 w-full">
-        {MAIN_STAGES.map((stage) => {
+      {/* Flex layout with arrows between stages */}
+      <div className="flex items-start w-full">
+        {MAIN_STAGES.map((stage, index) => {
           const isExpanded = expandedStages.has(stage.id);
           const hasSubStatuses = SUB_STATUSES[stage.id] && SUB_STATUSES[stage.id].length > 0;
           const count = getStageCount(stage.id);
           const isAlwaysExpanded = stage.id === '1';
+          const isLastStage = index === MAIN_STAGES.length - 1;
 
           return (
-            <div key={stage.id} className="flex flex-col w-full">
-              {/* Main Stage Box - Glassmorphism Dark Style with relative positioning */}
-              <div className="relative w-full">
-                <button
-                  onClick={() => onStageClick(stage.id === 'all' ? null : stage.id)}
-                  className={cn(
-                    "w-full h-16 rounded-md border-2 transition-all",
-                    "flex flex-col items-center justify-center",
-                    "bg-slate-900/50 backdrop-blur-sm text-white",
-                    "hover:bg-slate-800/70",
-                    stage.borderColor,
-                    selectedStage === stage.id && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                    stage.id === 'all' && selectedStage === null && "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                  )}
-                  data-testid={`button-funnel-${stage.id}`}
-                >
-                  <div className="font-bold text-sm">{stage.label}</div>
-                  <div className="text-xs text-gray-300">
-                    {count}건 ({getPercentage(count)})
-                  </div>
-                </button>
-                
-                {/* Accordion Toggle Button - Center Right, with hover effects */}
-                {hasSubStatuses && !isAlwaysExpanded && (
+            <div key={stage.id} className="flex items-start flex-1 min-w-0">
+              {/* Stage Column */}
+              <div className="flex flex-col w-full">
+                {/* Main Stage Box */}
+                <div className="relative w-full">
                   <button
-                    onClick={(e) => toggleStage(stage.id, e)}
+                    onClick={() => onStageClick(stage.id === 'all' ? null : stage.id)}
                     className={cn(
-                      "absolute right-1 top-1/2 -translate-y-1/2",
-                      "w-6 h-6 rounded-full",
-                      "flex items-center justify-center",
-                      "transition-all duration-200",
-                      "text-gray-400 hover:text-white",
-                      "hover:bg-white/20"
+                      "w-full h-16 rounded-md border-2 transition-all",
+                      "flex flex-col items-center justify-center",
+                      "bg-slate-900/50 backdrop-blur-sm text-white",
+                      "hover:bg-slate-800/70",
+                      stage.borderColor,
+                      selectedStage === stage.id && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                      stage.id === 'all' && selectedStage === null && "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     )}
-                    data-testid={`button-toggle-${stage.id}`}
+                    data-testid={`button-funnel-${stage.id}`}
                   >
-                    <ChevronDown 
-                      className={cn(
-                        "w-4 h-4 transition-transform duration-200",
-                        isExpanded && "rotate-180"
-                      )} 
-                    />
+                    <div className="font-bold text-sm">{stage.label}</div>
+                    <div className="text-xs text-gray-300">
+                      {count}건 ({getPercentage(count)})
+                    </div>
                   </button>
+                  
+                  {/* Accordion Toggle Button */}
+                  {hasSubStatuses && !isAlwaysExpanded && (
+                    <button
+                      onClick={(e) => toggleStage(stage.id, e)}
+                      className={cn(
+                        "absolute right-1 top-1/2 -translate-y-1/2",
+                        "w-6 h-6 rounded-full",
+                        "flex items-center justify-center",
+                        "transition-all duration-200",
+                        "text-gray-400 hover:text-white",
+                        "hover:bg-white/20"
+                      )}
+                      data-testid={`button-toggle-${stage.id}`}
+                    >
+                      <ChevronDown 
+                        className={cn(
+                          "w-4 h-4 transition-transform duration-200",
+                          isExpanded && "rotate-180"
+                        )} 
+                      />
+                    </button>
+                  )}
+                </div>
+
+                {/* Sub-statuses */}
+                {hasSubStatuses && (isAlwaysExpanded || isExpanded) && (
+                  <div className="mt-2 flex flex-col gap-1 w-full">
+                    {SUB_STATUSES[stage.id].map((sub) => {
+                      const subCount = getSubStatusCount(sub.id);
+                      const isTrash = sub.id === '1-1';
+                      
+                      return (
+                        <div key={sub.id} className="flex flex-col gap-1 w-full">
+                          <button
+                            onClick={() => {
+                              if (isTrash) {
+                                setExpandedTrash(!expandedTrash);
+                              }
+                              onStageClick(sub.id);
+                            }}
+                            className={cn(
+                              "w-full h-11 rounded-md border-l-4 transition-all",
+                              "flex items-center justify-between px-3",
+                              "bg-gray-800 text-white",
+                              "hover:bg-gray-700",
+                              sub.accentColor,
+                              selectedStage === sub.id && "ring-2 ring-primary"
+                            )}
+                            data-testid={`button-funnel-${sub.id}`}
+                          >
+                            <span className="font-medium text-xs truncate">{sub.label}</span>
+                            <span className="text-xs text-gray-300 flex items-center gap-1 flex-shrink-0">
+                              {subCount} ({getPercentage(subCount)})
+                              {isTrash && (
+                                <ChevronDown 
+                                  className={cn(
+                                    "w-3 h-3 transition-transform duration-200",
+                                    expandedTrash && "rotate-180"
+                                  )} 
+                                />
+                              )}
+                            </span>
+                          </button>
+                          
+                          {/* Nested 쓰레기통 상세사유 */}
+                          {isTrash && expandedTrash && NESTED_STATUSES['1-1'] && (
+                            <div className="flex flex-col gap-1 w-full pl-2">
+                              {NESTED_STATUSES['1-1'].map((nested) => {
+                                const nestedCount = getSubStatusCount(nested.id);
+                                return (
+                                  <button
+                                    key={nested.id}
+                                    onClick={() => onStageClick(nested.id)}
+                                    className={cn(
+                                      "w-full h-9 rounded-md border-l-4 border-l-red-400 transition-all",
+                                      "flex items-center justify-between px-3",
+                                      "bg-gray-700 text-white text-xs",
+                                      "hover:bg-gray-600",
+                                      selectedStage === nested.id && "ring-2 ring-primary"
+                                    )}
+                                    data-testid={`button-funnel-${nested.id}`}
+                                  >
+                                    <span className="truncate">{nested.label}</span>
+                                    <span className="text-gray-300 flex-shrink-0 ml-1">{nestedCount}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
 
-              {/* Sub-statuses - Vertical Stack, 100% width */}
-              {hasSubStatuses && (isAlwaysExpanded || isExpanded) && (
-                <div className="mt-2 flex flex-col gap-1 w-full">
-                  {SUB_STATUSES[stage.id].map((sub) => {
-                    const subCount = getSubStatusCount(sub.id);
-                    const isTrash = sub.id === '1-1';
-                    
-                    return (
-                      <div key={sub.id} className="flex flex-col gap-1 w-full">
-                        {/* Sub-status Button - 100% width, left border accent */}
-                        <button
-                          onClick={() => {
-                            if (isTrash) {
-                              setExpandedTrash(!expandedTrash);
-                            }
-                            onStageClick(sub.id);
-                          }}
-                          className={cn(
-                            "w-full h-11 rounded-md border-l-4 transition-all",
-                            "flex items-center justify-between px-3",
-                            "bg-gray-800 text-white",
-                            "hover:bg-gray-700",
-                            sub.accentColor,
-                            selectedStage === sub.id && "ring-2 ring-primary"
-                          )}
-                          data-testid={`button-funnel-${sub.id}`}
-                        >
-                          <span className="font-medium text-xs truncate">{sub.label}</span>
-                          <span className="text-xs text-gray-300 flex items-center gap-1 flex-shrink-0">
-                            {subCount} ({getPercentage(subCount)})
-                            {isTrash && (
-                              <ChevronDown 
-                                className={cn(
-                                  "w-3 h-3 transition-transform duration-200",
-                                  expandedTrash && "rotate-180"
-                                )} 
-                              />
-                            )}
-                          </span>
-                        </button>
-                        
-                        {/* 쓰레기통 상세사유 - Nested Accordion */}
-                        {isTrash && expandedTrash && NESTED_STATUSES['1-1'] && (
-                          <div className="flex flex-col gap-1 w-full pl-2">
-                            {NESTED_STATUSES['1-1'].map((nested) => {
-                              const nestedCount = getSubStatusCount(nested.id);
-                              return (
-                                <button
-                                  key={nested.id}
-                                  onClick={() => onStageClick(nested.id)}
-                                  className={cn(
-                                    "w-full h-9 rounded-md border-l-4 border-l-red-400 transition-all",
-                                    "flex items-center justify-between px-3",
-                                    "bg-gray-700 text-white text-xs",
-                                    "hover:bg-gray-600",
-                                    selectedStage === nested.id && "ring-2 ring-primary"
-                                  )}
-                                  data-testid={`button-funnel-${nested.id}`}
-                                >
-                                  <span className="truncate">{nested.label}</span>
-                                  <span className="text-gray-300 flex-shrink-0 ml-1">{nestedCount}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+              {/* Flow Arrow between stages (except last) */}
+              {!isLastStage && (
+                <div className="flex items-center justify-center px-1 h-16 flex-shrink-0">
+                  <ChevronRight className="w-5 h-5 text-gray-500" />
                 </div>
               )}
             </div>
