@@ -16,8 +16,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
+  DropdownMenuSubTriggerLeft,
+  DropdownMenuSubContentLeft,
 } from '@/components/ui/dropdown-menu';
 import {
   Select,
@@ -32,7 +32,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { MemoModal } from './MemoModal';
-import { MoreHorizontal, ChevronLeft, Edit, Trash2, History, Check, X, FolderOpen } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Customer, UserRole } from '@shared/types';
 
@@ -605,28 +605,25 @@ export function CustomerTable({
                       
                       {/* Status change submenu - opens to left */}
                       <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="flex-row-reverse justify-end gap-2">
-                          <ChevronLeft className="w-4 h-4" />
-                          <span>상태 변경</span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent side="left" className="w-48">
+                        <DropdownMenuSubTriggerLeft>
+                          상태 변경
+                        </DropdownMenuSubTriggerLeft>
+                        <DropdownMenuSubContentLeft className="w-48">
                           {MENU_STAGES.map(stage => (
                             <DropdownMenuSub key={stage.id}>
-                              <DropdownMenuSubTrigger className="flex-row-reverse justify-end gap-2">
-                                <ChevronLeft className="w-4 h-4" />
-                                <span>{stage.label}</span>
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent side="left" className="w-52">
+                              <DropdownMenuSubTriggerLeft>
+                                {stage.label}
+                              </DropdownMenuSubTriggerLeft>
+                              <DropdownMenuSubContentLeft className="w-52">
                                 {MENU_SUB_STATUSES[stage.id]?.map(sub => {
                                   const isTrash = sub.id === '1-1';
                                   if (isTrash) {
                                     return (
                                       <DropdownMenuSub key={sub.id}>
-                                        <DropdownMenuSubTrigger className="flex-row-reverse justify-end gap-2 text-destructive">
-                                          <ChevronLeft className="w-4 h-4" />
-                                          <span>{sub.label}</span>
-                                        </DropdownMenuSubTrigger>
-                                        <DropdownMenuSubContent side="left" className="w-44">
+                                        <DropdownMenuSubTriggerLeft className="text-destructive">
+                                          {sub.label}
+                                        </DropdownMenuSubTriggerLeft>
+                                        <DropdownMenuSubContentLeft className="w-44">
                                           {TRASH_REASONS.map(reason => (
                                             <DropdownMenuItem
                                               key={reason.id}
@@ -637,7 +634,7 @@ export function CustomerTable({
                                               {reason.label}
                                             </DropdownMenuItem>
                                           ))}
-                                        </DropdownMenuSubContent>
+                                        </DropdownMenuSubContentLeft>
                                       </DropdownMenuSub>
                                     );
                                   }
@@ -651,10 +648,10 @@ export function CustomerTable({
                                     </DropdownMenuItem>
                                   );
                                 })}
-                              </DropdownMenuSubContent>
+                              </DropdownMenuSubContentLeft>
                             </DropdownMenuSub>
                           ))}
-                        </DropdownMenuSubContent>
+                        </DropdownMenuSubContentLeft>
                       </DropdownMenuSub>
 
                       {canDelete && (
