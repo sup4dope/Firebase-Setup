@@ -120,19 +120,18 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         </div>
       </div>
 
-      {/* Flex layout with arrows between stages */}
-      <div className="flex items-start w-full">
-        {MAIN_STAGES.map((stage, index) => {
-          const isExpanded = expandedStages.has(stage.id);
-          const hasSubStatuses = SUB_STATUSES[stage.id] && SUB_STATUSES[stage.id].length > 0;
-          const count = getStageCount(stage.id);
-          const isAlwaysExpanded = stage.id === '1';
-          const isLastStage = index === MAIN_STAGES.length - 1;
+      {/* CSS Grid with equal 7 columns - arrows positioned absolutely */}
+      <div className="relative w-full">
+        {/* Grid container for boxes */}
+        <div className="grid grid-cols-7 gap-4 w-full">
+          {MAIN_STAGES.map((stage) => {
+            const isExpanded = expandedStages.has(stage.id);
+            const hasSubStatuses = SUB_STATUSES[stage.id] && SUB_STATUSES[stage.id].length > 0;
+            const count = getStageCount(stage.id);
+            const isAlwaysExpanded = stage.id === '1';
 
-          return (
-            <div key={stage.id} className="flex items-start flex-1 min-w-0">
-              {/* Stage Column */}
-              <div className="flex flex-col w-full">
+            return (
+              <div key={stage.id} className="flex flex-col w-full">
                 {/* Main Stage Box */}
                 <div className="relative w-full">
                   <button
@@ -249,16 +248,24 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                   </div>
                 )}
               </div>
+            );
+          })}
+        </div>
 
-              {/* Flow Arrow between stages (except last) */}
-              {!isLastStage && (
-                <div className="flex items-center justify-center px-1 h-16 flex-shrink-0">
-                  <ChevronRight className="w-5 h-5 text-gray-500" />
-                </div>
-              )}
+        {/* Flow arrows - positioned absolutely in the gaps */}
+        <div className="absolute top-0 left-0 w-full h-16 pointer-events-none" style={{ zIndex: 10 }}>
+          {[0, 1, 2, 3, 4, 5].map((index) => (
+            <div
+              key={index}
+              className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center"
+              style={{
+                left: `calc(${((index + 1) / 7) * 100}% - 8px)`,
+              }}
+            >
+              <ChevronRight className="w-4 h-4 text-gray-500" />
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
     </div>
   );
