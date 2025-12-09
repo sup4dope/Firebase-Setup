@@ -249,17 +249,18 @@ export function TeamManagement({
                   <TableCell>
                     {isSuperAdmin ? (
                       <Select
-                        defaultValue={user.team_id || ''}
+                        defaultValue={user.team_id || 'none'}
                         onValueChange={(value) => {
-                          const team = teams.find(t => t.id === value);
-                          onUpdateUserTeam(user.uid, value, team?.name || '');
+                          const teamId = value === 'none' ? '' : value;
+                          const team = teams.find(t => t.id === teamId);
+                          onUpdateUserTeam(user.uid, teamId, team?.name || '');
                         }}
                       >
                         <SelectTrigger className="w-[140px]" data-testid={`select-team-${user.uid}`}>
                           <SelectValue placeholder="팀 선택" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">미배정</SelectItem>
+                          <SelectItem value="none">미배정</SelectItem>
                           {teams.map(team => (
                             <SelectItem key={team.id} value={team.id}>
                               {team.name}

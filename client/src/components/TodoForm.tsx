@@ -173,14 +173,14 @@ export function TodoForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>관련 고객 (선택)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={(val) => field.onChange(val === 'none' ? '' : val)} defaultValue={field.value || 'none'}>
                     <FormControl>
                       <SelectTrigger data-testid="select-todo-customer">
                         <SelectValue placeholder="고객 선택 (선택사항)" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">없음</SelectItem>
+                      <SelectItem value="none">없음</SelectItem>
                       {customers.map(customer => (
                         <SelectItem key={customer.id} value={customer.id}>
                           {customer.name} ({customer.company_name})
