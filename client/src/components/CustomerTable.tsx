@@ -15,9 +15,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTriggerLeft,
-  DropdownMenuSubContentLeft,
 } from '@/components/ui/dropdown-menu';
 import {
   Select,
@@ -96,6 +93,47 @@ const TRASH_REASONS = [
   { id: '1-1-7', label: '신용점수 미달' },
   { id: '1-1-8', label: '차입금초과' },
 ];
+
+// Build flat list of all status options for native select
+const buildStatusOptions = (): { value: string; label: string; indent: number }[] => {
+  const options: { value: string; label: string; indent: number }[] = [];
+  
+  MENU_STAGES.forEach(stage => {
+    // Add stage as header (non-selectable, but we'll show it)
+    const subs = MENU_SUB_STATUSES[stage.id] || [];
+    
+    subs.forEach(sub => {
+      if (sub.id === '1-1') {
+        // 쓰레기통 has nested reasons
+        options.push({ value: sub.id, label: `${stage.label} > ${sub.label}`, indent: 1 });
+        TRASH_REASONS.forEach(reason => {
+          options.push({ value: reason.id, label: `└ ${reason.label}`, indent: 2 });
+        });
+      } else {
+        options.push({ value: sub.id, label: `${stage.label} > ${sub.label}`, indent: 1 });
+      }
+    });
+  });
+  
+  return options;
+};
+
+const STATUS_OPTIONS = buildStatusOptions();
+
+// Get display label for a status code
+const getStatusDisplayLabel = (statusCode: string): string => {
+  // Check trash reasons first
+  const trashReason = TRASH_REASONS.find(r => r.id === statusCode);
+  if (trashReason) return trashReason.label;
+  
+  // Check sub-statuses
+  for (const stageId of Object.keys(MENU_SUB_STATUSES)) {
+    const sub = MENU_SUB_STATUSES[stageId]?.find(s => s.id === statusCode);
+    if (sub) return sub.label;
+  }
+  
+  return statusCode;
+};
 
 interface CustomerTableProps {
   customers: Customer[];
@@ -444,6 +482,7 @@ export function CustomerTable({
               <TableHead className="w-[50px] font-semibold text-center">No</TableHead>
               <TableHead className="w-[100px] font-semibold">유입일자</TableHead>
               <TableHead className="w-[90px] font-semibold">고객명</TableHead>
+              <TableHead className="w-[150px] font-semibold">상태</TableHead>
               <TableHead className="w-[70px] font-semibold text-center">신용점수</TableHead>
               <TableHead className="w-[130px] font-semibold">상호명</TableHead>
               <TableHead className="w-[60px] font-semibold text-center">7년초과</TableHead>
@@ -482,6 +521,32 @@ export function CustomerTable({
                   >
                     {customer.name}
                   </button>
+                </TableCell>
+                
+                {/* 상태 - Native select for instant status change */}
+                <TableCell>
+                  <select
+                    value={customer.status_code || ''}
+                    onChange={(e) => {
+                      const newStatus = e.target.value as StatusCode;
+                      if (newStatus && newStatus !== customer.status_code) {
+                        onStatusChange(customer.id, customer.status_code, newStatus);
+                      }
+                    }}
+                    className="w-full h-8 px-2 text-xs bg-background border border-border rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                    data-testid={`select-status-${customer.id}`}
+                  >
+                    <option value="" disabled>상태 선택</option>
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option 
+                        key={opt.value} 
+                        value={opt.value}
+                        style={{ paddingLeft: opt.indent === 2 ? '16px' : '0px' }}
+                      >
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </TableCell>
                 
                 {/* 신용점수 - 800+ yellow pulse, 700- red */}
@@ -601,58 +666,6 @@ export function CustomerTable({
                         <History className="w-4 h-4 mr-2" />
                         변경 이력
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      
-                      {/* Status change submenu - opens to left */}
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTriggerLeft>
-                          상태 변경
-                        </DropdownMenuSubTriggerLeft>
-                        <DropdownMenuSubContentLeft className="w-48">
-                          {MENU_STAGES.map(stage => (
-                            <DropdownMenuSub key={stage.id}>
-                              <DropdownMenuSubTriggerLeft>
-                                {stage.label}
-                              </DropdownMenuSubTriggerLeft>
-                              <DropdownMenuSubContentLeft className="w-52">
-                                {MENU_SUB_STATUSES[stage.id]?.map(sub => {
-                                  const isTrash = sub.id === '1-1';
-                                  if (isTrash) {
-                                    return (
-                                      <DropdownMenuSub key={sub.id}>
-                                        <DropdownMenuSubTriggerLeft className="text-destructive">
-                                          {sub.label}
-                                        </DropdownMenuSubTriggerLeft>
-                                        <DropdownMenuSubContentLeft className="w-44">
-                                          {TRASH_REASONS.map(reason => (
-                                            <DropdownMenuItem
-                                              key={reason.id}
-                                              onClick={() => onStatusChange(customer.id, customer.status_code, reason.id as any)}
-                                              disabled={customer.status_code === reason.id}
-                                              className="text-destructive"
-                                            >
-                                              {reason.label}
-                                            </DropdownMenuItem>
-                                          ))}
-                                        </DropdownMenuSubContentLeft>
-                                      </DropdownMenuSub>
-                                    );
-                                  }
-                                  return (
-                                    <DropdownMenuItem
-                                      key={sub.id}
-                                      onClick={() => onStatusChange(customer.id, customer.status_code, sub.id as any)}
-                                      disabled={customer.status_code === sub.id}
-                                    >
-                                      {sub.label}
-                                    </DropdownMenuItem>
-                                  );
-                                })}
-                              </DropdownMenuSubContentLeft>
-                            </DropdownMenuSub>
-                          ))}
-                        </DropdownMenuSubContentLeft>
-                      </DropdownMenuSub>
 
                       {canDelete && (
                         <>
