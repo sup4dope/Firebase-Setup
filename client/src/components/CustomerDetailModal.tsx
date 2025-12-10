@@ -657,8 +657,8 @@ export function CustomerDetailModal({
                 <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
                   <h3 className="text-xs font-semibold text-emerald-400">사업자 정보</h3>
                   
-                  {/* Row 3-1: 상호명, 개업일 - grid-cols-2 gap-2 items-end (밑변 정렬) */}
-                  <div className="grid grid-cols-2 gap-2 items-end">
+                  {/* Row 3-1: 상호명, 개업일 - grid-cols-2 gap-3 items-end (Row 2와 동일) */}
+                  <div className="grid grid-cols-2 gap-3 items-end">
                     <div>
                       <Label className="text-xs text-gray-400">상호명</Label>
                       <Input 
