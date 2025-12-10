@@ -446,8 +446,8 @@ export function CustomerDetailModal({
                   </div>
 
                   {/* Row 2-2: 연락처, 통신사 */}
-                  <div className="flex flex-wrap gap-3 items-end">
-                    <div className="flex items-end gap-1">
+                  <div className="flex w-full gap-3 items-end">
+                    <div className="flex items-end gap-1 flex-1">
                       <div className="w-16">
                         <Label className="text-xs text-gray-400">연락처</Label>
                         <Input 
@@ -461,17 +461,17 @@ export function CustomerDetailModal({
                         maxLength={4}
                         value={formData.phone_part2 || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, phone_part2: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 w-16"
+                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
                       />
                       <span className="text-gray-500 pb-2">-</span>
                       <Input 
                         maxLength={4}
                         value={formData.phone_part3 || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, phone_part3: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 w-16"
+                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
                       />
                     </div>
-                    <div className="w-28">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">통신사</Label>
                       <Select 
                         value={formData.carrier || 'SKT'} 
@@ -552,20 +552,26 @@ export function CustomerDetailModal({
                   {/* Daum Postcode Modal for Home */}
                   {showHomeAddressSearch && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                      <div className="bg-white rounded-lg p-4 w-[400px]">
-                        <DaumPostcodeEmbed 
-                          onComplete={(data) => {
-                            setFormData(p => ({ ...p, home_address: data.address }));
-                            setShowHomeAddressSearch(false);
-                          }}
-                        />
-                        <Button 
-                          variant="outline" 
-                          className="w-full mt-2"
-                          onClick={() => setShowHomeAddressSearch(false)}
-                        >
-                          닫기
-                        </Button>
+                      <div className="bg-white rounded-lg w-[400px] overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b">
+                          <span className="font-medium text-gray-700">자택 주소 검색</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => setShowHomeAddressSearch(false)}
+                            className="text-gray-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div className="p-4">
+                          <DaumPostcodeEmbed 
+                            onComplete={(data) => {
+                              setFormData(p => ({ ...p, home_address: data.address }));
+                              setShowHomeAddressSearch(false);
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -631,8 +637,8 @@ export function CustomerDetailModal({
                   </div>
 
                   {/* Row 3-3: 사업자등록번호, 재도전, 혁신 */}
-                  <div className="flex flex-wrap gap-3">
-                    <div className="w-36">
+                  <div className="flex w-full gap-3">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">사업자등록번호</Label>
                       <Input 
                         value={formData.business_registration_number || ''} 
@@ -641,7 +647,7 @@ export function CustomerDetailModal({
                         placeholder="000-00-00000"
                       />
                     </div>
-                    <div className="w-28">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">재도전</Label>
                       <Select 
                         value={formData.retry_type || '해당없음'} 
@@ -657,7 +663,7 @@ export function CustomerDetailModal({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="w-28">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">혁신기술</Label>
                       <Select 
                         value={formData.innovation_type || '해당없음'} 
@@ -725,27 +731,33 @@ export function CustomerDetailModal({
                   {/* Daum Postcode Modal for Business */}
                   {showBusinessAddressSearch && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                      <div className="bg-white rounded-lg p-4 w-[400px]">
-                        <DaumPostcodeEmbed 
-                          onComplete={(data) => {
-                            setFormData(p => ({ ...p, business_address: data.address }));
-                            setShowBusinessAddressSearch(false);
-                          }}
-                        />
-                        <Button 
-                          variant="outline" 
-                          className="w-full mt-2"
-                          onClick={() => setShowBusinessAddressSearch(false)}
-                        >
-                          닫기
-                        </Button>
+                      <div className="bg-white rounded-lg w-[400px] overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b">
+                          <span className="font-medium text-gray-700">사업장 주소 검색</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => setShowBusinessAddressSearch(false)}
+                            className="text-gray-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div className="p-4">
+                          <DaumPostcodeEmbed 
+                            onComplete={(data) => {
+                              setFormData(p => ({ ...p, business_address: data.address }));
+                              setShowBusinessAddressSearch(false);
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
 
                   {/* Row 3-5: 매출 (최근, Y-1, Y-2, Y-3) */}
-                  <div className="flex flex-wrap gap-3">
-                    <div className="w-24">
+                  <div className="flex w-full gap-3">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">최근매출</Label>
                       <div className="relative">
                         <Input 
@@ -757,7 +769,7 @@ export function CustomerDetailModal({
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
                       </div>
                     </div>
-                    <div className="w-24">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">Y-1 매출</Label>
                       <div className="relative">
                         <Input 
@@ -769,7 +781,7 @@ export function CustomerDetailModal({
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
                       </div>
                     </div>
-                    <div className="w-24">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">Y-2 매출</Label>
                       <div className="relative">
                         <Input 
@@ -781,7 +793,7 @@ export function CustomerDetailModal({
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
                       </div>
                     </div>
-                    <div className="w-24">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">Y-3 매출</Label>
                       <div className="relative">
                         <Input 
