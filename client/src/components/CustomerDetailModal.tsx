@@ -466,7 +466,7 @@ export function CustomerDetailModal({
                 </div>
 
                 {/* 고객 정보 그룹 (Border Box) */}
-                <div className="border border-gray-700 rounded-lg p-1.5 space-y-1">
+                <div className="border border-gray-700 rounded-lg p-1.5 space-y-1 ml-[6px] mr-[6px] mt-[20px] mb-[20px] pl-[10px] pr-[10px] pt-[10px] pb-[10px]">
                   <h3 className="text-xs font-semibold text-blue-400">고객 정보</h3>
                   
                   {/* Row 2-1: 이름, 신용점수, 주민등록번호 - 이름 flex-1 확장, 나머지 고정폭 */}
