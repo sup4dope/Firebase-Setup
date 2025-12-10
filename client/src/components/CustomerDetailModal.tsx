@@ -389,14 +389,14 @@ export function CustomerDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] p-0 bg-gray-900 border-gray-700 overflow-hidden">
+      <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] p-0 bg-gray-900 border-gray-700 flex flex-col overflow-hidden">
         <VisuallyHidden>
           <DialogTitle>
             {isNewCustomer ? '신규 고객 등록' : `${customer?.name || '고객'} 상세정보`}
           </DialogTitle>
         </VisuallyHidden>
-        {/* Header - Slim */}
-        <div className="flex items-center justify-between px-6 py-2 border-b border-gray-700 bg-gray-900/80">
+        {/* Header - h-16 shrink-0 고정 */}
+        <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-gray-700 bg-gray-900/80">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-bold text-gray-100">
               {isNewCustomer ? '신규 고객 등록' : `${customer?.name || '고객'} 상세정보`}
@@ -440,12 +440,11 @@ export function CustomerDetailModal({
           </div>
         </div>
 
-        {/* Main Content - 4 Section Grid */}
-        <div className="flex-1 grid grid-cols-[30%_70%] h-[calc(90vh-48px)] overflow-hidden">
+        {/* Main Content - flex-1 h-[calc(100%-4rem)] overflow-hidden */}
+        <div className="flex-1 flex flex-row h-[calc(100%-4rem)] overflow-hidden">
           
-          {/* Section 1: Left Panel - Input Form (Compact) */}
-          <div className="border-r border-gray-700 overflow-hidden">
-            <ScrollArea className="h-full">
+          {/* Section 1: Left Panel - w-[35%] h-full overflow-y-auto */}
+          <div className="w-[35%] h-full border-r border-gray-700 overflow-y-auto">
               <div className="p-2 pt-1 space-y-2">
                 
                 {/* 유입경로 (최상단) - 1. 상단에 바짝 붙임 */}
@@ -889,14 +888,13 @@ export function CustomerDetailModal({
                   </div>
                 </div>
               </div>
-            </ScrollArea>
           </div>
 
-          {/* Right Panel - flex flex-col h-full max-h-full overflow-hidden */}
-          <div className="flex flex-col h-full max-h-full overflow-hidden">
+          {/* Right Panel - w-[65%] h-full flex flex-col */}
+          <div className="w-[65%] h-full flex flex-col overflow-hidden">
             
-            {/* Section 2: Top - Document Viewer (h-2/5 shrink-0) */}
-            <div className="h-2/5 shrink-0 border-b border-gray-700 flex flex-col overflow-hidden">
+            {/* Section 2: Top - Document Viewer (h-1/3) */}
+            <div className="h-1/3 shrink-0 border-b border-gray-700 flex flex-col overflow-hidden">
               {/* Document Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
                 <div className="flex items-center gap-2 flex-1 overflow-x-auto">
@@ -1001,8 +999,8 @@ export function CustomerDetailModal({
               </div>
             </div>
 
-            {/* Bottom Section - h-3/5 overflow-hidden (60% 고정) */}
-            <div className="h-3/5 overflow-hidden">
+            {/* Bottom Section - flex-1 min-h-0 overflow-hidden */}
+            <div className="flex-1 min-h-0 overflow-hidden">
               <div className="flex flex-row h-full">
               
               {/* Section 3: Memo Chat (Left 50%) */}
