@@ -446,10 +446,10 @@ export function CustomerDetailModal({
           {/* Section 1: Left Panel - Input Form (Compact) */}
           <div className="border-r border-gray-700 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="p-3 space-y-2">
+              <div className="p-2 pt-1 space-y-2">
                 
-                {/* 유입경로 (최상단) */}
-                <div className="space-y-1">
+                {/* 유입경로 (최상단) - 1. 상단에 바짝 붙임 */}
+                <div className="space-y-0.5">
                   <Label className="text-xs text-gray-300">유입경로</Label>
                   <Select 
                     value={formData.entry_source || '광고랜딩명'} 
@@ -470,9 +470,9 @@ export function CustomerDetailModal({
                 <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
                   <h3 className="text-xs font-semibold text-blue-400">고객 정보</h3>
                   
-                  {/* Row 2-1: 이름, 신용점수, 주민등록번호 */}
-                  <div className="flex flex-wrap gap-2">
-                    <div className="flex-1 min-w-[80px]">
+                  {/* Row 2-1: 이름, 신용점수, 주민등록번호 - 2. 비율 15:15:35:35 */}
+                  <div className="grid grid-cols-[15%_15%_1fr_1fr] gap-1.5 items-end">
+                    <div>
                       <Label className="text-xs text-gray-400">이름</Label>
                       <Input 
                         value={formData.name || ''} 
@@ -481,8 +481,8 @@ export function CustomerDetailModal({
                         data-testid="input-customer-name"
                       />
                     </div>
-                    <div className="w-16">
-                      <Label className="text-xs text-gray-400">신용점수</Label>
+                    <div>
+                      <Label className="text-xs text-gray-400">신용</Label>
                       <Input 
                         type="number"
                         value={formData.credit_score || ''} 
@@ -490,61 +490,58 @@ export function CustomerDetailModal({
                         className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                       />
                     </div>
-                    <div className="flex items-end gap-1">
-                      <div className="w-20">
-                        <Label className="text-xs text-gray-400">주민번호(앞)</Label>
-                        <Input 
-                          maxLength={6}
-                          value={formData.ssn_front || ''} 
-                          onChange={(e) => setFormData(p => ({ ...p, ssn_front: e.target.value }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
-                          placeholder="YYMMDD"
-                        />
-                      </div>
-                      <span className="text-gray-500 pb-1.5 text-sm">-</span>
-                      <div className="w-20">
-                        <Label className="text-xs text-gray-400">(뒤7자리)</Label>
-                        <Input 
-                          maxLength={7}
-                          value={formData.ssn_back || ''} 
-                          onChange={(e) => setFormData(p => ({ ...p, ssn_back: e.target.value }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
-                          placeholder="0000000"
-                        />
-                      </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">주민번호(앞6)</Label>
+                      <Input 
+                        maxLength={6}
+                        value={formData.ssn_front || ''} 
+                        onChange={(e) => setFormData(p => ({ ...p, ssn_front: e.target.value }))}
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        placeholder="YYMMDD"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">주민번호(뒤7)</Label>
+                      <Input 
+                        maxLength={7}
+                        value={formData.ssn_back || ''} 
+                        onChange={(e) => setFormData(p => ({ ...p, ssn_back: e.target.value }))}
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        placeholder="0000000"
+                      />
                     </div>
                   </div>
 
-                  {/* Row 2-2: 연락처, 통신사 */}
-                  <div className="flex w-full gap-2 items-end">
-                    <div className="flex items-end gap-1 flex-[2]">
-                      <div className="w-12">
+                  {/* Row 2-2: 연락처, 통신사 - 8. 연락처 컴팩트, 통신사 넓게 */}
+                  <div className="flex w-full gap-1.5 items-end">
+                    <div className="flex items-end gap-0.5">
+                      <div className="w-11">
                         <Label className="text-xs text-gray-400">연락처</Label>
                         <Input 
                           value={formData.phone_part1 || '010'} 
                           onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
                           onBlur={handleBlurSave}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm px-1.5 text-center"
                         />
                       </div>
-                      <span className="text-gray-500 pb-1.5 text-sm">-</span>
+                      <span className="text-gray-500 pb-1.5 text-xs">-</span>
                       <Input 
                         maxLength={4}
                         value={formData.phone_part2 || ''} 
                         onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
                         onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 w-12 h-8 text-sm px-1.5 text-center"
                       />
-                      <span className="text-gray-500 pb-1.5 text-sm">-</span>
+                      <span className="text-gray-500 pb-1.5 text-xs">-</span>
                       <Input 
                         maxLength={4}
                         value={formData.phone_part3 || ''} 
                         onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
                         onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 w-12 h-8 text-sm px-1.5 text-center"
                       />
                     </div>
-                    <div className="w-24">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">통신사</Label>
                       <Select 
                         value={formData.carrier || 'SKT'} 
@@ -656,7 +653,7 @@ export function CustomerDetailModal({
                 <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
                   <h3 className="text-xs font-semibold text-emerald-400">사업자 정보</h3>
                   
-                  {/* Row 3-1: 상호명, 개업일 */}
+                  {/* Row 3-1: 상호명, 개업일 - 4. 7년 초과 배지 라벨 옆으로 */}
                   <div className="flex flex-wrap gap-2">
                     <div className="flex-1 min-w-[120px]">
                       <Label className="text-xs text-gray-400">상호명</Label>
@@ -668,24 +665,26 @@ export function CustomerDetailModal({
                       />
                     </div>
                     <div className="w-36">
-                      <Label className="text-xs text-gray-400">개업일</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs text-gray-400">개업일</Label>
+                        {formData.founding_date && formData.over_7_years && (
+                          <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-orange-600/20 text-orange-400 leading-tight">
+                            7년초과
+                          </Badge>
+                        )}
+                      </div>
                       <Input 
                         type="date"
                         value={formData.founding_date || ''} 
                         onChange={(e) => handleFoundingDateChange(e.target.value)}
                         className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                       />
-                      {formData.founding_date && formData.over_7_years && (
-                        <Badge variant="secondary" className="mt-0.5 text-[10px] bg-orange-600/20 text-orange-400">
-                          7년 초과
-                        </Badge>
-                      )}
                     </div>
                   </div>
 
-                  {/* Row 3-2: 업종, 종목 */}
-                  <div className="flex flex-wrap gap-2">
-                    <div className="w-28">
+                  {/* Row 3-2: 업종, 종목 - 3. 정확히 50:50 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
                       <Label className="text-xs text-gray-400">업종</Label>
                       <Select 
                         value={formData.business_type || '기타'} 
@@ -701,7 +700,7 @@ export function CustomerDetailModal({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex-1 min-w-[100px]">
+                    <div>
                       <Label className="text-xs text-gray-400">종목</Label>
                       <Input 
                         value={formData.business_item || ''} 
@@ -711,9 +710,9 @@ export function CustomerDetailModal({
                     </div>
                   </div>
 
-                  {/* Row 3-3: 사업자등록번호, 재도전, 혁신 */}
-                  <div className="flex w-full gap-2">
-                    <div className="flex-1">
+                  {/* Row 3-3: 사업자등록번호, 재도전, 혁신 - 5. 비율 2:1:1 (50%:25%:25%) */}
+                  <div className="grid grid-cols-[2fr_1fr_1fr] gap-2">
+                    <div>
                       <Label className="text-xs text-gray-400">사업자번호</Label>
                       <Input 
                         value={formData.business_registration_number || ''} 
@@ -722,7 +721,7 @@ export function CustomerDetailModal({
                         placeholder="000-00-00000"
                       />
                     </div>
-                    <div className="w-20">
+                    <div>
                       <Label className="text-xs text-gray-400">재도전</Label>
                       <Select 
                         value={formData.retry_type || '해당없음'} 
@@ -738,7 +737,7 @@ export function CustomerDetailModal({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="w-20">
+                    <div>
                       <Label className="text-xs text-gray-400">혁신</Label>
                       <Select 
                         value={formData.innovation_type || '해당없음'} 
@@ -831,10 +830,10 @@ export function CustomerDetailModal({
                     </div>
                   )}
 
-                  {/* Row 3-5: 매출 (최근, Y-1, Y-2, Y-3) */}
-                  <div className="flex w-full gap-1.5">
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-400">최근</Label>
+                  {/* Row 3-5: 매출 - 6. 라벨 수정 및 grid-cols-4 등간격 */}
+                  <div className="grid grid-cols-4 gap-1.5">
+                    <div>
+                      <Label className="text-xs text-gray-400">최근 매출</Label>
                       <div className="relative">
                         <Input 
                           type="number"
@@ -845,8 +844,8 @@ export function CustomerDetailModal({
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-400">Y-1</Label>
+                    <div>
+                      <Label className="text-xs text-gray-400">Y-1 매출</Label>
                       <div className="relative">
                         <Input 
                           type="number"
@@ -857,8 +856,8 @@ export function CustomerDetailModal({
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-400">Y-2</Label>
+                    <div>
+                      <Label className="text-xs text-gray-400">Y-2 매출</Label>
                       <div className="relative">
                         <Input 
                           type="number"
@@ -869,8 +868,8 @@ export function CustomerDetailModal({
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-400">Y-3</Label>
+                    <div>
+                      <Label className="text-xs text-gray-400">Y-3 매출</Label>
                       <div className="relative">
                         <Input 
                           type="number"
