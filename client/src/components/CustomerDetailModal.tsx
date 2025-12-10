@@ -512,36 +512,34 @@ export function CustomerDetailModal({
                     </div>
                   </div>
 
-                  {/* Row 2-2: 연락처, 통신사 - 비율 6:4 고정 */}
-                  <div className="flex w-full gap-2 items-end">
-                    <div className="basis-3/5 flex items-end gap-1">
-                      <div className="w-12">
-                        <Label className="text-xs text-gray-400">연락처</Label>
+                  {/* Row 2-2: 연락처, 통신사 - 연락처 grid 3등분, 통신사 w-20 컴팩트 */}
+                  <div className="flex flex-row w-full gap-2 items-end">
+                    <div className="flex-1">
+                      <Label className="text-xs text-gray-400">연락처</Label>
+                      <div className="grid grid-cols-3 gap-1">
                         <Input 
                           value={formData.phone_part1 || '010'} 
                           onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
                           onBlur={handleBlurSave}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm px-1.5 text-center"
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm text-center"
+                        />
+                        <Input 
+                          maxLength={4}
+                          value={formData.phone_part2 || ''} 
+                          onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
+                          onBlur={handleBlurSave}
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm text-center"
+                        />
+                        <Input 
+                          maxLength={4}
+                          value={formData.phone_part3 || ''} 
+                          onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
+                          onBlur={handleBlurSave}
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm text-center"
                         />
                       </div>
-                      <span className="text-gray-500 pb-2 text-xs">-</span>
-                      <Input 
-                        maxLength={4}
-                        value={formData.phone_part2 || ''} 
-                        onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
-                        onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-9 text-sm px-1.5 text-center"
-                      />
-                      <span className="text-gray-500 pb-2 text-xs">-</span>
-                      <Input 
-                        maxLength={4}
-                        value={formData.phone_part3 || ''} 
-                        onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
-                        onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-9 text-sm px-1.5 text-center"
-                      />
                     </div>
-                    <div className="basis-2/5">
+                    <div className="w-20">
                       <Label className="text-xs text-gray-400">통신사</Label>
                       <Select 
                         value={formData.carrier || 'SKT'} 
@@ -653,9 +651,9 @@ export function CustomerDetailModal({
                 <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
                   <h3 className="text-xs font-semibold text-emerald-400">사업자 정보</h3>
                   
-                  {/* Row 3-1: 상호명, 개업일 - 수직 정렬 통일 h-9 */}
-                  <div className="flex gap-2 items-end">
-                    <div className="flex-1 min-w-[120px]">
+                  {/* Row 3-1: 상호명, 개업일 - grid-cols-2로 50:50 통일 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
                       <Label className="text-xs text-gray-400">상호명</Label>
                       <Input 
                         value={formData.company_name || ''} 
@@ -664,7 +662,7 @@ export function CustomerDetailModal({
                         data-testid="input-company-name"
                       />
                     </div>
-                    <div className="w-36">
+                    <div>
                       <div className="flex items-center gap-1.5">
                         <Label className="text-xs text-gray-400">개업일</Label>
                         {formData.founding_date && formData.over_7_years && (
@@ -710,24 +708,24 @@ export function CustomerDetailModal({
                     </div>
                   </div>
 
-                  {/* Row 3-3: 사업자등록번호, 재도전, 혁신 - 5. 비율 2:1:1 (50%:25%:25%) */}
-                  <div className="grid grid-cols-[2fr_1fr_1fr] gap-2">
-                    <div>
+                  {/* Row 3-3: 사업자등록번호, 재도전, 혁신 - flex 2:1:1 비율 */}
+                  <div className="flex gap-2">
+                    <div className="flex-[2]">
                       <Label className="text-xs text-gray-400">사업자번호</Label>
                       <Input 
                         value={formData.business_registration_number || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, business_registration_number: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
                         placeholder="000-00-00000"
                       />
                     </div>
-                    <div>
+                    <div className="flex-[1]">
                       <Label className="text-xs text-gray-400">재도전</Label>
                       <Select 
                         value={formData.retry_type || '해당없음'} 
                         onValueChange={(v) => setFormData(p => ({ ...p, retry_type: v }))}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
@@ -737,13 +735,13 @@ export function CustomerDetailModal({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
+                    <div className="flex-[1]">
                       <Label className="text-xs text-gray-400">혁신</Label>
                       <Select 
                         value={formData.innovation_type || '해당없음'} 
                         onValueChange={(v) => setFormData(p => ({ ...p, innovation_type: v }))}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
@@ -886,11 +884,11 @@ export function CustomerDetailModal({
             </ScrollArea>
           </div>
 
-          {/* Right Panel - Split into top and bottom */}
+          {/* Right Panel - Split into top 55% and bottom 45% */}
           <div className="flex flex-col h-full overflow-hidden">
             
-            {/* Section 2: Top - Document Viewer (50% height) */}
-            <div className="h-1/2 border-b border-gray-700 flex flex-col overflow-hidden">
+            {/* Section 2: Top - Document Viewer (55% height) */}
+            <div className="h-[55%] border-b border-gray-700 flex flex-col overflow-hidden">
               {/* Document Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
                 <div className="flex items-center gap-2 flex-1 overflow-x-auto">
@@ -995,12 +993,12 @@ export function CustomerDetailModal({
               </div>
             </div>
 
-            {/* Bottom Section - Split into 2 columns - 5. overflow 해결 */}
-            <div className="h-1/2 flex overflow-hidden min-h-0">
+            {/* Bottom Section - 45% 고정 높이, 좌우 50:50 분할 */}
+            <div className="h-[45%] flex flex-row overflow-hidden">
               
               {/* Section 3: Memo Chat (Left 50%) */}
-              <div className="w-1/2 border-r border-gray-700 flex flex-col min-h-0 overflow-hidden">
-                <div className="px-4 py-2 border-b border-gray-700 bg-gray-800/30 shrink-0">
+              <div className="w-1/2 border-r border-gray-700 flex flex-col h-full overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-gray-700 bg-gray-800/30 shrink-0">
                   <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
                     <UserIcon className="w-4 h-4" />
                     상담 메모
@@ -1008,21 +1006,21 @@ export function CustomerDetailModal({
                 </div>
                 
                 {/* Memo Messages - flex-1 overflow-y-auto */}
-                <div ref={memoScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-900/50 min-h-0">
+                <div ref={memoScrollRef} className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-900/50">
                   {memos.length === 0 ? (
-                    <div className="text-center text-gray-500 py-4">
+                    <div className="text-center text-gray-500 py-3">
                       <p className="text-sm">상담 메모가 없습니다</p>
                     </div>
                   ) : (
                     memos.map((memo) => (
                       <div key={memo.id} className="flex flex-col">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-0.5">
                           <span className="text-xs font-medium text-blue-400">{memo.author_name}</span>
                           <span className="text-xs text-gray-500">
                             {safeFormatDate(memo.created_at, 'MM/dd HH:mm')}
                           </span>
                         </div>
-                        <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-3 py-2 max-w-[90%]">
+                        <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
                           <p className="text-sm text-gray-200 whitespace-pre-wrap">{memo.content}</p>
                         </div>
                       </div>
@@ -1030,14 +1028,14 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* Memo Input - shrink-0 하단 고정 */}
-                <div className="p-2 border-t border-gray-700 bg-gray-800/30 shrink-0">
-                  <div className="flex gap-2">
+                {/* Memo Input - shrink-0 py-2 최소 패딩 */}
+                <div className="py-2 px-2 border-t border-gray-700 bg-gray-800/30 shrink-0">
+                  <div className="flex gap-1.5">
                     <Textarea
                       value={newMemo}
                       onChange={(e) => setNewMemo(e.target.value)}
                       placeholder="메모 입력..."
-                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none h-12 text-sm"
+                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none h-10 text-sm"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -1058,8 +1056,8 @@ export function CustomerDetailModal({
               </div>
 
               {/* Section 4: AI Chat (Right 50%) */}
-              <div className="w-1/2 flex flex-col min-h-0 overflow-hidden bg-gray-950/30">
-                <div className="px-4 py-2 border-b border-gray-700 bg-purple-900/20 shrink-0">
+              <div className="w-1/2 flex flex-col h-full overflow-hidden bg-gray-950/30">
+                <div className="px-3 py-1.5 border-b border-gray-700 bg-purple-900/20 shrink-0">
                   <h3 className="text-sm font-semibold text-purple-300 flex items-center gap-2">
                     <Bot className="w-4 h-4" />
                     AI 질의
@@ -1067,10 +1065,10 @@ export function CustomerDetailModal({
                 </div>
                 
                 {/* AI Messages - flex-1 overflow-y-auto */}
-                <div ref={aiScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+                <div ref={aiScrollRef} className="flex-1 overflow-y-auto p-2 space-y-2">
                   {aiMessages.length === 0 ? (
-                    <div className="text-center text-gray-500 py-4">
-                      <Bot className="w-8 h-8 mx-auto mb-2 text-purple-600/50" />
+                    <div className="text-center text-gray-500 py-3">
+                      <Bot className="w-7 h-7 mx-auto mb-1 text-purple-600/50" />
                       <p className="text-sm">AI에게 질문하세요</p>
                     </div>
                   ) : (
@@ -1083,14 +1081,14 @@ export function CustomerDetailModal({
                         )}
                       >
                         <div className={cn(
-                          "rounded-lg px-3 py-2 max-w-[90%]",
+                          "rounded-lg px-2 py-1.5 max-w-[90%]",
                           msg.role === 'user' 
                             ? "bg-purple-600/30 border border-purple-600/40" 
                             : "bg-gray-700/50 border border-gray-600/50"
                         )}>
                           <p className="text-sm text-gray-200 whitespace-pre-wrap">{msg.content}</p>
                         </div>
-                        <span className="text-xs text-gray-500 mt-1">
+                        <span className="text-xs text-gray-500 mt-0.5">
                           {safeFormatDate(msg.created_at, 'HH:mm')}
                         </span>
                       </div>
@@ -1098,14 +1096,14 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* AI Input - shrink-0 하단 고정 */}
-                <div className="p-2 border-t border-gray-700 bg-purple-900/10 shrink-0">
-                  <div className="flex gap-2">
+                {/* AI Input - shrink-0 py-2 최소 패딩 */}
+                <div className="py-2 px-2 border-t border-gray-700 bg-purple-900/10 shrink-0">
+                  <div className="flex gap-1.5">
                     <Textarea
                       value={aiInput}
                       onChange={(e) => setAiInput(e.target.value)}
                       placeholder="AI에게 질문하기..."
-                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none h-12 text-sm"
+                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none h-10 text-sm"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
