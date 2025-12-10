@@ -443,9 +443,9 @@ export function CustomerDetailModal({
         {/* Main Content - flex-1 h-[calc(100%-4rem)] overflow-hidden */}
         <div className="flex-1 flex flex-row h-[calc(100%-4rem)] overflow-hidden">
           
-          {/* Section 1: Left Panel - w-[35%] h-full overflow-y-auto */}
-          <div className="w-[35%] h-full border-r border-gray-700 overflow-y-auto">
-              <div className="p-2 pt-1 space-y-2">
+          {/* Section 1: Left Panel - w-[35%] h-full overflow-hidden (스크롤 제거) */}
+          <div className="w-[35%] h-full border-r border-gray-700 overflow-hidden">
+              <div className="p-1.5 space-y-1">
                 
                 {/* 유입경로 (최상단) - 1. 상단에 바짝 붙임 */}
                 <div className="space-y-0.5">
@@ -466,7 +466,7 @@ export function CustomerDetailModal({
                 </div>
 
                 {/* 고객 정보 그룹 (Border Box) */}
-                <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
+                <div className="border border-gray-700 rounded-lg p-1.5 space-y-1">
                   <h3 className="text-xs font-semibold text-blue-400">고객 정보</h3>
                   
                   {/* Row 2-1: 이름, 신용점수, 주민등록번호 - 이름 flex-1 확장, 나머지 고정폭 */}
@@ -653,7 +653,7 @@ export function CustomerDetailModal({
                 </div>
 
                 {/* 사업자 정보 그룹 (Border Box) */}
-                <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
+                <div className="border border-gray-700 rounded-lg p-1.5 space-y-1">
                   <h3 className="text-xs font-semibold text-emerald-400">사업자 정보</h3>
                   
                   {/* Row 3-1: 상호명, 개업일 - grid-cols-2 gap-3 items-end (Row 2와 동일) */}
@@ -893,8 +893,8 @@ export function CustomerDetailModal({
           {/* Right Panel - w-[65%] h-full flex flex-col */}
           <div className="w-[65%] h-full flex flex-col overflow-hidden">
             
-            {/* Section 2: Top - Document Viewer (h-1/3) */}
-            <div className="h-1/3 shrink-0 border-b border-gray-700 flex flex-col overflow-hidden">
+            {/* Section 2: Top - Document Viewer (h-[60%]) */}
+            <div className="h-[60%] shrink-0 border-b border-gray-700 flex flex-col overflow-hidden">
               {/* Document Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
                 <div className="flex items-center gap-2 flex-1 overflow-x-auto">
@@ -999,9 +999,9 @@ export function CustomerDetailModal({
               </div>
             </div>
 
-            {/* Bottom Section - flex-1 min-h-0 overflow-hidden */}
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <div className="flex flex-row h-full">
+            {/* Bottom Section - h-[40%] min-h-0 overflow-hidden */}
+            <div className="h-[40%] min-h-0 overflow-hidden">
+              <div className="flex flex-row w-full h-full">
               
               {/* Section 3: Memo Chat (Left 50%) */}
               <div className="w-1/2 border-r border-gray-700 flex flex-col h-full">
