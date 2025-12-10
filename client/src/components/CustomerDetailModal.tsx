@@ -448,7 +448,7 @@ export function CustomerDetailModal({
               <div className="p-1.5 space-y-1">
                 
                 {/* 유입경로 (최상단) - 1. 상단에 바짝 붙임 */}
-                <div className="space-y-0.5">
+                <div className="space-y-0.5 ml-[6px] mr-[6px] pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
                   <Label className="text-xs text-gray-300 ml-[11px] mr-[11px]">유입경로</Label>
                   <Select 
                     value={formData.entry_source || '광고랜딩명'} 
