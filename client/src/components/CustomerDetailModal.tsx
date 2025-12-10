@@ -443,72 +443,72 @@ export function CustomerDetailModal({
         {/* Main Content - 4 Section Grid */}
         <div className="flex-1 grid grid-cols-[30%_70%] h-[calc(90vh-48px)] overflow-hidden">
           
-          {/* Section 1: Left Panel - Input Form */}
+          {/* Section 1: Left Panel - Input Form (Compact) */}
           <div className="border-r border-gray-700 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="p-5 space-y-5">
+              <div className="p-3 space-y-2">
                 
                 {/* 유입경로 (최상단) */}
-                <div className="space-y-2">
-                  <Label className="text-gray-300">유입경로</Label>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-300">유입경로</Label>
                   <Select 
                     value={formData.entry_source || '광고랜딩명'} 
                     onValueChange={(v) => setFormData(p => ({ ...p, entry_source: v }))}
                   >
-                    <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                    <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
                       {ENTRY_SOURCES.map(src => (
-                        <SelectItem key={src} value={src} className="text-gray-200">{src}</SelectItem>
+                        <SelectItem key={src} value={src} className="text-gray-200 text-sm">{src}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* 고객 정보 그룹 (Border Box) */}
-                <div className="border border-gray-700 rounded-lg p-4 space-y-4">
-                  <h3 className="text-sm font-semibold text-blue-400 mb-3">고객 정보</h3>
+                <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
+                  <h3 className="text-xs font-semibold text-blue-400">고객 정보</h3>
                   
                   {/* Row 2-1: 이름, 신용점수, 주민등록번호 */}
-                  <div className="flex flex-wrap gap-3">
-                    <div className="flex-1 min-w-[100px]">
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex-1 min-w-[80px]">
                       <Label className="text-xs text-gray-400">이름</Label>
                       <Input 
                         value={formData.name || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                         data-testid="input-customer-name"
                       />
                     </div>
-                    <div className="w-20">
+                    <div className="w-16">
                       <Label className="text-xs text-gray-400">신용점수</Label>
                       <Input 
                         type="number"
                         value={formData.credit_score || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, credit_score: Number(e.target.value) }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                       />
                     </div>
                     <div className="flex items-end gap-1">
-                      <div className="w-24">
+                      <div className="w-20">
                         <Label className="text-xs text-gray-400">주민번호(앞)</Label>
                         <Input 
                           maxLength={6}
                           value={formData.ssn_front || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, ssn_front: e.target.value }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200"
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                           placeholder="YYMMDD"
                         />
                       </div>
-                      <span className="text-gray-500 pb-2">-</span>
-                      <div className="w-24">
+                      <span className="text-gray-500 pb-1.5 text-sm">-</span>
+                      <div className="w-20">
                         <Label className="text-xs text-gray-400">(뒤7자리)</Label>
                         <Input 
                           maxLength={7}
                           value={formData.ssn_back || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, ssn_back: e.target.value }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200"
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                           placeholder="0000000"
                         />
                       </div>
@@ -516,46 +516,46 @@ export function CustomerDetailModal({
                   </div>
 
                   {/* Row 2-2: 연락처, 통신사 */}
-                  <div className="flex w-full gap-3 items-end">
+                  <div className="flex w-full gap-2 items-end">
                     <div className="flex items-end gap-1 flex-[2]">
-                      <div className="w-14">
+                      <div className="w-12">
                         <Label className="text-xs text-gray-400">연락처</Label>
                         <Input 
                           value={formData.phone_part1 || '010'} 
                           onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
                           onBlur={handleBlurSave}
-                          className="bg-gray-800 border-gray-600 text-gray-200"
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                         />
                       </div>
-                      <span className="text-gray-500 pb-2">-</span>
+                      <span className="text-gray-500 pb-1.5 text-sm">-</span>
                       <Input 
                         maxLength={4}
                         value={formData.phone_part2 || ''} 
                         onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
                         onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
+                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-8 text-sm"
                       />
-                      <span className="text-gray-500 pb-2">-</span>
+                      <span className="text-gray-500 pb-1.5 text-sm">-</span>
                       <Input 
                         maxLength={4}
                         value={formData.phone_part3 || ''} 
                         onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
                         onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
+                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-8 text-sm"
                       />
                     </div>
-                    <div className="w-28">
+                    <div className="w-24">
                       <Label className="text-xs text-gray-400">통신사</Label>
                       <Select 
                         value={formData.carrier || 'SKT'} 
                         onValueChange={(v) => { handleFieldChange({ carrier: v }); }}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
                           {CARRIERS.map(c => (
-                            <SelectItem key={c} value={c} className="text-gray-200">{c}</SelectItem>
+                            <SelectItem key={c} value={c} className="text-gray-200 text-sm">{c}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -563,48 +563,49 @@ export function CustomerDetailModal({
                   </div>
 
                   {/* Row 2-3: 자택주소, 상세주소, 자가여부, 상동여부 */}
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
+                  <div className="space-y-1.5">
+                    <div className="flex gap-1.5">
                       <div className="flex-1">
                         <Label className="text-xs text-gray-400">자택주소</Label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5">
                           <Input 
                             value={formData.home_address || ''} 
                             readOnly
-                            className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
-                            placeholder="주소 검색 버튼 클릭"
+                            className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-8 text-sm"
+                            placeholder="주소 검색"
                           />
                           <Button 
                             type="button" 
                             variant="outline" 
-                            size="icon"
+                            size="sm"
                             onClick={() => setShowHomeAddressSearch(true)}
-                            className="border-gray-600"
+                            className="border-gray-600 h-8 w-8 p-0"
                           >
-                            <Search className="w-4 h-4" />
+                            <Search className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-3 items-center">
-                      <div className="flex-1 min-w-[120px]">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <div className="flex-1 min-w-[100px]">
                         <Label className="text-xs text-gray-400">상세주소</Label>
                         <Input 
                           value={formData.home_address_detail || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, home_address_detail: e.target.value }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200"
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                           placeholder="동/호수"
                         />
                       </div>
-                      <div className="flex items-center gap-2 pt-5">
+                      <div className="flex items-center gap-1.5 pt-4">
                         <Checkbox 
                           id="home-owned"
                           checked={formData.is_home_owned || false}
                           onCheckedChange={(c) => setFormData(p => ({ ...p, is_home_owned: !!c }))}
+                          className="h-3.5 w-3.5"
                         />
                         <Label htmlFor="home-owned" className="text-xs text-gray-400">자가</Label>
                       </div>
-                      <div className="flex items-center gap-2 pt-5">
+                      <div className="flex items-center gap-1.5 pt-4">
                         <Checkbox 
                           id="same-address"
                           checked={formData.is_same_as_business || false}
@@ -616,8 +617,9 @@ export function CustomerDetailModal({
                               business_address_detail: c ? p.home_address_detail : p.business_address_detail,
                             }));
                           }}
+                          className="h-3.5 w-3.5"
                         />
-                        <Label htmlFor="same-address" className="text-xs text-gray-400">사업장 동일</Label>
+                        <Label htmlFor="same-address" className="text-xs text-gray-400">사업장동일</Label>
                       </div>
                     </div>
                   </div>
@@ -651,30 +653,30 @@ export function CustomerDetailModal({
                 </div>
 
                 {/* 사업자 정보 그룹 (Border Box) */}
-                <div className="border border-gray-700 rounded-lg p-4 space-y-4">
-                  <h3 className="text-sm font-semibold text-emerald-400 mb-3">사업자 정보</h3>
+                <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
+                  <h3 className="text-xs font-semibold text-emerald-400">사업자 정보</h3>
                   
                   {/* Row 3-1: 상호명, 개업일 */}
-                  <div className="flex flex-wrap gap-3">
-                    <div className="flex-1 min-w-[150px]">
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex-1 min-w-[120px]">
                       <Label className="text-xs text-gray-400">상호명</Label>
                       <Input 
                         value={formData.company_name || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, company_name: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                         data-testid="input-company-name"
                       />
                     </div>
-                    <div className="w-40">
+                    <div className="w-36">
                       <Label className="text-xs text-gray-400">개업일</Label>
                       <Input 
                         type="date"
                         value={formData.founding_date || ''} 
                         onChange={(e) => handleFoundingDateChange(e.target.value)}
-                        className="bg-gray-800 border-gray-600 text-gray-200"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                       />
-                      {formData.over_7_years && (
-                        <Badge variant="secondary" className="mt-1 text-xs bg-orange-600/20 text-orange-400">
+                      {formData.founding_date && formData.over_7_years && (
+                        <Badge variant="secondary" className="mt-0.5 text-[10px] bg-orange-600/20 text-orange-400">
                           7년 초과
                         </Badge>
                       )}
@@ -682,72 +684,72 @@ export function CustomerDetailModal({
                   </div>
 
                   {/* Row 3-2: 업종, 종목 */}
-                  <div className="flex flex-wrap gap-3">
-                    <div className="w-32">
+                  <div className="flex flex-wrap gap-2">
+                    <div className="w-28">
                       <Label className="text-xs text-gray-400">업종</Label>
                       <Select 
                         value={formData.business_type || '기타'} 
                         onValueChange={(v) => setFormData(p => ({ ...p, business_type: v }))}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
                           {BUSINESS_TYPES.map(t => (
-                            <SelectItem key={t} value={t} className="text-gray-200">{t}</SelectItem>
+                            <SelectItem key={t} value={t} className="text-gray-200 text-sm">{t}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex-1 min-w-[120px]">
+                    <div className="flex-1 min-w-[100px]">
                       <Label className="text-xs text-gray-400">종목</Label>
                       <Input 
                         value={formData.business_item || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, business_item: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Row 3-3: 사업자등록번호, 재도전, 혁신 */}
-                  <div className="flex w-full gap-3">
+                  <div className="flex w-full gap-2">
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-400">사업자등록번호</Label>
+                      <Label className="text-xs text-gray-400">사업자번호</Label>
                       <Input 
                         value={formData.business_registration_number || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, business_registration_number: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                         placeholder="000-00-00000"
                       />
                     </div>
-                    <div className="flex-1">
+                    <div className="w-20">
                       <Label className="text-xs text-gray-400">재도전</Label>
                       <Select 
                         value={formData.retry_type || '해당없음'} 
                         onValueChange={(v) => setFormData(p => ({ ...p, retry_type: v }))}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
                           {RETRY_OPTIONS.map(o => (
-                            <SelectItem key={o} value={o} className="text-gray-200">{o}</SelectItem>
+                            <SelectItem key={o} value={o} className="text-gray-200 text-sm">{o}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-400">혁신기술</Label>
+                    <div className="w-20">
+                      <Label className="text-xs text-gray-400">혁신</Label>
                       <Select 
                         value={formData.innovation_type || '해당없음'} 
                         onValueChange={(v) => setFormData(p => ({ ...p, innovation_type: v }))}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
                           {INNOVATION_OPTIONS.map(o => (
-                            <SelectItem key={o} value={o} className="text-gray-200">{o}</SelectItem>
+                            <SelectItem key={o} value={o} className="text-gray-200 text-sm">{o}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -755,46 +757,47 @@ export function CustomerDetailModal({
                   </div>
 
                   {/* Row 3-4: 사업장 소재지, 상세주소, 자가여부 */}
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
+                  <div className="space-y-1.5">
+                    <div className="flex gap-1.5">
                       <div className="flex-1">
                         <Label className="text-xs text-gray-400">사업장 소재지</Label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5">
                           <Input 
                             value={formData.business_address || ''} 
                             readOnly
-                            className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
-                            placeholder="주소 검색 버튼 클릭"
+                            className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-8 text-sm"
+                            placeholder="주소 검색"
                           />
                           <Button 
                             type="button" 
                             variant="outline" 
-                            size="icon"
+                            size="sm"
                             onClick={() => setShowBusinessAddressSearch(true)}
-                            className="border-gray-600"
+                            className="border-gray-600 h-8 w-8 p-0"
                             disabled={formData.is_same_as_business}
                           >
-                            <Search className="w-4 h-4" />
+                            <Search className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-3 items-center">
-                      <div className="flex-1 min-w-[120px]">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <div className="flex-1 min-w-[100px]">
                         <Label className="text-xs text-gray-400">상세주소</Label>
                         <Input 
                           value={formData.business_address_detail || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, business_address_detail: e.target.value }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200"
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
                           placeholder="동/호수"
                           disabled={formData.is_same_as_business}
                         />
                       </div>
-                      <div className="flex items-center gap-2 pt-5">
+                      <div className="flex items-center gap-1.5 pt-4">
                         <Checkbox 
                           id="business-owned"
                           checked={formData.is_business_owned || false}
                           onCheckedChange={(c) => setFormData(p => ({ ...p, is_business_owned: !!c }))}
+                          className="h-3.5 w-3.5"
                         />
                         <Label htmlFor="business-owned" className="text-xs text-gray-400">자가</Label>
                       </div>
@@ -829,53 +832,53 @@ export function CustomerDetailModal({
                   )}
 
                   {/* Row 3-5: 매출 (최근, Y-1, Y-2, Y-3) */}
-                  <div className="flex w-full gap-3">
+                  <div className="flex w-full gap-1.5">
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-400">최근매출</Label>
+                      <Label className="text-xs text-gray-400">최근</Label>
                       <div className="relative">
                         <Input 
                           type="number"
                           value={formData.recent_sales || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, recent_sales: Number(e.target.value) }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                          className="bg-gray-800 border-gray-600 text-gray-200 pr-6 h-8 text-sm"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
                     </div>
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-400">Y-1 매출</Label>
+                      <Label className="text-xs text-gray-400">Y-1</Label>
                       <div className="relative">
                         <Input 
                           type="number"
                           value={formData.sales_y1 || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, sales_y1: Number(e.target.value) }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                          className="bg-gray-800 border-gray-600 text-gray-200 pr-6 h-8 text-sm"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
                     </div>
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-400">Y-2 매출</Label>
+                      <Label className="text-xs text-gray-400">Y-2</Label>
                       <div className="relative">
                         <Input 
                           type="number"
                           value={formData.sales_y2 || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, sales_y2: Number(e.target.value) }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                          className="bg-gray-800 border-gray-600 text-gray-200 pr-6 h-8 text-sm"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
                     </div>
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-400">Y-3 매출</Label>
+                      <Label className="text-xs text-gray-400">Y-3</Label>
                       <div className="relative">
                         <Input 
                           type="number"
                           value={formData.sales_y3 || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, sales_y3: Number(e.target.value) }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                          className="bg-gray-800 border-gray-600 text-gray-200 pr-6 h-8 text-sm"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
                     </div>
                   </div>
