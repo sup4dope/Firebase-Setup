@@ -512,40 +512,46 @@ export function CustomerDetailModal({
                     </div>
                   </div>
 
-                  {/* Row 2-2: 연락처, 통신사 - 연락처 grid 3등분, 통신사 w-20 컴팩트 */}
-                  <div className="flex flex-row w-full gap-2 items-end">
-                    <div className="flex-1">
+                  {/* Row 2-2: 연락처, 통신사 - 2:2:2:4 비율, 하이픈 포함 */}
+                  <div className="flex flex-row items-center w-full gap-2">
+                    <div className="flex-[2]">
                       <Label className="text-xs text-gray-400">연락처</Label>
-                      <div className="grid grid-cols-3 gap-1">
-                        <Input 
-                          value={formData.phone_part1 || '010'} 
-                          onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
-                          onBlur={handleBlurSave}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm text-center"
-                        />
-                        <Input 
-                          maxLength={4}
-                          value={formData.phone_part2 || ''} 
-                          onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
-                          onBlur={handleBlurSave}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm text-center"
-                        />
-                        <Input 
-                          maxLength={4}
-                          value={formData.phone_part3 || ''} 
-                          onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
-                          onBlur={handleBlurSave}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm text-center"
-                        />
-                      </div>
+                      <Input 
+                        value={formData.phone_part1 || '010'} 
+                        onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
+                        onBlur={handleBlurSave}
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm text-center w-full"
+                      />
                     </div>
-                    <div className="w-20">
+                    <span className="text-gray-500 mt-5">-</span>
+                    <div className="flex-[2]">
+                      <Label className="text-xs text-gray-400 invisible">중간</Label>
+                      <Input 
+                        maxLength={4}
+                        value={formData.phone_part2 || ''} 
+                        onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
+                        onBlur={handleBlurSave}
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm text-center w-full"
+                      />
+                    </div>
+                    <span className="text-gray-500 mt-5">-</span>
+                    <div className="flex-[2]">
+                      <Label className="text-xs text-gray-400 invisible">끝</Label>
+                      <Input 
+                        maxLength={4}
+                        value={formData.phone_part3 || ''} 
+                        onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
+                        onBlur={handleBlurSave}
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm text-center w-full"
+                      />
+                    </div>
+                    <div className="flex-[4]">
                       <Label className="text-xs text-gray-400">통신사</Label>
                       <Select 
                         value={formData.carrier || 'SKT'} 
                         onValueChange={(v) => { handleFieldChange({ carrier: v }); }}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm">
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
@@ -651,14 +657,14 @@ export function CustomerDetailModal({
                 <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
                   <h3 className="text-xs font-semibold text-emerald-400">사업자 정보</h3>
                   
-                  {/* Row 3-1: 상호명, 개업일 - grid-cols-2로 50:50 통일 */}
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* Row 3-1: 상호명, 개업일 - grid-cols-2 gap-3 (50:50) */}
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs text-gray-400">상호명</Label>
                       <Input 
                         value={formData.company_name || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, company_name: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm"
                         data-testid="input-company-name"
                       />
                     </div>
@@ -675,20 +681,20 @@ export function CustomerDetailModal({
                         type="date"
                         value={formData.founding_date || ''} 
                         onChange={(e) => handleFoundingDateChange(e.target.value)}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm"
                       />
                     </div>
                   </div>
 
-                  {/* Row 3-2: 업종, 종목 - 3. 정확히 50:50 */}
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* Row 3-2: 업종, 종목 - grid-cols-2 gap-3 (50:50) */}
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs text-gray-400">업종</Label>
                       <Select 
                         value={formData.business_type || '기타'} 
                         onValueChange={(v) => setFormData(p => ({ ...p, business_type: v }))}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
@@ -703,53 +709,55 @@ export function CustomerDetailModal({
                       <Input 
                         value={formData.business_item || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, business_item: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm"
                       />
                     </div>
                   </div>
 
-                  {/* Row 3-3: 사업자등록번호, 재도전, 혁신 - flex 2:1:1 비율 */}
-                  <div className="flex gap-2">
-                    <div className="flex-[2]">
+                  {/* Row 3-3: 사업자번호 | 재도전+혁신 - grid-cols-2 gap-3 (50:50) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
                       <Label className="text-xs text-gray-400">사업자번호</Label>
                       <Input 
                         value={formData.business_registration_number || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, business_registration_number: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm"
                         placeholder="000-00-00000"
                       />
                     </div>
-                    <div className="flex-[1]">
-                      <Label className="text-xs text-gray-400">재도전</Label>
-                      <Select 
-                        value={formData.retry_type || '해당없음'} 
-                        onValueChange={(v) => setFormData(p => ({ ...p, retry_type: v }))}
-                      >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-700">
-                          {RETRY_OPTIONS.map(o => (
-                            <SelectItem key={o} value={o} className="text-gray-200 text-sm">{o}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex-[1]">
-                      <Label className="text-xs text-gray-400">혁신</Label>
-                      <Select 
-                        value={formData.innovation_type || '해당없음'} 
-                        onValueChange={(v) => setFormData(p => ({ ...p, innovation_type: v }))}
-                      >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-700">
-                          {INNOVATION_OPTIONS.map(o => (
-                            <SelectItem key={o} value={o} className="text-gray-200 text-sm">{o}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="flex flex-row gap-2">
+                      <div className="flex-1">
+                        <Label className="text-xs text-gray-400">재도전</Label>
+                        <Select 
+                          value={formData.retry_type || '해당없음'} 
+                          onValueChange={(v) => setFormData(p => ({ ...p, retry_type: v }))}
+                        >
+                          <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-800 border-gray-700">
+                            {RETRY_OPTIONS.map(o => (
+                              <SelectItem key={o} value={o} className="text-gray-200 text-sm">{o}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs text-gray-400">혁신</Label>
+                        <Select 
+                          value={formData.innovation_type || '해당없음'} 
+                          onValueChange={(v) => setFormData(p => ({ ...p, innovation_type: v }))}
+                        >
+                          <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-800 border-gray-700">
+                            {INNOVATION_OPTIONS.map(o => (
+                              <SelectItem key={o} value={o} className="text-gray-200 text-sm">{o}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
 
@@ -1028,14 +1036,14 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* Memo Input - shrink-0 py-2 최소 패딩 */}
-                <div className="py-2 px-2 border-t border-gray-700 bg-gray-800/30 shrink-0">
-                  <div className="flex gap-1.5">
-                    <Textarea
+                {/* Memo Input - h-10 슬림 입력창 */}
+                <div className="py-1.5 px-2 border-t border-gray-700 bg-gray-800/30 shrink-0">
+                  <div className="flex gap-1.5 items-center">
+                    <Input
                       value={newMemo}
                       onChange={(e) => setNewMemo(e.target.value)}
                       placeholder="메모 입력..."
-                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none h-10 text-sm"
+                      className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm flex-1"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -1047,7 +1055,7 @@ export function CustomerDetailModal({
                       onClick={handleMemoSubmit}
                       disabled={!newMemo.trim()}
                       size="icon"
-                      className="shrink-0 self-end"
+                      className="shrink-0 h-10"
                     >
                       <Send className="w-4 h-4" />
                     </Button>
@@ -1096,14 +1104,14 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* AI Input - shrink-0 py-2 최소 패딩 */}
-                <div className="py-2 px-2 border-t border-gray-700 bg-purple-900/10 shrink-0">
-                  <div className="flex gap-1.5">
-                    <Textarea
+                {/* AI Input - h-10 슬림 입력창 */}
+                <div className="py-1.5 px-2 border-t border-gray-700 bg-purple-900/10 shrink-0">
+                  <div className="flex gap-1.5 items-center">
+                    <Input
                       value={aiInput}
                       onChange={(e) => setAiInput(e.target.value)}
                       placeholder="AI에게 질문하기..."
-                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none h-10 text-sm"
+                      className="bg-gray-800 border-gray-600 text-gray-200 h-10 text-sm flex-1"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -1115,7 +1123,7 @@ export function CustomerDetailModal({
                       onClick={handleAISubmit}
                       disabled={!aiInput.trim()}
                       size="icon"
-                      className="shrink-0 self-end bg-purple-600 hover:bg-purple-700"
+                      className="shrink-0 h-10 bg-purple-600 hover:bg-purple-700"
                     >
                       <Send className="w-4 h-4" />
                     </Button>
