@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Upload, FileText, Send, Bot, User as UserIcon, Search } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Trash2, Upload, FileText, Send, Bot, User as UserIcon, Search, Check, Loader2 } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
@@ -67,7 +68,7 @@ function safeFormatDate(date: any, formatStr: string): string {
 }
 
 const ENTRY_SOURCES = ['광고랜딩명', '외주', '고객소개'];
-const CARRIERS = ['SKT', 'KT', 'LG U+', '알뜰폰'];
+const CARRIERS = ['SKT', 'KT', 'LG', 'SKT알뜰폰', 'KT알뜰폰', 'LG알뜰폰'];
 const BUSINESS_TYPES = ['음식점', '소매업', '서비스업', '제조업', '도매업', '건설업', '운수업', 'IT/소프트웨어', '기타'];
 const RETRY_OPTIONS = ['해당없음', '폐업', '이전', '변경'];
 const INNOVATION_OPTIONS = ['해당없음', '배달앱', '효율화', '매출신장', '기타'];
@@ -108,8 +109,10 @@ export function CustomerDetailModal({
   }>({});
   
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showHomeAddressSearch, setShowHomeAddressSearch] = useState(false);
   const [showBusinessAddressSearch, setShowBusinessAddressSearch] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Documents state
   const [documents, setDocuments] = useState<CustomerDocument[]>([]);
@@ -206,11 +209,8 @@ export function CustomerDetailModal({
     }));
   };
 
-  // Handle file upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Handle file upload (shared logic)
+  const uploadFile = async (file: File) => {
     setIsUploading(true);
     try {
       const customerId = customer?.id || `new_${Date.now()}`;
@@ -238,6 +238,30 @@ export function CustomerDetailModal({
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  // Handle file input change
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadFile(file);
+  };
+
+  // Dropzone for drag & drop
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      uploadFile(acceptedFiles[0]);
+    }
+  }, [customer?.id, currentUser]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+    },
+    noClick: true, // We have a separate button for clicking
+  });
 
   // Handle memo submit
   const handleMemoSubmit = () => {
@@ -286,11 +310,14 @@ export function CustomerDetailModal({
     }, 500);
   };
 
-  // Handle save
-  const handleSave = async () => {
+  // Auto-save function
+  const performSave = useCallback(async () => {
+    if (isNewCustomer && !formData.name?.trim()) return; // Don't save empty new customers
+    
+    setSaveStatus('saving');
     setIsSaving(true);
     try {
-      const phone = `${formData.phone_part1}-${formData.phone_part2}-${formData.phone_part3}`;
+      const phone = `${formData.phone_part1 || '010'}-${formData.phone_part2 || ''}-${formData.phone_part3 || ''}`;
       const customerData: Partial<Customer> = {
         ...formData,
         phone,
@@ -303,13 +330,49 @@ export function CustomerDetailModal({
         documents,
       };
       await onSave(customerData);
-      onClose();
+      setSaveStatus('saved');
+      // Reset to idle after 2 seconds
+      setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('Error saving customer:', error);
+      setSaveStatus('idle');
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [formData, memos, documents, onSave, isNewCustomer]);
+
+  // Debounced auto-save (1 second after last change)
+  const triggerAutoSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      performSave();
+    }, 1000);
+  }, [performSave]);
+
+  // Handle field change with auto-save trigger
+  const handleFieldChange = useCallback((updates: Partial<typeof formData>) => {
+    setFormData(prev => ({ ...prev, ...updates }));
+    triggerAutoSave();
+  }, [triggerAutoSave]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Save on blur (when focus leaves input)
+  const handleBlurSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    performSave();
+  }, [performSave]);
 
   // Handle delete
   const handleDelete = async () => {
@@ -332,19 +395,34 @@ export function CustomerDetailModal({
             {isNewCustomer ? '신규 고객 등록' : `${customer?.name || '고객'} 상세정보`}
           </DialogTitle>
         </VisuallyHidden>
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 bg-gray-900/80">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-gray-100">
+        {/* Header - Slim */}
+        <div className="flex items-center justify-between px-6 py-2 border-b border-gray-700 bg-gray-900/80">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-gray-100">
               {isNewCustomer ? '신규 고객 등록' : `${customer?.name || '고객'} 상세정보`}
             </h2>
             {customer?.id && (
-              <Badge variant="outline" className="text-gray-400 border-gray-600">
+              <Badge variant="outline" className="text-gray-400 border-gray-600 text-xs">
                 {customer.id}
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Auto-save status indicator */}
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              {saveStatus === 'saving' && (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>저장 중...</span>
+                </>
+              )}
+              {saveStatus === 'saved' && (
+                <>
+                  <Check className="w-3 h-3 text-green-500" />
+                  <span className="text-green-500">모든 변경사항 저장됨</span>
+                </>
+              )}
+            </div>
             {onDelete && customer?.id && (
               <Button 
                 variant="destructive" 
@@ -356,14 +434,6 @@ export function CustomerDetailModal({
                 삭제
               </Button>
             )}
-            <Button 
-              onClick={handleSave} 
-              disabled={isSaving}
-              data-testid="button-save-customer"
-            >
-              <Save className="w-4 h-4 mr-1" />
-              {isSaving ? '저장 중...' : '저장'}
-            </Button>
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="w-5 h-5" />
             </Button>
@@ -371,7 +441,7 @@ export function CustomerDetailModal({
         </div>
 
         {/* Main Content - 4 Section Grid */}
-        <div className="flex-1 grid grid-cols-[30%_70%] h-[calc(90vh-72px)] overflow-hidden">
+        <div className="flex-1 grid grid-cols-[30%_70%] h-[calc(90vh-48px)] overflow-hidden">
           
           {/* Section 1: Left Panel - Input Form */}
           <div className="border-r border-gray-700 overflow-hidden">
@@ -447,12 +517,13 @@ export function CustomerDetailModal({
 
                   {/* Row 2-2: 연락처, 통신사 */}
                   <div className="flex w-full gap-3 items-end">
-                    <div className="flex items-end gap-1 flex-1">
-                      <div className="w-16">
+                    <div className="flex items-end gap-1 flex-[2]">
+                      <div className="w-14">
                         <Label className="text-xs text-gray-400">연락처</Label>
                         <Input 
                           value={formData.phone_part1 || '010'} 
-                          onChange={(e) => setFormData(p => ({ ...p, phone_part1: e.target.value }))}
+                          onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
+                          onBlur={handleBlurSave}
                           className="bg-gray-800 border-gray-600 text-gray-200"
                         />
                       </div>
@@ -460,22 +531,24 @@ export function CustomerDetailModal({
                       <Input 
                         maxLength={4}
                         value={formData.phone_part2 || ''} 
-                        onChange={(e) => setFormData(p => ({ ...p, phone_part2: e.target.value }))}
+                        onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
+                        onBlur={handleBlurSave}
                         className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
                       />
                       <span className="text-gray-500 pb-2">-</span>
                       <Input 
                         maxLength={4}
                         value={formData.phone_part3 || ''} 
-                        onChange={(e) => setFormData(p => ({ ...p, phone_part3: e.target.value }))}
+                        onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
+                        onBlur={handleBlurSave}
                         className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
                       />
                     </div>
-                    <div className="flex-1">
+                    <div className="w-28">
                       <Label className="text-xs text-gray-400">통신사</Label>
                       <Select 
                         value={formData.carrier || 'SKT'} 
-                        onValueChange={(v) => setFormData(p => ({ ...p, carrier: v }))}
+                        onValueChange={(v) => { handleFieldChange({ carrier: v }); }}
                       >
                         <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
                           <SelectValue />
@@ -860,9 +933,23 @@ export function CustomerDetailModal({
                 </div>
               </div>
               
-              {/* Document Viewer */}
-              <div className="flex-1 p-4 overflow-auto bg-gray-950/50">
-                {selectedDocument ? (
+              {/* Document Viewer with Drag & Drop */}
+              <div 
+                {...getRootProps()} 
+                className={cn(
+                  "flex-1 p-4 overflow-auto bg-gray-950/50 transition-all",
+                  isDragActive && "border-2 border-dashed border-blue-500 bg-blue-500/10"
+                )}
+              >
+                <input {...getInputProps()} />
+                {isDragActive ? (
+                  <div className="h-full flex items-center justify-center text-blue-400">
+                    <div className="text-center">
+                      <Upload className="w-16 h-16 mx-auto mb-4 animate-pulse" />
+                      <p className="text-lg font-medium">파일을 여기에 놓으세요</p>
+                    </div>
+                  </div>
+                ) : selectedDocument ? (
                   <div className="h-full flex items-center justify-center">
                     {selectedDocument.file_type.includes('pdf') ? (
                       <iframe 
@@ -892,10 +979,13 @@ export function CustomerDetailModal({
                     )}
                   </div>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-gray-500">
-                    <div className="text-center">
+                  <div 
+                    className="h-full flex items-center justify-center text-gray-500 cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="text-center border-2 border-dashed border-gray-700 rounded-lg p-8">
                       <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                      <p>파일을 업로드하세요</p>
+                      <p>파일을 드래그하거나 클릭하여 업로드하세요</p>
                       <p className="text-xs text-gray-600 mt-1">PDF, PNG, JPG 지원</p>
                     </div>
                   </div>
