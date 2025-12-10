@@ -470,84 +470,84 @@ export function CustomerDetailModal({
                 <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
                   <h3 className="text-xs font-semibold text-blue-400">고객 정보</h3>
                   
-                  {/* Row 2-1: 이름, 신용점수, 주민등록번호 - 2. 비율 15:15:35:35 */}
-                  <div className="grid grid-cols-[15%_15%_1fr_1fr] gap-1.5 items-end">
-                    <div>
+                  {/* Row 2-1: 이름, 신용점수, 주민등록번호 - 이름 flex-1 확장, 나머지 고정폭 */}
+                  <div className="flex gap-1.5 items-end">
+                    <div className="flex-1">
                       <Label className="text-xs text-gray-400">이름</Label>
                       <Input 
                         value={formData.name || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
                         data-testid="input-customer-name"
                       />
                     </div>
-                    <div>
-                      <Label className="text-xs text-gray-400">신용</Label>
+                    <div className="w-20">
+                      <Label className="text-xs text-gray-400">신용점수</Label>
                       <Input 
                         type="number"
                         value={formData.credit_score || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, credit_score: Number(e.target.value) }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
                       />
                     </div>
-                    <div>
-                      <Label className="text-xs text-gray-400">주민번호(앞6)</Label>
+                    <div className="w-28">
+                      <Label className="text-xs text-gray-400">주민등록번호(앞)</Label>
                       <Input 
                         maxLength={6}
                         value={formData.ssn_front || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, ssn_front: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
                         placeholder="YYMMDD"
                       />
                     </div>
-                    <div>
-                      <Label className="text-xs text-gray-400">주민번호(뒤7)</Label>
+                    <div className="w-28">
+                      <Label className="text-xs text-gray-400">주민등록번호(뒤)</Label>
                       <Input 
                         maxLength={7}
                         value={formData.ssn_back || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, ssn_back: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
                         placeholder="0000000"
                       />
                     </div>
                   </div>
 
-                  {/* Row 2-2: 연락처, 통신사 - 8. 연락처 컴팩트, 통신사 넓게 */}
-                  <div className="flex w-full gap-1.5 items-end">
-                    <div className="flex items-end gap-0.5">
-                      <div className="w-11">
+                  {/* Row 2-2: 연락처, 통신사 - 비율 6:4 고정 */}
+                  <div className="flex w-full gap-2 items-end">
+                    <div className="basis-3/5 flex items-end gap-1">
+                      <div className="w-12">
                         <Label className="text-xs text-gray-400">연락처</Label>
                         <Input 
                           value={formData.phone_part1 || '010'} 
                           onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
                           onBlur={handleBlurSave}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm px-1.5 text-center"
+                          className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm px-1.5 text-center"
                         />
                       </div>
-                      <span className="text-gray-500 pb-1.5 text-xs">-</span>
+                      <span className="text-gray-500 pb-2 text-xs">-</span>
                       <Input 
                         maxLength={4}
                         value={formData.phone_part2 || ''} 
                         onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
                         onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 w-12 h-8 text-sm px-1.5 text-center"
+                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-9 text-sm px-1.5 text-center"
                       />
-                      <span className="text-gray-500 pb-1.5 text-xs">-</span>
+                      <span className="text-gray-500 pb-2 text-xs">-</span>
                       <Input 
                         maxLength={4}
                         value={formData.phone_part3 || ''} 
                         onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
                         onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 w-12 h-8 text-sm px-1.5 text-center"
+                        className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-9 text-sm px-1.5 text-center"
                       />
                     </div>
-                    <div className="flex-1">
+                    <div className="basis-2/5">
                       <Label className="text-xs text-gray-400">통신사</Label>
                       <Select 
                         value={formData.carrier || 'SKT'} 
                         onValueChange={(v) => { handleFieldChange({ carrier: v }); }}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
@@ -653,14 +653,14 @@ export function CustomerDetailModal({
                 <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
                   <h3 className="text-xs font-semibold text-emerald-400">사업자 정보</h3>
                   
-                  {/* Row 3-1: 상호명, 개업일 - 4. 7년 초과 배지 라벨 옆으로 */}
-                  <div className="flex flex-wrap gap-2">
+                  {/* Row 3-1: 상호명, 개업일 - 수직 정렬 통일 h-9 */}
+                  <div className="flex gap-2 items-end">
                     <div className="flex-1 min-w-[120px]">
                       <Label className="text-xs text-gray-400">상호명</Label>
                       <Input 
                         value={formData.company_name || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, company_name: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
                         data-testid="input-company-name"
                       />
                     </div>
@@ -677,7 +677,7 @@ export function CustomerDetailModal({
                         type="date"
                         value={formData.founding_date || ''} 
                         onChange={(e) => handleFoundingDateChange(e.target.value)}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
                       />
                     </div>
                   </div>
@@ -995,22 +995,22 @@ export function CustomerDetailModal({
               </div>
             </div>
 
-            {/* Bottom Section - Split into 2 columns */}
-            <div className="h-1/2 flex overflow-hidden">
+            {/* Bottom Section - Split into 2 columns - 5. overflow 해결 */}
+            <div className="h-1/2 flex overflow-hidden min-h-0">
               
               {/* Section 3: Memo Chat (Left 50%) */}
-              <div className="w-1/2 border-r border-gray-700 flex flex-col overflow-hidden">
-                <div className="px-4 py-2 border-b border-gray-700 bg-gray-800/30">
+              <div className="w-1/2 border-r border-gray-700 flex flex-col min-h-0 overflow-hidden">
+                <div className="px-4 py-2 border-b border-gray-700 bg-gray-800/30 shrink-0">
                   <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
                     <UserIcon className="w-4 h-4" />
                     상담 메모
                   </h3>
                 </div>
                 
-                {/* Memo Messages */}
-                <div ref={memoScrollRef} className="flex-1 overflow-auto p-3 space-y-3 bg-gray-900/50">
+                {/* Memo Messages - flex-1 overflow-y-auto */}
+                <div ref={memoScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-900/50 min-h-0">
                   {memos.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
+                    <div className="text-center text-gray-500 py-4">
                       <p className="text-sm">상담 메모가 없습니다</p>
                     </div>
                   ) : (
@@ -1030,14 +1030,14 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* Memo Input */}
-                <div className="p-3 border-t border-gray-700 bg-gray-800/30">
+                {/* Memo Input - shrink-0 하단 고정 */}
+                <div className="p-2 border-t border-gray-700 bg-gray-800/30 shrink-0">
                   <div className="flex gap-2">
                     <Textarea
                       value={newMemo}
                       onChange={(e) => setNewMemo(e.target.value)}
                       placeholder="메모 입력..."
-                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none min-h-[60px]"
+                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none h-12 text-sm"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -1058,21 +1058,20 @@ export function CustomerDetailModal({
               </div>
 
               {/* Section 4: AI Chat (Right 50%) */}
-              <div className="w-1/2 flex flex-col overflow-hidden bg-gray-950/30">
-                <div className="px-4 py-2 border-b border-gray-700 bg-purple-900/20">
+              <div className="w-1/2 flex flex-col min-h-0 overflow-hidden bg-gray-950/30">
+                <div className="px-4 py-2 border-b border-gray-700 bg-purple-900/20 shrink-0">
                   <h3 className="text-sm font-semibold text-purple-300 flex items-center gap-2">
                     <Bot className="w-4 h-4" />
                     AI 질의
                   </h3>
                 </div>
                 
-                {/* AI Messages */}
-                <div ref={aiScrollRef} className="flex-1 overflow-auto p-3 space-y-3">
+                {/* AI Messages - flex-1 overflow-y-auto */}
+                <div ref={aiScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
                   {aiMessages.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
-                      <Bot className="w-10 h-10 mx-auto mb-2 text-purple-600/50" />
+                    <div className="text-center text-gray-500 py-4">
+                      <Bot className="w-8 h-8 mx-auto mb-2 text-purple-600/50" />
                       <p className="text-sm">AI에게 질문하세요</p>
-                      <p className="text-xs text-gray-600 mt-1">고객 분석 및 추천 기능</p>
                     </div>
                   ) : (
                     aiMessages.map((msg) => (
@@ -1099,14 +1098,14 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* AI Input */}
-                <div className="p-3 border-t border-gray-700 bg-purple-900/10">
+                {/* AI Input - shrink-0 하단 고정 */}
+                <div className="p-2 border-t border-gray-700 bg-purple-900/10 shrink-0">
                   <div className="flex gap-2">
                     <Textarea
                       value={aiInput}
                       onChange={(e) => setAiInput(e.target.value)}
                       placeholder="AI에게 질문하기..."
-                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none min-h-[60px]"
+                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none h-12 text-sm"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
