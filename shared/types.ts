@@ -92,7 +92,7 @@ export interface Customer {
   // 고객 정보
   credit_score?: number; // 신용점수
   ssn_front?: string; // 주민등록번호 앞 6자리
-  ssn_back_first?: string; // 주민등록번호 뒤 첫째자리
+  ssn_back?: string; // 주민등록번호 뒤 7자리
   carrier?: string; // 통신사
   home_address?: string; // 자택주소
   home_address_detail?: string; // 자택 상세주소

@@ -86,7 +86,7 @@ export function CustomerDetailModal({
   const [formData, setFormData] = useState<Partial<Customer> & {
     entry_source?: string;
     ssn_front?: string;
-    ssn_back_first?: string;
+    ssn_back?: string;
     phone_part1?: string;
     phone_part2?: string;
     phone_part3?: string;
@@ -135,7 +135,7 @@ export function CustomerDetailModal({
         ...customer,
         entry_source: customer.entry_source || '광고랜딩명',
         ssn_front: customer.ssn_front || '',
-        ssn_back_first: customer.ssn_back_first || '',
+        ssn_back: customer.ssn_back || '',
         phone_part1: phoneParts[0] || '010',
         phone_part2: phoneParts[1] || '',
         phone_part3: phoneParts[2] || '',
@@ -371,7 +371,7 @@ export function CustomerDetailModal({
         </div>
 
         {/* Main Content - 4 Section Grid */}
-        <div className="flex-1 grid grid-cols-[40%_60%] h-[calc(90vh-72px)] overflow-hidden">
+        <div className="flex-1 grid grid-cols-[30%_70%] h-[calc(90vh-72px)] overflow-hidden">
           
           {/* Section 1: Left Panel - Input Form */}
           <div className="border-r border-gray-700 overflow-hidden">
@@ -432,17 +432,16 @@ export function CustomerDetailModal({
                         />
                       </div>
                       <span className="text-gray-500 pb-2">-</span>
-                      <div className="w-20">
-                        <Label className="text-xs text-gray-400">(뒤)</Label>
+                      <div className="w-24">
+                        <Label className="text-xs text-gray-400">(뒤7자리)</Label>
                         <Input 
-                          maxLength={1}
-                          value={formData.ssn_back_first || ''} 
-                          onChange={(e) => setFormData(p => ({ ...p, ssn_back_first: e.target.value }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 w-12"
-                          placeholder="*"
+                          maxLength={7}
+                          value={formData.ssn_back || ''} 
+                          onChange={(e) => setFormData(p => ({ ...p, ssn_back: e.target.value }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200"
+                          placeholder="0000000"
                         />
                       </div>
-                      <span className="text-gray-500 pb-2">******</span>
                     </div>
                   </div>
 
