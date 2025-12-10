@@ -657,8 +657,8 @@ export function CustomerDetailModal({
                 <div className="border border-gray-700 rounded-lg p-2.5 space-y-2">
                   <h3 className="text-xs font-semibold text-emerald-400">사업자 정보</h3>
                   
-                  {/* Row 3-1: 상호명, 개업일 - grid-cols-2 gap-3 items-center, h-9 강제 */}
-                  <div className="grid grid-cols-2 gap-3 items-center">
+                  {/* Row 3-1: 상호명, 개업일 - grid-cols-2 gap-2 items-end (밑변 정렬) */}
+                  <div className="grid grid-cols-2 gap-2 items-end">
                     <div>
                       <Label className="text-xs text-gray-400">상호명</Label>
                       <Input 
@@ -892,11 +892,11 @@ export function CustomerDetailModal({
             </ScrollArea>
           </div>
 
-          {/* Right Panel - Split into top 55% and bottom 45% */}
+          {/* Right Panel - flex flex-col h-full overflow-hidden */}
           <div className="flex flex-col h-full overflow-hidden">
             
-            {/* Section 2: Top - Document Viewer (55% height) */}
-            <div className="h-[55%] border-b border-gray-700 flex flex-col overflow-hidden">
+            {/* Section 2: Top - Document Viewer (h-[55%] shrink-0) */}
+            <div className="h-[55%] shrink-0 border-b border-gray-700 flex flex-col overflow-hidden">
               {/* Document Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
                 <div className="flex items-center gap-2 flex-1 overflow-x-auto">
@@ -1001,21 +1001,21 @@ export function CustomerDetailModal({
               </div>
             </div>
 
-            {/* Bottom Section - h-[45%] flex flex-col overflow-hidden */}
-            <div className="h-[45%] flex flex-col overflow-hidden">
-              <div className="flex flex-row flex-1 min-h-0 overflow-hidden">
+            {/* Bottom Section - flex-1 min-h-0 (남은 공간만 차지) */}
+            <div className="flex-1 min-h-0">
+              <div className="flex flex-row h-full">
               
               {/* Section 3: Memo Chat (Left 50%) */}
               <div className="w-1/2 border-r border-gray-700 flex flex-col h-full">
-                <div className="px-3 py-1.5 border-b border-gray-700 bg-gray-800/30 shrink-0">
+                <div className="h-10 shrink-0 px-3 border-b border-gray-700 bg-gray-800/30 flex items-center">
                   <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
                     <UserIcon className="w-4 h-4" />
                     상담 메모
                   </h3>
                 </div>
                 
-                {/* Memo Messages - flex-1 min-h-0 overflow-y-auto */}
-                <div ref={memoScrollRef} className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-gray-900/50">
+                {/* Memo Messages - flex-1 overflow-y-auto */}
+                <div ref={memoScrollRef} className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-900/50">
                   {memos.length === 0 ? (
                     <div className="text-center text-gray-500 py-3">
                       <p className="text-sm">상담 메모가 없습니다</p>
@@ -1037,13 +1037,13 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* Memo Input - h-12 shrink-0 고정 */}
-                <div className="h-12 shrink-0 border-t border-gray-700 bg-gray-800/30 flex items-center px-2 gap-1.5">
+                {/* Memo Input - h-auto shrink-0 */}
+                <div className="h-auto shrink-0 border-t border-gray-700 bg-gray-800/30 flex items-center px-2 py-1.5 gap-1.5">
                   <Input
                     value={newMemo}
                     onChange={(e) => setNewMemo(e.target.value)}
                     placeholder="메모 입력..."
-                    className="bg-transparent border-gray-600 text-gray-200 h-full w-full text-sm flex-1"
+                    className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -1064,15 +1064,15 @@ export function CustomerDetailModal({
 
               {/* Section 4: AI Chat (Right 50%) */}
               <div className="w-1/2 flex flex-col h-full bg-gray-950/30">
-                <div className="px-3 py-1.5 border-b border-gray-700 bg-purple-900/20 shrink-0">
+                <div className="h-10 shrink-0 px-3 border-b border-gray-700 bg-purple-900/20 flex items-center">
                   <h3 className="text-sm font-semibold text-purple-300 flex items-center gap-2">
                     <Bot className="w-4 h-4" />
                     AI 질의
                   </h3>
                 </div>
                 
-                {/* AI Messages - flex-1 min-h-0 overflow-y-auto */}
-                <div ref={aiScrollRef} className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+                {/* AI Messages - flex-1 overflow-y-auto */}
+                <div ref={aiScrollRef} className="flex-1 overflow-y-auto p-2 space-y-2">
                   {aiMessages.length === 0 ? (
                     <div className="text-center text-gray-500 py-3">
                       <Bot className="w-7 h-7 mx-auto mb-1 text-purple-600/50" />
@@ -1103,13 +1103,13 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* AI Input - h-12 shrink-0 고정 */}
-                <div className="h-12 shrink-0 border-t border-gray-700 bg-purple-900/10 flex items-center px-2 gap-1.5">
+                {/* AI Input - h-auto shrink-0 */}
+                <div className="h-auto shrink-0 border-t border-gray-700 bg-purple-900/10 flex items-center px-2 py-1.5 gap-1.5">
                   <Input
                     value={aiInput}
                     onChange={(e) => setAiInput(e.target.value)}
                     placeholder="AI에게 질문하기..."
-                    className="bg-transparent border-gray-600 text-gray-200 h-full w-full text-sm flex-1"
+                    className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
