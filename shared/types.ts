@@ -71,7 +71,7 @@ export interface Customer {
   readable_id: string; // YYMMDD-XXX format
   name: string;
   company_name: string;
-  business_registration_number?: string; // 사업자등록번호 (필수, 중복 체크용)
+  business_registration_number?: string; // 사업자등록번호
   phone?: string;
   email?: string;
   status_code: StatusCode;
@@ -80,23 +80,57 @@ export interface Customer {
   team_id: string;
   team_name?: string;
   entry_date: string; // YYYY-MM-DD
-  founding_date?: string; // 설립일 YYYY-MM-DD
-  address?: string; // 기본 주소
-  address_detail?: string; // 상세 주소
+  founding_date?: string; // 설립일/개업일 YYYY-MM-DD
+  address?: string; // 기본 주소 (deprecated, use business_address)
+  address_detail?: string; // 상세 주소 (deprecated)
   approved_amount: number; // 승인 금액
   commission_rate: number; // 수수료율 (총관리자만 열람)
   contract_completion_date?: string; // 최초 계약 도달일
   notes?: string;
   created_at: Date;
-  // New fields for updated schema
+  
+  // 고객 정보
   credit_score?: number; // 신용점수
-  over_7_years?: boolean; // 7년 초과 여부
+  ssn_front?: string; // 주민등록번호 앞 6자리
+  ssn_back_first?: string; // 주민등록번호 뒤 첫째자리
+  carrier?: string; // 통신사
+  home_address?: string; // 자택주소
+  home_address_detail?: string; // 자택 상세주소
+  is_home_owned?: boolean; // 자택 자가여부
+  is_same_as_business?: boolean; // 자택=사업장 동일여부
+  
+  // 사업자 정보
+  entry_source?: string; // 유입경로
+  business_type?: string; // 업종
+  business_item?: string; // 종목
+  retry_type?: string; // 재도전 유형
+  innovation_type?: string; // 혁신기술 유형
+  business_address?: string; // 사업장 소재지
+  business_address_detail?: string; // 사업장 상세주소
+  is_business_owned?: boolean; // 사업장 자가여부
+  over_7_years?: boolean; // 7년 초과 여부 (자동 계산)
+  
+  // 매출 정보
+  recent_sales?: number; // 최근 매출 (억원)
+  sales_y1?: number; // Y-1 매출 (억원)
+  sales_y2?: number; // Y-2 매출 (억원)
+  sales_y3?: number; // Y-3 매출 (억원)
   avg_revenue_3y?: number; // 3년 평균 매출 (억원)
-  recent_sales?: number; // 최근 매출(작년) (억원)
-  industry?: string; // 업종
+  
+  // 관리 정보
+  industry?: string; // 업종 (deprecated, use business_type)
   processing_org?: string; // 진행기관
   latest_memo?: string; // 최근 메모
-  memo_history?: { date: string; content: string; author: string; author_id: string }[]; // 메모 이력
+  memo_history?: CustomerMemo[]; // 메모 이력
+  documents?: CustomerDocument[]; // 문서 리스트
+}
+
+// Customer Memo
+export interface CustomerMemo {
+  content: string;
+  author_id: string;
+  author_name: string;
+  created_at: Date;
 }
 
 // Customer Document (Firebase Storage)

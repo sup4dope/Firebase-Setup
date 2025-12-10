@@ -1,50 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Upload, FileText, MessageCircle, History, CheckSquare, Search, Calendar, Send, Download } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { X, Save, Trash2, Upload, FileText, Send, Bot, User as UserIcon, Search } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { Customer, User, Todo, CustomerDocument, CustomerHistoryLog, StatusCode } from '@shared/types';
+import { Customer, User, CustomerDocument, StatusCode } from '@shared/types';
 import { format, differenceInYears, parseISO } from 'date-fns';
 import DaumPostcodeEmbed from 'react-daum-postcode';
 import { storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Status badge colors (sync with CustomerTable)
-const STAGE_COLORS: Record<string, string> = {
-  '0': 'bg-gray-600 text-white',
-  '1': 'bg-purple-600 text-white',
-  '2': 'bg-green-600 text-white',
-  '3': 'bg-blue-600 text-white',
-  '4': 'bg-orange-600 text-white',
-  '5': 'bg-teal-600 text-white',
-};
+interface MemoItem {
+  id: string;
+  content: string;
+  author_id: string;
+  author_name: string;
+  created_at: Date;
+}
 
-// Status labels
-const STATUS_OPTIONS = [
-  { value: '0-1', label: '단기부재' },
-  { value: '0-2', label: '장기부재' },
-  { value: '1-1', label: '상담대기' },
-  { value: '1-2', label: '상담진행' },
-  { value: '2-1', label: '계약완료(선불)' },
-  { value: '2-2', label: '계약완료(후불)' },
-  { value: '3-1', label: '서류취합(선불)' },
-  { value: '3-2', label: '서류취합(후불)' },
-  { value: '4-1', label: '신청완료(선불)' },
-  { value: '4-2', label: '신청완료(외주)' },
-  { value: '5-1', label: '집행완료' },
-  { value: '5-2', label: '최종부결' },
-];
-
-// Processing organizations
-const PROCESSING_ORGS = ['신보', '기보', '지역신보', '기은', '농협', '기타'];
+interface AIMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: Date;
+}
 
 interface CustomerDetailModalProps {
   isOpen: boolean;
@@ -57,6 +43,35 @@ interface CustomerDetailModalProps {
   onDelete?: (customerId: string) => Promise<void>;
 }
 
+// Helper to safely format dates (handles Firestore Timestamps and Date objects)
+function safeFormatDate(date: any, formatStr: string): string {
+  try {
+    if (!date) return '';
+    // Handle Firestore Timestamp
+    if (date?.toDate && typeof date.toDate === 'function') {
+      return format(date.toDate(), formatStr);
+    }
+    // Handle Date object
+    if (date instanceof Date && !isNaN(date.getTime())) {
+      return format(date, formatStr);
+    }
+    // Handle date string or number
+    const parsedDate = new Date(date);
+    if (!isNaN(parsedDate.getTime())) {
+      return format(parsedDate, formatStr);
+    }
+    return '';
+  } catch {
+    return '';
+  }
+}
+
+const ENTRY_SOURCES = ['광고랜딩명', '외주', '고객소개'];
+const CARRIERS = ['SKT', 'KT', 'LG U+', '알뜰폰'];
+const BUSINESS_TYPES = ['음식점', '소매업', '서비스업', '제조업', '도매업', '건설업', '운수업', 'IT/소프트웨어', '기타'];
+const RETRY_OPTIONS = ['해당없음', '폐업', '이전', '변경'];
+const INNOVATION_OPTIONS = ['해당없음', '배달앱', '효율화', '매출신장', '기타'];
+
 export function CustomerDetailModal({
   isOpen,
   onClose,
@@ -68,14 +83,33 @@ export function CustomerDetailModal({
   onDelete,
 }: CustomerDetailModalProps) {
   // Form state
-  const [formData, setFormData] = useState<Partial<Customer>>({});
-  const [isSaving, setIsSaving] = useState(false);
-  const [showAddressSearch, setShowAddressSearch] = useState(false);
-  const [activeTab, setActiveTab] = useState('memo');
+  const [formData, setFormData] = useState<Partial<Customer> & {
+    entry_source?: string;
+    ssn_front?: string;
+    ssn_back_first?: string;
+    phone_part1?: string;
+    phone_part2?: string;
+    phone_part3?: string;
+    carrier?: string;
+    home_address?: string;
+    home_address_detail?: string;
+    is_home_owned?: boolean;
+    is_same_as_business?: boolean;
+    business_type?: string;
+    business_item?: string;
+    retry_type?: string;
+    innovation_type?: string;
+    business_address?: string;
+    business_address_detail?: string;
+    is_business_owned?: boolean;
+    sales_y1?: number;
+    sales_y2?: number;
+    sales_y3?: number;
+  }>({});
   
-  // Memo state
-  const [newMemo, setNewMemo] = useState('');
-  const [memoHistory, setMemoHistory] = useState<Customer['memo_history']>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showHomeAddressSearch, setShowHomeAddressSearch] = useState(false);
+  const [showBusinessAddressSearch, setShowBusinessAddressSearch] = useState(false);
   
   // Documents state
   const [documents, setDocuments] = useState<CustomerDocument[]>([]);
@@ -83,19 +117,52 @@ export function CustomerDetailModal({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // History state
-  const [historyLogs, setHistoryLogs] = useState<CustomerHistoryLog[]>([]);
+  // Memo state
+  const [memos, setMemos] = useState<MemoItem[]>([]);
+  const [newMemo, setNewMemo] = useState('');
+  const memoScrollRef = useRef<HTMLDivElement>(null);
   
-  // Todos state
-  const [customerTodos, setCustomerTodos] = useState<Todo[]>([]);
-  const [newTodoContent, setNewTodoContent] = useState('');
-  const [newTodoDueDate, setNewTodoDueDate] = useState('');
+  // AI Chat state
+  const [aiMessages, setAiMessages] = useState<AIMessage[]>([]);
+  const [aiInput, setAiInput] = useState('');
+  const aiScrollRef = useRef<HTMLDivElement>(null);
 
-  // Initialize form data when customer changes
+  // Initialize form data
   useEffect(() => {
     if (customer) {
-      setFormData({ ...customer });
-      setMemoHistory(customer.memo_history || []);
+      const phoneParts = customer.phone?.split('-') || ['010', '', ''];
+      setFormData({
+        ...customer,
+        entry_source: customer.entry_source || '광고랜딩명',
+        ssn_front: customer.ssn_front || '',
+        ssn_back_first: customer.ssn_back_first || '',
+        phone_part1: phoneParts[0] || '010',
+        phone_part2: phoneParts[1] || '',
+        phone_part3: phoneParts[2] || '',
+        carrier: customer.carrier || 'SKT',
+        home_address: customer.home_address || '',
+        home_address_detail: customer.home_address_detail || '',
+        is_home_owned: customer.is_home_owned || false,
+        is_same_as_business: customer.is_same_as_business || false,
+        business_type: customer.business_type || '기타',
+        business_item: customer.business_item || '',
+        retry_type: customer.retry_type || '해당없음',
+        innovation_type: customer.innovation_type || '해당없음',
+        business_address: customer.business_address || customer.address || '',
+        business_address_detail: customer.business_address_detail || '',
+        is_business_owned: customer.is_business_owned || false,
+        sales_y1: customer.sales_y1 || 0,
+        sales_y2: customer.sales_y2 || 0,
+        sales_y3: customer.sales_y3 || 0,
+      });
+      setMemos(customer.memo_history?.map((m, i) => ({
+        id: `memo_${i}`,
+        content: m.content,
+        author_id: m.author_id,
+        author_name: m.author_name,
+        created_at: m.created_at instanceof Date ? m.created_at : new Date(m.created_at),
+      })) || []);
+      setDocuments(customer.documents || []);
     } else if (isNewCustomer) {
       setFormData({
         name: '',
@@ -115,47 +182,45 @@ export function CustomerDetailModal({
         approved_amount: 0,
         commission_rate: 0,
         processing_org: '기타',
+        entry_source: '광고랜딩명',
+        phone_part1: '010',
+        carrier: 'SKT',
+        business_type: '기타',
+        retry_type: '해당없음',
+        innovation_type: '해당없음',
       });
-      setMemoHistory([]);
+      setMemos([]);
+      setDocuments([]);
     }
+    setAiMessages([]);
   }, [customer, isNewCustomer, currentUser]);
 
-  // Calculate 7-year status based on founding date
+  // Calculate 7-year status
   const handleFoundingDateChange = (date: string) => {
-    setFormData(prev => {
-      const foundingDate = parseISO(date);
-      const yearsOld = differenceInYears(new Date(), foundingDate);
-      return {
-        ...prev,
-        founding_date: date,
-        over_7_years: yearsOld > 7,
-      };
-    });
-  };
-
-  // Handle address selection from Daum Postcode
-  const handleAddressComplete = (data: any) => {
+    const foundingDate = parseISO(date);
+    const yearsOld = differenceInYears(new Date(), foundingDate);
     setFormData(prev => ({
       ...prev,
-      address: data.address,
+      founding_date: date,
+      over_7_years: yearsOld > 7,
     }));
-    setShowAddressSearch(false);
   };
 
   // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !customer?.id) return;
+    if (!file) return;
 
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `customers/${customer.id}/${Date.now()}_${file.name}`);
+      const customerId = customer?.id || `new_${Date.now()}`;
+      const storageRef = ref(storage, `customers/${customerId}/${Date.now()}_${file.name}`);
       await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(storageRef);
 
       const newDoc: CustomerDocument = {
         id: `doc_${Date.now()}`,
-        customer_id: customer.id,
+        customer_id: customerId,
         file_name: file.name,
         file_url: downloadURL,
         file_type: file.type,
@@ -165,55 +230,79 @@ export function CustomerDetailModal({
       };
 
       setDocuments(prev => [...prev, newDoc]);
+      setSelectedDocument(newDoc);
     } catch (error) {
       console.error('Error uploading file:', error);
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  // Handle document delete
-  const handleDeleteDocument = async (doc: CustomerDocument) => {
-    try {
-      const storageRef = ref(storage, doc.file_url);
-      await deleteObject(storageRef);
-      setDocuments(prev => prev.filter(d => d.id !== doc.id));
-      if (selectedDocument?.id === doc.id) {
-        setSelectedDocument(null);
-      }
-    } catch (error) {
-      console.error('Error deleting document:', error);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   // Handle memo submit
   const handleMemoSubmit = () => {
     if (!newMemo.trim() || !currentUser) return;
-
-    const memo = {
-      date: new Date().toISOString(),
+    
+    const memo: MemoItem = {
+      id: `memo_${Date.now()}`,
       content: newMemo.trim(),
-      author: currentUser.name,
       author_id: currentUser.uid,
+      author_name: currentUser.name,
+      created_at: new Date(),
     };
-
-    setMemoHistory(prev => [...(prev || []), memo]);
-    setFormData(prev => ({
-      ...prev,
-      memo_history: [...(prev.memo_history || []), memo],
-      latest_memo: newMemo.trim(),
-    }));
+    
+    setMemos(prev => [...prev, memo]);
     setNewMemo('');
+    
+    setTimeout(() => {
+      memoScrollRef.current?.scrollTo({ top: memoScrollRef.current.scrollHeight, behavior: 'smooth' });
+    }, 100);
+  };
+
+  // Handle AI query submit
+  const handleAISubmit = () => {
+    if (!aiInput.trim()) return;
+    
+    const userMsg: AIMessage = {
+      id: `ai_${Date.now()}`,
+      role: 'user',
+      content: aiInput.trim(),
+      created_at: new Date(),
+    };
+    
+    setAiMessages(prev => [...prev, userMsg]);
+    setAiInput('');
+    
+    // Simulate AI response
+    setTimeout(() => {
+      const aiResponse: AIMessage = {
+        id: `ai_${Date.now()}`,
+        role: 'assistant',
+        content: 'AI 기능은 현재 개발 중입니다. 추후 고객 분석 및 추천 기능이 제공될 예정입니다.',
+        created_at: new Date(),
+      };
+      setAiMessages(prev => [...prev, aiResponse]);
+      aiScrollRef.current?.scrollTo({ top: aiScrollRef.current.scrollHeight, behavior: 'smooth' });
+    }, 500);
   };
 
   // Handle save
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onSave(formData);
+      const phone = `${formData.phone_part1}-${formData.phone_part2}-${formData.phone_part3}`;
+      const customerData: Partial<Customer> = {
+        ...formData,
+        phone,
+        memo_history: memos.map(m => ({
+          content: m.content,
+          author_id: m.author_id,
+          author_name: m.author_name,
+          created_at: m.created_at,
+        })),
+        documents,
+      };
+      await onSave(customerData);
       onClose();
     } catch (error) {
       console.error('Error saving customer:', error);
@@ -225,7 +314,7 @@ export function CustomerDetailModal({
   // Handle delete
   const handleDelete = async () => {
     if (!customer?.id || !onDelete) return;
-    if (!confirm('정말로 이 고객을 삭제하시겠습니까?')) return;
+    if (!window.confirm('정말 이 고객을 삭제하시겠습니까?')) return;
     
     try {
       await onDelete(customer.id);
@@ -235,40 +324,31 @@ export function CustomerDetailModal({
     }
   };
 
-  const getStatusBadgeColor = (statusCode: string) => {
-    const stage = statusCode?.charAt(0) || '1';
-    return STAGE_COLORS[stage] || STAGE_COLORS['1'];
-  };
-
-  const getStatusLabel = (statusCode: string) => {
-    return STATUS_OPTIONS.find(s => s.value === statusCode)?.label || statusCode;
-  };
-
-  const isSuperAdmin = currentUser?.role === 'super_admin';
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-11/12 max-w-7xl h-[90vh] p-0 bg-gray-900 border-gray-700 overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] p-0 bg-gray-900 border-gray-700 overflow-hidden">
+        <VisuallyHidden>
+          <DialogTitle>
+            {isNewCustomer ? '신규 고객 등록' : `${customer?.name || '고객'} 상세정보`}
+          </DialogTitle>
+        </VisuallyHidden>
         {/* Header */}
-        <DialogHeader className="flex flex-row items-center justify-between gap-4 px-6 py-4 border-b border-gray-700 bg-gray-800/50">
-          <div className="flex items-center gap-3">
-            <DialogTitle className="text-xl font-bold text-gray-100">
-              {isNewCustomer ? '새 고객 등록' : formData.name || '고객 상세'}
-            </DialogTitle>
-            {!isNewCustomer && formData.status_code && (
-              <Badge className={cn("text-xs", getStatusBadgeColor(formData.status_code))}>
-                {getStatusLabel(formData.status_code)}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 bg-gray-900/80">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-bold text-gray-100">
+              {isNewCustomer ? '신규 고객 등록' : `${customer?.name || '고객'} 상세정보`}
+            </h2>
+            {customer?.id && (
+              <Badge variant="outline" className="text-gray-400 border-gray-600">
+                {customer.id}
               </Badge>
-            )}
-            {formData.readable_id && (
-              <span className="text-sm text-gray-500">{formData.readable_id}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            {isSuperAdmin && !isNewCustomer && onDelete && (
-              <Button
-                variant="destructive"
-                size="sm"
+            {onDelete && customer?.id && (
+              <Button 
+                variant="destructive" 
+                size="sm" 
                 onClick={handleDelete}
                 data-testid="button-delete-customer"
               >
@@ -276,599 +356,676 @@ export function CustomerDetailModal({
                 삭제
               </Button>
             )}
-            <Button
-              onClick={handleSave}
+            <Button 
+              onClick={handleSave} 
               disabled={isSaving}
               data-testid="button-save-customer"
             >
               <Save className="w-4 h-4 mr-1" />
               {isSaving ? '저장 중...' : '저장'}
             </Button>
-            <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-modal">
+            <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="w-5 h-5" />
             </Button>
           </div>
-        </DialogHeader>
+        </div>
 
-        {/* Content - Two Column Layout */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left Panel - Form (40%) */}
-          <ScrollArea className="w-2/5 border-r border-gray-700">
-            <div className="p-6 space-y-6">
-              {/* 기본 정보 */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">기본 정보</h3>
+        {/* Main Content - 4 Section Grid */}
+        <div className="flex-1 grid grid-cols-[40%_60%] h-[calc(90vh-72px)] overflow-hidden">
+          
+          {/* Section 1: Left Panel - Input Form */}
+          <div className="border-r border-gray-700 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="p-5 space-y-5">
                 
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="name" className="text-gray-300">고객명</Label>
-                    <Input
-                      id="name"
-                      value={formData.name || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="bg-gray-800 border-gray-600 text-gray-100"
-                      data-testid="input-customer-name"
-                    />
-                  </div>
+                {/* 유입경로 (최상단) */}
+                <div className="space-y-2">
+                  <Label className="text-gray-300">유입경로</Label>
+                  <Select 
+                    value={formData.entry_source || '광고랜딩명'} 
+                    onValueChange={(v) => setFormData(p => ({ ...p, entry_source: v }))}
+                  >
+                    <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      {ENTRY_SOURCES.map(src => (
+                        <SelectItem key={src} value={src} className="text-gray-200">{src}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  <div>
-                    <Label htmlFor="business_registration_number" className="text-gray-300">
-                      사업자등록번호 <span className="text-red-400">*</span>
-                    </Label>
-                    <Input
-                      id="business_registration_number"
-                      value={formData.business_registration_number || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, business_registration_number: e.target.value }))}
-                      placeholder="000-00-00000"
-                      className="bg-gray-800 border-gray-600 text-gray-100"
-                      data-testid="input-business-number"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="company_name" className="text-gray-300">상호명</Label>
-                    <Input
-                      id="company_name"
-                      value={formData.company_name || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, company_name: e.target.value }))}
-                      className="bg-gray-800 border-gray-600 text-gray-100"
-                      data-testid="input-company-name"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="phone" className="text-gray-300">연락처</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                      placeholder="010-0000-0000"
-                      className="bg-gray-800 border-gray-600 text-gray-100"
-                      data-testid="input-phone"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="founding_date" className="text-gray-300">설립일</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="founding_date"
-                        type="date"
-                        value={formData.founding_date || ''}
-                        onChange={(e) => handleFoundingDateChange(e.target.value)}
-                        className="bg-gray-800 border-gray-600 text-gray-100 flex-1"
-                        data-testid="input-founding-date"
+                {/* 고객 정보 그룹 (Border Box) */}
+                <div className="border border-gray-700 rounded-lg p-4 space-y-4">
+                  <h3 className="text-sm font-semibold text-blue-400 mb-3">고객 정보</h3>
+                  
+                  {/* Row 2-1: 이름, 신용점수, 주민등록번호 */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex-1 min-w-[100px]">
+                      <Label className="text-xs text-gray-400">이름</Label>
+                      <Input 
+                        value={formData.name || ''} 
+                        onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
+                        className="bg-gray-800 border-gray-600 text-gray-200"
+                        data-testid="input-customer-name"
                       />
+                    </div>
+                    <div className="w-20">
+                      <Label className="text-xs text-gray-400">신용점수</Label>
+                      <Input 
+                        type="number"
+                        value={formData.credit_score || ''} 
+                        onChange={(e) => setFormData(p => ({ ...p, credit_score: Number(e.target.value) }))}
+                        className="bg-gray-800 border-gray-600 text-gray-200"
+                      />
+                    </div>
+                    <div className="flex items-end gap-1">
+                      <div className="w-24">
+                        <Label className="text-xs text-gray-400">주민번호(앞)</Label>
+                        <Input 
+                          maxLength={6}
+                          value={formData.ssn_front || ''} 
+                          onChange={(e) => setFormData(p => ({ ...p, ssn_front: e.target.value }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200"
+                          placeholder="YYMMDD"
+                        />
+                      </div>
+                      <span className="text-gray-500 pb-2">-</span>
+                      <div className="w-20">
+                        <Label className="text-xs text-gray-400">(뒤)</Label>
+                        <Input 
+                          maxLength={1}
+                          value={formData.ssn_back_first || ''} 
+                          onChange={(e) => setFormData(p => ({ ...p, ssn_back_first: e.target.value }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200 w-12"
+                          placeholder="*"
+                        />
+                      </div>
+                      <span className="text-gray-500 pb-2">******</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="over_7_years"
-                      checked={formData.over_7_years || false}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, over_7_years: !!checked }))}
-                      data-testid="checkbox-over-7-years"
-                    />
-                    <Label htmlFor="over_7_years" className="text-gray-300">
-                      7년 초과 (자동 계산됨)
-                    </Label>
+                  {/* Row 2-2: 연락처, 통신사 */}
+                  <div className="flex flex-wrap gap-3 items-end">
+                    <div className="flex items-end gap-1">
+                      <div className="w-16">
+                        <Label className="text-xs text-gray-400">연락처</Label>
+                        <Input 
+                          value={formData.phone_part1 || '010'} 
+                          onChange={(e) => setFormData(p => ({ ...p, phone_part1: e.target.value }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200"
+                        />
+                      </div>
+                      <span className="text-gray-500 pb-2">-</span>
+                      <Input 
+                        maxLength={4}
+                        value={formData.phone_part2 || ''} 
+                        onChange={(e) => setFormData(p => ({ ...p, phone_part2: e.target.value }))}
+                        className="bg-gray-800 border-gray-600 text-gray-200 w-16"
+                      />
+                      <span className="text-gray-500 pb-2">-</span>
+                      <Input 
+                        maxLength={4}
+                        value={formData.phone_part3 || ''} 
+                        onChange={(e) => setFormData(p => ({ ...p, phone_part3: e.target.value }))}
+                        className="bg-gray-800 border-gray-600 text-gray-200 w-16"
+                      />
+                    </div>
+                    <div className="w-28">
+                      <Label className="text-xs text-gray-400">통신사</Label>
+                      <Select 
+                        value={formData.carrier || 'SKT'} 
+                        onValueChange={(v) => setFormData(p => ({ ...p, carrier: v }))}
+                      >
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-700">
+                          {CARRIERS.map(c => (
+                            <SelectItem key={c} value={c} className="text-gray-200">{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
-                  <div>
-                    <Label className="text-gray-300">주소</Label>
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <Input
-                          value={formData.address || ''}
-                          readOnly
-                          placeholder="주소를 검색하세요"
-                          className="bg-gray-800 border-gray-600 text-gray-100 flex-1"
-                          data-testid="input-address"
+                  {/* Row 2-3: 자택주소, 상세주소, 자가여부, 상동여부 */}
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Label className="text-xs text-gray-400">자택주소</Label>
+                        <div className="flex gap-2">
+                          <Input 
+                            value={formData.home_address || ''} 
+                            readOnly
+                            className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
+                            placeholder="주소 검색 버튼 클릭"
+                          />
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="icon"
+                            onClick={() => setShowHomeAddressSearch(true)}
+                            className="border-gray-600"
+                          >
+                            <Search className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-3 items-center">
+                      <div className="flex-1 min-w-[120px]">
+                        <Label className="text-xs text-gray-400">상세주소</Label>
+                        <Input 
+                          value={formData.home_address_detail || ''} 
+                          onChange={(e) => setFormData(p => ({ ...p, home_address_detail: e.target.value }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200"
+                          placeholder="동/호수"
                         />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setShowAddressSearch(true)}
-                          className="border-gray-600"
-                          data-testid="button-search-address"
+                      </div>
+                      <div className="flex items-center gap-2 pt-5">
+                        <Checkbox 
+                          id="home-owned"
+                          checked={formData.is_home_owned || false}
+                          onCheckedChange={(c) => setFormData(p => ({ ...p, is_home_owned: !!c }))}
+                        />
+                        <Label htmlFor="home-owned" className="text-xs text-gray-400">자가</Label>
+                      </div>
+                      <div className="flex items-center gap-2 pt-5">
+                        <Checkbox 
+                          id="same-address"
+                          checked={formData.is_same_as_business || false}
+                          onCheckedChange={(c) => {
+                            setFormData(p => ({ 
+                              ...p, 
+                              is_same_as_business: !!c,
+                              business_address: c ? p.home_address : p.business_address,
+                              business_address_detail: c ? p.home_address_detail : p.business_address_detail,
+                            }));
+                          }}
+                        />
+                        <Label htmlFor="same-address" className="text-xs text-gray-400">사업장 동일</Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Daum Postcode Modal for Home */}
+                  {showHomeAddressSearch && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                      <div className="bg-white rounded-lg p-4 w-[400px]">
+                        <DaumPostcodeEmbed 
+                          onComplete={(data) => {
+                            setFormData(p => ({ ...p, home_address: data.address }));
+                            setShowHomeAddressSearch(false);
+                          }}
+                        />
+                        <Button 
+                          variant="outline" 
+                          className="w-full mt-2"
+                          onClick={() => setShowHomeAddressSearch(false)}
                         >
-                          <Search className="w-4 h-4 mr-1" />
-                          검색
+                          닫기
                         </Button>
                       </div>
-                      {showAddressSearch && (
-                        <div className="border border-gray-600 rounded-md overflow-hidden">
-                          <DaumPostcodeEmbed
-                            onComplete={handleAddressComplete}
-                            style={{ height: 400 }}
-                          />
-                        </div>
-                      )}
-                      <Input
-                        value={formData.address_detail || ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, address_detail: e.target.value }))}
-                        placeholder="상세주소"
-                        className="bg-gray-800 border-gray-600 text-gray-100"
-                        data-testid="input-address-detail"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 재무 정보 */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">재무 정보</h3>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="credit_score" className="text-gray-300">신용점수</Label>
-                    <Input
-                      id="credit_score"
-                      type="number"
-                      value={formData.credit_score || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, credit_score: parseInt(e.target.value) || 0 }))}
-                      className="bg-gray-800 border-gray-600 text-gray-100"
-                      data-testid="input-credit-score"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="recent_sales" className="text-gray-300">작년 매출 (억원)</Label>
-                    <Input
-                      id="recent_sales"
-                      type="number"
-                      step="0.1"
-                      value={formData.recent_sales || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, recent_sales: parseFloat(e.target.value) || 0 }))}
-                      className="bg-gray-800 border-gray-600 text-gray-100"
-                      data-testid="input-recent-sales"
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <Label htmlFor="avg_revenue_3y" className="text-gray-300">3년 평균 매출 (억원)</Label>
-                    <Input
-                      id="avg_revenue_3y"
-                      type="number"
-                      step="0.1"
-                      value={formData.avg_revenue_3y || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, avg_revenue_3y: parseFloat(e.target.value) || 0 }))}
-                      className="bg-gray-800 border-gray-600 text-gray-100"
-                      data-testid="input-avg-revenue"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* 관리 정보 */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">관리 정보</h3>
-                
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="manager" className="text-gray-300">담당자</Label>
-                    <Select
-                      value={formData.manager_id || ''}
-                      onValueChange={(value) => {
-                        const selectedUser = users.find(u => u.uid === value);
-                        setFormData(prev => ({
-                          ...prev,
-                          manager_id: value,
-                          manager_name: selectedUser?.name || '',
-                        }));
-                      }}
-                    >
-                      <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100" data-testid="select-manager">
-                        <SelectValue placeholder="담당자 선택" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-600">
-                        {users.map(user => (
-                          <SelectItem key={user.uid} value={user.uid} className="text-gray-100">
-                            {user.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="processing_org" className="text-gray-300">진행기관</Label>
-                    <Select
-                      value={formData.processing_org || '기타'}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, processing_org: value }))}
-                    >
-                      <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100" data-testid="select-processing-org">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-600">
-                        {PROCESSING_ORGS.map(org => (
-                          <SelectItem key={org} value={org} className="text-gray-100">
-                            {org}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="status" className="text-gray-300">상태</Label>
-                    <Select
-                      value={formData.status_code || '1-1'}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, status_code: value as StatusCode }))}
-                    >
-                      <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100" data-testid="select-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-600">
-                        {STATUS_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value} className="text-gray-100">
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* 수수료율 - 총관리자만 표시 */}
-                  {isSuperAdmin && (
-                    <div>
-                      <Label htmlFor="commission_rate" className="text-gray-300">
-                        수수료율 (%)
-                        <span className="ml-2 text-xs text-yellow-500">(총관리자 전용)</span>
-                      </Label>
-                      <Input
-                        id="commission_rate"
-                        type="number"
-                        step="0.1"
-                        value={formData.commission_rate || ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, commission_rate: parseFloat(e.target.value) || 0 }))}
-                        className="bg-gray-800 border-gray-600 text-gray-100"
-                        data-testid="input-commission-rate"
-                      />
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-          </ScrollArea>
 
-          {/* Right Panel - Tabs (60%) */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
-              <TabsList className="w-full justify-start bg-gray-800 border-b border-gray-700 rounded-none p-0 h-12">
-                <TabsTrigger
-                  value="memo"
-                  className="flex-1 h-full rounded-none data-[state=active]:bg-gray-700 data-[state=active]:border-b-2 data-[state=active]:border-blue-500"
-                  data-testid="tab-memo"
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  상담 메모
-                </TabsTrigger>
-                <TabsTrigger
-                  value="documents"
-                  className="flex-1 h-full rounded-none data-[state=active]:bg-gray-700 data-[state=active]:border-b-2 data-[state=active]:border-blue-500"
-                  data-testid="tab-documents"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  문서 관리
-                </TabsTrigger>
-                <TabsTrigger
-                  value="history"
-                  className="flex-1 h-full rounded-none data-[state=active]:bg-gray-700 data-[state=active]:border-b-2 data-[state=active]:border-blue-500"
-                  data-testid="tab-history"
-                >
-                  <History className="w-4 h-4 mr-2" />
-                  변경 이력
-                </TabsTrigger>
-                <TabsTrigger
-                  value="todos"
-                  className="flex-1 h-full rounded-none data-[state=active]:bg-gray-700 data-[state=active]:border-b-2 data-[state=active]:border-blue-500"
-                  data-testid="tab-todos"
-                >
-                  <CheckSquare className="w-4 h-4 mr-2" />
-                  할 일
-                </TabsTrigger>
-              </TabsList>
+                {/* 사업자 정보 그룹 (Border Box) */}
+                <div className="border border-gray-700 rounded-lg p-4 space-y-4">
+                  <h3 className="text-sm font-semibold text-emerald-400 mb-3">사업자 정보</h3>
+                  
+                  {/* Row 3-1: 상호명, 개업일 */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex-1 min-w-[150px]">
+                      <Label className="text-xs text-gray-400">상호명</Label>
+                      <Input 
+                        value={formData.company_name || ''} 
+                        onChange={(e) => setFormData(p => ({ ...p, company_name: e.target.value }))}
+                        className="bg-gray-800 border-gray-600 text-gray-200"
+                        data-testid="input-company-name"
+                      />
+                    </div>
+                    <div className="w-40">
+                      <Label className="text-xs text-gray-400">개업일</Label>
+                      <Input 
+                        type="date"
+                        value={formData.founding_date || ''} 
+                        onChange={(e) => handleFoundingDateChange(e.target.value)}
+                        className="bg-gray-800 border-gray-600 text-gray-200"
+                      />
+                      {formData.over_7_years && (
+                        <Badge variant="secondary" className="mt-1 text-xs bg-orange-600/20 text-orange-400">
+                          7년 초과
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
 
-              {/* Tab 1: 상담 메모 (Chat Style) */}
-              <TabsContent value="memo" className="flex-1 flex flex-col mt-0 overflow-hidden">
-                <ScrollArea className="flex-1 p-4">
-                  <div className="space-y-4">
-                    {(!memoHistory || memoHistory.length === 0) ? (
-                      <div className="text-center text-gray-500 py-12">
-                        아직 등록된 메모가 없습니다.
-                      </div>
-                    ) : (
-                      memoHistory.map((memo, index) => (
-                        <div
-                          key={index}
-                          className={cn(
-                            "flex flex-col max-w-[80%]",
-                            memo.author_id === currentUser?.uid ? "ml-auto items-end" : "items-start"
-                          )}
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs text-gray-500">{memo.author}</span>
-                            <span className="text-xs text-gray-600">
-                              {format(new Date(memo.date), 'yyyy-MM-dd HH:mm')}
-                            </span>
-                          </div>
-                          <div
-                            className={cn(
-                              "px-4 py-2 rounded-2xl text-sm",
-                              memo.author_id === currentUser?.uid
-                                ? "bg-blue-600 text-white rounded-br-sm"
-                                : "bg-gray-700 text-gray-100 rounded-bl-sm"
-                            )}
+                  {/* Row 3-2: 업종, 종목 */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="w-32">
+                      <Label className="text-xs text-gray-400">업종</Label>
+                      <Select 
+                        value={formData.business_type || '기타'} 
+                        onValueChange={(v) => setFormData(p => ({ ...p, business_type: v }))}
+                      >
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-700">
+                          {BUSINESS_TYPES.map(t => (
+                            <SelectItem key={t} value={t} className="text-gray-200">{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1 min-w-[120px]">
+                      <Label className="text-xs text-gray-400">종목</Label>
+                      <Input 
+                        value={formData.business_item || ''} 
+                        onChange={(e) => setFormData(p => ({ ...p, business_item: e.target.value }))}
+                        className="bg-gray-800 border-gray-600 text-gray-200"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3-3: 사업자등록번호, 재도전, 혁신 */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="w-36">
+                      <Label className="text-xs text-gray-400">사업자등록번호</Label>
+                      <Input 
+                        value={formData.business_registration_number || ''} 
+                        onChange={(e) => setFormData(p => ({ ...p, business_registration_number: e.target.value }))}
+                        className="bg-gray-800 border-gray-600 text-gray-200"
+                        placeholder="000-00-00000"
+                      />
+                    </div>
+                    <div className="w-28">
+                      <Label className="text-xs text-gray-400">재도전</Label>
+                      <Select 
+                        value={formData.retry_type || '해당없음'} 
+                        onValueChange={(v) => setFormData(p => ({ ...p, retry_type: v }))}
+                      >
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-700">
+                          {RETRY_OPTIONS.map(o => (
+                            <SelectItem key={o} value={o} className="text-gray-200">{o}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-28">
+                      <Label className="text-xs text-gray-400">혁신기술</Label>
+                      <Select 
+                        value={formData.innovation_type || '해당없음'} 
+                        onValueChange={(v) => setFormData(p => ({ ...p, innovation_type: v }))}
+                      >
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-700">
+                          {INNOVATION_OPTIONS.map(o => (
+                            <SelectItem key={o} value={o} className="text-gray-200">{o}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Row 3-4: 사업장 소재지, 상세주소, 자가여부 */}
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Label className="text-xs text-gray-400">사업장 소재지</Label>
+                        <div className="flex gap-2">
+                          <Input 
+                            value={formData.business_address || ''} 
+                            readOnly
+                            className="bg-gray-800 border-gray-600 text-gray-200 flex-1"
+                            placeholder="주소 검색 버튼 클릭"
+                          />
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="icon"
+                            onClick={() => setShowBusinessAddressSearch(true)}
+                            className="border-gray-600"
+                            disabled={formData.is_same_as_business}
                           >
-                            {memo.content}
-                          </div>
+                            <Search className="w-4 h-4" />
+                          </Button>
                         </div>
-                      ))
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-3 items-center">
+                      <div className="flex-1 min-w-[120px]">
+                        <Label className="text-xs text-gray-400">상세주소</Label>
+                        <Input 
+                          value={formData.business_address_detail || ''} 
+                          onChange={(e) => setFormData(p => ({ ...p, business_address_detail: e.target.value }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200"
+                          placeholder="동/호수"
+                          disabled={formData.is_same_as_business}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 pt-5">
+                        <Checkbox 
+                          id="business-owned"
+                          checked={formData.is_business_owned || false}
+                          onCheckedChange={(c) => setFormData(p => ({ ...p, is_business_owned: !!c }))}
+                        />
+                        <Label htmlFor="business-owned" className="text-xs text-gray-400">자가</Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Daum Postcode Modal for Business */}
+                  {showBusinessAddressSearch && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                      <div className="bg-white rounded-lg p-4 w-[400px]">
+                        <DaumPostcodeEmbed 
+                          onComplete={(data) => {
+                            setFormData(p => ({ ...p, business_address: data.address }));
+                            setShowBusinessAddressSearch(false);
+                          }}
+                        />
+                        <Button 
+                          variant="outline" 
+                          className="w-full mt-2"
+                          onClick={() => setShowBusinessAddressSearch(false)}
+                        >
+                          닫기
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 3-5: 매출 (최근, Y-1, Y-2, Y-3) */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="w-24">
+                      <Label className="text-xs text-gray-400">최근매출</Label>
+                      <div className="relative">
+                        <Input 
+                          type="number"
+                          value={formData.recent_sales || ''} 
+                          onChange={(e) => setFormData(p => ({ ...p, recent_sales: Number(e.target.value) }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
+                      </div>
+                    </div>
+                    <div className="w-24">
+                      <Label className="text-xs text-gray-400">Y-1 매출</Label>
+                      <div className="relative">
+                        <Input 
+                          type="number"
+                          value={formData.sales_y1 || ''} 
+                          onChange={(e) => setFormData(p => ({ ...p, sales_y1: Number(e.target.value) }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
+                      </div>
+                    </div>
+                    <div className="w-24">
+                      <Label className="text-xs text-gray-400">Y-2 매출</Label>
+                      <div className="relative">
+                        <Input 
+                          type="number"
+                          value={formData.sales_y2 || ''} 
+                          onChange={(e) => setFormData(p => ({ ...p, sales_y2: Number(e.target.value) }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
+                      </div>
+                    </div>
+                    <div className="w-24">
+                      <Label className="text-xs text-gray-400">Y-3 매출</Label>
+                      <div className="relative">
+                        <Input 
+                          type="number"
+                          value={formData.sales_y3 || ''} 
+                          onChange={(e) => setFormData(p => ({ ...p, sales_y3: Number(e.target.value) }))}
+                          className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">억</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Right Panel - Split into top and bottom */}
+          <div className="flex flex-col h-full overflow-hidden">
+            
+            {/* Section 2: Top - Document Viewer (50% height) */}
+            <div className="h-1/2 border-b border-gray-700 flex flex-col overflow-hidden">
+              {/* Document Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
+                <div className="flex items-center gap-2 flex-1 overflow-x-auto">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    className="hidden"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="border-gray-600 shrink-0"
+                  >
+                    <Upload className="w-4 h-4 mr-1" />
+                    {isUploading ? '업로드 중...' : '파일 업로드'}
+                  </Button>
+                  
+                  {/* File Tabs */}
+                  <div className="flex gap-1 overflow-x-auto">
+                    {documents.map((doc) => (
+                      <Button
+                        key={doc.id}
+                        variant={selectedDocument?.id === doc.id ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => setSelectedDocument(doc)}
+                        className={cn(
+                          "shrink-0 max-w-[150px]",
+                          selectedDocument?.id === doc.id 
+                            ? "bg-blue-600/20 text-blue-400" 
+                            : "text-gray-400"
+                        )}
+                      >
+                        <FileText className="w-3 h-3 mr-1" />
+                        <span className="truncate">{doc.file_name}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Document Viewer */}
+              <div className="flex-1 p-4 overflow-auto bg-gray-950/50">
+                {selectedDocument ? (
+                  <div className="h-full flex items-center justify-center">
+                    {selectedDocument.file_type.includes('pdf') ? (
+                      <iframe 
+                        src={selectedDocument.file_url} 
+                        className="w-full h-full rounded border border-gray-700"
+                        title={selectedDocument.file_name}
+                      />
+                    ) : selectedDocument.file_type.includes('image') ? (
+                      <img 
+                        src={selectedDocument.file_url} 
+                        alt={selectedDocument.file_name}
+                        className="max-w-full max-h-full object-contain rounded"
+                      />
+                    ) : (
+                      <div className="text-gray-500 text-center">
+                        <FileText className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                        <p>미리보기를 지원하지 않는 파일 형식입니다</p>
+                        <a 
+                          href={selectedDocument.file_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:underline mt-2 inline-block"
+                        >
+                          다운로드
+                        </a>
+                      </div>
                     )}
                   </div>
-                </ScrollArea>
-                <div className="p-4 border-t border-gray-700 bg-gray-800/50">
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                      <p>파일을 업로드하세요</p>
+                      <p className="text-xs text-gray-600 mt-1">PDF, PNG, JPG 지원</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Section - Split into 2 columns */}
+            <div className="h-1/2 flex overflow-hidden">
+              
+              {/* Section 3: Memo Chat (Left 50%) */}
+              <div className="w-1/2 border-r border-gray-700 flex flex-col overflow-hidden">
+                <div className="px-4 py-2 border-b border-gray-700 bg-gray-800/30">
+                  <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                    <UserIcon className="w-4 h-4" />
+                    상담 메모
+                  </h3>
+                </div>
+                
+                {/* Memo Messages */}
+                <div ref={memoScrollRef} className="flex-1 overflow-auto p-3 space-y-3 bg-gray-900/50">
+                  {memos.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      <p className="text-sm">상담 메모가 없습니다</p>
+                    </div>
+                  ) : (
+                    memos.map((memo) => (
+                      <div key={memo.id} className="flex flex-col">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-blue-400">{memo.author_name}</span>
+                          <span className="text-xs text-gray-500">
+                            {safeFormatDate(memo.created_at, 'MM/dd HH:mm')}
+                          </span>
+                        </div>
+                        <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-3 py-2 max-w-[90%]">
+                          <p className="text-sm text-gray-200 whitespace-pre-wrap">{memo.content}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                
+                {/* Memo Input */}
+                <div className="p-3 border-t border-gray-700 bg-gray-800/30">
                   <div className="flex gap-2">
                     <Textarea
                       value={newMemo}
                       onChange={(e) => setNewMemo(e.target.value)}
-                      placeholder="메모를 입력하세요..."
-                      className="bg-gray-800 border-gray-600 text-gray-100 resize-none min-h-[60px]"
+                      placeholder="메모 입력..."
+                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none min-h-[60px]"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleMemoSubmit();
                         }
                       }}
-                      data-testid="textarea-memo"
                     />
-                    <Button onClick={handleMemoSubmit} className="self-end" data-testid="button-send-memo">
+                    <Button 
+                      onClick={handleMemoSubmit}
+                      disabled={!newMemo.trim()}
+                      size="icon"
+                      className="shrink-0 self-end"
+                    >
                       <Send className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
-              </TabsContent>
+              </div>
 
-              {/* Tab 2: 문서 관리 */}
-              <TabsContent value="documents" className="flex-1 flex flex-col mt-0 overflow-hidden">
-                <div className="p-4 border-b border-gray-700 bg-gray-800/30">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading || isNewCustomer}
-                      data-testid="button-upload-file"
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      {isUploading ? '업로드 중...' : '파일 업로드'}
-                    </Button>
-                    {isNewCustomer && (
-                      <span className="text-xs text-gray-500">저장 후 파일 업로드가 가능합니다</span>
-                    )}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </div>
+              {/* Section 4: AI Chat (Right 50%) */}
+              <div className="w-1/2 flex flex-col overflow-hidden bg-gray-950/30">
+                <div className="px-4 py-2 border-b border-gray-700 bg-purple-900/20">
+                  <h3 className="text-sm font-semibold text-purple-300 flex items-center gap-2">
+                    <Bot className="w-4 h-4" />
+                    AI 질의
+                  </h3>
                 </div>
-
-                <div className="flex flex-1 overflow-hidden">
-                  {/* File List */}
-                  <div className="w-1/3 border-r border-gray-700 overflow-y-auto">
-                    {documents.length === 0 ? (
-                      <div className="text-center text-gray-500 py-8 text-sm">
-                        업로드된 문서가 없습니다
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-700">
-                        {documents.map(doc => (
-                          <div
-                            key={doc.id}
-                            className={cn(
-                              "p-3 cursor-pointer hover:bg-gray-800 transition-colors",
-                              selectedDocument?.id === doc.id && "bg-gray-800"
-                            )}
-                            onClick={() => setSelectedDocument(doc)}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-200 truncate">
-                                  {doc.file_name}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {format(new Date(doc.uploaded_at), 'yyyy-MM-dd HH:mm')}
-                                </p>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteDocument(doc);
-                                }}
-                                data-testid={`button-delete-doc-${doc.id}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Document Preview */}
-                  <div className="flex-1 bg-gray-950 flex items-center justify-center">
-                    {selectedDocument ? (
-                      selectedDocument.file_type === 'application/pdf' ? (
-                        <iframe
-                          src={selectedDocument.file_url}
-                          className="w-full h-full"
-                          title="PDF Preview"
-                        />
-                      ) : selectedDocument.file_type.startsWith('image/') ? (
-                        <img
-                          src={selectedDocument.file_url}
-                          alt={selectedDocument.file_name}
-                          className="max-w-full max-h-full object-contain"
-                        />
-                      ) : (
-                        <div className="text-center text-gray-500">
-                          <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                          <p>미리보기를 지원하지 않는 파일 형식입니다</p>
-                          <Button
-                            variant="outline"
-                            className="mt-4"
-                            onClick={() => window.open(selectedDocument.file_url, '_blank')}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            다운로드
-                          </Button>
-                        </div>
-                      )
-                    ) : (
-                      <div className="text-center text-gray-500">
-                        <FileText className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                        <p>파일을 선택하면 미리보기가 표시됩니다</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* Tab 3: 변경 이력 */}
-              <TabsContent value="history" className="flex-1 mt-0 overflow-hidden">
-                <ScrollArea className="h-full p-4">
-                  {historyLogs.length === 0 ? (
-                    <div className="text-center text-gray-500 py-12">
-                      변경 이력이 없습니다.
+                
+                {/* AI Messages */}
+                <div ref={aiScrollRef} className="flex-1 overflow-auto p-3 space-y-3">
+                  {aiMessages.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      <Bot className="w-10 h-10 mx-auto mb-2 text-purple-600/50" />
+                      <p className="text-sm">AI에게 질문하세요</p>
+                      <p className="text-xs text-gray-600 mt-1">고객 분석 및 추천 기능</p>
                     </div>
                   ) : (
-                    <div className="relative pl-6 border-l-2 border-gray-700 space-y-6">
-                      {historyLogs.map((log, index) => (
-                        <div key={log.id} className="relative">
-                          <div className="absolute -left-[25px] w-4 h-4 rounded-full bg-blue-600 border-2 border-gray-900" />
-                          <div className="bg-gray-800 rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-gray-200">
-                                {log.description}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {format(new Date(log.changed_at), 'yyyy-MM-dd HH:mm')}
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-400">
-                              {log.changed_by_name}
-                            </p>
-                            {log.old_value && log.new_value && (
-                              <div className="mt-2 text-xs">
-                                <span className="text-red-400 line-through">{log.old_value}</span>
-                                <span className="text-gray-500 mx-2">&rarr;</span>
-                                <span className="text-green-400">{log.new_value}</span>
-                              </div>
-                            )}
-                          </div>
+                    aiMessages.map((msg) => (
+                      <div 
+                        key={msg.id} 
+                        className={cn(
+                          "flex flex-col",
+                          msg.role === 'user' ? 'items-end' : 'items-start'
+                        )}
+                      >
+                        <div className={cn(
+                          "rounded-lg px-3 py-2 max-w-[90%]",
+                          msg.role === 'user' 
+                            ? "bg-purple-600/30 border border-purple-600/40" 
+                            : "bg-gray-700/50 border border-gray-600/50"
+                        )}>
+                          <p className="text-sm text-gray-200 whitespace-pre-wrap">{msg.content}</p>
                         </div>
-                      ))}
-                    </div>
+                        <span className="text-xs text-gray-500 mt-1">
+                          {safeFormatDate(msg.created_at, 'HH:mm')}
+                        </span>
+                      </div>
+                    ))
                   )}
-                </ScrollArea>
-              </TabsContent>
-
-              {/* Tab 4: 할 일 */}
-              <TabsContent value="todos" className="flex-1 flex flex-col mt-0 overflow-hidden">
-                <ScrollArea className="flex-1 p-4">
-                  {customerTodos.length === 0 ? (
-                    <div className="text-center text-gray-500 py-12">
-                      이 고객과 연동된 할 일이 없습니다.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {customerTodos.map(todo => (
-                        <div
-                          key={todo.id}
-                          className={cn(
-                            "flex items-start gap-3 p-4 rounded-lg bg-gray-800 border border-gray-700",
-                            todo.is_completed && "opacity-60"
-                          )}
-                        >
-                          <Checkbox
-                            checked={todo.is_completed}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <p className={cn(
-                              "text-sm text-gray-200",
-                              todo.is_completed && "line-through"
-                            )}>
-                              {todo.content}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                              <span>{todo.assigned_to_name}</span>
-                              <span>|</span>
-                              <span>마감: {todo.due_date}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </ScrollArea>
-
-                {/* Add Todo Form */}
-                <div className="p-4 border-t border-gray-700 bg-gray-800/50">
+                </div>
+                
+                {/* AI Input */}
+                <div className="p-3 border-t border-gray-700 bg-purple-900/10">
                   <div className="flex gap-2">
-                    <Input
-                      value={newTodoContent}
-                      onChange={(e) => setNewTodoContent(e.target.value)}
-                      placeholder="할 일을 입력하세요..."
-                      className="bg-gray-800 border-gray-600 text-gray-100 flex-1"
-                      data-testid="input-new-todo"
+                    <Textarea
+                      value={aiInput}
+                      onChange={(e) => setAiInput(e.target.value)}
+                      placeholder="AI에게 질문하기..."
+                      className="bg-gray-800 border-gray-600 text-gray-200 resize-none min-h-[60px]"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAISubmit();
+                        }
+                      }}
                     />
-                    <Input
-                      type="date"
-                      value={newTodoDueDate}
-                      onChange={(e) => setNewTodoDueDate(e.target.value)}
-                      className="bg-gray-800 border-gray-600 text-gray-100 w-40"
-                      data-testid="input-todo-due-date"
-                    />
-                    <Button data-testid="button-add-todo">
-                      추가
+                    <Button 
+                      onClick={handleAISubmit}
+                      disabled={!aiInput.trim()}
+                      size="icon"
+                      className="shrink-0 self-end bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Send className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
           </div>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
-
-export default CustomerDetailModal;
