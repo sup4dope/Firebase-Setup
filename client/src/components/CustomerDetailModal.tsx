@@ -450,7 +450,7 @@ export function CustomerDetailModal({
                 
                 {/* 유입경로 (최상단) - 1. 상단에 바짝 붙임 */}
                 <div className="space-y-0.5">
-                  <Label className="text-xs text-gray-300">유입경로</Label>
+                  <Label className="text-xs text-gray-300 ml-[11px] mr-[11px]">유입경로</Label>
                   <Select 
                     value={formData.entry_source || '광고랜딩명'} 
                     onValueChange={(v) => setFormData(p => ({ ...p, entry_source: v }))}
