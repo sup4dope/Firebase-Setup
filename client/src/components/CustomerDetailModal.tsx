@@ -653,7 +653,7 @@ export function CustomerDetailModal({
                 </div>
 
                 {/* 사업자 정보 그룹 (Border Box) */}
-                <div className="border border-gray-700 rounded-lg p-1.5 space-y-1">
+                <div className="border border-gray-700 rounded-lg p-1.5 space-y-1 ml-[6px] mr-[6px] pl-[10px] pr-[10px] pt-[10px] pb-[10px] mt-[0px] mb-[0px]">
                   <h3 className="text-xs font-semibold text-emerald-400">사업자 정보</h3>
                   
                   {/* Row 3-1: 상호명, 개업일 - grid-cols-2 gap-3 items-end (Row 2와 동일) */}
