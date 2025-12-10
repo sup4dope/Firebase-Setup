@@ -892,11 +892,11 @@ export function CustomerDetailModal({
             </ScrollArea>
           </div>
 
-          {/* Right Panel - flex flex-col h-full overflow-hidden */}
-          <div className="flex flex-col h-full overflow-hidden">
+          {/* Right Panel - flex flex-col h-full max-h-full overflow-hidden */}
+          <div className="flex flex-col h-full max-h-full overflow-hidden">
             
-            {/* Section 2: Top - Document Viewer (h-[40%] shrink-0) */}
-            <div className="h-[40%] shrink-0 border-b border-gray-700 flex flex-col overflow-hidden">
+            {/* Section 2: Top - Document Viewer (h-2/5 shrink-0) */}
+            <div className="h-2/5 shrink-0 border-b border-gray-700 flex flex-col overflow-hidden">
               {/* Document Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
                 <div className="flex items-center gap-2 flex-1 overflow-x-auto">
@@ -1001,8 +1001,8 @@ export function CustomerDetailModal({
               </div>
             </div>
 
-            {/* Bottom Section - flex-1 min-h-0 (남은 공간만 차지) */}
-            <div className="flex-1 min-h-0">
+            {/* Bottom Section - h-3/5 overflow-hidden (60% 고정) */}
+            <div className="h-3/5 overflow-hidden">
               <div className="flex flex-row h-full">
               
               {/* Section 3: Memo Chat (Left 50%) */}
