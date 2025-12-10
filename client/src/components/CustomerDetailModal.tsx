@@ -895,8 +895,8 @@ export function CustomerDetailModal({
           {/* Right Panel - flex flex-col h-full overflow-hidden */}
           <div className="flex flex-col h-full overflow-hidden">
             
-            {/* Section 2: Top - Document Viewer (h-[55%] shrink-0) */}
-            <div className="h-[55%] shrink-0 border-b border-gray-700 flex flex-col overflow-hidden">
+            {/* Section 2: Top - Document Viewer (h-[40%] shrink-0) */}
+            <div className="h-[40%] shrink-0 border-b border-gray-700 flex flex-col overflow-hidden">
               {/* Document Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
                 <div className="flex items-center gap-2 flex-1 overflow-x-auto">
@@ -1014,8 +1014,8 @@ export function CustomerDetailModal({
                   </h3>
                 </div>
                 
-                {/* Memo Messages - flex-1 overflow-y-auto */}
-                <div ref={memoScrollRef} className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-900/50">
+                {/* Memo Messages - flex-1 overflow-y-auto min-h-0 */}
+                <div ref={memoScrollRef} className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2 bg-gray-900/50">
                   {memos.length === 0 ? (
                     <div className="text-center text-gray-500 py-3">
                       <p className="text-sm">상담 메모가 없습니다</p>
@@ -1037,8 +1037,8 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* Memo Input - h-auto shrink-0 */}
-                <div className="h-auto shrink-0 border-t border-gray-700 bg-gray-800/30 flex items-center px-2 py-1.5 gap-1.5">
+                {/* Memo Input - h-auto shrink-0 py-2 */}
+                <div className="h-auto shrink-0 border-t border-gray-700 bg-gray-800/30 flex items-center px-2 py-2 gap-1.5">
                   <Input
                     value={newMemo}
                     onChange={(e) => setNewMemo(e.target.value)}
@@ -1071,8 +1071,8 @@ export function CustomerDetailModal({
                   </h3>
                 </div>
                 
-                {/* AI Messages - flex-1 overflow-y-auto */}
-                <div ref={aiScrollRef} className="flex-1 overflow-y-auto p-2 space-y-2">
+                {/* AI Messages - flex-1 overflow-y-auto min-h-0 */}
+                <div ref={aiScrollRef} className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2">
                   {aiMessages.length === 0 ? (
                     <div className="text-center text-gray-500 py-3">
                       <Bot className="w-7 h-7 mx-auto mb-1 text-purple-600/50" />
@@ -1103,8 +1103,8 @@ export function CustomerDetailModal({
                   )}
                 </div>
                 
-                {/* AI Input - h-auto shrink-0 */}
-                <div className="h-auto shrink-0 border-t border-gray-700 bg-purple-900/10 flex items-center px-2 py-1.5 gap-1.5">
+                {/* AI Input - h-auto shrink-0 py-2 */}
+                <div className="h-auto shrink-0 border-t border-gray-700 bg-purple-900/10 flex items-center px-2 py-2 gap-1.5">
                   <Input
                     value={aiInput}
                     onChange={(e) => setAiInput(e.target.value)}
