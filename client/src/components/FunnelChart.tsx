@@ -257,9 +257,9 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
           {[0, 1, 2, 3, 4, 5].map((index) => (
             <div
               key={index}
-              className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center"
+              className="absolute top-1/2 -translate-y-1/2 w-8 flex items-center justify-center"
               style={{
-                left: `calc(${((index + 1) / 7) * 100}% - 8px)`,
+                left: `calc(${((index + 1) / 7) * 100}% - 16px)`,
               }}
             >
               <ChevronRight className="w-4 h-4 text-gray-500" />
