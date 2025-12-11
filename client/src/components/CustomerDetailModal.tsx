@@ -575,21 +575,35 @@ export function CustomerDetailModal({
     }, 1000);
   }, [performSave]);
 
-  // Handle field change with auto-save trigger - passes updatedData directly to avoid stale state
+  // Handle field change with auto-save trigger
   const handleFieldChange = (e: any) => {
-    // 1. 입력값 안전하게 추출 (checkbox 지원)
-    const name = e.target ? e.target.name : e.name;
-    const value = e.target 
-      ? e.target.type === 'checkbox' ? e.target.checked : e.target.value 
-      : e.value;
+    // 1. 값 추출 (Checkbox 등 타입 체크 포함)
+    let name: string;
+    let value: any;
 
-    // 2. 최신 데이터 객체 생성
+    if (e.target) {
+      name = e.target.name;
+      value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    } else {
+      // 객체로 직접 전달된 경우 (예: { name: 'field', value: 'val' } 또는 { field1: val1, field2: val2 })
+      if (e.name !== undefined && e.value !== undefined) {
+        name = e.name;
+        value = e.value;
+      } else {
+        // 여러 필드를 한번에 업데이트하는 경우
+        const updatedData = { ...formData, ...e };
+        setFormData(updatedData);
+        pendingDataRef.current = updatedData;
+        triggerAutoSave();
+        return;
+      }
+    }
+
+    // 2. ★핵심: 화면 즉시 갱신 (State Update)
     const updatedData = { ...formData, [name]: value };
-
-    // 3. ★핵심: UI 즉시 업데이트 (이게 없으면 입력창이 멈춤)
     setFormData(updatedData);
 
-    // 4. 자동 저장 트리거
+    // 3. 자동 저장 호출 (Debounce)
     pendingDataRef.current = updatedData;
     triggerAutoSave();
   };
