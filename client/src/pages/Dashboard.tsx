@@ -331,9 +331,9 @@ export default function Dashboard() {
             return c;
           })
         );
-        // ★핵심: 상세페이지 변경 감지 -> 대시보드 목록 갱신 (메모 동기화)
-        console.log("🔄 상세페이지 변경 감지 -> 대시보드 목록 갱신");
-        fetchData();
+        // ★수정: fetchData 대신 로컬 상태만 업데이트 (모달 깜빡임 방지)
+        // setCustomers에서 이미 해당 고객의 데이터를 업데이트했으므로 추가 작업 불필요
+        console.log("🔄 상세페이지 변경 감지 -> 로컬 상태 업데이트 완료");
         // Silent update - no toast for auto-save
         return data.id;
       } catch (error: any) {

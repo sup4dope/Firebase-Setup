@@ -492,10 +492,10 @@ export function CustomerDetailModal({
         }
       }
       
-      // 부모 컴포넌트에 변경 알림 (리스트 갱신용)
-      if (onSave && formData.id) {
-        onSave({ id: formData.id });
-      }
+      // ★수정: 부모에게 최소한의 데이터만 전달 (메모 정보만 업데이트)
+      // onSave를 호출하면 Dashboard가 updateCustomer를 다시 호출해서 중복 저장됨
+      // 대신 직접 customers 컬렉션을 업데이트했으므로 추가 작업 불필요
+      // onSnapshot이 실시간으로 메모를 동기화하므로 별도 갱신 불필요
     } catch (error) {
       console.error('메모 저장 실패:', error);
     }
