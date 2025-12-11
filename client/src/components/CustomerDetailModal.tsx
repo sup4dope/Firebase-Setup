@@ -564,59 +564,53 @@ export function CustomerDetailModal({
     }
   }, [formData, memos, documents, onSave, currentUser]);
 
-  // Debounced auto-save (1 second after last change)
-  const triggerAutoSave = useCallback(() => {
+  // Debounced save function - 데이터를 직접 받아서 1초 후 저장
+  const debouncedSave = useCallback((dataToSave: typeof formData) => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
     saveTimeoutRef.current = setTimeout(() => {
-      // Pass pendingDataRef.current to ensure latest data is used
-      performSave(pendingDataRef.current || undefined);
+      performSave(dataToSave);
     }, 1000);
   }, [performSave]);
 
-  // Handle field change with auto-save trigger
+  // 입력 필드 변경 핸들러 (자동 저장 연결 복구)
   const handleFieldChange = (e: any) => {
-    // 1. 값 추출 (Checkbox 등 타입 체크 포함)
+    // 1. 입력값 안전하게 추출 (이벤트 객체 vs 직접 호출 모두 대응)
     let name: string;
     let value: any;
 
     if (e.target) {
+      // 일반 input, checkbox, select 이벤트
       name = e.target.name;
       value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     } else {
-      // 객체로 직접 전달된 경우 (예: { name: 'field', value: 'val' } 또는 { field1: val1, field2: val2 })
-      if (e.name !== undefined && e.value !== undefined) {
-        name = e.name;
-        value = e.value;
-      } else {
-        // 여러 필드를 한번에 업데이트하는 경우
-        const updatedData = { ...formData, ...e };
-        setFormData(updatedData);
-        pendingDataRef.current = updatedData;
-        triggerAutoSave();
-        return;
-      }
+      // DatePicker 등에서 객체로 넘긴 경우 ({ field: value })
+      name = e.name || Object.keys(e)[0];
+      value = e.value !== undefined ? e.value : Object.values(e)[0];
     }
 
-    // 2. ★핵심: 화면 즉시 갱신 (State Update)
+    if (!name) return; // 방어 코드
+
+    // 2. 최신 데이터 객체 생성 (비동기 State 문제 해결)
     const updatedData = { ...formData, [name]: value };
+
+    // 3. UI 업데이트 (화면 갱신)
     setFormData(updatedData);
 
-    // 3. 자동 저장 호출 (Debounce)
-    pendingDataRef.current = updatedData;
-    triggerAutoSave();
+    // 4. ★핵심: 최신 객체로 저장 함수 직접 호출 (State 기다리지 않음)
+    debouncedSave(updatedData);
   };
   
   // Handle object updates (for complex field changes like founding_date with over_7_years)
   const handleFieldChangeObject = useCallback((updates: Partial<typeof formData>) => {
     setFormData(prev => {
       const updatedData = { ...prev, ...updates };
-      pendingDataRef.current = updatedData;
+      // 직접 debouncedSave 호출
+      debouncedSave(updatedData);
       return updatedData;
     });
-    triggerAutoSave();
-  }, [triggerAutoSave]);
+  }, [debouncedSave]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -627,13 +621,13 @@ export function CustomerDetailModal({
     };
   }, []);
 
-  // Save on blur (when focus leaves input) - uses pendingDataRef for latest data
+  // Save on blur (when focus leaves input) - 즉시 저장
   const handleBlurSave = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    performSave(pendingDataRef.current || undefined);
-  }, [performSave]);
+    performSave(formData);
+  }, [performSave, formData]);
 
   // Handle delete
   const handleDelete = async () => {
