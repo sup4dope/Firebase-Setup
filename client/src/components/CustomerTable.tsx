@@ -545,7 +545,7 @@ export function CustomerTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead className="w-28 font-semibold whitespace-nowrap">유입일자</TableHead>
+              <TableHead className="w-28 font-semibold whitespace-nowrap text-center">유입일자</TableHead>
               <TableHead className="w-[50px] font-semibold text-center">No</TableHead>
               <TableHead className="w-[90px] font-semibold">고객명</TableHead>
               <TableHead className="w-[150px] font-semibold">상태</TableHead>
