@@ -225,19 +225,24 @@ export function CustomerDetailModal({
     setAiMessages([]);
   }, [customer, isNewCustomer, currentUser]);
 
-  // [추가] 메모 내역 불러오기 (실시간 리스너)
+  // [수정] 메모 실시간 로딩 (로그 추가)
   useEffect(() => {
-    if (!formData.id) return;
+    const customerId = formData.id;
+    if (!customerId) {
+      console.log("🚫 customerId 없음, 메모 로딩 건너뜀");
+      return;
+    }
 
-    // 날짜순 정렬 (오래된 게 위로)
+    console.log(`📢 메모 로딩 시작 (Customer ID: ${customerId})`);
+
     const q = query(
       collection(db, "counseling_logs"),
-      where("customer_id", "==", formData.id),
+      where("customer_id", "==", customerId),
       orderBy("created_at", "asc")
     );
 
-    // 실시간으로 DB 변화 감지
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log(`✅ 메모 로드 성공: ${snapshot.size}개`);
       const logs = snapshot.docs.map(doc => ({
         id: doc.id,
         content: doc.data().content || '',
@@ -246,6 +251,8 @@ export function CustomerDetailModal({
         created_at: doc.data().created_at?.toDate?.() || new Date(),
       })) as MemoItem[];
       setMemos(logs);
+    }, (error) => {
+      console.error("🔥 메모 로딩 실패:", error);
     });
 
     return () => unsubscribe();

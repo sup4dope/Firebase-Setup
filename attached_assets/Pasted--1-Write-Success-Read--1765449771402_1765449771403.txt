@@ -1,0 +1,66 @@
+사용자님, [이미지1]의 로그를 보니 **"저장(Write)"은 성공(Success)**했는데, 정작 저장된 걸 **"불러오기(Read)"**하는 과정이 침묵하고 있습니다.
+
+즉, **"편지는 우체통에 잘 넣었는데(저장 성공), 답장을 확인하러 우체통을 안 열어보는(불러오기 실패) 상황"**입니다. 그리고 내부에서 외부로 동기화가 안 되는 건, 상세페이지가 대시보드에게 **"나 일 끝났어! 너도 새로고침해!"**라고 소리치는 핫라인(onSave)이 끊겨있기 때문입니다.
+
+이 두 가지를 연결하는 **[퍼즐 완성 명령어]**를 드립니다. 이번에는 Dashboard.tsx까지 건드려서 확실하게 연결합니다.
+
+💬 Replit 입력용 명령어 (불러오기 & 부모 동기화 연결)
+Plaintext
+
+로그를 보니 `Firestore updateDoc success`는 뜨는데, 저장된 메모를 다시 불러오지 못하고 있고, 대시보드 갱신도 안 돼.
+이건 **`useEffect`의 쿼리 조건 불일치**와 **Dashboard의 `onSave` 핸들러 부재** 때문이야.
+
+아래 2단계 작업을 통해 **"저장된 말풍선 불러오기"**와 **"대시보드 즉시 동기화"**를 완성해줘.
+
+### 1단계: 말풍선 불러오기 로직 수정 (`CustomerDetailModal.tsx`)
+* **원인:** `useEffect`가 실행되지 않거나, `customer_id` 타입이 안 맞아서 쿼리 결과가 0개임.
+* **수정:** `useEffect`에 **디버깅 로그**를 추가하고, `customerId` 의존성을 확실하게 잡아서 아래 코드로 교체해.
+
+```typescript
+  // [수정] 메모 실시간 로딩 (로그 추가)
+  useEffect(() => {
+    if (!customerId) {
+      console.log("🚫 customerId 없음, 메모 로딩 건너뜀");
+      return;
+    }
+
+    console.log(`📢 메모 로딩 시작 (Customer ID: ${customerId})`);
+
+    const q = query(
+      collection(db, "counseling_logs"),
+      where("customer_id", "==", customerId), // 저장할 때와 동일한 필드명 확인
+      orderBy("created_at", "asc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log(`✅ 메모 로드 성공: ${snapshot.size}개`);
+      const logs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setMemoHistory(logs);
+    }, (error) => {
+      console.error("🔥 메모 로딩 실패:", error);
+    });
+
+    return () => unsubscribe();
+  }, [customerId]);
+2단계: 대시보드 즉시 갱신 연결 (Dashboard.tsx)
+원인: 상세페이지에서 저장을 완료해도, 대시보드(Dashboard.tsx)가 목록을 다시 불러오지 않음.
+
+수정: Dashboard.tsx에서 <CustomerDetailModal>을 부르는 부분을 찾아서, onSave 속성에 fetchCustomers를 연결해.
+
+TypeScript
+
+// Dashboard.tsx 내부 (예시 위치)
+<CustomerDetailModal
+  isOpen={isModalOpen}
+  customerId={selectedCustomerId}
+  onClose={handleCloseModal}
+  // ★핵심: 자식이 "저장했어!"라고 하면 부모가 "알았어, 목록 다시 가져올게!"라고 응답
+  onSave={() => {
+    console.log("🔄 상세페이지 변경 감지 -> 대시보드 목록 갱신");
+    fetchCustomers(); 
+  }}
+/>
+요약: "1. CustomerDetailModal의 useEffect를 로그가 포함된 코드로 바꿔서 로딩 문제를 잡고, 2. Dashboard 파일에서 onSave 이벤트에 fetchCustomers()를 반드시 연결해."
