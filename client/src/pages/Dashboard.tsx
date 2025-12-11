@@ -321,8 +321,8 @@ export default function Dashboard() {
         );
         // Silent update - no toast for auto-save
         return data.id;
-      } catch (error) {
-        console.error('Error updating customer:', error);
+      } catch (error: any) {
+        console.error('Error updating customer:', error?.message || error?.code || error);
         throw error;
       } finally {
         setFormLoading(false);

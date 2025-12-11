@@ -195,7 +195,18 @@ export const createCustomer = async (customer: InsertCustomer): Promise<Customer
 };
 
 export const updateCustomer = async (id: string, data: Partial<Customer>): Promise<void> => {
-  await updateDoc(doc(db, 'customers', id), data);
+  try {
+    // Remove undefined values which Firestore doesn't accept
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    console.log('🔄 Firestore updateDoc called:', id, cleanData);
+    await updateDoc(doc(db, 'customers', id), cleanData);
+    console.log('✅ Firestore updateDoc success');
+  } catch (error: any) {
+    console.error('❌ Firestore updateDoc error:', error?.message || error?.code || error);
+    throw error;
+  }
 };
 
 export const deleteCustomer = async (id: string): Promise<void> => {
