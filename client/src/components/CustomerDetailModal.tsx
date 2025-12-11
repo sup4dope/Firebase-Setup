@@ -137,6 +137,7 @@ export function CustomerDetailModal({
   const [showHomeAddressSearch, setShowHomeAddressSearch] = useState(false);
   const [showBusinessAddressSearch, setShowBusinessAddressSearch] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingDataRef = useRef<Partial<typeof formData> | null>(null);
   
   // Documents state
   const [documents, setDocuments] = useState<CustomerDocument[]>([]);
@@ -358,78 +359,84 @@ export function CustomerDetailModal({
     }, 500);
   };
 
-  // Auto-save function
-  const performSave = useCallback(async () => {
-    if (!formData.name?.trim()) return; // Don't save empty customers
+  // Auto-save function - uses pendingDataRef for latest data to avoid async state issues
+  const performSave = useCallback(async (dataOverride?: Partial<typeof formData>) => {
+    // Use override data (from pendingDataRef) if provided, otherwise fall back to formData
+    const dataToSave = dataOverride || pendingDataRef.current || formData;
+    
+    if (!dataToSave.name?.trim()) return; // Don't save empty customers
+    
+    // Clear pending data after reading it
+    pendingDataRef.current = null;
     
     setSaveStatus('saving');
     setIsSaving(true);
     try {
-      const phone = `${formData.phone_part1 || '010'}-${formData.phone_part2 || ''}-${formData.phone_part3 || ''}`;
+      const phone = `${dataToSave.phone_part1 || '010'}-${dataToSave.phone_part2 || ''}-${dataToSave.phone_part3 || ''}`;
       
       // Get latest memo content for dashboard sync
       const latestMemo = memos.length > 0 ? memos[memos.length - 1].content : '';
       
       const customerData: Partial<Customer> = {
         // Include id if it exists (for updates)
-        ...(formData.id && { id: formData.id }),
+        ...(dataToSave.id && { id: dataToSave.id }),
         
         // Basic info
-        name: formData.name,
-        company_name: formData.company_name || '',
-        business_registration_number: formData.business_registration_number || '',
+        name: dataToSave.name,
+        company_name: dataToSave.company_name || '',
+        business_registration_number: dataToSave.business_registration_number || '',
         phone,
-        email: formData.email || '',
-        status_code: formData.status_code || '1-1',
+        email: dataToSave.email || '',
+        status_code: dataToSave.status_code || '1-1',
         
         // Manager/Team info
-        manager_id: formData.manager_id || currentUser?.uid || '',
-        manager_name: formData.manager_name || currentUser?.name || '',
-        team_id: formData.team_id || currentUser?.team_id || '',
-        team_name: formData.team_name || currentUser?.team_name || '',
+        manager_id: dataToSave.manager_id || currentUser?.uid || '',
+        manager_name: dataToSave.manager_name || currentUser?.name || '',
+        team_id: dataToSave.team_id || currentUser?.team_id || '',
+        team_name: dataToSave.team_name || currentUser?.team_name || '',
         
         // Dates
-        entry_date: formData.entry_date || '',
-        founding_date: formData.founding_date || '',
+        entry_date: dataToSave.entry_date || '',
+        founding_date: dataToSave.founding_date || '',
         
         // Customer personal info
-        credit_score: formData.credit_score || 0,
-        ssn_front: formData.ssn_front || '',
-        ssn_back: formData.ssn_back || '',
-        carrier: formData.carrier || 'SKT',
+        credit_score: dataToSave.credit_score || 0,
+        ssn_front: dataToSave.ssn_front || '',
+        ssn_back: dataToSave.ssn_back || '',
+        carrier: dataToSave.carrier || 'SKT',
         
         // Home address
-        home_address: formData.home_address || '',
-        home_address_detail: formData.home_address_detail || '',
-        is_home_owned: formData.is_home_owned || false,
-        is_same_as_business: formData.is_same_as_business || false,
+        home_address: dataToSave.home_address || '',
+        home_address_detail: dataToSave.home_address_detail || '',
+        is_home_owned: dataToSave.is_home_owned || false,
+        is_same_as_business: dataToSave.is_same_as_business || false,
         
         // Business info
-        entry_source: formData.entry_source || '광고랜딩명',
-        business_type: formData.business_type || '기타',
-        business_item: formData.business_item || '',
-        retry_type: formData.retry_type || '해당없음',
-        innovation_type: formData.innovation_type || '해당없음',
-        over_7_years: formData.over_7_years || false,
+        entry_source: dataToSave.entry_source || '광고랜딩명',
+        business_type: dataToSave.business_type || '기타',
+        business_item: dataToSave.business_item || '',
+        retry_type: dataToSave.retry_type || '해당없음',
+        innovation_type: dataToSave.innovation_type || '해당없음',
+        over_7_years: dataToSave.over_7_years || false,
         
         // Business address
-        business_address: formData.business_address || '',
-        business_address_detail: formData.business_address_detail || '',
-        is_business_owned: formData.is_business_owned || false,
+        business_address: dataToSave.business_address || '',
+        business_address_detail: dataToSave.business_address_detail || '',
+        is_business_owned: dataToSave.is_business_owned || false,
         
         // Sales data
-        recent_sales: formData.recent_sales || 0,
-        sales_y1: formData.sales_y1 || 0,
-        sales_y2: formData.sales_y2 || 0,
-        sales_y3: formData.sales_y3 || 0,
-        avg_revenue_3y: formData.avg_revenue_3y || 0,
+        recent_sales: dataToSave.recent_sales || 0,
+        sales_y1: dataToSave.sales_y1 || 0,
+        sales_y2: dataToSave.sales_y2 || 0,
+        sales_y3: dataToSave.sales_y3 || 0,
+        avg_revenue_3y: dataToSave.avg_revenue_3y || 0,
         
         // Contract/Financial info
-        approved_amount: formData.approved_amount || 0,
-        commission_rate: formData.commission_rate || 0,
-        processing_org: formData.processing_org || '미등록',
-        industry: formData.industry || '',
-        notes: formData.notes || '',
+        approved_amount: dataToSave.approved_amount || 0,
+        commission_rate: dataToSave.commission_rate || 0,
+        processing_org: dataToSave.processing_org || '미등록',
+        industry: dataToSave.industry || '',
+        notes: dataToSave.notes || '',
         
         // Memos - include latest_memo for dashboard sync and updated_at for recency
         latest_memo: latestMemo,
@@ -451,7 +458,7 @@ export function CustomerDetailModal({
       
       // If a new ID was returned (first-time creation), store it for future updates
       // Also preserve phone_part fields in formData for consistent UI rendering
-      if (returnedId && !formData.id) {
+      if (returnedId && !dataToSave.id) {
         setFormData(prev => ({ 
           ...prev, 
           id: returnedId,
@@ -479,13 +486,20 @@ export function CustomerDetailModal({
       clearTimeout(saveTimeoutRef.current);
     }
     saveTimeoutRef.current = setTimeout(() => {
-      performSave();
+      // Pass pendingDataRef.current to ensure latest data is used
+      performSave(pendingDataRef.current || undefined);
     }, 1000);
   }, [performSave]);
 
-  // Handle field change with auto-save trigger
+  // Handle field change with auto-save trigger - stores latest data in ref to avoid async state issues
   const handleFieldChange = useCallback((updates: Partial<typeof formData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
+    setFormData(prev => {
+      // Calculate the latest merged data
+      const updatedData = { ...prev, ...updates };
+      // Store in ref for performSave to use (avoids async state timing issue)
+      pendingDataRef.current = updatedData;
+      return updatedData;
+    });
     triggerAutoSave();
   }, [triggerAutoSave]);
 
@@ -498,12 +512,12 @@ export function CustomerDetailModal({
     };
   }, []);
 
-  // Save on blur (when focus leaves input)
+  // Save on blur (when focus leaves input) - uses pendingDataRef for latest data
   const handleBlurSave = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    performSave();
+    performSave(pendingDataRef.current || undefined);
   }, [performSave]);
 
   // Handle delete
