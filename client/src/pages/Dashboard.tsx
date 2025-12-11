@@ -333,7 +333,7 @@ export default function Dashboard() {
         );
         // ★핵심: 상세페이지 변경 감지 -> 대시보드 목록 갱신 (메모 동기화)
         console.log("🔄 상세페이지 변경 감지 -> 대시보드 목록 갱신");
-        fetchCustomers();
+        fetchData();
         // Silent update - no toast for auto-save
         return data.id;
       } catch (error: any) {
