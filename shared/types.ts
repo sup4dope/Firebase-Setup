@@ -69,6 +69,7 @@ export const FUNNEL_STAGES = [
 export interface Customer {
   id: string;
   readable_id: string; // YYMMDD-XXX format
+  daily_sequence: number; // 일별 순번 (해당 날짜의 전체 접수 순서, 1부터 시작)
   name: string;
   company_name: string;
   business_registration_number?: string; // 사업자등록번호

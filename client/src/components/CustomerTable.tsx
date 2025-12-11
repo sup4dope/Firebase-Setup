@@ -208,18 +208,19 @@ interface CustomerTableProps {
 
 const PROCESSING_ORGS = ['중진공', '신보', '기보', '소진공', '기타'];
 
-// Dummy data for display
+// Dummy data for display - daily_sequence는 날짜별 전사적 일별 채번
 const DUMMY_CUSTOMERS: Customer[] = [
   {
     id: '1',
-    readable_id: '241209-001',
+    readable_id: '241211-001',
+    daily_sequence: 1, // 12월 11일 첫 번째
     name: '김철수',
     company_name: '(주)테크솔루션',
     status_code: '2-1',
     manager_id: 'user1',
     manager_name: '박담당',
     team_id: 'team1',
-    entry_date: '2024-12-01',
+    entry_date: '2024-12-11',
     approved_amount: 50000000,
     commission_rate: 2.5,
     created_at: new Date(),
@@ -237,14 +238,15 @@ const DUMMY_CUSTOMERS: Customer[] = [
   },
   {
     id: '2',
-    readable_id: '241209-002',
+    readable_id: '241211-002',
+    daily_sequence: 2, // 12월 11일 두 번째
     name: '이영희',
     company_name: '영희상사',
     status_code: '1-1',
     manager_id: 'user2',
     manager_name: '김매니저',
     team_id: 'team1',
-    entry_date: '2024-12-02',
+    entry_date: '2024-12-11',
     approved_amount: 0,
     commission_rate: 0,
     created_at: new Date(),
@@ -261,14 +263,15 @@ const DUMMY_CUSTOMERS: Customer[] = [
   },
   {
     id: '3',
-    readable_id: '241208-003',
+    readable_id: '241211-005',
+    daily_sequence: 5, // 12월 11일 다섯 번째 (중간에 다른 담당자들이 3,4번 등록)
     name: '박지민',
     company_name: '지민테크',
     status_code: '4-3',
     manager_id: 'user1',
     manager_name: '박담당',
     team_id: 'team1',
-    entry_date: '2024-11-15',
+    entry_date: '2024-12-11',
     approved_amount: 120000000,
     commission_rate: 3.0,
     created_at: new Date(),
@@ -287,14 +290,15 @@ const DUMMY_CUSTOMERS: Customer[] = [
   },
   {
     id: '4',
-    readable_id: '241207-004',
+    readable_id: '241210-001',
+    daily_sequence: 1, // 12월 10일 첫 번째
     name: '최동훈',
     company_name: '동훈물류',
     status_code: '3-2',
     manager_id: 'user3',
     manager_name: '이팀장',
     team_id: 'team2',
-    entry_date: '2024-11-20',
+    entry_date: '2024-12-10',
     approved_amount: 80000000,
     commission_rate: 2.0,
     created_at: new Date(),
@@ -312,14 +316,15 @@ const DUMMY_CUSTOMERS: Customer[] = [
   },
   {
     id: '5',
-    readable_id: '241206-005',
+    readable_id: '241210-003',
+    daily_sequence: 3, // 12월 10일 세 번째
     name: '정수아',
     company_name: '수아디자인',
     status_code: '5-2',
     manager_id: 'user2',
     manager_name: '김매니저',
     team_id: 'team1',
-    entry_date: '2024-10-05',
+    entry_date: '2024-12-10',
     approved_amount: 200000000,
     commission_rate: 2.8,
     created_at: new Date(),
@@ -338,14 +343,15 @@ const DUMMY_CUSTOMERS: Customer[] = [
   },
   {
     id: '6',
-    readable_id: '241205-006',
+    readable_id: '241209-001',
+    daily_sequence: 1, // 12월 9일 첫 번째
     name: '한민준',
     company_name: '민준건설',
     status_code: '0-1',
     manager_id: 'user1',
     manager_name: '박담당',
     team_id: 'team1',
-    entry_date: '2024-12-03',
+    entry_date: '2024-12-09',
     approved_amount: 0,
     commission_rate: 0,
     created_at: new Date(),
@@ -362,14 +368,15 @@ const DUMMY_CUSTOMERS: Customer[] = [
   },
   {
     id: '7',
-    readable_id: '241204-007',
+    readable_id: '241209-002',
+    daily_sequence: 2, // 12월 9일 두 번째
     name: '서예린',
     company_name: '예린F&B',
     status_code: '2-3',
     manager_id: 'user3',
     manager_name: '이팀장',
     team_id: 'team2',
-    entry_date: '2024-11-25',
+    entry_date: '2024-12-09',
     approved_amount: 35000000,
     commission_rate: 2.5,
     created_at: new Date(),
@@ -387,14 +394,15 @@ const DUMMY_CUSTOMERS: Customer[] = [
   },
   {
     id: '8',
-    readable_id: '241203-008',
+    readable_id: '241208-001',
+    daily_sequence: 1, // 12월 8일 첫 번째
     name: '윤성호',
     company_name: '성호전자',
     status_code: '1-2',
     manager_id: 'user2',
     manager_name: '김매니저',
     team_id: 'team1',
-    entry_date: '2024-12-04',
+    entry_date: '2024-12-08',
     approved_amount: 0,
     commission_rate: 0,
     created_at: new Date(),
@@ -537,8 +545,8 @@ export function CustomerTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead className="w-[50px] font-semibold text-center">No</TableHead>
               <TableHead className="w-[100px] font-semibold">유입일자</TableHead>
+              <TableHead className="w-[50px] font-semibold text-center">No</TableHead>
               <TableHead className="w-[90px] font-semibold">고객명</TableHead>
               <TableHead className="w-[150px] font-semibold">상태</TableHead>
               <TableHead className="w-[70px] font-semibold text-center">신용점수</TableHead>
@@ -560,14 +568,14 @@ export function CustomerTable({
                 className="group hover:bg-muted/30"
                 data-testid={`row-customer-${customer.id}`}
               >
-                {/* No */}
-                <TableCell className="text-center text-muted-foreground tabular-nums">
-                  {index + 1}
-                </TableCell>
-                
                 {/* 유입일자 */}
                 <TableCell className="text-sm tabular-nums">
                   {customer.entry_date}
+                </TableCell>
+                
+                {/* No - daily_sequence (일별 순번) */}
+                <TableCell className="text-center text-muted-foreground tabular-nums">
+                  {customer.daily_sequence || '-'}
                 </TableCell>
                 
                 {/* 고객명 - clickable */}
