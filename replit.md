@@ -95,6 +95,15 @@ npm run dev
 - 프론트엔드: http://localhost:5000
 
 ## 최근 변경사항
+- 2024-12-11: 역할 기반 접근 제어 및 변경 이력 로그 기능 추가
+  - Staff 사용자 읽기 전용 모드 (모든 입력 필드 비활성화)
+  - "읽기 전용" 배지 헤더에 표시 (staff 사용자)
+  - 삭제 버튼 및 저장 상태 표시 숨김 (staff 사용자)
+  - 상태 변경 시 자동 이력 로그 생성 (customer_history_logs)
+  - 담당자 변경 시 자동 이력 로그 생성
+  - "변경 이력" 탭 추가 (타임라인 UI)
+  - initialTab prop으로 변경 이력 탭 직접 열기 지원
+
 - 2024-12-09: 초기 프로젝트 설정 및 모든 컴포넌트 구현
   - Firebase 인증 (Google Sign-in)
   - 고객 관리 (CRUD + 상태 변경)
@@ -103,3 +112,7 @@ npm run dev
   - 팀/사용자 관리
   - 공휴일 관리
   - 다크모드 지원
+
+## Firestore 인덱스 (필수)
+Firebase Console에서 다음 복합 인덱스를 생성해야 합니다:
+- customer_history_logs: customer_id (ASC) + changed_at (DESC)

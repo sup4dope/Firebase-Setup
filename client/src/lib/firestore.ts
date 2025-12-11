@@ -14,7 +14,7 @@ import {
   writeBatch,
   limit,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, addCustomerHistoryLog } from './firebase';
 import type {
   User,
   Team,
@@ -28,7 +28,9 @@ import type {
   InsertHoliday,
   InsertStatusLog,
   StatusCode,
+  CustomerHistoryLog,
 } from '@shared/types';
+import { STATUS_LABELS } from '@shared/types';
 
 // Helper to convert Firestore timestamp to Date
 const toDate = (timestamp: Timestamp | Date | string): Date => {
@@ -229,6 +231,55 @@ export const updateCustomerStatus = async (
   });
   
   await batch.commit();
+  
+  // Add customer history log for audit trail
+  try {
+    const oldLabel = STATUS_LABELS[previousStatus] || previousStatus;
+    const newLabel = STATUS_LABELS[newStatus] || newStatus;
+    await addCustomerHistoryLog({
+      customer_id: customerId,
+      action_type: 'status_change',
+      description: `상태 변경: ${oldLabel} → ${newLabel}`,
+      changed_by: userId,
+      changed_by_name: userName,
+      old_value: oldLabel,
+      new_value: newLabel,
+    });
+  } catch (error) {
+    console.error('Error adding history log:', error);
+  }
+};
+
+// Update customer manager with history log
+export const updateCustomerManager = async (
+  customerId: string,
+  previousManagerId: string,
+  previousManagerName: string,
+  newManagerId: string,
+  newManagerName: string,
+  changedByUserId: string,
+  changedByUserName: string
+): Promise<void> => {
+  // Update customer manager
+  await updateDoc(doc(db, 'customers', customerId), {
+    manager_id: newManagerId,
+    manager_name: newManagerName,
+  });
+  
+  // Add customer history log for audit trail
+  try {
+    await addCustomerHistoryLog({
+      customer_id: customerId,
+      action_type: 'manager_change',
+      description: `담당자 변경: ${previousManagerName || '없음'} → ${newManagerName}`,
+      changed_by: changedByUserId,
+      changed_by_name: changedByUserName,
+      old_value: previousManagerName || '없음',
+      new_value: newManagerName,
+    });
+  } catch (error) {
+    console.error('Error adding history log:', error);
+  }
 };
 
 // Status Logs

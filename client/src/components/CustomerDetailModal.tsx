@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Trash2, Upload, FileText, Send, Bot, User as UserIcon, Search, Check, Loader2 } from 'lucide-react';
+import { X, Trash2, Upload, FileText, Send, Bot, User as UserIcon, Search, Check, Loader2, History, Clock, ArrowRight, UserCog, Lock } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
@@ -11,11 +11,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { Customer, User, CustomerDocument, StatusCode } from '@shared/types';
+import { Customer, User, CustomerDocument, StatusCode, CustomerHistoryLog } from '@shared/types';
 import { format, differenceInYears, parseISO } from 'date-fns';
 import DaumPostcodeEmbed from 'react-daum-postcode';
-import { storage } from '@/lib/firebase';
+import { storage, getCustomerHistoryLogs } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface MemoItem {
@@ -33,6 +34,16 @@ interface AIMessage {
   created_at: Date;
 }
 
+interface HistoryLogItem {
+  id: string;
+  action_type: 'status_change' | 'manager_change' | 'info_update' | 'document_upload' | 'memo_added';
+  description: string;
+  changed_by_name?: string;
+  changed_at: Date;
+  old_value?: string;
+  new_value?: string;
+}
+
 interface CustomerDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -42,6 +53,7 @@ interface CustomerDetailModalProps {
   users: User[];
   onSave: (customer: Partial<Customer>) => Promise<void>;
   onDelete?: (customerId: string) => Promise<void>;
+  initialTab?: 'memo' | 'history';
 }
 
 // Helper to safely format dates (handles Firestore Timestamps and Date objects)
@@ -83,7 +95,18 @@ export function CustomerDetailModal({
   users,
   onSave,
   onDelete,
+  initialTab = 'memo',
 }: CustomerDetailModalProps) {
+  // Role-based access control: staff users are read-only
+  const isReadOnly = currentUser?.role === 'staff' && !isNewCustomer;
+  
+  // Active tab state for bottom panel
+  const [activeBottomTab, setActiveBottomTab] = useState<'memo' | 'history'>(initialTab);
+  
+  // History logs state
+  const [historyLogs, setHistoryLogs] = useState<CustomerHistoryLog[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  
   // Form state
   const [formData, setFormData] = useState<Partial<Customer> & {
     entry_source?: string;
@@ -199,6 +222,30 @@ export function CustomerDetailModal({
     setAiMessages([]);
   }, [customer, isNewCustomer, currentUser]);
 
+  // Update tab when initialTab changes
+  useEffect(() => {
+    setActiveBottomTab(initialTab);
+  }, [initialTab]);
+
+  // Load history logs when history tab is selected or customer changes
+  useEffect(() => {
+    const loadHistoryLogs = async () => {
+      if (activeBottomTab === 'history' && customer?.id) {
+        setIsLoadingHistory(true);
+        try {
+          const logs = await getCustomerHistoryLogs(customer.id);
+          setHistoryLogs(logs);
+        } catch (error) {
+          console.error('Error loading history logs:', error);
+          setHistoryLogs([]);
+        } finally {
+          setIsLoadingHistory(false);
+        }
+      }
+    };
+    loadHistoryLogs();
+  }, [activeBottomTab, customer?.id]);
+
   // Calculate 7-year status
   const handleFoundingDateChange = (date: string) => {
     const foundingDate = parseISO(date);
@@ -262,6 +309,7 @@ export function CustomerDetailModal({
       'image/jpeg': ['.jpg', '.jpeg'],
     },
     noClick: true, // We have a separate button for clicking
+    disabled: isReadOnly, // Disable drag & drop for read-only users
   });
 
   // Handle memo submit
@@ -407,24 +455,34 @@ export function CustomerDetailModal({
                 {customer.id}
               </Badge>
             )}
+            {/* Read-only indicator for staff users */}
+            {isReadOnly && (
+              <Badge variant="outline" className="bg-yellow-900/30 text-yellow-400 border-yellow-600/30 text-xs">
+                <Lock className="w-3 h-3 mr-1" />
+                읽기 전용
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-3">
-            {/* Auto-save status indicator */}
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              {saveStatus === 'saving' && (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>저장 중...</span>
-                </>
-              )}
-              {saveStatus === 'saved' && (
-                <>
-                  <Check className="w-3 h-3 text-green-500" />
-                  <span className="text-green-500">모든 변경사항 저장됨</span>
-                </>
-              )}
-            </div>
-            {onDelete && customer?.id && (
+            {/* Auto-save status indicator - hide for read-only users */}
+            {!isReadOnly && (
+              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                {saveStatus === 'saving' && (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>저장 중...</span>
+                  </>
+                )}
+                {saveStatus === 'saved' && (
+                  <>
+                    <Check className="w-3 h-3 text-green-500" />
+                    <span className="text-green-500">모든 변경사항 저장됨</span>
+                  </>
+                )}
+              </div>
+            )}
+            {/* Delete button - hide for read-only users */}
+            {!isReadOnly && onDelete && customer?.id && (
               <Button 
                 variant="destructive" 
                 size="sm" 
@@ -454,8 +512,12 @@ export function CustomerDetailModal({
                   <Select 
                     value={formData.entry_source || '광고랜딩명'} 
                     onValueChange={(v) => setFormData(p => ({ ...p, entry_source: v }))}
+                    disabled={isReadOnly}
                   >
-                    <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm">
+                    <SelectTrigger className={cn(
+                      "border-gray-600 text-gray-200 h-8 text-sm",
+                      isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                    )}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
@@ -477,7 +539,11 @@ export function CustomerDetailModal({
                       <Input 
                         value={formData.name || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                         data-testid="input-customer-name"
                       />
                     </div>
@@ -487,7 +553,11 @@ export function CustomerDetailModal({
                         type="number"
                         value={formData.credit_score || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, credit_score: Number(e.target.value) }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                       />
                     </div>
                     <div className="w-28">
@@ -496,7 +566,11 @@ export function CustomerDetailModal({
                         maxLength={6}
                         value={formData.ssn_front || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, ssn_front: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                         placeholder="YYMMDD"
                       />
                     </div>
@@ -506,7 +580,11 @@ export function CustomerDetailModal({
                         maxLength={7}
                         value={formData.ssn_back || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, ssn_back: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                         placeholder="0000000"
                       />
                     </div>
@@ -520,7 +598,11 @@ export function CustomerDetailModal({
                         value={formData.phone_part1 || '010'} 
                         onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
                         onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm text-center w-full"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm text-center w-full",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                       />
                     </div>
                     <span className="text-gray-500 mt-5">-</span>
@@ -531,7 +613,11 @@ export function CustomerDetailModal({
                         value={formData.phone_part2 || ''} 
                         onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
                         onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm text-center w-full"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm text-center w-full",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                       />
                     </div>
                     <span className="text-gray-500 mt-5">-</span>
@@ -542,7 +628,11 @@ export function CustomerDetailModal({
                         value={formData.phone_part3 || ''} 
                         onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
                         onBlur={handleBlurSave}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm text-center w-full"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm text-center w-full",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                       />
                     </div>
                     <div className="flex-[4]">
@@ -550,8 +640,12 @@ export function CustomerDetailModal({
                       <Select 
                         value={formData.carrier || 'SKT'} 
                         onValueChange={(v) => { handleFieldChange({ carrier: v }); }}
+                        disabled={isReadOnly}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm w-full">
+                        <SelectTrigger className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm w-full",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
@@ -572,7 +666,10 @@ export function CustomerDetailModal({
                           <Input 
                             value={formData.home_address || ''} 
                             readOnly
-                            className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-8 text-sm"
+                            className={cn(
+                              "border-gray-600 text-gray-200 flex-1 h-8 text-sm",
+                              isReadOnly ? "bg-gray-700 opacity-70" : "bg-gray-800"
+                            )}
                             placeholder="주소 검색"
                           />
                           <Button 
@@ -580,7 +677,11 @@ export function CustomerDetailModal({
                             variant="outline" 
                             size="sm"
                             onClick={() => setShowHomeAddressSearch(true)}
-                            className="border-gray-600 h-8 w-8 p-0"
+                            disabled={isReadOnly}
+                            className={cn(
+                              "border-gray-600 h-8 w-8 p-0",
+                              isReadOnly && "opacity-50 cursor-not-allowed"
+                            )}
                           >
                             <Search className="w-3.5 h-3.5" />
                           </Button>
@@ -593,7 +694,11 @@ export function CustomerDetailModal({
                         <Input 
                           value={formData.home_address_detail || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, home_address_detail: e.target.value }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                          disabled={isReadOnly}
+                          className={cn(
+                            "border-gray-600 text-gray-200 h-8 text-sm",
+                            isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                          )}
                           placeholder="동/호수"
                         />
                       </div>
@@ -602,7 +707,8 @@ export function CustomerDetailModal({
                           id="home-owned"
                           checked={formData.is_home_owned || false}
                           onCheckedChange={(c) => setFormData(p => ({ ...p, is_home_owned: !!c }))}
-                          className="h-3.5 w-3.5"
+                          disabled={isReadOnly}
+                          className={cn("h-3.5 w-3.5", isReadOnly && "opacity-50 cursor-not-allowed")}
                         />
                         <Label htmlFor="home-owned" className="text-xs text-gray-400">자가</Label>
                       </div>
@@ -618,7 +724,8 @@ export function CustomerDetailModal({
                               business_address_detail: c ? p.home_address_detail : p.business_address_detail,
                             }));
                           }}
-                          className="h-3.5 w-3.5"
+                          disabled={isReadOnly}
+                          className={cn("h-3.5 w-3.5", isReadOnly && "opacity-50 cursor-not-allowed")}
                         />
                         <Label htmlFor="same-address" className="text-xs text-gray-400">사업장동일</Label>
                       </div>
@@ -664,7 +771,11 @@ export function CustomerDetailModal({
                       <Input 
                         value={formData.company_name || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, company_name: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                         data-testid="input-company-name"
                       />
                     </div>
@@ -681,7 +792,11 @@ export function CustomerDetailModal({
                         type="date"
                         value={formData.founding_date || ''} 
                         onChange={(e) => handleFoundingDateChange(e.target.value)}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                       />
                     </div>
                   </div>
@@ -693,8 +808,12 @@ export function CustomerDetailModal({
                       <Select 
                         value={formData.business_type || '기타'} 
                         onValueChange={(v) => setFormData(p => ({ ...p, business_type: v }))}
+                        disabled={isReadOnly}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm">
+                        <SelectTrigger className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
@@ -709,7 +828,11 @@ export function CustomerDetailModal({
                       <Input 
                         value={formData.business_item || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, business_item: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                       />
                     </div>
                   </div>
@@ -721,7 +844,11 @@ export function CustomerDetailModal({
                       <Input 
                         value={formData.business_registration_number || ''} 
                         onChange={(e) => setFormData(p => ({ ...p, business_registration_number: e.target.value }))}
-                        className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm"
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-9 text-sm",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                        )}
                         placeholder="000-00-00000"
                       />
                     </div>
@@ -731,8 +858,12 @@ export function CustomerDetailModal({
                         <Select 
                           value={formData.retry_type || '해당없음'} 
                           onValueChange={(v) => setFormData(p => ({ ...p, retry_type: v }))}
+                          disabled={isReadOnly}
                         >
-                          <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm">
+                          <SelectTrigger className={cn(
+                            "border-gray-600 text-gray-200 h-9 text-sm",
+                            isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                          )}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-gray-800 border-gray-700">
@@ -747,8 +878,12 @@ export function CustomerDetailModal({
                         <Select 
                           value={formData.innovation_type || '해당없음'} 
                           onValueChange={(v) => setFormData(p => ({ ...p, innovation_type: v }))}
+                          disabled={isReadOnly}
                         >
-                          <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 h-9 text-sm">
+                          <SelectTrigger className={cn(
+                            "border-gray-600 text-gray-200 h-9 text-sm",
+                            isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                          )}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-gray-800 border-gray-700">
@@ -770,7 +905,10 @@ export function CustomerDetailModal({
                           <Input 
                             value={formData.business_address || ''} 
                             readOnly
-                            className="bg-gray-800 border-gray-600 text-gray-200 flex-1 h-8 text-sm"
+                            className={cn(
+                              "border-gray-600 text-gray-200 flex-1 h-8 text-sm",
+                              isReadOnly ? "bg-gray-700 opacity-70" : "bg-gray-800"
+                            )}
                             placeholder="주소 검색"
                           />
                           <Button 
@@ -778,8 +916,11 @@ export function CustomerDetailModal({
                             variant="outline" 
                             size="sm"
                             onClick={() => setShowBusinessAddressSearch(true)}
-                            className="border-gray-600 h-8 w-8 p-0"
-                            disabled={formData.is_same_as_business}
+                            className={cn(
+                              "border-gray-600 h-8 w-8 p-0",
+                              isReadOnly && "opacity-50 cursor-not-allowed"
+                            )}
+                            disabled={formData.is_same_as_business || isReadOnly}
                           >
                             <Search className="w-3.5 h-3.5" />
                           </Button>
@@ -792,9 +933,12 @@ export function CustomerDetailModal({
                         <Input 
                           value={formData.business_address_detail || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, business_address_detail: e.target.value }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 h-8 text-sm"
+                          className={cn(
+                            "border-gray-600 text-gray-200 h-8 text-sm",
+                            isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                          )}
                           placeholder="동/호수"
-                          disabled={formData.is_same_as_business}
+                          disabled={formData.is_same_as_business || isReadOnly}
                         />
                       </div>
                       <div className="flex items-center gap-1.5 pt-4">
@@ -802,7 +946,8 @@ export function CustomerDetailModal({
                           id="business-owned"
                           checked={formData.is_business_owned || false}
                           onCheckedChange={(c) => setFormData(p => ({ ...p, is_business_owned: !!c }))}
-                          className="h-3.5 w-3.5"
+                          disabled={isReadOnly}
+                          className={cn("h-3.5 w-3.5", isReadOnly && "opacity-50 cursor-not-allowed")}
                         />
                         <Label htmlFor="business-owned" className="text-xs text-gray-400">자가</Label>
                       </div>
@@ -845,7 +990,11 @@ export function CustomerDetailModal({
                           type="number"
                           value={formData.recent_sales || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, recent_sales: Number(e.target.value) }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 pr-6 h-8 text-sm"
+                          disabled={isReadOnly}
+                          className={cn(
+                            "border-gray-600 text-gray-200 pr-6 h-8 text-sm",
+                            isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                          )}
                         />
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
@@ -857,7 +1006,11 @@ export function CustomerDetailModal({
                           type="number"
                           value={formData.sales_y1 || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, sales_y1: Number(e.target.value) }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 pr-6 h-8 text-sm"
+                          disabled={isReadOnly}
+                          className={cn(
+                            "border-gray-600 text-gray-200 pr-6 h-8 text-sm",
+                            isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                          )}
                         />
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
@@ -869,7 +1022,11 @@ export function CustomerDetailModal({
                           type="number"
                           value={formData.sales_y2 || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, sales_y2: Number(e.target.value) }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 pr-6 h-8 text-sm"
+                          disabled={isReadOnly}
+                          className={cn(
+                            "border-gray-600 text-gray-200 pr-6 h-8 text-sm",
+                            isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                          )}
                         />
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
@@ -881,7 +1038,11 @@ export function CustomerDetailModal({
                           type="number"
                           value={formData.sales_y3 || ''} 
                           onChange={(e) => setFormData(p => ({ ...p, sales_y3: Number(e.target.value) }))}
-                          className="bg-gray-800 border-gray-600 text-gray-200 pr-6 h-8 text-sm"
+                          disabled={isReadOnly}
+                          className={cn(
+                            "border-gray-600 text-gray-200 pr-6 h-8 text-sm",
+                            isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
+                          )}
                         />
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">억</span>
                       </div>
@@ -910,8 +1071,11 @@ export function CustomerDetailModal({
                     variant="outline" 
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="border-gray-600 shrink-0"
+                    disabled={isUploading || isReadOnly}
+                    className={cn(
+                      "border-gray-600 shrink-0",
+                      isReadOnly && "opacity-50 cursor-not-allowed"
+                    )}
                   >
                     <Upload className="w-4 h-4 mr-1" />
                     {isUploading ? '업로드 중...' : '파일 업로드'}
@@ -1000,132 +1164,233 @@ export function CustomerDetailModal({
               </div>
             </div>
 
-            {/* Bottom Section - h-[40%] min-h-0 overflow-hidden */}
-            <div className="h-[40%] min-h-0 overflow-hidden">
-              <div className="flex flex-row w-full h-full">
+            {/* Bottom Section - h-[40%] min-h-0 overflow-hidden with Tabs */}
+            <div className="h-[40%] min-h-0 overflow-hidden flex flex-col">
+              {/* Tab Headers */}
+              <div className="h-10 shrink-0 border-b border-gray-700 bg-gray-800/30 flex items-center px-2 gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveBottomTab('memo')}
+                  className={cn(
+                    "h-8 px-3 text-sm",
+                    activeBottomTab === 'memo' 
+                      ? "bg-blue-600/20 text-blue-400" 
+                      : "text-gray-400"
+                  )}
+                  data-testid="tab-memo"
+                >
+                  <UserIcon className="w-4 h-4 mr-1.5" />
+                  상담 메모
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveBottomTab('history')}
+                  className={cn(
+                    "h-8 px-3 text-sm",
+                    activeBottomTab === 'history' 
+                      ? "bg-orange-600/20 text-orange-400" 
+                      : "text-gray-400"
+                  )}
+                  data-testid="tab-history"
+                >
+                  <History className="w-4 h-4 mr-1.5" />
+                  변경 이력
+                </Button>
+              </div>
               
-              {/* Section 3: Memo Chat (Left 50%) */}
-              <div className="w-1/2 border-r border-gray-700 flex flex-col h-full">
-                <div className="h-10 shrink-0 px-3 border-b border-gray-700 bg-gray-800/30 flex items-center">
-                  <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                    <UserIcon className="w-4 h-4" />
-                    상담 메모
-                  </h3>
-                </div>
-                
-                {/* Memo Messages - flex-1 overflow-y-auto min-h-0 */}
-                <div ref={memoScrollRef} className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2 bg-gray-900/50">
-                  {memos.length === 0 ? (
-                    <div className="text-center text-gray-500 py-3">
-                      <p className="text-sm">상담 메모가 없습니다</p>
+              {/* Tab Content */}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                {activeBottomTab === 'memo' ? (
+                  <div className="flex flex-row w-full h-full">
+                    {/* Section 3: Memo Chat (Left 50%) */}
+                    <div className="w-1/2 border-r border-gray-700 flex flex-col h-full">
+                      {/* Memo Messages - flex-1 overflow-y-auto min-h-0 */}
+                      <div ref={memoScrollRef} className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2 bg-gray-900/50">
+                        {memos.length === 0 ? (
+                          <div className="text-center text-gray-500 py-3">
+                            <p className="text-sm">상담 메모가 없습니다</p>
+                          </div>
+                        ) : (
+                          memos.map((memo) => (
+                            <div key={memo.id} className="flex flex-col">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-xs font-medium text-blue-400">{memo.author_name}</span>
+                                <span className="text-xs text-gray-500">
+                                  {safeFormatDate(memo.created_at, 'MM/dd HH:mm')}
+                                </span>
+                              </div>
+                              <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
+                                <p className="text-sm text-gray-200 whitespace-pre-wrap">{memo.content}</p>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      
+                      {/* Memo Input - h-auto shrink-0 py-2 */}
+                      <div className="h-auto shrink-0 border-t border-gray-700 bg-gray-800/30 flex items-center px-2 py-2 gap-1.5">
+                        <Input
+                          value={newMemo}
+                          onChange={(e) => setNewMemo(e.target.value)}
+                          placeholder="메모 입력..."
+                          className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleMemoSubmit();
+                            }
+                          }}
+                        />
+                        <Button 
+                          onClick={handleMemoSubmit}
+                          disabled={!newMemo.trim()}
+                          size="icon"
+                          className="shrink-0"
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                  ) : (
-                    memos.map((memo) => (
-                      <div key={memo.id} className="flex flex-col">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-medium text-blue-400">{memo.author_name}</span>
-                          <span className="text-xs text-gray-500">
-                            {safeFormatDate(memo.created_at, 'MM/dd HH:mm')}
+
+                    {/* Section 4: AI Chat (Right 50%) */}
+                    <div className="w-1/2 flex flex-col h-full bg-gray-950/30">
+                      {/* AI Messages - flex-1 overflow-y-auto min-h-0 */}
+                      <div ref={aiScrollRef} className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2">
+                        <div className="h-8 shrink-0 px-2 flex items-center">
+                          <span className="text-xs font-semibold text-purple-400 flex items-center gap-1.5">
+                            <Bot className="w-3.5 h-3.5" />
+                            AI 질의
                           </span>
                         </div>
-                        <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
-                          <p className="text-sm text-gray-200 whitespace-pre-wrap">{memo.content}</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                
-                {/* Memo Input - h-auto shrink-0 py-2 */}
-                <div className="h-auto shrink-0 border-t border-gray-700 bg-gray-800/30 flex items-center px-2 py-2 gap-1.5">
-                  <Input
-                    value={newMemo}
-                    onChange={(e) => setNewMemo(e.target.value)}
-                    placeholder="메모 입력..."
-                    className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleMemoSubmit();
-                      }
-                    }}
-                  />
-                  <Button 
-                    onClick={handleMemoSubmit}
-                    disabled={!newMemo.trim()}
-                    size="icon"
-                    className="shrink-0"
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Section 4: AI Chat (Right 50%) */}
-              <div className="w-1/2 flex flex-col h-full bg-gray-950/30">
-                <div className="h-10 shrink-0 px-3 border-b border-gray-700 bg-purple-900/20 flex items-center">
-                  <h3 className="text-sm font-semibold text-purple-300 flex items-center gap-2">
-                    <Bot className="w-4 h-4" />
-                    AI 질의
-                  </h3>
-                </div>
-                
-                {/* AI Messages - flex-1 overflow-y-auto min-h-0 */}
-                <div ref={aiScrollRef} className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2">
-                  {aiMessages.length === 0 ? (
-                    <div className="text-center text-gray-500 py-3">
-                      <Bot className="w-7 h-7 mx-auto mb-1 text-purple-600/50" />
-                      <p className="text-sm">AI에게 질문하세요</p>
-                    </div>
-                  ) : (
-                    aiMessages.map((msg) => (
-                      <div 
-                        key={msg.id} 
-                        className={cn(
-                          "flex flex-col",
-                          msg.role === 'user' ? 'items-end' : 'items-start'
+                        {aiMessages.length === 0 ? (
+                          <div className="text-center text-gray-500 py-3">
+                            <Bot className="w-7 h-7 mx-auto mb-1 text-purple-600/50" />
+                            <p className="text-sm">AI에게 질문하세요</p>
+                          </div>
+                        ) : (
+                          aiMessages.map((msg) => (
+                            <div 
+                              key={msg.id} 
+                              className={cn(
+                                "flex flex-col",
+                                msg.role === 'user' ? 'items-end' : 'items-start'
+                              )}
+                            >
+                              <div className={cn(
+                                "rounded-lg px-2 py-1.5 max-w-[90%]",
+                                msg.role === 'user' 
+                                  ? "bg-purple-600/30 border border-purple-600/40" 
+                                  : "bg-gray-700/50 border border-gray-600/50"
+                              )}>
+                                <p className="text-sm text-gray-200 whitespace-pre-wrap">{msg.content}</p>
+                              </div>
+                              <span className="text-xs text-gray-500 mt-0.5">
+                                {safeFormatDate(msg.created_at, 'HH:mm')}
+                              </span>
+                            </div>
+                          ))
                         )}
-                      >
-                        <div className={cn(
-                          "rounded-lg px-2 py-1.5 max-w-[90%]",
-                          msg.role === 'user' 
-                            ? "bg-purple-600/30 border border-purple-600/40" 
-                            : "bg-gray-700/50 border border-gray-600/50"
-                        )}>
-                          <p className="text-sm text-gray-200 whitespace-pre-wrap">{msg.content}</p>
-                        </div>
-                        <span className="text-xs text-gray-500 mt-0.5">
-                          {safeFormatDate(msg.created_at, 'HH:mm')}
-                        </span>
                       </div>
-                    ))
-                  )}
-                </div>
-                
-                {/* AI Input - h-auto shrink-0 py-2 */}
-                <div className="h-auto shrink-0 border-t border-gray-700 bg-purple-900/10 flex items-center px-2 py-2 gap-1.5">
-                  <Input
-                    value={aiInput}
-                    onChange={(e) => setAiInput(e.target.value)}
-                    placeholder="AI에게 질문하기..."
-                    className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleAISubmit();
-                      }
-                    }}
-                  />
-                  <Button 
-                    onClick={handleAISubmit}
-                    disabled={!aiInput.trim()}
-                    size="icon"
-                    className="shrink-0 bg-purple-600 hover:bg-purple-700"
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+                      
+                      {/* AI Input - h-auto shrink-0 py-2 */}
+                      <div className="h-auto shrink-0 border-t border-gray-700 bg-purple-900/10 flex items-center px-2 py-2 gap-1.5">
+                        <Input
+                          value={aiInput}
+                          onChange={(e) => setAiInput(e.target.value)}
+                          placeholder="AI에게 질문하기..."
+                          className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleAISubmit();
+                            }
+                          }}
+                        />
+                        <Button 
+                          onClick={handleAISubmit}
+                          disabled={!aiInput.trim()}
+                          size="icon"
+                          className="shrink-0 bg-purple-600 hover:bg-purple-700"
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* History Tab Content - Timeline View */
+                  <div className="h-full overflow-y-auto p-4 bg-gray-900/50">
+                    {isLoadingHistory ? (
+                      <div className="flex items-center justify-center h-full">
+                        <Loader2 className="w-6 h-6 animate-spin text-orange-400" />
+                        <span className="ml-2 text-gray-400">이력 로딩 중...</span>
+                      </div>
+                    ) : historyLogs.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                        <History className="w-12 h-12 mb-3 text-gray-600" />
+                        <p className="text-sm">변경 이력이 없습니다</p>
+                        <p className="text-xs text-gray-600 mt-1">상태나 담당자가 변경되면 자동으로 기록됩니다</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {historyLogs.map((log, index) => (
+                          <div key={log.id} className="flex gap-3">
+                            {/* Timeline line and dot */}
+                            <div className="flex flex-col items-center">
+                              <div className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                                log.action_type === 'status_change' 
+                                  ? "bg-blue-600/20 text-blue-400" 
+                                  : log.action_type === 'manager_change'
+                                  ? "bg-green-600/20 text-green-400"
+                                  : "bg-gray-600/20 text-gray-400"
+                              )}>
+                                {log.action_type === 'status_change' ? (
+                                  <ArrowRight className="w-4 h-4" />
+                                ) : log.action_type === 'manager_change' ? (
+                                  <UserCog className="w-4 h-4" />
+                                ) : (
+                                  <Clock className="w-4 h-4" />
+                                )}
+                              </div>
+                              {index < historyLogs.length - 1 && (
+                                <div className="w-0.5 flex-1 bg-gray-700 my-1" />
+                              )}
+                            </div>
+                            
+                            {/* Content */}
+                            <div className="flex-1 pb-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-medium text-gray-300">
+                                  {log.changed_by_name || '시스템'}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {safeFormatDate(log.changed_at, 'yyyy.MM.dd HH:mm')}
+                                </span>
+                              </div>
+                              <div className="bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2">
+                                <p className="text-sm text-gray-200">{log.description}</p>
+                                {log.old_value && log.new_value && (
+                                  <div className="flex items-center gap-2 mt-1.5 text-xs">
+                                    <Badge variant="outline" className="bg-gray-700/50 text-gray-400 border-gray-600">
+                                      {log.old_value}
+                                    </Badge>
+                                    <ArrowRight className="w-3 h-3 text-gray-500" />
+                                    <Badge variant="outline" className="bg-blue-600/20 text-blue-400 border-blue-600/30">
+                                      {log.new_value}
+                                    </Badge>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

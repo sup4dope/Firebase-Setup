@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isNewCustomerModal, setIsNewCustomerModal] = useState(false);
+  const [detailModalInitialTab, setDetailModalInitialTab] = useState<'memo' | 'history'>('memo');
 
   // Fetch data
   const fetchData = async () => {
@@ -219,10 +220,13 @@ export default function Dashboard() {
 
   const handleViewHistory = async (customerId: string) => {
     const customer = customers.find(c => c.id === customerId);
-    const logs = await getStatusLogs(customerId);
-    setSelectedCustomerLogs(logs);
-    setSelectedCustomerName(customer?.name || '');
-    setHistoryDialogOpen(true);
+    if (customer) {
+      // Open detail modal with history tab selected
+      setSelectedCustomer(customer);
+      setIsNewCustomerModal(false);
+      setDetailModalInitialTab('history');
+      setDetailModalOpen(true);
+    }
   };
 
   const handleEdit = (customer: Customer) => {
@@ -234,6 +238,7 @@ export default function Dashboard() {
   const handleCustomerClick = (customer: Customer) => {
     setSelectedCustomer(customer);
     setIsNewCustomerModal(false);
+    setDetailModalInitialTab('memo');
     setDetailModalOpen(true);
   };
 
@@ -444,6 +449,7 @@ export default function Dashboard() {
           setDetailModalOpen(false);
           setSelectedCustomer(null);
           setIsNewCustomerModal(false);
+          setDetailModalInitialTab('memo');
         }}
         customer={selectedCustomer}
         isNewCustomer={isNewCustomerModal}
@@ -451,6 +457,7 @@ export default function Dashboard() {
         users={users}
         onSave={handleDetailModalSave}
         onDelete={isSuperAdmin ? handleDetailModalDelete : undefined}
+        initialTab={detailModalInitialTab}
       />
     </div>
   );
