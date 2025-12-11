@@ -25,6 +25,8 @@ import {
   updateCustomerStatus,
 } from '@/lib/firestore';
 import { Plus, Search, RefreshCw } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { addDoc, collection } from 'firebase/firestore';
 import type { Customer, User, Team, Holiday, StatusLog, StatusCode, InsertCustomer } from '@shared/types';
 
 export default function Dashboard() {
@@ -248,12 +250,22 @@ export default function Dashboard() {
     const updatedMemoHistory = [...(customer.memo_history || []), newMemo];
     
     try {
+      // 1. 대시보드용: 고객 정보 업데이트 (customers 컬렉션)
       await updateCustomer(customerId, {
         memo_history: updatedMemoHistory,
         recent_memo: content,       // 대시보드 테이블 표시용
         latest_memo: content,       // 호환성용
         last_memo_date: new Date(),
         updated_at: new Date(),
+      });
+      
+      // 2. 상세페이지용: 채팅 로그에도 추가 (counseling_logs 컬렉션) - ★쌍방향 동기화
+      await addDoc(collection(db, "counseling_logs"), {
+        customer_id: customerId,
+        content: content,
+        author_name: user.name || "관리자",
+        created_at: new Date(),
+        type: "memo"
       });
       
       // Update local state

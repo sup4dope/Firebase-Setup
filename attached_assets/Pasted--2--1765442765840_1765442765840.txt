@@ -1,0 +1,75 @@
+실시간 저장 기능은 완벽해졌어! 이제 마지막으로 **'쌍방향 메모 동기화'**를 위해 2개 파일의 함수를 수정해줘.
+
+현재 안쪽(상세페이지)과 바깥쪽(대시보드)이 서로 다른 곳에만 메모를 저장하고 있어서 동기화가 안 되고 있어.
+아래 코드로 **"어디서 쓰든 무조건 양쪽(Log + Customer)에 다 저장"**하도록 로직을 통일해.
+
+### 1. 안쪽 -> 바깥쪽 동기화 (`CustomerDetailModal.tsx`)
+* **수정 대상:** `handleMemoSubmit` 함수
+* **내용:** 채팅 로그(`counseling_logs`)에 추가하면서, 동시에 고객 정보(`customers`)의 `recent_memo`도 업데이트.
+```typescript
+  const handleMemoSubmit = async () => {
+    const content = memoInput.trim();
+    if (!content) return;
+    setMemoInput(""); // 입력창 비우기
+
+    try {
+      // 1. 상세페이지용: 채팅 로그에 기록 (말풍선)
+      await addDoc(collection(db, "counseling_logs"), {
+        customer_id: customerId,
+        content: content,
+        author_name: currentUser?.displayName || "관리자",
+        created_at: new Date(),
+        type: "memo"
+      });
+
+      // 2. 대시보드용: 고객 정보 '겉면' 업데이트 (리스트 동기화)
+      if (customerId) {
+        await updateDoc(doc(db, "customers", customerId), {
+          recent_memo: content,      // 대시보드 표시용
+          latest_memo: content,      // (호환성)
+          last_memo_date: new Date() // 정렬용
+        });
+      }
+      
+      // 3. (옵션) 목록 갱신
+      fetchMemoHistory();
+
+    } catch (error) {
+      console.error("메모 저장 실패:", error);
+    }
+  };
+2. 바깥쪽 -> 안쪽 동기화 (Dashboard.tsx)
+수정 대상: handleAddMemo (또는 메모 저장 핸들러)
+
+내용: 기존엔 recent_memo만 바꿨지만, 이제는 counseling_logs에도 똑같이 addDoc을 해줘. 그래야 나중에 상세페이지 들어갔을 때 말풍선이 보임.
+
+TypeScript
+
+  // 대시보드에서 메모 추가 시 실행되는 함수
+  const handleAddMemo = async (customerId: string, memoContent: string) => {
+    try {
+      // 1. 대시보드용: 고객 정보 업데이트
+      await updateDoc(doc(db, "customers", customerId), {
+        recent_memo: memoContent,
+        latest_memo: memoContent,
+        last_memo_date: new Date()
+      });
+
+      // 2. 상세페이지용: 채팅 로그에도 똑같이 추가 (★핵심 추가)
+      await addDoc(collection(db, "counseling_logs"), {
+        customer_id: customerId,
+        content: memoContent,
+        author_name: "관리자", // 대시보드에선 '관리자'로 통일 혹은 currentUser 사용
+        created_at: new Date(),
+        type: "memo"
+      });
+      
+      // UI 갱신 (데이터 다시 불러오기 등)
+      // fetchCustomers(); ...
+
+    } catch (error) {
+      console.error("대시보드 메모 저장 실패:", error);
+      alert("메모 저장 중 오류가 발생했습니다.");
+    }
+  };
+요약: "메모를 저장할 때는 addDoc(로그)과 updateDoc(고객정보) 이 두 가지를 무조건 세트로 실행하게 두 파일 모두 고쳐줘."

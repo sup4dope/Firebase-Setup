@@ -17,8 +17,9 @@ import { cn } from '@/lib/utils';
 import { Customer, User, CustomerDocument, StatusCode, CustomerHistoryLog } from '@shared/types';
 import { format, differenceInYears, parseISO } from 'date-fns';
 import DaumPostcodeEmbed from 'react-daum-postcode';
-import { storage, getCustomerHistoryLogs } from '@/lib/firebase';
+import { storage, db, getCustomerHistoryLogs } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 
 interface MemoItem {
   id: string;
@@ -321,9 +322,10 @@ export function CustomerDetailModal({
   const handleMemoSubmit = async () => {
     if (!newMemo.trim() || !currentUser) return;
     
+    const content = newMemo.trim();
     const memo: MemoItem = {
       id: `memo_${Date.now()}`,
-      content: newMemo.trim(),
+      content,
       author_id: currentUser.uid,
       author_name: currentUser.name,
       created_at: new Date(),
@@ -339,76 +341,110 @@ export function CustomerDetailModal({
       memoScrollRef.current?.scrollTo({ top: memoScrollRef.current.scrollHeight, behavior: 'smooth' });
     }, 100);
     
-    // Immediately save to Firestore (don't wait for debounce)
-    // This ensures memos are persisted and dashboard syncs
-    if (formData.id || formData.name?.trim()) {
-      const dataToSave = pendingDataRef.current || formData;
-      const phone = `${dataToSave.phone_part1 || '010'}-${dataToSave.phone_part2 || ''}-${dataToSave.phone_part3 || ''}`;
-      
-      const customerData: Partial<Customer> = {
-        ...(dataToSave.id && { id: dataToSave.id }),
-        name: dataToSave.name || '',
-        company_name: dataToSave.company_name || '',
-        business_registration_number: dataToSave.business_registration_number || '',
-        phone,
-        email: dataToSave.email || '',
-        status_code: dataToSave.status_code || '1-1',
-        manager_id: dataToSave.manager_id || currentUser?.uid || '',
-        manager_name: dataToSave.manager_name || currentUser?.name || '',
-        team_id: dataToSave.team_id || currentUser?.team_id || '',
-        team_name: dataToSave.team_name || currentUser?.team_name || '',
-        entry_date: dataToSave.entry_date || '',
-        founding_date: dataToSave.founding_date || '',
-        credit_score: dataToSave.credit_score || 0,
-        ssn_front: dataToSave.ssn_front || '',
-        ssn_back: dataToSave.ssn_back || '',
-        carrier: dataToSave.carrier || 'SKT',
-        home_address: dataToSave.home_address || '',
-        home_address_detail: dataToSave.home_address_detail || '',
-        is_home_owned: dataToSave.is_home_owned || false,
-        is_same_as_business: dataToSave.is_same_as_business || false,
-        entry_source: dataToSave.entry_source || '광고랜딩명',
-        business_type: dataToSave.business_type || '기타',
-        business_item: dataToSave.business_item || '',
-        retry_type: dataToSave.retry_type || '해당없음',
-        innovation_type: dataToSave.innovation_type || '해당없음',
-        over_7_years: dataToSave.over_7_years || false,
-        business_address: dataToSave.business_address || '',
-        business_address_detail: dataToSave.business_address_detail || '',
-        is_business_owned: dataToSave.is_business_owned || false,
-        recent_sales: dataToSave.recent_sales || 0,
-        sales_y1: dataToSave.sales_y1 || 0,
-        sales_y2: dataToSave.sales_y2 || 0,
-        sales_y3: dataToSave.sales_y3 || 0,
-        avg_revenue_3y: dataToSave.avg_revenue_3y || 0,
-        approved_amount: dataToSave.approved_amount || 0,
-        commission_rate: dataToSave.commission_rate || 0,
-        processing_org: dataToSave.processing_org || '미등록',
-        industry: dataToSave.industry || '',
-        notes: dataToSave.notes || '',
-        // ★핵심: Dashboard sync fields - recent_memo도 함께 업데이트
-        recent_memo: memo.content,       // 대시보드가 보는 필드명
-        latest_memo: memo.content,       // 호환성용
-        last_memo_date: memo.created_at, // 정렬용 시간
-        // Full memo history including the new memo
-        memo_history: updatedMemos.map(m => ({
-          content: m.content,
-          author_id: m.author_id,
-          author_name: m.author_name,
-          created_at: m.created_at,
-        })),
-        documents,
-        updated_at: new Date(),
-      };
-      
-      try {
-        const returnedId = await onSave(customerData);
-        if (returnedId && !formData.id) {
-          setFormData(prev => ({ ...prev, id: returnedId }));
-        }
-      } catch (error) {
-        console.error('Error saving memo:', error);
+    try {
+      // 1. 상세페이지용: 채팅 로그에 기록 (counseling_logs 컬렉션)
+      if (formData.id) {
+        await addDoc(collection(db, "counseling_logs"), {
+          customer_id: formData.id,
+          content: content,
+          author_name: currentUser.name || "관리자",
+          created_at: new Date(),
+          type: "memo"
+        });
       }
+
+      // 2. 대시보드용: 고객 정보 '겉면' 업데이트 (customers 컬렉션)
+      if (formData.id) {
+        await updateDoc(doc(db, "customers", formData.id), {
+          recent_memo: content,
+          latest_memo: content,
+          last_memo_date: new Date(),
+          memo_history: updatedMemos.map(m => ({
+            content: m.content,
+            author_id: m.author_id,
+            author_name: m.author_name,
+            created_at: m.created_at,
+          })),
+          updated_at: new Date(),
+        });
+      } else if (formData.name?.trim()) {
+        // 신규 고객인 경우 - 기존 onSave 로직 사용
+        const dataToSave = pendingDataRef.current || formData;
+        const phone = `${dataToSave.phone_part1 || '010'}-${dataToSave.phone_part2 || ''}-${dataToSave.phone_part3 || ''}`;
+        
+        const customerData: Partial<Customer> = {
+          name: dataToSave.name || '',
+          company_name: dataToSave.company_name || '',
+          business_registration_number: dataToSave.business_registration_number || '',
+          phone,
+          email: dataToSave.email || '',
+          status_code: dataToSave.status_code || '1-1',
+          manager_id: dataToSave.manager_id || currentUser?.uid || '',
+          manager_name: dataToSave.manager_name || currentUser?.name || '',
+          team_id: dataToSave.team_id || currentUser?.team_id || '',
+          team_name: dataToSave.team_name || currentUser?.team_name || '',
+          entry_date: dataToSave.entry_date || '',
+          founding_date: dataToSave.founding_date || '',
+          credit_score: dataToSave.credit_score || 0,
+          ssn_front: dataToSave.ssn_front || '',
+          ssn_back: dataToSave.ssn_back || '',
+          carrier: dataToSave.carrier || 'SKT',
+          home_address: dataToSave.home_address || '',
+          home_address_detail: dataToSave.home_address_detail || '',
+          is_home_owned: dataToSave.is_home_owned || false,
+          is_same_as_business: dataToSave.is_same_as_business || false,
+          entry_source: dataToSave.entry_source || '광고랜딩명',
+          business_type: dataToSave.business_type || '기타',
+          business_item: dataToSave.business_item || '',
+          retry_type: dataToSave.retry_type || '해당없음',
+          innovation_type: dataToSave.innovation_type || '해당없음',
+          over_7_years: dataToSave.over_7_years || false,
+          business_address: dataToSave.business_address || '',
+          business_address_detail: dataToSave.business_address_detail || '',
+          is_business_owned: dataToSave.is_business_owned || false,
+          recent_sales: dataToSave.recent_sales || 0,
+          sales_y1: dataToSave.sales_y1 || 0,
+          sales_y2: dataToSave.sales_y2 || 0,
+          sales_y3: dataToSave.sales_y3 || 0,
+          avg_revenue_3y: dataToSave.avg_revenue_3y || 0,
+          approved_amount: dataToSave.approved_amount || 0,
+          commission_rate: dataToSave.commission_rate || 0,
+          processing_org: dataToSave.processing_org || '미등록',
+          industry: dataToSave.industry || '',
+          notes: dataToSave.notes || '',
+          recent_memo: content,
+          latest_memo: content,
+          last_memo_date: memo.created_at,
+          memo_history: updatedMemos.map(m => ({
+            content: m.content,
+            author_id: m.author_id,
+            author_name: m.author_name,
+            created_at: m.created_at,
+          })),
+          documents,
+          updated_at: new Date(),
+        };
+        
+        const returnedId = await onSave(customerData);
+        if (returnedId) {
+          setFormData(prev => ({ ...prev, id: returnedId }));
+          // 신규 고객 생성 후 로그도 추가
+          await addDoc(collection(db, "counseling_logs"), {
+            customer_id: returnedId,
+            content: content,
+            author_name: currentUser.name || "관리자",
+            created_at: new Date(),
+            type: "memo"
+          });
+        }
+      }
+      
+      // 부모 컴포넌트에 변경 알림 (리스트 갱신용)
+      if (onSave && formData.id) {
+        onSave({ id: formData.id });
+      }
+    } catch (error) {
+      console.error('메모 저장 실패:', error);
     }
   };
 
