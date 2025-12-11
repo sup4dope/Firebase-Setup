@@ -443,25 +443,34 @@ export function CustomerDetailModal({
     }, 500);
   };
 
-  // Auto-save function - uses pendingDataRef for latest data to avoid async state issues
-  const performSave = useCallback(async (dataOverride?: Partial<typeof formData>) => {
-    // Use override data (from pendingDataRef) if provided, otherwise fall back to formData
-    const dataToSave = dataOverride || pendingDataRef.current || formData;
+  // Refs for memos and documents to avoid dependency issues
+  const memosRef = useRef(memos);
+  const documentsRef = useRef(documents);
+  const currentUserRef = useRef(currentUser);
+  
+  // Keep refs updated
+  useEffect(() => { memosRef.current = memos; }, [memos]);
+  useEffect(() => { documentsRef.current = documents; }, [documents]);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+
+  // ★핵심: performSave의 의존성 최소화 - onSave만 의존
+  const performSave = useCallback(async (dataToSave: any) => {
+    if (!dataToSave?.name?.trim()) return; // Don't save empty customers
     
-    console.log("💾 Firestore 저장 요청:", dataToSave); // 저장 확인용 로그
-    
-    if (!dataToSave.name?.trim()) return; // Don't save empty customers
-    
-    // Clear pending data after reading it
-    pendingDataRef.current = null;
+    console.log("💾 Firestore 저장 요청:", dataToSave);
     
     setSaveStatus('saving');
     setIsSaving(true);
     try {
       const phone = `${dataToSave.phone_part1 || '010'}-${dataToSave.phone_part2 || ''}-${dataToSave.phone_part3 || ''}`;
       
+      // Use refs to get current values without adding dependencies
+      const currentMemos = memosRef.current;
+      const currentDocs = documentsRef.current;
+      const user = currentUserRef.current;
+      
       // Get latest memo content for dashboard sync
-      const latestMemo = memos.length > 0 ? memos[memos.length - 1].content : '';
+      const latestMemo = currentMemos.length > 0 ? currentMemos[currentMemos.length - 1].content : '';
       
       const customerData: Partial<Customer> = {
         // Include id if it exists (for updates)
@@ -476,10 +485,10 @@ export function CustomerDetailModal({
         status_code: dataToSave.status_code || '1-1',
         
         // Manager/Team info
-        manager_id: dataToSave.manager_id || currentUser?.uid || '',
-        manager_name: dataToSave.manager_name || currentUser?.name || '',
-        team_id: dataToSave.team_id || currentUser?.team_id || '',
-        team_name: dataToSave.team_name || currentUser?.team_name || '',
+        manager_id: dataToSave.manager_id || user?.uid || '',
+        manager_name: dataToSave.manager_name || user?.name || '',
+        team_id: dataToSave.team_id || user?.team_id || '',
+        team_name: dataToSave.team_name || user?.team_name || '',
         
         // Dates
         entry_date: dataToSave.entry_date || '',
@@ -525,9 +534,9 @@ export function CustomerDetailModal({
         notes: dataToSave.notes || '',
         
         // ★핵심: Dashboard sync fields - recent_memo도 함께 업데이트
-        recent_memo: latestMemo,  // 대시보드가 보는 필드명
-        latest_memo: latestMemo,  // 호환성용
-        memo_history: memos.map(m => ({
+        recent_memo: latestMemo,
+        latest_memo: latestMemo,
+        memo_history: currentMemos.map(m => ({
           content: m.content,
           author_id: m.author_id,
           author_name: m.author_name,
@@ -535,7 +544,7 @@ export function CustomerDetailModal({
         })),
         
         // Documents
-        documents,
+        documents: currentDocs,
         
         // Updated timestamp for dashboard sync
         updated_at: new Date(),
@@ -544,12 +553,10 @@ export function CustomerDetailModal({
       const returnedId = await onSave(customerData);
       
       // If a new ID was returned (first-time creation), store it for future updates
-      // Also preserve phone_part fields in formData for consistent UI rendering
       if (returnedId && !dataToSave.id) {
         setFormData(prev => ({ 
           ...prev, 
           id: returnedId,
-          // Preserve phone parts for UI
           phone_part1: prev.phone_part1,
           phone_part2: prev.phone_part2,
           phone_part3: prev.phone_part3,
@@ -557,7 +564,6 @@ export function CustomerDetailModal({
       }
       
       setSaveStatus('saved');
-      // Reset to idle after 2 seconds
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('Error saving customer:', error);
@@ -565,7 +571,7 @@ export function CustomerDetailModal({
     } finally {
       setIsSaving(false);
     }
-  }, [formData, memos, documents, onSave, currentUser]);
+  }, [onSave]); // ★핵심: onSave만 의존 - 타이머 리셋 방지
 
   // Debounced save function - useMemo로 메모이제이션하여 타이머 유지
   const debouncedSave = useMemo(
