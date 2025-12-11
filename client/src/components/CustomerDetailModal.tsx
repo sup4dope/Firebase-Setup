@@ -258,12 +258,8 @@ export function CustomerDetailModal({
       over_7_years: yearsOld > 7 
     };
     setFormData(updatedData);
-    pendingDataRef.current = updatedData;
-    // triggerAutoSave will be called after component mounts
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      performSave(pendingDataRef.current || undefined);
-    }, 1000);
+    // debouncedSave 호출
+    debouncedSave(updatedData);
   };
 
   // Handle file upload (shared logic)
@@ -443,116 +439,73 @@ export function CustomerDetailModal({
     }, 500);
   };
 
-  // Refs for memos and documents to avoid dependency issues
-  const memosRef = useRef(memos);
-  const documentsRef = useRef(documents);
-  const currentUserRef = useRef(currentUser);
-  
-  // Keep refs updated
-  useEffect(() => { memosRef.current = memos; }, [memos]);
-  useEffect(() => { documentsRef.current = documents; }, [documents]);
-  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
-
-  // ★핵심: performSave의 의존성 최소화 - onSave만 의존
-  const performSave = useCallback(async (dataToSave: any) => {
-    if (!dataToSave?.name?.trim()) return; // Don't save empty customers
+  // 1. 실제 저장 로직 (매번 재생성되어도 됨 - 최신 상태 참조)
+  const runSaveLogic = async (dataToSave: any) => {
+    if (!dataToSave?.name?.trim()) return;
     
-    console.log("💾 Firestore 저장 요청:", dataToSave);
+    console.log("💾 Firestore 실제 저장 요청:", dataToSave);
     
     setSaveStatus('saving');
     setIsSaving(true);
     try {
       const phone = `${dataToSave.phone_part1 || '010'}-${dataToSave.phone_part2 || ''}-${dataToSave.phone_part3 || ''}`;
-      
-      // Use refs to get current values without adding dependencies
-      const currentMemos = memosRef.current;
-      const currentDocs = documentsRef.current;
-      const user = currentUserRef.current;
-      
-      // Get latest memo content for dashboard sync
-      const latestMemo = currentMemos.length > 0 ? currentMemos[currentMemos.length - 1].content : '';
+      const latestMemo = memos.length > 0 ? memos[memos.length - 1].content : '';
       
       const customerData: Partial<Customer> = {
-        // Include id if it exists (for updates)
         ...(dataToSave.id && { id: dataToSave.id }),
-        
-        // Basic info
         name: dataToSave.name,
         company_name: dataToSave.company_name || '',
         business_registration_number: dataToSave.business_registration_number || '',
         phone,
         email: dataToSave.email || '',
         status_code: dataToSave.status_code || '1-1',
-        
-        // Manager/Team info
-        manager_id: dataToSave.manager_id || user?.uid || '',
-        manager_name: dataToSave.manager_name || user?.name || '',
-        team_id: dataToSave.team_id || user?.team_id || '',
-        team_name: dataToSave.team_name || user?.team_name || '',
-        
-        // Dates
+        manager_id: dataToSave.manager_id || currentUser?.uid || '',
+        manager_name: dataToSave.manager_name || currentUser?.name || '',
+        team_id: dataToSave.team_id || currentUser?.team_id || '',
+        team_name: dataToSave.team_name || currentUser?.team_name || '',
         entry_date: dataToSave.entry_date || '',
         founding_date: dataToSave.founding_date || '',
-        
-        // Customer personal info
         credit_score: dataToSave.credit_score || 0,
         ssn_front: dataToSave.ssn_front || '',
         ssn_back: dataToSave.ssn_back || '',
         carrier: dataToSave.carrier || 'SKT',
-        
-        // Home address
         home_address: dataToSave.home_address || '',
         home_address_detail: dataToSave.home_address_detail || '',
         is_home_owned: dataToSave.is_home_owned || false,
         is_same_as_business: dataToSave.is_same_as_business || false,
-        
-        // Business info
         entry_source: dataToSave.entry_source || '광고랜딩명',
         business_type: dataToSave.business_type || '기타',
         business_item: dataToSave.business_item || '',
         retry_type: dataToSave.retry_type || '해당없음',
         innovation_type: dataToSave.innovation_type || '해당없음',
         over_7_years: dataToSave.over_7_years || false,
-        
-        // Business address
         business_address: dataToSave.business_address || '',
         business_address_detail: dataToSave.business_address_detail || '',
         is_business_owned: dataToSave.is_business_owned || false,
-        
-        // Sales data
         recent_sales: dataToSave.recent_sales || 0,
         sales_y1: dataToSave.sales_y1 || 0,
         sales_y2: dataToSave.sales_y2 || 0,
         sales_y3: dataToSave.sales_y3 || 0,
         avg_revenue_3y: dataToSave.avg_revenue_3y || 0,
-        
-        // Contract/Financial info
         approved_amount: dataToSave.approved_amount || 0,
         commission_rate: dataToSave.commission_rate || 0,
         processing_org: dataToSave.processing_org || '미등록',
         industry: dataToSave.industry || '',
         notes: dataToSave.notes || '',
-        
-        // ★핵심: Dashboard sync fields - recent_memo도 함께 업데이트
         recent_memo: latestMemo,
         latest_memo: latestMemo,
-        memo_history: currentMemos.map(m => ({
+        memo_history: memos.map(m => ({
           content: m.content,
           author_id: m.author_id,
           author_name: m.author_name,
           created_at: m.created_at,
         })),
-        
-        // Documents
-        documents: currentDocs,
-        
-        // Updated timestamp for dashboard sync
+        documents,
         updated_at: new Date(),
       };
       
       const returnedId = await onSave(customerData);
       
-      // If a new ID was returned (first-time creation), store it for future updates
       if (returnedId && !dataToSave.id) {
         setFormData(prev => ({ 
           ...prev, 
@@ -571,15 +524,21 @@ export function CustomerDetailModal({
     } finally {
       setIsSaving(false);
     }
-  }, [onSave]); // ★핵심: onSave만 의존 - 타이머 리셋 방지
+  };
 
-  // Debounced save function - useMemo로 메모이제이션하여 타이머 유지
+  // 2. 최신 저장 로직을 담을 Ref
+  const saveLogicRef = useRef(runSaveLogic);
+  
+  // 3. 렌더링마다 Ref에 최신 로직 업데이트
+  saveLogicRef.current = runSaveLogic;
+
+  // 4. ★무적 타이머: 의존성 배열이 비어있음 -> 절대 재생성 안 됨
   const debouncedSave = useMemo(
-    () => debounce((newData: typeof formData) => {
-      console.log("⏳ 자동 저장 실행 중...", newData);
-      performSave(newData);
+    () => debounce((newData: any) => {
+      console.log("⏳ 1초 경과, 저장 실행!", newData);
+      saveLogicRef.current(newData);
     }, 1000),
-    [performSave]
+    [] // ★핵심: 부모가 리렌더링되든 말든 이 타이머는 영원히 유지됨
   );
 
   const handleFieldChange = (e: any) => {
@@ -608,17 +567,8 @@ export function CustomerDetailModal({
     const newData = { ...formData, [name]: value };
     setFormData(newData);
 
-    // 3. 저장 함수 호출 (에러가 나도 입력은 되게 try-catch로 감쌈)
-    try {
-      if (typeof debouncedSave === 'function') {
-        debouncedSave(newData);
-      } else {
-        console.warn("debouncedSave 없음, performSave 시도");
-        performSave(newData);
-      }
-    } catch (err) {
-      console.error("자동 저장 실패 (입력은 유지됨):", err);
-    }
+    // 3. 저장 함수 호출
+    debouncedSave(newData);
   };
   
   // Handle object updates (for complex field changes like founding_date with over_7_years)
@@ -640,11 +590,8 @@ export function CustomerDetailModal({
 
   // Save on blur (when focus leaves input) - 즉시 저장
   const handleBlurSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    performSave(formData);
-  }, [performSave, formData]);
+    debouncedSave.flush(); // 대기 중인 저장을 즉시 실행
+  }, [debouncedSave]);
 
   // Handle delete
   const handleDelete = async () => {
