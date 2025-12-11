@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { X, Trash2, Upload, FileText, Send, Bot, User as UserIcon, Search, Check, Loader2, History, Clock, ArrowRight, UserCog, Lock } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
+import debounce from 'lodash/debounce';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
@@ -447,6 +448,8 @@ export function CustomerDetailModal({
     // Use override data (from pendingDataRef) if provided, otherwise fall back to formData
     const dataToSave = dataOverride || pendingDataRef.current || formData;
     
+    console.log("💾 Firestore 저장 요청:", dataToSave); // 저장 확인용 로그
+    
     if (!dataToSave.name?.trim()) return; // Don't save empty customers
     
     // Clear pending data after reading it
@@ -564,15 +567,14 @@ export function CustomerDetailModal({
     }
   }, [formData, memos, documents, onSave, currentUser]);
 
-  // Debounced save function - 데이터를 직접 받아서 1초 후 저장
-  const debouncedSave = useCallback((dataToSave: typeof formData) => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = setTimeout(() => {
-      performSave(dataToSave);
-    }, 1000);
-  }, [performSave]);
+  // Debounced save function - useMemo로 메모이제이션하여 타이머 유지
+  const debouncedSave = useMemo(
+    () => debounce((newData: typeof formData) => {
+      console.log("⏳ 자동 저장 실행 중...", newData);
+      performSave(newData);
+    }, 1000),
+    [performSave]
+  );
 
   const handleFieldChange = (e: any) => {
     // 1. 값 추출 (어떤 형태의 입력이든 다 받아줌)
@@ -623,14 +625,12 @@ export function CustomerDetailModal({
     });
   }, [debouncedSave]);
 
-  // Cleanup timeout on unmount
+  // Cleanup debounce on unmount
   useEffect(() => {
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      debouncedSave.cancel();
     };
-  }, []);
+  }, [debouncedSave]);
 
   // Save on blur (when focus leaves input) - 즉시 저장
   const handleBlurSave = useCallback(() => {
