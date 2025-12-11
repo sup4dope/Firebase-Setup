@@ -51,7 +51,7 @@ interface CustomerDetailModalProps {
   isNewCustomer?: boolean;
   currentUser: User | null;
   users: User[];
-  onSave: (customer: Partial<Customer>) => Promise<void>;
+  onSave: (customer: Partial<Customer>) => Promise<string | undefined>;
   onDelete?: (customerId: string) => Promise<void>;
   initialTab?: 'memo' | 'history';
 }
@@ -361,15 +361,57 @@ export function CustomerDetailModal({
 
   // Auto-save function
   const performSave = useCallback(async () => {
-    if (isNewCustomer && !formData.name?.trim()) return; // Don't save empty new customers
+    if (!formData.name?.trim()) return; // Don't save empty customers
     
     setSaveStatus('saving');
     setIsSaving(true);
     try {
       const phone = `${formData.phone_part1 || '010'}-${formData.phone_part2 || ''}-${formData.phone_part3 || ''}`;
       const customerData: Partial<Customer> = {
-        ...formData,
+        // Include id if it exists (for updates)
+        ...(formData.id && { id: formData.id }),
+        name: formData.name,
+        company_name: formData.company_name || '',
+        business_registration_number: formData.business_registration_number || '',
         phone,
+        status_code: formData.status_code || '1-1',
+        manager_id: formData.manager_id || currentUser?.uid || '',
+        manager_name: formData.manager_name || currentUser?.name || '',
+        team_id: formData.team_id || currentUser?.team_id || '',
+        team_name: formData.team_name || currentUser?.team_name || '',
+        entry_date: formData.entry_date || '',
+        credit_score: formData.credit_score || 0,
+        over_7_years: formData.over_7_years || false,
+        avg_revenue_3y: formData.avg_revenue_3y || 0,
+        recent_sales: formData.recent_sales || 0,
+        approved_amount: formData.approved_amount || 0,
+        commission_rate: formData.commission_rate || 0,
+        processing_org: formData.processing_org || '미등록',
+        industry: formData.industry || '',
+        // Extended fields - customer info
+        entry_source: formData.entry_source || '광고랜딩명',
+        ssn_front: formData.ssn_front || '',
+        ssn_back: formData.ssn_back || '',
+        carrier: formData.carrier || 'SKT',
+        // Address fields
+        home_address: formData.home_address || '',
+        home_address_detail: formData.home_address_detail || '',
+        is_home_owned: formData.is_home_owned || false,
+        is_same_as_business: formData.is_same_as_business || false,
+        // Business info
+        business_type: formData.business_type || '기타',
+        business_item: formData.business_item || '',
+        founding_date: formData.founding_date || '',
+        retry_type: formData.retry_type || '해당없음',
+        innovation_type: formData.innovation_type || '해당없음',
+        business_address: formData.business_address || '',
+        business_address_detail: formData.business_address_detail || '',
+        is_business_owned: formData.is_business_owned || false,
+        // Sales data
+        sales_y1: formData.sales_y1 || 0,
+        sales_y2: formData.sales_y2 || 0,
+        sales_y3: formData.sales_y3 || 0,
+        // Memos and documents
         memo_history: memos.map(m => ({
           content: m.content,
           author_id: m.author_id,
@@ -378,7 +420,22 @@ export function CustomerDetailModal({
         })),
         documents,
       };
-      await onSave(customerData);
+      
+      const returnedId = await onSave(customerData);
+      
+      // If a new ID was returned (first-time creation), store it for future updates
+      // Also preserve phone_part fields in formData for consistent UI rendering
+      if (returnedId && !formData.id) {
+        setFormData(prev => ({ 
+          ...prev, 
+          id: returnedId,
+          // Preserve phone parts for UI
+          phone_part1: prev.phone_part1,
+          phone_part2: prev.phone_part2,
+          phone_part3: prev.phone_part3,
+        }));
+      }
+      
       setSaveStatus('saved');
       // Reset to idle after 2 seconds
       setTimeout(() => setSaveStatus('idle'), 2000);
@@ -388,7 +445,7 @@ export function CustomerDetailModal({
     } finally {
       setIsSaving(false);
     }
-  }, [formData, memos, documents, onSave, isNewCustomer]);
+  }, [formData, memos, documents, onSave, currentUser]);
 
   // Debounced auto-save (1 second after last change)
   const triggerAutoSave = useCallback(() => {

@@ -249,46 +249,57 @@ export default function Dashboard() {
     setDetailModalOpen(true);
   };
 
-  // Save customer from detail modal
-  const handleDetailModalSave = async (data: Partial<Customer>) => {
-    if (isNewCustomerModal) {
-      // Create new customer
+  // Save customer from detail modal - returns customer ID for tracking
+  const handleDetailModalSave = async (data: Partial<Customer>): Promise<string | undefined> => {
+    // If data has an id, it's an update (even if it was originally a "new" customer)
+    if (data.id) {
+      // Update existing customer - merge with existing data to preserve all fields
+      setFormLoading(true);
+      try {
+        await updateCustomer(data.id, data);
+        setCustomers(prev =>
+          prev.map(c => {
+            if (c.id === data.id) {
+              // Merge: keep existing fields (readable_id, created_at, etc.) and update with new data
+              return { ...c, ...data };
+            }
+            return c;
+          })
+        );
+        // Silent update - no toast for auto-save
+        return data.id;
+      } catch (error) {
+        console.error('Error updating customer:', error);
+        throw error;
+      } finally {
+        setFormLoading(false);
+      }
+    } else {
+      // Create new customer (only happens once)
       setFormLoading(true);
       try {
         const newCustomer = await createCustomer(data as InsertCustomer);
-        setCustomers(prev => [newCustomer, ...prev]);
+        setCustomers(prev => {
+          // Check if customer already exists (prevent duplicates)
+          const exists = prev.some(c => c.id === newCustomer.id);
+          if (exists) {
+            return prev.map(c => c.id === newCustomer.id ? newCustomer : c);
+          }
+          return [newCustomer, ...prev];
+        });
+        // Update selectedCustomer so subsequent saves use the new ID
+        setSelectedCustomer(newCustomer);
+        setIsNewCustomerModal(false);
         toast({
           title: '성공',
           description: '고객이 등록되었습니다.',
         });
+        return newCustomer.id;
       } catch (error) {
         console.error('Error creating customer:', error);
         toast({
           title: '오류',
           description: '고객 등록 중 오류가 발생했습니다.',
-          variant: 'destructive',
-        });
-        throw error;
-      } finally {
-        setFormLoading(false);
-      }
-    } else if (selectedCustomer) {
-      // Update existing customer
-      setFormLoading(true);
-      try {
-        await updateCustomer(selectedCustomer.id, data);
-        setCustomers(prev =>
-          prev.map(c => c.id === selectedCustomer.id ? { ...c, ...data } : c)
-        );
-        toast({
-          title: '성공',
-          description: '고객 정보가 수정되었습니다.',
-        });
-      } catch (error) {
-        console.error('Error updating customer:', error);
-        toast({
-          title: '오류',
-          description: '고객 수정 중 오류가 발생했습니다.',
           variant: 'destructive',
         });
         throw error;
