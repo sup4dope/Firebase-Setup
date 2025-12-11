@@ -171,7 +171,7 @@ function AuthenticatedApp() {
 
   return (
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-      <div className="flex h-screen w-full">
+      <div className="flex h-screen w-full bg-background">
         <AppSidebar
           user={user!}
           userRole={user!.role}
@@ -187,7 +187,7 @@ function AuthenticatedApp() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <ThemeToggle />
           </header>
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto bg-background">
             <Switch>
               <Route path="/" component={Dashboard} />
               <Route path="/teams" component={Teams} />

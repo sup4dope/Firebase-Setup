@@ -331,7 +331,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden">
+    <div className="flex flex-col h-full w-full overflow-hidden bg-background">
       {/* Top Header - Stats Summary + Filters */}
       <div className="flex-shrink-0 p-4 border-b border-gray-800 bg-gray-900/30">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
@@ -370,7 +370,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content Area - Scrollable */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      <div className="flex-1 overflow-auto p-4 space-y-4 bg-background">
         {/* Funnel Chart - Wide and centered */}
         <FunnelChart
           customers={customers}
