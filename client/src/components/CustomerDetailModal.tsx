@@ -312,7 +312,7 @@ export function CustomerDetailModal({
     disabled: isReadOnly, // Disable drag & drop for read-only users
   });
 
-  // Handle memo submit
+  // Handle memo submit - adds memo and triggers auto-save
   const handleMemoSubmit = () => {
     if (!newMemo.trim() || !currentUser) return;
     
@@ -324,7 +324,12 @@ export function CustomerDetailModal({
       created_at: new Date(),
     };
     
-    setMemos(prev => [...prev, memo]);
+    setMemos(prev => {
+      const updatedMemos = [...prev, memo];
+      // Trigger auto-save after memos update (use setTimeout to ensure state is updated)
+      setTimeout(() => triggerAutoSave(), 50);
+      return updatedMemos;
+    });
     setNewMemo('');
     
     setTimeout(() => {
@@ -438,8 +443,11 @@ export function CustomerDetailModal({
         industry: dataToSave.industry || '',
         notes: dataToSave.notes || '',
         
-        // Memos - include latest_memo for dashboard sync and updated_at for recency
+        // Memos - include multiple field names for dashboard sync
         latest_memo: latestMemo,
+        recent_memo: latestMemo,  // Dashboard uses this field name
+        memo_content: latestMemo, // For detail page reload
+        last_memo_date: memos.length > 0 ? new Date() : undefined, // Memo update timestamp
         memo_history: memos.map(m => ({
           content: m.content,
           author_id: m.author_id,
