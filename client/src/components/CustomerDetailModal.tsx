@@ -574,32 +574,43 @@ export function CustomerDetailModal({
     }, 1000);
   }, [performSave]);
 
-  // 입력 필드 변경 핸들러 (자동 저장 연결 복구)
   const handleFieldChange = (e: any) => {
-    // 1. 입력값 안전하게 추출 (이벤트 객체 vs 직접 호출 모두 대응)
-    let name: string;
-    let value: any;
+    // 1. 값 추출 (어떤 형태의 입력이든 다 받아줌)
+    let name = "";
+    let value: any = "";
 
-    if (e.target) {
-      // 일반 input, checkbox, select 이벤트
+    if (e && e.target) {
+      // 일반 input 태그인 경우 (name 속성이 있는 input)
       name = e.target.name;
       value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    } else {
-      // DatePicker 등에서 객체로 넘긴 경우 ({ field: value })
-      name = e.name || Object.keys(e)[0];
-      value = e.value !== undefined ? e.value : Object.values(e)[0];
+    } else if (e && typeof e === 'object') {
+      // ★핵심: { fieldName: value } 형태로 호출된 경우
+      // 예: { name: "홍길동" }, { credit_score: 750 }, { entry_source: "유튜브" }
+      const keys = Object.keys(e);
+      if (keys.length > 0) {
+        name = keys[0];
+        value = e[name];
+      }
     }
 
-    if (!name) return; // 방어 코드
+    // 방어 코드: 이름이 없으면 중단
+    if (!name) return;
 
-    // 2. 최신 데이터 객체 생성 (비동기 State 문제 해결)
-    const updatedData = { ...formData, [name]: value };
+    // 2. ★핵심: 검사 하지 말고 무조건 State 업데이트 (입력 렉 방지)
+    const newData = { ...formData, [name]: value };
+    setFormData(newData);
 
-    // 3. UI 업데이트 (화면 갱신)
-    setFormData(updatedData);
-
-    // 4. ★핵심: 최신 객체로 저장 함수 직접 호출 (State 기다리지 않음)
-    debouncedSave(updatedData);
+    // 3. 저장 함수 호출 (에러가 나도 입력은 되게 try-catch로 감쌈)
+    try {
+      if (typeof debouncedSave === 'function') {
+        debouncedSave(newData);
+      } else {
+        console.warn("debouncedSave 없음, performSave 시도");
+        performSave(newData);
+      }
+    } catch (err) {
+      console.error("자동 저장 실패 (입력은 유지됨):", err);
+    }
   };
   
   // Handle object updates (for complex field changes like founding_date with over_7_years)
