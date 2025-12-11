@@ -31,7 +31,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { MemoModal } from './MemoModal';
-import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Customer, UserRole } from '@shared/types';
 
@@ -745,11 +745,11 @@ export function CustomerTable({
                   {customer.company_name}
                 </TableCell>
                 
-                {/* 7년 초과 */}
+                {/* 7년 초과 - 경고 표시 (부정적 조건) */}
                 <TableCell className="text-center">
                   {customer.over_7_years ? (
-                    <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
-                      <Check className="w-3 h-3" />
+                    <Badge variant="outline" className="bg-orange-900/30 text-orange-400 border-orange-500/20">
+                      <AlertTriangle className="w-3 h-3" />
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-500/20">
