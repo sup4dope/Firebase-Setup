@@ -577,16 +577,19 @@ export function CustomerDetailModal({
 
   // Handle field change with auto-save trigger - passes updatedData directly to avoid stale state
   const handleFieldChange = (e: any) => {
+    // 1. 입력값 안전하게 추출 (checkbox 지원)
     const name = e.target ? e.target.name : e.name;
-    const value = e.target ? e.target.value : e.value;
-    
-    // 1. 최신 데이터 객체 즉시 생성 (State 의존성 제거)
+    const value = e.target 
+      ? e.target.type === 'checkbox' ? e.target.checked : e.target.value 
+      : e.value;
+
+    // 2. 최신 데이터 객체 생성
     const updatedData = { ...formData, [name]: value };
-    
-    // 2. UI 업데이트
+
+    // 3. ★핵심: UI 즉시 업데이트 (이게 없으면 입력창이 멈춤)
     setFormData(updatedData);
-    
-    // 3. ★핵심: 최신 데이터를 pendingDataRef에 저장하고 저장 트리거
+
+    // 4. 자동 저장 트리거
     pendingDataRef.current = updatedData;
     triggerAutoSave();
   };
