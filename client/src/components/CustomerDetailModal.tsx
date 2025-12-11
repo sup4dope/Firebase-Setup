@@ -250,11 +250,10 @@ export function CustomerDetailModal({
   const handleFoundingDateChange = (date: string) => {
     const foundingDate = parseISO(date);
     const yearsOld = differenceInYears(new Date(), foundingDate);
-    setFormData(prev => ({
-      ...prev,
+    handleFieldChange({
       founding_date: date,
       over_7_years: yearsOld > 7,
-    }));
+    });
   };
 
   // Handle file upload (shared logic)
@@ -595,7 +594,7 @@ export function CustomerDetailModal({
                   <Label className="text-xs text-gray-300 ml-[11px] mr-[11px]">유입경로</Label>
                   <Select 
                     value={formData.entry_source || '광고랜딩명'} 
-                    onValueChange={(v) => setFormData(p => ({ ...p, entry_source: v }))}
+                    onValueChange={(v) => handleFieldChange({ entry_source: v })}
                     disabled={isReadOnly}
                   >
                     <SelectTrigger className={cn(
@@ -622,7 +621,7 @@ export function CustomerDetailModal({
                       <Label className="text-xs text-gray-400">이름</Label>
                       <Input 
                         value={formData.name || ''} 
-                        onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
+                        onChange={(e) => handleFieldChange({ name: e.target.value })}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-9 text-sm",
@@ -636,7 +635,7 @@ export function CustomerDetailModal({
                       <Input 
                         type="number"
                         value={formData.credit_score || ''} 
-                        onChange={(e) => setFormData(p => ({ ...p, credit_score: Number(e.target.value) }))}
+                        onChange={(e) => handleFieldChange({ credit_score: Number(e.target.value) })}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-9 text-sm",
@@ -649,7 +648,7 @@ export function CustomerDetailModal({
                       <Input 
                         maxLength={6}
                         value={formData.ssn_front || ''} 
-                        onChange={(e) => setFormData(p => ({ ...p, ssn_front: e.target.value }))}
+                        onChange={(e) => handleFieldChange({ ssn_front: e.target.value })}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-9 text-sm",
@@ -663,7 +662,7 @@ export function CustomerDetailModal({
                       <Input 
                         maxLength={7}
                         value={formData.ssn_back || ''} 
-                        onChange={(e) => setFormData(p => ({ ...p, ssn_back: e.target.value }))}
+                        onChange={(e) => handleFieldChange({ ssn_back: e.target.value })}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-9 text-sm",
@@ -777,7 +776,7 @@ export function CustomerDetailModal({
                         <Label className="text-xs text-gray-400">상세주소</Label>
                         <Input 
                           value={formData.home_address_detail || ''} 
-                          onChange={(e) => setFormData(p => ({ ...p, home_address_detail: e.target.value }))}
+                          onChange={(e) => handleFieldChange({ home_address_detail: e.target.value })}
                           disabled={isReadOnly}
                           className={cn(
                             "border-gray-600 text-gray-200 h-8 text-sm",
@@ -790,7 +789,7 @@ export function CustomerDetailModal({
                         <Checkbox 
                           id="home-owned"
                           checked={formData.is_home_owned || false}
-                          onCheckedChange={(c) => setFormData(p => ({ ...p, is_home_owned: !!c }))}
+                          onCheckedChange={(c) => handleFieldChange({ is_home_owned: !!c })}
                           disabled={isReadOnly}
                           className={cn("h-3.5 w-3.5", isReadOnly && "opacity-50 cursor-not-allowed")}
                         />
@@ -801,12 +800,11 @@ export function CustomerDetailModal({
                           id="same-address"
                           checked={formData.is_same_as_business || false}
                           onCheckedChange={(c) => {
-                            setFormData(p => ({ 
-                              ...p, 
+                            handleFieldChange({ 
                               is_same_as_business: !!c,
-                              business_address: c ? p.home_address : p.business_address,
-                              business_address_detail: c ? p.home_address_detail : p.business_address_detail,
-                            }));
+                              business_address: c ? formData.home_address : formData.business_address,
+                              business_address_detail: c ? formData.home_address_detail : formData.business_address_detail,
+                            });
                           }}
                           disabled={isReadOnly}
                           className={cn("h-3.5 w-3.5", isReadOnly && "opacity-50 cursor-not-allowed")}
@@ -834,7 +832,7 @@ export function CustomerDetailModal({
                         <div className="p-4">
                           <DaumPostcodeEmbed 
                             onComplete={(data) => {
-                              setFormData(p => ({ ...p, home_address: data.address }));
+                              handleFieldChange({ home_address: data.address });
                               setShowHomeAddressSearch(false);
                             }}
                           />
@@ -854,7 +852,7 @@ export function CustomerDetailModal({
                       <Label className="text-xs text-gray-400">상호명</Label>
                       <Input 
                         value={formData.company_name || ''} 
-                        onChange={(e) => setFormData(p => ({ ...p, company_name: e.target.value }))}
+                        onChange={(e) => handleFieldChange({ company_name: e.target.value })}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-9 text-sm",
@@ -891,7 +889,7 @@ export function CustomerDetailModal({
                       <Label className="text-xs text-gray-400">업종</Label>
                       <Select 
                         value={formData.business_type || '기타'} 
-                        onValueChange={(v) => setFormData(p => ({ ...p, business_type: v }))}
+                        onValueChange={(v) => handleFieldChange({ business_type: v })}
                         disabled={isReadOnly}
                       >
                         <SelectTrigger className={cn(
@@ -911,7 +909,7 @@ export function CustomerDetailModal({
                       <Label className="text-xs text-gray-400">종목</Label>
                       <Input 
                         value={formData.business_item || ''} 
-                        onChange={(e) => setFormData(p => ({ ...p, business_item: e.target.value }))}
+                        onChange={(e) => handleFieldChange({ business_item: e.target.value })}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-9 text-sm",
@@ -927,7 +925,7 @@ export function CustomerDetailModal({
                       <Label className="text-xs text-gray-400">사업자번호</Label>
                       <Input 
                         value={formData.business_registration_number || ''} 
-                        onChange={(e) => setFormData(p => ({ ...p, business_registration_number: e.target.value }))}
+                        onChange={(e) => handleFieldChange({ business_registration_number: e.target.value })}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-9 text-sm",
@@ -941,7 +939,7 @@ export function CustomerDetailModal({
                         <Label className="text-xs text-gray-400">재도전</Label>
                         <Select 
                           value={formData.retry_type || '해당없음'} 
-                          onValueChange={(v) => setFormData(p => ({ ...p, retry_type: v }))}
+                          onValueChange={(v) => handleFieldChange({ retry_type: v })}
                           disabled={isReadOnly}
                         >
                           <SelectTrigger className={cn(
@@ -961,7 +959,7 @@ export function CustomerDetailModal({
                         <Label className="text-xs text-gray-400">혁신</Label>
                         <Select 
                           value={formData.innovation_type || '해당없음'} 
-                          onValueChange={(v) => setFormData(p => ({ ...p, innovation_type: v }))}
+                          onValueChange={(v) => handleFieldChange({ innovation_type: v })}
                           disabled={isReadOnly}
                         >
                           <SelectTrigger className={cn(
@@ -1016,7 +1014,7 @@ export function CustomerDetailModal({
                         <Label className="text-xs text-gray-400">상세주소</Label>
                         <Input 
                           value={formData.business_address_detail || ''} 
-                          onChange={(e) => setFormData(p => ({ ...p, business_address_detail: e.target.value }))}
+                          onChange={(e) => handleFieldChange({ business_address_detail: e.target.value })}
                           className={cn(
                             "border-gray-600 text-gray-200 h-8 text-sm",
                             isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800"
@@ -1029,7 +1027,7 @@ export function CustomerDetailModal({
                         <Checkbox 
                           id="business-owned"
                           checked={formData.is_business_owned || false}
-                          onCheckedChange={(c) => setFormData(p => ({ ...p, is_business_owned: !!c }))}
+                          onCheckedChange={(c) => handleFieldChange({ is_business_owned: !!c })}
                           disabled={isReadOnly}
                           className={cn("h-3.5 w-3.5", isReadOnly && "opacity-50 cursor-not-allowed")}
                         />
@@ -1056,7 +1054,7 @@ export function CustomerDetailModal({
                         <div className="p-4">
                           <DaumPostcodeEmbed 
                             onComplete={(data) => {
-                              setFormData(p => ({ ...p, business_address: data.address }));
+                              handleFieldChange({ business_address: data.address });
                               setShowBusinessAddressSearch(false);
                             }}
                           />
@@ -1073,7 +1071,7 @@ export function CustomerDetailModal({
                         <Input 
                           type="number"
                           value={formData.recent_sales || ''} 
-                          onChange={(e) => setFormData(p => ({ ...p, recent_sales: Number(e.target.value) }))}
+                          onChange={(e) => handleFieldChange({ recent_sales: Number(e.target.value) })}
                           disabled={isReadOnly}
                           className={cn(
                             "border-gray-600 text-gray-200 pr-6 h-8 text-sm",
@@ -1089,7 +1087,7 @@ export function CustomerDetailModal({
                         <Input 
                           type="number"
                           value={formData.sales_y1 || ''} 
-                          onChange={(e) => setFormData(p => ({ ...p, sales_y1: Number(e.target.value) }))}
+                          onChange={(e) => handleFieldChange({ sales_y1: Number(e.target.value) })}
                           disabled={isReadOnly}
                           className={cn(
                             "border-gray-600 text-gray-200 pr-6 h-8 text-sm",
@@ -1105,7 +1103,7 @@ export function CustomerDetailModal({
                         <Input 
                           type="number"
                           value={formData.sales_y2 || ''} 
-                          onChange={(e) => setFormData(p => ({ ...p, sales_y2: Number(e.target.value) }))}
+                          onChange={(e) => handleFieldChange({ sales_y2: Number(e.target.value) })}
                           disabled={isReadOnly}
                           className={cn(
                             "border-gray-600 text-gray-200 pr-6 h-8 text-sm",
@@ -1121,7 +1119,7 @@ export function CustomerDetailModal({
                         <Input 
                           type="number"
                           value={formData.sales_y3 || ''} 
-                          onChange={(e) => setFormData(p => ({ ...p, sales_y3: Number(e.target.value) }))}
+                          onChange={(e) => handleFieldChange({ sales_y3: Number(e.target.value) })}
                           disabled={isReadOnly}
                           className={cn(
                             "border-gray-600 text-gray-200 pr-6 h-8 text-sm",
