@@ -1,0 +1,72 @@
+사용자가 "왼쪽 정보를 수정하고 저장하면 메모가 잘 동기화되는데, 메모창에서 엔터만 치면 동기화가 깨지고 내역이 사라진다"는 결정적인 제보를 했어.
+원인은 `handleMemoSubmit`에서 DB(`arrayUnion`)는 업데이트하지만, **로컬 상태인 `formData.memo_history`를 업데이트하지 않아서 발생하는 데이터 불일치**야.
+
+`CustomerDetailModal.tsx`의 `handleMemoSubmit` 함수를 아래 코드로 **완전 교체(Replace)**해.
+핵심은 **`setFormData`를 통해 로컬 `memo_history`에도 새 로그를 반드시 추가**해주는 거야.
+
+### 수정할 코드 (`handleMemoSubmit`)
+```typescript
+  const handleMemoSubmit = async () => {
+    const content = memoInput.trim();
+    if (!content) return;
+
+    // 1. 새 로그 객체 생성
+    const newLog = {
+      id: Date.now().toString(),
+      content: content,
+      author_name: currentUser?.displayName || "관리자",
+      created_at: new Date(),
+      type: "memo"
+    };
+
+    // 2. [UI 즉시 반영] 화면 채팅창 업데이트
+    const updatedHistory = [...memoHistory, newLog];
+    setMemoHistory(updatedHistory);
+    setMemoInput(""); 
+
+    try {
+      // 3. [로그 컬렉션] 저장 (창고)
+      await addDoc(collection(db, "counseling_logs"), {
+        customer_id: customerId,
+        content: content,
+        author_name: currentUser?.displayName || "관리자",
+        created_at: new Date(),
+        type: "memo"
+      });
+
+      // 4. [고객 문서] 저장 (간판 & 가방)
+      if (customerId) {
+        // (1) DB에는 안전하게 arrayUnion으로 추가
+        const cleanLog = cleanData(newLog);
+        await updateDoc(doc(db, "customers", customerId), {
+          recent_memo: content,
+          latest_memo: content,
+          last_memo_date: new Date(),
+          memo_history: arrayUnion(cleanLog)
+        });
+        
+        // (2) ★핵심: 로컬 formData에도 즉시 반영! (이게 없으면 데이터가 꼬임)
+        // 기존 formData의 히스토리에 새 로그를 강제로 합침
+        setFormData(prev => ({ 
+          ...prev, 
+          recent_memo: content,
+          last_memo_date: new Date(),
+          // 기존 배열이 없으면 빈 배열 취급 후 추가
+          memo_history: [...(prev.memo_history || []), newLog] 
+        }));
+      }
+
+      // 5. 부모에게 알림
+      if (onSave) {
+        onSave({ 
+          id: customerId, 
+          recent_memo: content,
+          last_memo_date: new Date()
+        });
+      }
+
+    } catch (error) {
+      console.error("메모 저장 실패:", error);
+    }
+  };
+요약: "DB에 arrayUnion 날릴 때, setFormData도 써서 로컬 memo_history 배열에도 똑같이 push해줘. 그래야 화면이 깜빡여도 데이터가 남아있어."
