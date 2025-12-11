@@ -439,11 +439,26 @@ export function CustomerDetailModal({
     }, 500);
   };
 
+  // [헬퍼] 데이터 정제 함수 (Invalid Date, undefined 제거)
+  const cleanData = (data: any) => {
+    const cleaned = { ...data };
+    Object.keys(cleaned).forEach(key => {
+      const value = cleaned[key];
+      // 1. 날짜가 Invalid Date인 경우 -> null로 변경
+      if (value instanceof Date && isNaN(value.getTime())) {
+        cleaned[key] = null;
+      }
+      // 2. undefined인 경우 -> 삭제 (Firestore는 undefined 싫어함)
+      if (value === undefined) {
+        delete cleaned[key];
+      }
+    });
+    return cleaned;
+  };
+
   // 1. 실제 저장 로직 (매번 재생성되어도 됨 - 최신 상태 참조)
   const runSaveLogic = async (dataToSave: any) => {
     if (!dataToSave?.name?.trim()) return;
-    
-    console.log("💾 Firestore 실제 저장 요청:", dataToSave);
     
     setSaveStatus('saving');
     setIsSaving(true);
@@ -504,7 +519,11 @@ export function CustomerDetailModal({
         updated_at: new Date(),
       };
       
-      const returnedId = await onSave(customerData);
+      // ★핵심: 저장 전 데이터 청소 (Invalid Date, undefined 제거)
+      const sanitizedData = cleanData(customerData);
+      console.log("💾 Firestore 저장 (Sanitized):", sanitizedData);
+      
+      const returnedId = await onSave(sanitizedData);
       
       if (returnedId && !dataToSave.id) {
         setFormData(prev => ({ 
