@@ -376,18 +376,12 @@ export function CustomerDetailModal({
 
       // 2. 대시보드용: 고객 정보 '겉면' 업데이트 (customers 컬렉션)
       if (formData.id) {
-        // ★핵심: cleanData로 Invalid Date 방지
+        // ★핵심: memo_history는 저장하지 않음! (Invalid Date 에러 원인 제거)
+        // 오직 최근 메모 1줄만 갱신
         const updateData = cleanData({
           recent_memo: content,
           latest_memo: content,
           last_memo_date: new Date(),
-          memo_history: updatedMemos.map(m => ({
-            content: m.content,
-            author_id: m.author_id,
-            author_name: m.author_name,
-            created_at: m.created_at,
-          })),
-          updated_at: new Date(),
         });
         await updateDoc(doc(db, "customers", formData.id), updateData);
       } else if (formData.name?.trim()) {
@@ -437,13 +431,7 @@ export function CustomerDetailModal({
           notes: dataToSave.notes || '',
           recent_memo: content,
           latest_memo: content,
-          last_memo_date: memo.created_at,
-          memo_history: updatedMemos.map(m => ({
-            content: m.content,
-            author_id: m.author_id,
-            author_name: m.author_name,
-            created_at: m.created_at,
-          })),
+          last_memo_date: new Date(),
           documents,
           updated_at: new Date(),
         };
