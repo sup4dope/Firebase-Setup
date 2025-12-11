@@ -250,7 +250,8 @@ export default function Dashboard() {
     try {
       await updateCustomer(customerId, {
         memo_history: updatedMemoHistory,
-        latest_memo: content,
+        recent_memo: content,       // 대시보드 테이블 표시용
+        latest_memo: content,       // 호환성용
         last_memo_date: new Date(),
         updated_at: new Date(),
       });
@@ -260,6 +261,7 @@ export default function Dashboard() {
         prev.map(c => c.id === customerId ? {
           ...c,
           memo_history: updatedMemoHistory,
+          recent_memo: content,
           latest_memo: content,
           last_memo_date: new Date(),
           updated_at: new Date(),

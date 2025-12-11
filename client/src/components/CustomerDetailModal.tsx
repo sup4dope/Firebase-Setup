@@ -247,14 +247,22 @@ export function CustomerDetailModal({
     loadHistoryLogs();
   }, [activeBottomTab, customer?.id]);
 
-  // Calculate 7-year status
+  // Calculate 7-year status (uses inline logic to avoid hoisting issues)
   const handleFoundingDateChange = (date: string) => {
     const foundingDate = parseISO(date);
     const yearsOld = differenceInYears(new Date(), foundingDate);
-    handleFieldChange({
-      founding_date: date,
-      over_7_years: yearsOld > 7,
-    });
+    const updatedData = { 
+      ...formData, 
+      founding_date: date, 
+      over_7_years: yearsOld > 7 
+    };
+    setFormData(updatedData);
+    pendingDataRef.current = updatedData;
+    // triggerAutoSave will be called after component mounts
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      performSave(pendingDataRef.current || undefined);
+    }, 1000);
   };
 
   // Handle file upload (shared logic)
@@ -381,9 +389,10 @@ export function CustomerDetailModal({
         processing_org: dataToSave.processing_org || '미등록',
         industry: dataToSave.industry || '',
         notes: dataToSave.notes || '',
-        // Dashboard sync fields - use the NEW memo just added
-        latest_memo: memo.content,
-        last_memo_date: memo.created_at,
+        // ★핵심: Dashboard sync fields - recent_memo도 함께 업데이트
+        recent_memo: memo.content,       // 대시보드가 보는 필드명
+        latest_memo: memo.content,       // 호환성용
+        last_memo_date: memo.created_at, // 정렬용 시간
         // Full memo history including the new memo
         memo_history: updatedMemos.map(m => ({
           content: m.content,
@@ -512,8 +521,9 @@ export function CustomerDetailModal({
         industry: dataToSave.industry || '',
         notes: dataToSave.notes || '',
         
-        // Memos - include latest_memo for dashboard sync and updated_at for recency
-        latest_memo: latestMemo,
+        // ★핵심: Dashboard sync fields - recent_memo도 함께 업데이트
+        recent_memo: latestMemo,  // 대시보드가 보는 필드명
+        latest_memo: latestMemo,  // 호환성용
         memo_history: memos.map(m => ({
           content: m.content,
           author_id: m.author_id,
@@ -565,12 +575,26 @@ export function CustomerDetailModal({
     }, 1000);
   }, [performSave]);
 
-  // Handle field change with auto-save trigger - stores latest data in ref to avoid async state issues
-  const handleFieldChange = useCallback((updates: Partial<typeof formData>) => {
+  // Handle field change with auto-save trigger - passes updatedData directly to avoid stale state
+  const handleFieldChange = (e: any) => {
+    const name = e.target ? e.target.name : e.name;
+    const value = e.target ? e.target.value : e.value;
+    
+    // 1. 최신 데이터 객체 즉시 생성 (State 의존성 제거)
+    const updatedData = { ...formData, [name]: value };
+    
+    // 2. UI 업데이트
+    setFormData(updatedData);
+    
+    // 3. ★핵심: 최신 데이터를 pendingDataRef에 저장하고 저장 트리거
+    pendingDataRef.current = updatedData;
+    triggerAutoSave();
+  };
+  
+  // Handle object updates (for complex field changes like founding_date with over_7_years)
+  const handleFieldChangeObject = useCallback((updates: Partial<typeof formData>) => {
     setFormData(prev => {
-      // Calculate the latest merged data
       const updatedData = { ...prev, ...updates };
-      // Store in ref for performSave to use (avoids async state timing issue)
       pendingDataRef.current = updatedData;
       return updatedData;
     });
