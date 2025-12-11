@@ -89,6 +89,7 @@ export interface Customer {
   contract_completion_date?: string; // 최초 계약 도달일
   notes?: string;
   created_at: Date;
+  updated_at?: Date; // 최종 업데이트 시각 (메모/상태 변경 시)
   
   // 고객 정보
   credit_score?: number; // 신용점수
