@@ -31,7 +31,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { MemoModal } from './MemoModal';
-import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Customer, UserRole } from '@shared/types';
 
@@ -208,219 +208,6 @@ interface CustomerTableProps {
 
 const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
-// Dummy data for display - daily_sequence는 날짜별 전사적 일별 채번
-const DUMMY_CUSTOMERS: Customer[] = [
-  {
-    id: '1',
-    readable_id: '241211-001',
-    daily_sequence: 1, // 12월 11일 첫 번째
-    name: '김철수',
-    company_name: '(주)테크솔루션',
-    status_code: '2-1',
-    manager_id: 'user1',
-    manager_name: '박담당',
-    team_id: 'team1',
-    entry_date: '2024-12-11',
-    approved_amount: 50000000,
-    commission_rate: 2.5,
-    created_at: new Date(),
-    credit_score: 780,
-    over_7_years: true,
-    avg_revenue_3y: 15.5,
-    recent_sales: 18.2,
-    industry: '제조업',
-    processing_org: '미등록',
-    latest_memo: '서류 준비 중, 다음 주 화요일 방문 예정',
-    memo_history: [
-      { date: '2024-12-01', content: '첫 상담 진행, 관심도 높음' },
-      { date: '2024-12-05', content: '서류 준비 중, 다음 주 화요일 방문 예정' },
-    ],
-  },
-  {
-    id: '2',
-    readable_id: '241211-002',
-    daily_sequence: 2, // 12월 11일 두 번째
-    name: '이영희',
-    company_name: '영희상사',
-    status_code: '1-1',
-    manager_id: 'user2',
-    manager_name: '김매니저',
-    team_id: 'team1',
-    entry_date: '2024-12-11',
-    approved_amount: 0,
-    commission_rate: 0,
-    created_at: new Date(),
-    credit_score: 650,
-    over_7_years: false,
-    avg_revenue_3y: 3.2,
-    recent_sales: 2.8,
-    industry: '도소매',
-    processing_org: '미등록',
-    latest_memo: '신용점수 미달로 상담 보류',
-    memo_history: [
-      { date: '2024-12-02', content: '신용점수 미달로 상담 보류' },
-    ],
-  },
-  {
-    id: '3',
-    readable_id: '241211-005',
-    daily_sequence: 5, // 12월 11일 다섯 번째 (중간에 다른 담당자들이 3,4번 등록)
-    name: '박지민',
-    company_name: '지민테크',
-    status_code: '4-3',
-    manager_id: 'user1',
-    manager_name: '박담당',
-    team_id: 'team1',
-    entry_date: '2024-12-11',
-    approved_amount: 120000000,
-    commission_rate: 3.0,
-    created_at: new Date(),
-    credit_score: 820,
-    over_7_years: true,
-    avg_revenue_3y: 45.0,
-    recent_sales: 52.3,
-    industry: 'IT서비스',
-    processing_org: '미등록',
-    latest_memo: '계약 완료, 집행 대기 중',
-    memo_history: [
-      { date: '2024-11-15', content: '상담 시작' },
-      { date: '2024-11-20', content: '서류 제출 완료' },
-      { date: '2024-12-01', content: '계약 완료, 집행 대기 중' },
-    ],
-  },
-  {
-    id: '4',
-    readable_id: '241210-001',
-    daily_sequence: 1, // 12월 10일 첫 번째
-    name: '최동훈',
-    company_name: '동훈물류',
-    status_code: '3-2',
-    manager_id: 'user3',
-    manager_name: '이팀장',
-    team_id: 'team2',
-    entry_date: '2024-12-10',
-    approved_amount: 80000000,
-    commission_rate: 2.0,
-    created_at: new Date(),
-    credit_score: 720,
-    over_7_years: true,
-    avg_revenue_3y: 28.7,
-    recent_sales: 31.5,
-    industry: '물류/운송',
-    processing_org: '미등록',
-    latest_memo: '심사 진행 중, 추가 서류 요청됨',
-    memo_history: [
-      { date: '2024-11-20', content: '상담 완료' },
-      { date: '2024-12-03', content: '심사 진행 중, 추가 서류 요청됨' },
-    ],
-  },
-  {
-    id: '5',
-    readable_id: '241210-003',
-    daily_sequence: 3, // 12월 10일 세 번째
-    name: '정수아',
-    company_name: '수아디자인',
-    status_code: '5-2',
-    manager_id: 'user2',
-    manager_name: '김매니저',
-    team_id: 'team1',
-    entry_date: '2024-12-10',
-    approved_amount: 200000000,
-    commission_rate: 2.8,
-    created_at: new Date(),
-    credit_score: 850,
-    over_7_years: true,
-    avg_revenue_3y: 62.3,
-    recent_sales: 71.0,
-    industry: '디자인',
-    processing_org: '미등록',
-    latest_memo: '집행 완료. 수수료 정산 대기',
-    memo_history: [
-      { date: '2024-10-05', content: '첫 상담' },
-      { date: '2024-11-01', content: '계약 체결' },
-      { date: '2024-12-01', content: '집행 완료. 수수료 정산 대기' },
-    ],
-  },
-  {
-    id: '6',
-    readable_id: '241209-001',
-    daily_sequence: 1, // 12월 9일 첫 번째
-    name: '한민준',
-    company_name: '민준건설',
-    status_code: '0-1',
-    manager_id: 'user1',
-    manager_name: '박담당',
-    team_id: 'team1',
-    entry_date: '2024-12-09',
-    approved_amount: 0,
-    commission_rate: 0,
-    created_at: new Date(),
-    credit_score: 680,
-    over_7_years: false,
-    avg_revenue_3y: 8.5,
-    recent_sales: 7.2,
-    industry: '건설',
-    processing_org: '미등록',
-    latest_memo: '통화 불가, 재연락 필요',
-    memo_history: [
-      { date: '2024-12-03', content: '통화 불가, 재연락 필요' },
-    ],
-  },
-  {
-    id: '7',
-    readable_id: '241209-002',
-    daily_sequence: 2, // 12월 9일 두 번째
-    name: '서예린',
-    company_name: '예린F&B',
-    status_code: '2-3',
-    manager_id: 'user3',
-    manager_name: '이팀장',
-    team_id: 'team2',
-    entry_date: '2024-12-09',
-    approved_amount: 35000000,
-    commission_rate: 2.5,
-    created_at: new Date(),
-    credit_score: 740,
-    over_7_years: false,
-    avg_revenue_3y: 12.1,
-    recent_sales: 14.5,
-    industry: '요식업',
-    processing_org: '미등록',
-    latest_memo: '서류 완료, 심사 접수 예정',
-    memo_history: [
-      { date: '2024-11-25', content: '상담 완료' },
-      { date: '2024-12-05', content: '서류 완료, 심사 접수 예정' },
-    ],
-  },
-  {
-    id: '8',
-    readable_id: '241208-001',
-    daily_sequence: 1, // 12월 8일 첫 번째
-    name: '윤성호',
-    company_name: '성호전자',
-    status_code: '1-2',
-    manager_id: 'user2',
-    manager_name: '김매니저',
-    team_id: 'team1',
-    entry_date: '2024-12-08',
-    approved_amount: 0,
-    commission_rate: 0,
-    created_at: new Date(),
-    credit_score: 810,
-    over_7_years: true,
-    avg_revenue_3y: 22.4,
-    recent_sales: 25.8,
-    industry: '전자/통신',
-    processing_org: '미등록',
-    latest_memo: '상담 진행 중, 조건 검토 필요. 고객이 금리에 대해 문의함. 다음 미팅에서 상세 설명 예정.',
-    memo_history: [
-      { date: '2024-12-04', content: '첫 상담 시작' },
-      { date: '2024-12-06', content: '상담 진행 중, 조건 검토 필요. 고객이 금리에 대해 문의함. 다음 미팅에서 상세 설명 예정.' },
-    ],
-  },
-];
-
-
 const getStageName = (stageId: string | null): string => {
   if (!stageId) return '전체';
   const stageMap: Record<string, string> = {
@@ -455,12 +242,6 @@ export function CustomerTable({
   // Memo modal state
   const [memoModalOpen, setMemoModalOpen] = useState(false);
   const [selectedCustomerForMemo, setSelectedCustomerForMemo] = useState<Customer | null>(null);
-  
-  // Local state for dummy data updates
-  const [localCustomers, setLocalCustomers] = useState<Customer[]>(DUMMY_CUSTOMERS);
-  
-  // Use dummy data if no real customers
-  const displayCustomers = customers.length > 0 ? customers : localCustomers;
 
   const handleMemoDoubleClick = (customer: Customer) => {
     setSelectedCustomerForMemo(customer);
@@ -472,21 +253,6 @@ export function CustomerTable({
     
     const today = new Date().toISOString().split('T')[0];
     const newMemo = { date: today, content };
-    
-    // Update local state for demo
-    setLocalCustomers(prev => 
-      prev.map(c => {
-        if (c.id === selectedCustomerForMemo.id) {
-          const updatedHistory = [...(c.memo_history || []), newMemo];
-          return {
-            ...c,
-            memo_history: updatedHistory,
-            latest_memo: content,
-          };
-        }
-        return c;
-      })
-    );
     
     // Update selected customer for modal
     setSelectedCustomerForMemo(prev => {
@@ -504,24 +270,19 @@ export function CustomerTable({
   };
 
   const handleProcessingOrgChange = (customerId: string, newOrg: string) => {
-    // Update local state for demo
-    setLocalCustomers(prev =>
-      prev.map(c => c.id === customerId ? { ...c, processing_org: newOrg } : c)
-    );
-    
     // Call external handler if provided
     onProcessingOrgChange?.(customerId, newOrg);
   };
 
-  if (displayCustomers.length === 0) {
+  if (customers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-          <Edit className="w-8 h-8 text-muted-foreground" />
+        <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
+          <Users className="w-8 h-8 text-gray-500" />
         </div>
-        <p className="text-lg font-medium text-foreground">등록된 고객이 없습니다</p>
-        <p className="text-sm text-muted-foreground mt-1">
-          새 고객을 추가하여 영업을 시작하세요
+        <p className="text-lg font-medium text-gray-200">데이터가 없습니다</p>
+        <p className="text-sm text-gray-500 mt-1">
+          우측 상단 버튼을 눌러 고객을 추가해주세요.
         </p>
       </div>
     );
@@ -536,7 +297,7 @@ export function CustomerTable({
           현재 조회: <span className="text-primary">{getStageName(selectedStage)}</span>
         </span>
         <span className="text-sm text-muted-foreground">
-          ({displayCustomers.length}건)
+          ({customers.length}건)
         </span>
       </div>
 
@@ -562,7 +323,7 @@ export function CustomerTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {displayCustomers.map((customer, index) => (
+            {customers.map((customer, index) => (
               <TableRow 
                 key={customer.id} 
                 className="group hover:bg-muted/30"
