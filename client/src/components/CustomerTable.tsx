@@ -546,18 +546,18 @@ export function CustomerTable({
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-28 font-semibold whitespace-nowrap text-center">유입일자</TableHead>
-              <TableHead className="w-[50px] font-semibold text-center">No</TableHead>
-              <TableHead className="w-[90px] font-semibold">고객명</TableHead>
-              <TableHead className="w-[150px] font-semibold">상태</TableHead>
-              <TableHead className="w-[70px] font-semibold text-center">신용점수</TableHead>
-              <TableHead className="w-[130px] font-semibold">상호명</TableHead>
-              <TableHead className="w-[60px] font-semibold text-center">7년초과</TableHead>
-              <TableHead className="w-[90px] font-semibold text-right">3년평균</TableHead>
-              <TableHead className="w-[90px] font-semibold text-right">최근매출</TableHead>
-              <TableHead className="w-[90px] font-semibold">업종</TableHead>
-              <TableHead className="w-[100px] font-semibold">진행기관</TableHead>
-              <TableHead className="w-[160px] font-semibold">최근 메모</TableHead>
-              <TableHead className="w-20 font-semibold">담당자</TableHead>
+              <TableHead className="w-[50px] font-semibold text-center whitespace-nowrap">No</TableHead>
+              <TableHead className="w-[90px] font-semibold whitespace-nowrap">고객명</TableHead>
+              <TableHead className="w-[150px] font-semibold whitespace-nowrap">상태</TableHead>
+              <TableHead className="w-[70px] font-semibold text-center whitespace-nowrap">신용점수</TableHead>
+              <TableHead className="w-[130px] font-semibold whitespace-nowrap">상호명</TableHead>
+              <TableHead className="w-[60px] font-semibold text-center whitespace-nowrap">7년초과</TableHead>
+              <TableHead className="w-[90px] font-semibold text-right whitespace-nowrap">3년평균</TableHead>
+              <TableHead className="w-[90px] font-semibold text-right whitespace-nowrap">최근매출</TableHead>
+              <TableHead className="w-[90px] font-semibold whitespace-nowrap">업종</TableHead>
+              <TableHead className="w-[100px] font-semibold whitespace-nowrap">진행기관</TableHead>
+              <TableHead className="w-[160px] font-semibold whitespace-nowrap">최근 메모</TableHead>
+              <TableHead className="w-20 font-semibold whitespace-nowrap">담당자</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
