@@ -414,7 +414,8 @@ export function CustomerDetailModal({
         recent_memo: content,
         latest_memo: content,
         last_memo_date: new Date(),
-        memo_history: [...(formData.memo_history || []), memo],
+        // ★핵심: formData가 아니라 현재 화면에 보이는 'memos' State를 기준으로 병합!
+        memo_history: updatedMemos,
       };
       
       // 로컬 상태 업데이트
