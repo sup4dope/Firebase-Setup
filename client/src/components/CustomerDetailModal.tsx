@@ -318,6 +318,27 @@ export function CustomerDetailModal({
     disabled: isReadOnly, // Disable drag & drop for read-only users
   });
 
+  // [헬퍼] 재귀적 데이터 정제 함수 (모든 깊이의 Invalid Date 제거)
+  const cleanData = (input: any): any => {
+    if (input instanceof Date) {
+      return isNaN(input.getTime()) ? null : input;
+    }
+    if (Array.isArray(input)) {
+      return input.map(cleanData);
+    }
+    if (typeof input === 'object' && input !== null) {
+      const cleanedObj: any = {};
+      Object.keys(input).forEach(key => {
+        const value = input[key];
+        if (value !== undefined) {
+          cleanedObj[key] = cleanData(value);
+        }
+      });
+      return cleanedObj;
+    }
+    return input;
+  };
+
   // Handle memo submit - saves immediately to Firestore and syncs with dashboard
   const handleMemoSubmit = async () => {
     if (!newMemo.trim() || !currentUser) return;
@@ -355,7 +376,8 @@ export function CustomerDetailModal({
 
       // 2. 대시보드용: 고객 정보 '겉면' 업데이트 (customers 컬렉션)
       if (formData.id) {
-        await updateDoc(doc(db, "customers", formData.id), {
+        // ★핵심: cleanData로 Invalid Date 방지
+        const updateData = cleanData({
           recent_memo: content,
           latest_memo: content,
           last_memo_date: new Date(),
@@ -367,6 +389,7 @@ export function CustomerDetailModal({
           })),
           updated_at: new Date(),
         });
+        await updateDoc(doc(db, "customers", formData.id), updateData);
       } else if (formData.name?.trim()) {
         // 신규 고객인 경우 - 기존 onSave 로직 사용
         const dataToSave = pendingDataRef.current || formData;
@@ -473,35 +496,6 @@ export function CustomerDetailModal({
       setAiMessages(prev => [...prev, aiResponse]);
       aiScrollRef.current?.scrollTo({ top: aiScrollRef.current.scrollHeight, behavior: 'smooth' });
     }, 500);
-  };
-
-  // [헬퍼] 재귀적 데이터 정제 함수 (모든 깊이의 Invalid Date 제거)
-  const cleanData = (input: any): any => {
-    // 1. 날짜 타입인 경우: 유효성 검사
-    if (input instanceof Date) {
-      return isNaN(input.getTime()) ? null : input;
-    }
-    
-    // 2. 배열인 경우: 내부 요소까지 재귀적으로 청소
-    if (Array.isArray(input)) {
-      return input.map(cleanData);
-    }
-    
-    // 3. 객체인 경우: 모든 키를 순회하며 재귀적으로 청소
-    if (typeof input === 'object' && input !== null) {
-      const cleanedObj: any = {};
-      Object.keys(input).forEach(key => {
-        const value = input[key];
-        // undefined는 삭제, 나머지는 청소해서 할당
-        if (value !== undefined) {
-          cleanedObj[key] = cleanData(value);
-        }
-      });
-      return cleanedObj;
-    }
-    
-    // 4. 그 외(문자, 숫자, null 등)는 그대로 반환
-    return input;
   };
 
   // 1. 실제 저장 로직 (매번 재생성되어도 됨 - 최신 상태 참조)
