@@ -407,24 +407,24 @@ export function CustomerDetailModal({
         });
       }
 
-      // 2. 대시보드용: 고객 정보 '겉면' 업데이트 (customers 컬렉션)
+      // 2. 대시보드용: 고객 정보 전체 업데이트 (customers 컬렉션)
       if (formData.id) {
-        // ★핵심: memo_history는 저장하지 않음! (Invalid Date 에러 원인 제거)
-        // 오직 최근 메모 1줄만 갱신
+        // ★핵심 수정: memo_history도 포함해서 저장! (cleanData로 Invalid Date 방지)
         const updateData = cleanData({
           recent_memo: content,
           latest_memo: content,
           last_memo_date: new Date(),
+          memo_history: updatedMemos, // ★말풍선 내역 포함!
         });
         await updateDoc(doc(db, "customers", formData.id), updateData);
         
         // ★핵심 추가: 로컬 formData도 즉시 업데이트 (autoSave 팀킬 방지!)
-        // 이걸 해야 나중에 autoSave가 옛날 메모로 덮어쓰지 않음
         setFormData(prev => ({
           ...prev,
           recent_memo: content,
           latest_memo: content,
           last_memo_date: new Date(),
+          memo_history: updatedMemos,
         }));
       } else if (formData.name?.trim()) {
         // 신규 고객인 경우 - 기존 onSave 로직 사용

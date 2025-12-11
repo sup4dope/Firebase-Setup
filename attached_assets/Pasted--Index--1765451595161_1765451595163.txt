@@ -1,0 +1,67 @@
+색인(Index) 설정은 완료되었는데도 말풍선이 저장되지 않아.
+사용자가 정확한 원인을 찾았어. "왼쪽 정보를 수정해서 저장할 땐 말풍선도 저장되는데, 메모창에서 엔터만 치면 저장이 안 된다"고 해.
+
+이건 `handleMemoSubmit` 함수가 `memo_history` 배열을 `customers` 문서에 저장하지 않기 때문이야.
+`CustomerDetailModal.tsx`의 `handleMemoSubmit` 함수를 **아래의 '완전 저장' 버전으로 교체(Replace)**해줘.
+
+### 수정할 코드 (`handleMemoSubmit`)
+```typescript
+  const handleMemoSubmit = async () => {
+    const content = memoInput.trim();
+    if (!content) return;
+
+    // 1. 새 로그 객체 생성
+    const newLog = {
+      id: Date.now().toString(),
+      content: content,
+      author_name: currentUser?.displayName || "관리자",
+      created_at: new Date(),
+      type: "memo"
+    };
+
+    // 2. 화면 즉시 반영 (낙관적 업데이트)
+    const updatedHistory = [...memoHistory, newLog];
+    setMemoHistory(updatedHistory);
+    setMemoInput(""); 
+
+    try {
+      // 3. [로그 컬렉션]에 추가 (기록용)
+      await addDoc(collection(db, "counseling_logs"), {
+        customer_id: customerId,
+        content: content,
+        author_name: currentUser?.displayName || "관리자",
+        created_at: new Date(),
+        type: "memo"
+      });
+
+      // 4. [고객 문서] 전체 업데이트 (★여기가 핵심 해결책)
+      if (customerId) {
+        // 왼쪽 정보 저장할 때처럼, memo_history를 포함해서 저장해야 
+        // 나중에 모달을 다시 열었을 때 말풍선이 유지됨.
+        const updateData = cleanData({
+          recent_memo: content,        // 대시보드용
+          latest_memo: content,        // 호환용
+          last_memo_date: new Date(),  // 정렬용
+          memo_history: updatedHistory // ★말풍선 내역 필수로 포함!
+        });
+
+        await updateDoc(doc(db, "customers", customerId), updateData);
+        
+        // 5. 로컬 formData도 동기화 (자동 저장 덮어쓰기 방지)
+        setFormData(prev => ({ ...prev, ...updateData }));
+      }
+
+      // 6. 부모(대시보드)에게 알림
+      if (onSave) {
+        onSave({ 
+          id: customerId, 
+          recent_memo: content,
+          last_memo_date: new Date()
+        });
+      }
+
+    } catch (error) {
+      console.error("메모 저장 실패:", error);
+    }
+  };
+요약: "엔터 칠 때도 updateDoc에 memo_history: updatedHistory를 꼭 포함시켜서, 왼쪽 정보 수정할 때랑 똑같이 데이터를 완벽하게 저장해."
