@@ -122,7 +122,8 @@ export interface Customer {
   // 관리 정보
   industry?: string; // 업종 (deprecated, use business_type)
   processing_org?: string; // 진행기관
-  latest_memo?: string; // 최근 메모
+  latest_memo?: string; // 최근 메모 (대시보드 동기화용)
+  last_memo_date?: Date; // 최근 메모 작성일 (대시보드 동기화용)
   memo_history?: CustomerMemo[]; // 메모 이력
   documents?: CustomerDocument[]; // 문서 리스트
 }

@@ -312,8 +312,8 @@ export function CustomerDetailModal({
     disabled: isReadOnly, // Disable drag & drop for read-only users
   });
 
-  // Handle memo submit
-  const handleMemoSubmit = () => {
+  // Handle memo submit - saves immediately to Firestore and syncs with dashboard
+  const handleMemoSubmit = async () => {
     if (!newMemo.trim() || !currentUser) return;
     
     const memo: MemoItem = {
@@ -324,12 +324,86 @@ export function CustomerDetailModal({
       created_at: new Date(),
     };
     
-    setMemos(prev => [...prev, memo]);
+    // Update local state
+    const updatedMemos = [...memos, memo];
+    setMemos(updatedMemos);
     setNewMemo('');
     
+    // Scroll to bottom
     setTimeout(() => {
       memoScrollRef.current?.scrollTo({ top: memoScrollRef.current.scrollHeight, behavior: 'smooth' });
     }, 100);
+    
+    // Immediately save to Firestore (don't wait for debounce)
+    // This ensures memos are persisted and dashboard syncs
+    if (formData.id || formData.name?.trim()) {
+      const dataToSave = pendingDataRef.current || formData;
+      const phone = `${dataToSave.phone_part1 || '010'}-${dataToSave.phone_part2 || ''}-${dataToSave.phone_part3 || ''}`;
+      
+      const customerData: Partial<Customer> = {
+        ...(dataToSave.id && { id: dataToSave.id }),
+        name: dataToSave.name || '',
+        company_name: dataToSave.company_name || '',
+        business_registration_number: dataToSave.business_registration_number || '',
+        phone,
+        email: dataToSave.email || '',
+        status_code: dataToSave.status_code || '1-1',
+        manager_id: dataToSave.manager_id || currentUser?.uid || '',
+        manager_name: dataToSave.manager_name || currentUser?.name || '',
+        team_id: dataToSave.team_id || currentUser?.team_id || '',
+        team_name: dataToSave.team_name || currentUser?.team_name || '',
+        entry_date: dataToSave.entry_date || '',
+        founding_date: dataToSave.founding_date || '',
+        credit_score: dataToSave.credit_score || 0,
+        ssn_front: dataToSave.ssn_front || '',
+        ssn_back: dataToSave.ssn_back || '',
+        carrier: dataToSave.carrier || 'SKT',
+        home_address: dataToSave.home_address || '',
+        home_address_detail: dataToSave.home_address_detail || '',
+        is_home_owned: dataToSave.is_home_owned || false,
+        is_same_as_business: dataToSave.is_same_as_business || false,
+        entry_source: dataToSave.entry_source || '광고랜딩명',
+        business_type: dataToSave.business_type || '기타',
+        business_item: dataToSave.business_item || '',
+        retry_type: dataToSave.retry_type || '해당없음',
+        innovation_type: dataToSave.innovation_type || '해당없음',
+        over_7_years: dataToSave.over_7_years || false,
+        business_address: dataToSave.business_address || '',
+        business_address_detail: dataToSave.business_address_detail || '',
+        is_business_owned: dataToSave.is_business_owned || false,
+        recent_sales: dataToSave.recent_sales || 0,
+        sales_y1: dataToSave.sales_y1 || 0,
+        sales_y2: dataToSave.sales_y2 || 0,
+        sales_y3: dataToSave.sales_y3 || 0,
+        avg_revenue_3y: dataToSave.avg_revenue_3y || 0,
+        approved_amount: dataToSave.approved_amount || 0,
+        commission_rate: dataToSave.commission_rate || 0,
+        processing_org: dataToSave.processing_org || '미등록',
+        industry: dataToSave.industry || '',
+        notes: dataToSave.notes || '',
+        // Dashboard sync fields - use the NEW memo just added
+        latest_memo: memo.content,
+        last_memo_date: memo.created_at,
+        // Full memo history including the new memo
+        memo_history: updatedMemos.map(m => ({
+          content: m.content,
+          author_id: m.author_id,
+          author_name: m.author_name,
+          created_at: m.created_at,
+        })),
+        documents,
+        updated_at: new Date(),
+      };
+      
+      try {
+        const returnedId = await onSave(customerData);
+        if (returnedId && !formData.id) {
+          setFormData(prev => ({ ...prev, id: returnedId }));
+        }
+      } catch (error) {
+        console.error('Error saving memo:', error);
+      }
+    }
   };
 
   // Handle AI query submit
