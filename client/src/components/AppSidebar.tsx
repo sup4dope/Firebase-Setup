@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   Sidebar,
@@ -25,9 +26,11 @@ import {
   Building2,
   Bell,
   Clock,
+  Crown,
 } from 'lucide-react';
 import { TodoList } from './TodoList';
 import { cn } from '@/lib/utils';
+import { promoteToAdmin } from '@/lib/firestore';
 import type { User, Todo, Customer, UserRole } from '@shared/types';
 
 interface AppSidebarProps {
@@ -66,6 +69,21 @@ export function AppSidebar({
   onSignOut,
 }: AppSidebarProps) {
   const [location] = useLocation();
+  const [isPromoting, setIsPromoting] = useState(false);
+
+  const handlePromoteToAdmin = async () => {
+    if (isPromoting) return;
+    setIsPromoting(true);
+    try {
+      await promoteToAdmin(user.uid);
+      alert('관리자 권한이 부여되었습니다. 새로고침하세요.');
+    } catch (error) {
+      console.error('Error promoting to admin:', error);
+      alert('권한 변경 중 오류가 발생했습니다.');
+    } finally {
+      setIsPromoting(false);
+    }
+  };
 
   const mainMenuItems = [
     { href: '/', label: '고객관리', icon: Users, description: '고객 목록 및 퍼널' },
@@ -203,7 +221,22 @@ export function AppSidebar({
 
       <SidebarSeparator className="bg-gray-700" />
 
-      <SidebarFooter className="p-4 bg-gray-900/30">
+      <SidebarFooter className="p-4 bg-gray-900/30 space-y-3">
+        {/* DEV ONLY: Admin Promote Button */}
+        {userRole !== 'super_admin' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePromoteToAdmin}
+            disabled={isPromoting}
+            className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+            data-testid="button-promote-admin"
+          >
+            <Crown className="w-4 h-4 mr-2" />
+            {isPromoting ? '처리 중...' : '관리자 권한 획득'}
+          </Button>
+        )}
+        
         <div className="flex items-center gap-3">
           <Avatar className="w-10 h-10 border-2 border-gray-700">
             <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white">

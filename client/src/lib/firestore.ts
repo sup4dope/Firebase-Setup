@@ -393,3 +393,9 @@ export const deleteHoliday = async (id: string): Promise<void> => {
   snapshot.docs.forEach(doc => batch.delete(doc.ref));
   await batch.commit();
 };
+
+// DEV ONLY: Promote user to super_admin
+export const promoteToAdmin = async (uid: string): Promise<void> => {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, { role: 'super_admin' });
+};
