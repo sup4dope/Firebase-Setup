@@ -72,6 +72,7 @@ const CARRIERS = ['SKT', 'KT', 'LG', 'SKT알뜰폰', 'KT알뜰폰', 'LG알뜰폰
 const BUSINESS_TYPES = ['음식점', '소매업', '서비스업', '제조업', '도매업', '건설업', '운수업', 'IT/소프트웨어', '기타'];
 const RETRY_OPTIONS = ['해당없음', '폐업', '이전', '변경'];
 const INNOVATION_OPTIONS = ['해당없음', '배달앱', '효율화', '매출신장', '기타'];
+const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
 export function CustomerDetailModal({
   isOpen,
@@ -184,7 +185,7 @@ export function CustomerDetailModal({
         recent_sales: 0,
         approved_amount: 0,
         commission_rate: 0,
-        processing_org: '기타',
+        processing_org: '미등록',
         entry_source: '광고랜딩명',
         phone_part1: '010',
         carrier: 'SKT',

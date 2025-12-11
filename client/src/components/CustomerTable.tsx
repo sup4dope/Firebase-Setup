@@ -206,7 +206,7 @@ interface CustomerTableProps {
   onAddMemo?: (customerId: string, content: string) => void;
 }
 
-const PROCESSING_ORGS = ['중진공', '신보', '기보', '소진공', '기타'];
+const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
 // Dummy data for display - daily_sequence는 날짜별 전사적 일별 채번
 const DUMMY_CUSTOMERS: Customer[] = [
@@ -229,7 +229,7 @@ const DUMMY_CUSTOMERS: Customer[] = [
     avg_revenue_3y: 15.5,
     recent_sales: 18.2,
     industry: '제조업',
-    processing_org: '중진공',
+    processing_org: '미등록',
     latest_memo: '서류 준비 중, 다음 주 화요일 방문 예정',
     memo_history: [
       { date: '2024-12-01', content: '첫 상담 진행, 관심도 높음' },
@@ -255,7 +255,7 @@ const DUMMY_CUSTOMERS: Customer[] = [
     avg_revenue_3y: 3.2,
     recent_sales: 2.8,
     industry: '도소매',
-    processing_org: '기보',
+    processing_org: '미등록',
     latest_memo: '신용점수 미달로 상담 보류',
     memo_history: [
       { date: '2024-12-02', content: '신용점수 미달로 상담 보류' },
@@ -280,7 +280,7 @@ const DUMMY_CUSTOMERS: Customer[] = [
     avg_revenue_3y: 45.0,
     recent_sales: 52.3,
     industry: 'IT서비스',
-    processing_org: '신보',
+    processing_org: '미등록',
     latest_memo: '계약 완료, 집행 대기 중',
     memo_history: [
       { date: '2024-11-15', content: '상담 시작' },
@@ -307,7 +307,7 @@ const DUMMY_CUSTOMERS: Customer[] = [
     avg_revenue_3y: 28.7,
     recent_sales: 31.5,
     industry: '물류/운송',
-    processing_org: '중진공',
+    processing_org: '미등록',
     latest_memo: '심사 진행 중, 추가 서류 요청됨',
     memo_history: [
       { date: '2024-11-20', content: '상담 완료' },
@@ -333,7 +333,7 @@ const DUMMY_CUSTOMERS: Customer[] = [
     avg_revenue_3y: 62.3,
     recent_sales: 71.0,
     industry: '디자인',
-    processing_org: '기보',
+    processing_org: '미등록',
     latest_memo: '집행 완료. 수수료 정산 대기',
     memo_history: [
       { date: '2024-10-05', content: '첫 상담' },
@@ -360,7 +360,7 @@ const DUMMY_CUSTOMERS: Customer[] = [
     avg_revenue_3y: 8.5,
     recent_sales: 7.2,
     industry: '건설',
-    processing_org: '기타',
+    processing_org: '미등록',
     latest_memo: '통화 불가, 재연락 필요',
     memo_history: [
       { date: '2024-12-03', content: '통화 불가, 재연락 필요' },
@@ -385,7 +385,7 @@ const DUMMY_CUSTOMERS: Customer[] = [
     avg_revenue_3y: 12.1,
     recent_sales: 14.5,
     industry: '요식업',
-    processing_org: '신보',
+    processing_org: '미등록',
     latest_memo: '서류 완료, 심사 접수 예정',
     memo_history: [
       { date: '2024-11-25', content: '상담 완료' },
@@ -411,7 +411,7 @@ const DUMMY_CUSTOMERS: Customer[] = [
     avg_revenue_3y: 22.4,
     recent_sales: 25.8,
     industry: '전자/통신',
-    processing_org: '소진공',
+    processing_org: '미등록',
     latest_memo: '상담 진행 중, 조건 검토 필요. 고객이 금리에 대해 문의함. 다음 미팅에서 상세 설명 예정.',
     memo_history: [
       { date: '2024-12-04', content: '첫 상담 시작' },
@@ -776,7 +776,7 @@ export function CustomerTable({
                 {/* 진행기관 - Dropdown */}
                 <TableCell>
                   <Select
-                    value={customer.processing_org || '기타'}
+                    value={customer.processing_org || '미등록'}
                     onValueChange={(value) => handleProcessingOrgChange(customer.id, value)}
                   >
                     <SelectTrigger 
@@ -785,7 +785,7 @@ export function CustomerTable({
                     >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-[300px]">
                       {PROCESSING_ORGS.map(org => (
                         <SelectItem key={org} value={org}>
                           {org}
