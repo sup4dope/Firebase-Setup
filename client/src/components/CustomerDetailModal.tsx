@@ -407,24 +407,38 @@ export function CustomerDetailModal({
         });
       }
 
-      // 2. ★핵심 수정: 통합 저장 함수(runSaveLogic)에 위임
-      // 직접 updateDoc 하지 않고, formData를 업데이트한 후 runSaveLogic 호출
+      // 2. ★핵심: arrayUnion으로 memo_history에 직접 추가 (runSaveLogic 타이밍 문제 우회)
+      if (formData.id) {
+        // Firestore용 메모 객체 (id 제외, created_at을 Timestamp로)
+        const memoForFirestore = cleanData({
+          content: memo.content,
+          author_id: memo.author_id,
+          author_name: memo.author_name,
+          created_at: memo.created_at,
+        });
+        
+        await updateDoc(doc(db, "customers", formData.id), {
+          recent_memo: content,
+          latest_memo: content,
+          last_memo_date: new Date(),
+          memo_history: arrayUnion(memoForFirestore), // ★기존 배열 끝에 안전하게 추가
+        });
+        
+        console.log("✅ memo_history에 arrayUnion으로 추가 완료:", memoForFirestore);
+      }
+      
+      // 3. 로컬 상태도 동기화 (자동저장이 덮어쓰지 않도록)
       const updatedFormData = {
         ...formData,
         recent_memo: content,
         latest_memo: content,
         last_memo_date: new Date(),
-        // ★핵심: formData가 아니라 현재 화면에 보이는 'memos' State를 기준으로 병합!
         memo_history: updatedMemos,
       };
-      
-      // 로컬 상태 업데이트
       setFormData(updatedFormData);
       
-      // 통합 저장 함수 호출 (왼쪽 정보 수정할 때와 동일한 흐름)
-      if (formData.id) {
-        await runSaveLogic(updatedFormData);
-      } else if (formData.name?.trim()) {
+      // 4. 신규 고객인 경우 처리
+      if (!formData.id && formData.name?.trim()) {
         // 신규 고객인 경우 - 기존 onSave 로직 사용
         const dataToSave = pendingDataRef.current || formData;
         const phone = `${dataToSave.phone_part1 || '010'}-${dataToSave.phone_part2 || ''}-${dataToSave.phone_part3 || ''}`;
