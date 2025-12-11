@@ -19,7 +19,7 @@ import { format, differenceInYears, parseISO } from 'date-fns';
 import DaumPostcodeEmbed from 'react-daum-postcode';
 import { storage, db, getCustomerHistoryLogs } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 
 interface MemoItem {
   id: string;
@@ -224,6 +224,32 @@ export function CustomerDetailModal({
     }
     setAiMessages([]);
   }, [customer, isNewCustomer, currentUser]);
+
+  // [추가] 메모 내역 불러오기 (실시간 리스너)
+  useEffect(() => {
+    if (!formData.id) return;
+
+    // 날짜순 정렬 (오래된 게 위로)
+    const q = query(
+      collection(db, "counseling_logs"),
+      where("customer_id", "==", formData.id),
+      orderBy("created_at", "asc")
+    );
+
+    // 실시간으로 DB 변화 감지
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const logs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        content: doc.data().content || '',
+        author_id: doc.data().author_id || '',
+        author_name: doc.data().author_name || '',
+        created_at: doc.data().created_at?.toDate?.() || new Date(),
+      })) as MemoItem[];
+      setMemos(logs);
+    });
+
+    return () => unsubscribe();
+  }, [formData.id]);
 
   // Update tab when initialTab changes
   useEffect(() => {
