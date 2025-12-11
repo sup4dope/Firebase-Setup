@@ -385,7 +385,7 @@ export function CustomerDetailModal({
       created_at: new Date(),
     };
     
-    // Update local state
+    // Update local state (채팅창 UI)
     const updatedMemos = [...memos, memo];
     setMemos(updatedMemos);
     setNewMemo('');
@@ -407,27 +407,22 @@ export function CustomerDetailModal({
         });
       }
 
-      // 2. 대시보드용: 고객 정보 안전한 업데이트 (customers 컬렉션)
+      // 2. ★핵심 수정: 통합 저장 함수(runSaveLogic)에 위임
+      // 직접 updateDoc 하지 않고, formData를 업데이트한 후 runSaveLogic 호출
+      const updatedFormData = {
+        ...formData,
+        recent_memo: content,
+        latest_memo: content,
+        last_memo_date: new Date(),
+        memo_history: [...(formData.memo_history || []), memo],
+      };
+      
+      // 로컬 상태 업데이트
+      setFormData(updatedFormData);
+      
+      // 통합 저장 함수 호출 (왼쪽 정보 수정할 때와 동일한 흐름)
       if (formData.id) {
-        // ★핵심 수정: arrayUnion으로 기존 배열에 안전하게 추가 (덮어쓰기 사고 방지)
-        const cleanMemo = cleanData(memo); // 새 메모만 정제
-
-        await updateDoc(doc(db, "customers", formData.id), {
-          recent_memo: content,
-          latest_memo: content,
-          last_memo_date: new Date(),
-          memo_history: arrayUnion(cleanMemo), // ★기존 배열 끝에 추가만!
-        });
-        
-        // ★핵심 추가: 로컬 formData도 즉시 업데이트 (autoSave 팀킬 방지!)
-        // 로컬에서는 arrayUnion을 못 쓰니 수동으로 추가
-        setFormData(prev => ({
-          ...prev,
-          recent_memo: content,
-          latest_memo: content,
-          last_memo_date: new Date(),
-          memo_history: [...(prev.memo_history || []), memo],
-        }));
+        await runSaveLogic(updatedFormData);
       } else if (formData.name?.trim()) {
         // 신규 고객인 경우 - 기존 onSave 로직 사용
         const dataToSave = pendingDataRef.current || formData;
