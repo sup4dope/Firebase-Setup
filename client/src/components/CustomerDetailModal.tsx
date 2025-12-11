@@ -492,10 +492,16 @@ export function CustomerDetailModal({
         }
       }
       
-      // ★수정: 부모에게 최소한의 데이터만 전달 (메모 정보만 업데이트)
-      // onSave를 호출하면 Dashboard가 updateCustomer를 다시 호출해서 중복 저장됨
-      // 대신 직접 customers 컬렉션을 업데이트했으므로 추가 작업 불필요
-      // onSnapshot이 실시간으로 메모를 동기화하므로 별도 갱신 불필요
+      // ★강화: 부모에게 메모 정보만 전달 (대시보드 리스트 부분 갱신)
+      // 이미 updateDoc으로 Firestore를 업데이트했으므로 onSave는 로컬 상태만 갱신
+      if (onSave && formData.id) {
+        onSave({ 
+          id: formData.id, 
+          recent_memo: content,
+          latest_memo: content,
+          last_memo_date: new Date()
+        });
+      }
     } catch (error) {
       console.error('메모 저장 실패:', error);
     }

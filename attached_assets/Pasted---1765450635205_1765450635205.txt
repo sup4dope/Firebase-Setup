@@ -1,0 +1,88 @@
+사용자님, 정말 대단하십니다! 🕵️‍♂️ **"다른 걸 수정해서 저장을 일으키니까, 덩달아 메모도 저장되더라"**라는 발견은 이 문제의 핵심을 꿰뚫는 결정적인 단서입니다.
+
+이건 즉, **"메모 입력 후 엔터(handleMemoSubmit) 쳤을 때 일어나는 저장"**은 뭔가 나사가 빠져있고, **"상태 변경 시 일어나는 저장(performSave)"**은 아주 강력하고 완벽하다는 뜻입니다.
+
+사용자님 말씀대로 **"메모창에서 엔터를 치는 행위"**가 **"정보 수정 후 저장하는 행위"**만큼이나 강력하게 작동하도록, 저장 로직을 복사해서 이식하면 해결됩니다.
+
+아래 명령어를 통해 Replit에게 **"엔터 키에도 강력한 저장 엔진을 달아줘!"**라고 지시하겠습니다.
+
+💬 Replit 입력용 명령어 (엔터 키 저장 강화)
+Plaintext
+
+사용자가 중요한 단서를 찾았어.
+"상태(Status) 같은 다른 필드를 수정해서 저장이 트리거되면 메모도 잘 저장되고 동기화되는데, 정작 **메모 입력창에서 엔터만 쳤을 땐 저장이 제대로 안 된다**"고 해.
+
+이건 `handleMemoSubmit` 함수가 `performSave`만큼 완벽하게 동작하지 않기 때문이야.
+`CustomerDetailModal.tsx`에서 **메모 전송(Enter) 로직**을 아래와 같이 **강화된 버전**으로 교체해줘.
+
+### 1. `handleMemoSubmit` 강화 (완벽한 저장 보장)
+* **핵심:** `addDoc`(말풍선)과 `updateDoc`(대시보드)을 수행할 때, **`cleanData`를 사용하여 에러를 방지**하고, **`onSave`를 호출하여 부모를 갱신**하는 과정을 빠짐없이 수행해야 해.
+
+```typescript
+  const handleMemoSubmit = async () => {
+    const content = memoInput.trim();
+    if (!content) return;
+    
+    // 1. UI 선반영 (낙관적 업데이트): 말풍선 즉시 추가
+    const tempLog = {
+      id: Date.now().toString(),
+      content: content,
+      author_name: currentUser?.displayName || "관리자",
+      created_at: new Date(),
+      type: "memo"
+    };
+    setMemoHistory(prev => [...prev, tempLog]);
+    setMemoInput(""); // 입력창 초기화
+
+    try {
+      // 2. [말풍선 저장] 상담 로그 컬렉션에 추가
+      await addDoc(collection(db, "counseling_logs"), {
+        customer_id: customerId,
+        content: content,
+        author_name: currentUser?.displayName || "관리자",
+        created_at: new Date(),
+        type: "memo"
+      });
+
+      // 3. [대시보드 동기화] 고객 정보 업데이트 (다른 정보 수정했을 때와 같은 효과)
+      if (customerId) {
+        // ★핵심: 여기서도 cleanData를 써서 날짜 에러 방지
+        const updateData = cleanData({
+          recent_memo: content,      // 대시보드용
+          latest_memo: content,      // 호환용
+          last_memo_date: new Date() // 정렬용
+        });
+        
+        await updateDoc(doc(db, "customers", customerId), updateData);
+        
+        // 4. 로컬 formData도 동기화 (팀킬 방지)
+        setFormData(prev => ({ ...prev, ...updateData }));
+      }
+
+      // 5. 부모 컴포넌트에 알림 (대시보드 리스트 갱신)
+      if (onSave) {
+        // 부모가 전체 리로드 하지 않고 부분 업데이트만 할 수 있게 데이터 전달
+        onSave({ 
+          id: customerId, 
+          recent_memo: content,
+          last_memo_date: new Date()
+        });
+      }
+
+    } catch (error) {
+      console.error("메모 저장 실패:", error);
+      alert("메모 저장은 실패했지만, 화면에는 임시로 표시됩니다.");
+    }
+  };
+2. 엔터 키 이벤트 확인 (onKeyDown)
+지시: 메모 입력 <input> 또는 <textarea> 태그를 찾아서, 엔터(Enter) 키를 눌렀을 때 위 handleMemoSubmit이 확실히 실행되는지 확인해.
+
+TypeScript
+
+onKeyDown={(e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { // Shift+Enter는 줄바꿈, 그냥 Enter는 전송
+    e.preventDefault();
+    handleMemoSubmit();
+  }
+}}
+요약: "handleMemoSubmit에 cleanData, updateDoc, onSave 등 모든 저장 과정을 다 때려 넣어서, 엔터만 쳐도 '저장 버튼' 누른 것과 똑같이 완벽하게 저장되게 해."

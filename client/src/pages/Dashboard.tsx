@@ -318,6 +318,25 @@ export default function Dashboard() {
   const handleDetailModalSave = async (data: Partial<Customer>): Promise<string | undefined> => {
     // If data has an id, it's an update (even if it was originally a "new" customer)
     if (data.id) {
+      // ★핵심: 메모 전용 업데이트인지 확인 (recent_memo만 있으면 Firestore 저장 건너뛰기)
+      const isMemoOnlyUpdate = Object.keys(data).every(key => 
+        ['id', 'recent_memo', 'latest_memo', 'last_memo_date'].includes(key)
+      );
+      
+      if (isMemoOnlyUpdate) {
+        // 메모 전용: 이미 CustomerDetailModal에서 updateDoc으로 저장했으므로 로컬만 업데이트
+        console.log("📝 메모 전용 업데이트 -> 로컬 상태만 갱신 (Firestore 중복 저장 방지)");
+        setCustomers(prev =>
+          prev.map(c => {
+            if (c.id === data.id) {
+              return { ...c, ...data };
+            }
+            return c;
+          })
+        );
+        return data.id;
+      }
+      
       // Update existing customer - merge with existing data to preserve all fields
       setFormLoading(true);
       try {
@@ -332,7 +351,6 @@ export default function Dashboard() {
           })
         );
         // ★수정: fetchData 대신 로컬 상태만 업데이트 (모달 깜빡임 방지)
-        // setCustomers에서 이미 해당 고객의 데이터를 업데이트했으므로 추가 작업 불필요
         console.log("🔄 상세페이지 변경 감지 -> 로컬 상태 업데이트 완료");
         // Silent update - no toast for auto-save
         return data.id;
