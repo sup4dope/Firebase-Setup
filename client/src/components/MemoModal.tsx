@@ -9,17 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send } from 'lucide-react';
-
-interface MemoEntry {
-  date: string;
-  content: string;
-}
+import { format } from 'date-fns';
+import type { CustomerMemo } from '@shared/types';
 
 interface MemoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customerName: string;
-  memoHistory: MemoEntry[];
+  memoHistory: CustomerMemo[];
   onAddMemo: (content: string) => void;
 }
 
@@ -61,20 +58,26 @@ export function MemoModal({
                   메모 이력이 없습니다
                 </div>
               ) : (
-                memoHistory.map((memo, index) => (
-                  <div
-                    key={index}
-                    className="bg-muted/50 rounded-lg p-3 space-y-1"
-                    data-testid={`memo-entry-${index}`}
-                  >
-                    <div className="text-xs text-muted-foreground">
-                      {memo.date}
+                memoHistory.map((memo, index) => {
+                  const memoDate = memo.created_at instanceof Date 
+                    ? memo.created_at 
+                    : new Date(memo.created_at);
+                  return (
+                    <div
+                      key={index}
+                      className="bg-muted/50 rounded-lg p-3 space-y-1"
+                      data-testid={`memo-entry-${index}`}
+                    >
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{format(memoDate, 'yyyy-MM-dd HH:mm')}</span>
+                        {memo.author_name && <span>- {memo.author_name}</span>}
+                      </div>
+                      <div className="text-sm whitespace-pre-wrap">
+                        {memo.content}
+                      </div>
                     </div>
-                    <div className="text-sm whitespace-pre-wrap">
-                      {memo.content}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </ScrollArea>

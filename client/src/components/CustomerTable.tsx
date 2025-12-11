@@ -33,7 +33,8 @@ import {
 import { MemoModal } from './MemoModal';
 import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Customer, UserRole } from '@shared/types';
+import type { Customer, UserRole, StatusCode, CustomerMemo } from '@shared/types';
+import { STATUS_LABELS } from '@shared/types';
 
 // Funnel stages synced with FunnelChart (excluding 'all')
 const MENU_STAGES = [
@@ -251,13 +252,18 @@ export function CustomerTable({
   const handleAddMemo = (content: string) => {
     if (!selectedCustomerForMemo) return;
     
-    const today = new Date().toISOString().split('T')[0];
-    const newMemo = { date: today, content };
+    // Create memo in CustomerMemo format
+    const newMemo: CustomerMemo = {
+      content,
+      author_id: '', // Will be filled by Dashboard handler
+      author_name: '', // Will be filled by Dashboard handler
+      created_at: new Date(),
+    };
     
-    // Update selected customer for modal
+    // Update selected customer for modal (optimistic update)
     setSelectedCustomerForMemo(prev => {
       if (!prev) return null;
-      const updatedHistory = [...(prev.memo_history || []), newMemo];
+      const updatedHistory: CustomerMemo[] = [...(prev.memo_history || []), newMemo];
       return {
         ...prev,
         memo_history: updatedHistory,
@@ -265,7 +271,7 @@ export function CustomerTable({
       };
     });
     
-    // Call external handler if provided
+    // Call external handler to persist to Firestore (including memo_history)
     onAddMemo?.(selectedCustomerForMemo.id, content);
   };
 

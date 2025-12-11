@@ -229,6 +229,57 @@ export default function Dashboard() {
     }
   };
 
+  // Handle adding memo from dashboard table (syncs with detail modal chat history)
+  const handleAddMemo = async (customerId: string, content: string) => {
+    if (!user) return;
+    
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) return;
+    
+    // Create new memo entry
+    const newMemo = {
+      content,
+      author_id: user.uid,
+      author_name: user.name,
+      created_at: new Date(),
+    };
+    
+    // Update memo_history array and latest_memo field
+    const updatedMemoHistory = [...(customer.memo_history || []), newMemo];
+    
+    try {
+      await updateCustomer(customerId, {
+        memo_history: updatedMemoHistory,
+        latest_memo: content,
+        last_memo_date: new Date(),
+        updated_at: new Date(),
+      });
+      
+      // Update local state
+      setCustomers(prev =>
+        prev.map(c => c.id === customerId ? {
+          ...c,
+          memo_history: updatedMemoHistory,
+          latest_memo: content,
+          last_memo_date: new Date(),
+          updated_at: new Date(),
+        } : c)
+      );
+      
+      toast({
+        title: '성공',
+        description: '메모가 저장되었습니다.',
+      });
+    } catch (error) {
+      console.error('Error adding memo:', error);
+      toast({
+        title: '오류',
+        description: '메모 저장 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
     setCustomerFormOpen(true);
@@ -425,6 +476,7 @@ export default function Dashboard() {
             onDelete={handleDeleteCustomer}
             onViewHistory={handleViewHistory}
             onCustomerClick={handleCustomerClick}
+            onAddMemo={handleAddMemo}
           />
         </div>
       </div>
