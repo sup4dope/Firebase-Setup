@@ -1778,7 +1778,10 @@ export function CustomerDetailModal({
                               {groupName}
                             </DropdownMenuLabel>
                             {options.map((option) => {
-                              const groupColor = GROUP_COLORS[option.group || ""] || "text-gray-300";
+                              // 최종부결은 빨간색으로 특별 처리
+                              const groupColor = option.value === "최종부결" 
+                                ? "text-red-300" 
+                                : (GROUP_COLORS[option.group || ""] || "text-gray-300");
                               const isSelected = formData.status_code === option.value;
                               return (
                                 <DropdownMenuItem

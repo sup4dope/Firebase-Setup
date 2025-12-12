@@ -189,7 +189,11 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
 
   // 하위 상태 칩 렌더링 (어두운 glassmorphism 배경 + 부모 테마 테두리)
   const renderSubStatus = (sub: { id: string; label: string }, parentTheme: string) => {
-    const theme = getTheme(parentTheme);
+    // 최종부결은 빨간색으로 특별 처리
+    const isRejection = sub.id === '최종부결';
+    const theme = isRejection 
+      ? { accent: 'border-l-red-500', text: 'text-red-300' } 
+      : getTheme(parentTheme);
     const subCount = getSubStatusCount(sub.id);
     
     return (
@@ -200,7 +204,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
           "w-full h-10 rounded-md border-l-4 transition-all duration-200",
           "flex items-center justify-between px-3",
           "bg-slate-900/60 backdrop-blur-sm",
-          "text-gray-200",
+          isRejection ? "text-red-300" : "text-gray-200",
           theme.accent,
           "hover:bg-slate-800/80 hover:shadow-md",
           selectedStage === sub.id && "ring-2 ring-primary"
@@ -208,7 +212,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         data-testid={`button-funnel-${sub.id}`}
       >
         <span className="font-medium text-xs truncate">{sub.label}</span>
-        <span className="text-xs text-gray-400 flex-shrink-0">
+        <span className={cn("text-xs flex-shrink-0", isRejection ? "text-red-400" : "text-gray-400")}>
           {subCount} ({getPercentage(subCount)})
         </span>
       </button>

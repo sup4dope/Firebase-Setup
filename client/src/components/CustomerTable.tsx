@@ -63,6 +63,15 @@ const GROUP_COLORS: Record<string, { bg: string; text: string }> = {
 
 // 상태 배지 정보 가져오기 (한글 상태명 기반, 그룹 색상 통일)
 const getStatusBadgeInfo = (statusCode: string): { label: string; colorClass: string; category: string } => {
+  // 최종부결은 빨간색으로 특별 처리
+  if (statusCode === '최종부결') {
+    return {
+      label: statusCode,
+      colorClass: 'bg-red-500/20 text-red-300',
+      category: '집행',
+    };
+  }
+  
   // 카테고리 결정
   let category = '기타';
   if (statusCode === '상담대기') category = '상담';
