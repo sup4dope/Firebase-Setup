@@ -394,9 +394,17 @@ export function CustomerTable({
                   )}
                 </TableCell>
                 
-                {/* 3년 평균 매출 */}
+                {/* 3년 평균 매출 (Y-1, Y-2, Y-3 평균) */}
                 <TableCell className="text-right tabular-nums">
-                  {customer.avg_revenue_3y ? `${customer.avg_revenue_3y.toFixed(1)}억` : '-'}
+                  {(() => {
+                    const y1 = customer.sales_y1 || 0;
+                    const y2 = customer.sales_y2 || 0;
+                    const y3 = customer.sales_y3 || 0;
+                    const values = [y1, y2, y3].filter(v => v > 0);
+                    if (values.length === 0) return '-';
+                    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                    return `${avg.toFixed(1)}억`;
+                  })()}
                 </TableCell>
                 
                 {/* 최근 매출(작년) */}
