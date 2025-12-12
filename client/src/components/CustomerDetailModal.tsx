@@ -946,8 +946,8 @@ export function CustomerDetailModal({
 
         {/* Main Content - 3단 레이아웃 (좌-중-우) */}
         <div className="flex-1 flex flex-row h-[calc(100%-4rem)] overflow-hidden">
-          {/* Section 1: 좌측 패널 - 상세 정보 입력 (22%) */}
-          <div className="w-[22%] min-w-[280px] h-full border-r border-gray-700 overflow-y-auto">
+          {/* Section 1: 좌측 패널 - 상세 정보 입력 (35%) */}
+          <div className="w-[35%] min-w-[400px] h-full border-r border-gray-700 overflow-y-auto">
             <div className="p-1.5 space-y-1">
               {/* 유입경로 (최상단) - 1. 상단에 바짝 붙임 */}
               <div className="space-y-0.5 ml-[6px] mr-[6px] pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
@@ -983,285 +983,199 @@ export function CustomerDetailModal({
                 </Select>
               </div>
 
-              {/* 고객 정보 그룹 (Border Box) */}
-              <div className="border border-gray-700 rounded-lg p-1.5 space-y-1 ml-[6px] mr-[6px] mt-[20px] mb-[20px] pl-[10px] pr-[10px] pt-[10px] pb-[10px]">
-                <h3 className="text-xs font-semibold text-blue-400">
-                  고객 정보
-                </h3>
+              {/* 고객 정보 그룹 (Border Box) - 10줄 압축 배치 */}
+              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5">
+                <h3 className="text-xs font-semibold text-blue-400 mb-1">고객 정보</h3>
 
-                {/* Row 2-1: 이름, 신용점수 */}
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <Label className="text-xs text-gray-400">이름</Label>
+                {/* Row 1: 이름 | 신용점수 | 주민번호 앞 | 주민번호 뒤 */}
+                <div className="flex gap-1.5 items-end">
+                  <div className="flex-1">
+                    <Label className="text-[10px] text-gray-400">이름</Label>
                     <Input
                       value={formData.name || ""}
-                      onChange={(e) =>
-                        handleFieldChange({ name: e.target.value })
-                      }
+                      onChange={(e) => handleFieldChange({ name: e.target.value })}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm w-full",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
                       )}
                       data-testid="input-customer-name"
                     />
                   </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">신용점수</Label>
+                  <div className="w-16">
+                    <Label className="text-[10px] text-gray-400">신용점수</Label>
                     <Input
                       type="number"
                       value={formData.credit_score || ""}
-                      onChange={(e) =>
-                        handleFieldChange({
-                          credit_score: Number(e.target.value),
-                        })
-                      }
+                      onChange={(e) => handleFieldChange({ credit_score: Number(e.target.value) })}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm w-full",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
                       )}
                     />
                   </div>
-                </div>
-
-                {/* Row 2-1-2: 주민등록번호 */}
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <Label className="text-xs text-gray-400">
-                      주민번호(앞)
-                    </Label>
+                  <div className="w-20">
+                    <Label className="text-[10px] text-gray-400">주민번호(앞)</Label>
                     <Input
                       maxLength={6}
                       value={formData.ssn_front || ""}
-                      onChange={(e) =>
-                        handleFieldChange({ ssn_front: e.target.value })
-                      }
+                      onChange={(e) => handleFieldChange({ ssn_front: e.target.value })}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm w-full",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
                       )}
                       placeholder="YYMMDD"
                     />
                   </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">
-                      주민번호(뒤)
-                    </Label>
+                  <div className="w-20">
+                    <Label className="text-[10px] text-gray-400">주민번호(뒤)</Label>
                     <Input
                       maxLength={7}
                       value={formData.ssn_back || ""}
-                      onChange={(e) =>
-                        handleFieldChange({ ssn_back: e.target.value })
-                      }
+                      onChange={(e) => handleFieldChange({ ssn_back: e.target.value })}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm w-full",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
                       )}
                       placeholder="0000000"
                     />
                   </div>
                 </div>
 
-                {/* Row 2-2: 연락처 */}
-                <div className="space-y-0.5">
-                  <Label className="text-xs text-gray-400">연락처</Label>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      value={formData.phone_part1 || "010"}
-                      onChange={(e) =>
-                        handleFieldChange({ phone_part1: e.target.value })
-                      }
-                      onBlur={handleBlurSave}
-                      disabled={isReadOnly}
-                      className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm text-center w-full",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
-                      )}
-                    />
-                    <span className="text-gray-500">-</span>
-                    <Input
-                      maxLength={4}
-                      value={formData.phone_part2 || ""}
-                      onChange={(e) =>
-                        handleFieldChange({ phone_part2: e.target.value })
-                      }
-                      onBlur={handleBlurSave}
-                      disabled={isReadOnly}
-                      className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm text-center w-full",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
-                      )}
-                    />
-                    <span className="text-gray-500">-</span>
-                    <Input
-                      maxLength={4}
-                      value={formData.phone_part3 || ""}
-                      onChange={(e) =>
-                        handleFieldChange({ phone_part3: e.target.value })
-                      }
-                      onBlur={handleBlurSave}
-                      disabled={isReadOnly}
-                      className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm text-center w-full",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
-                      )}
-                    />
-                  </div>
-                </div>
-
-                {/* Row 2-2-2: 통신사 */}
-                <div>
-                  <Label className="text-xs text-gray-400">통신사</Label>
-                  <Select
-                    value={formData.carrier || "SKT"}
-                    onValueChange={(v) => {
-                      handleFieldChange({ carrier: v });
-                    }}
-                    disabled={isReadOnly}
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm w-full",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
-                      )}
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
-                      {CARRIERS.map((c) => (
-                        <SelectItem
-                          key={c}
-                          value={c}
-                          className="text-gray-200 text-sm"
-                        >
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Row 2-3: 자택주소, 상세주소, 자가여부, 상동여부 */}
-                <div className="space-y-1.5">
-                  <div className="flex gap-1.5">
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-400">자택주소</Label>
-                      <div className="flex gap-1.5">
-                        <Input
-                          value={formData.home_address || ""}
-                          readOnly
-                          className={cn(
-                            "border-gray-600 text-gray-200 flex-1 h-8 text-sm",
-                            isReadOnly
-                              ? "bg-gray-700 opacity-70"
-                              : "bg-gray-800",
-                          )}
-                          placeholder="주소 검색"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowHomeAddressSearch(true)}
-                          disabled={isReadOnly}
-                          className={cn(
-                            "border-gray-600 h-8 w-8 p-0",
-                            isReadOnly && "opacity-50 cursor-not-allowed",
-                          )}
-                        >
-                          <Search className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <div className="flex-1 min-w-[100px]">
-                      <Label className="text-xs text-gray-400">상세주소</Label>
+                {/* Row 2: 연락처 (010-0000-0000) | 통신사 */}
+                <div className="flex gap-1.5 items-end">
+                  <div className="flex-1">
+                    <Label className="text-[10px] text-gray-400">연락처</Label>
+                    <div className="flex items-center gap-0.5">
                       <Input
-                        value={formData.home_address_detail || ""}
-                        onChange={(e) =>
-                          handleFieldChange({
-                            home_address_detail: e.target.value,
-                          })
-                        }
+                        value={formData.phone_part1 || "010"}
+                        onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
+                        onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
-                          "border-gray-600 text-gray-200 h-8 text-sm",
-                          isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                          "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
                         )}
-                        placeholder="동/호수"
+                      />
+                      <span className="text-gray-500 text-xs">-</span>
+                      <Input
+                        maxLength={4}
+                        value={formData.phone_part2 || ""}
+                        onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
+                        onBlur={handleBlurSave}
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        )}
+                      />
+                      <span className="text-gray-500 text-xs">-</span>
+                      <Input
+                        maxLength={4}
+                        value={formData.phone_part3 || ""}
+                        onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
+                        onBlur={handleBlurSave}
+                        disabled={isReadOnly}
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        )}
                       />
                     </div>
-                    <div className="flex items-center gap-1.5 pt-4">
-                      <Checkbox
-                        id="home-owned"
-                        checked={formData.is_home_owned || false}
-                        onCheckedChange={(c) =>
-                          handleFieldChange({ is_home_owned: !!c })
-                        }
-                        disabled={isReadOnly}
+                  </div>
+                  <div className="w-20">
+                    <Label className="text-[10px] text-gray-400">통신사</Label>
+                    <Select
+                      value={formData.carrier || "SKT"}
+                      onValueChange={(v) => handleFieldChange({ carrier: v })}
+                      disabled={isReadOnly}
+                    >
+                      <SelectTrigger
                         className={cn(
-                          "h-3.5 w-3.5",
-                          isReadOnly && "opacity-50 cursor-not-allowed",
+                          "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
                         )}
-                      />
-                      <Label
-                        htmlFor="home-owned"
-                        className="text-xs text-gray-400"
                       >
-                        자가
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-1.5 pt-4">
-                      <Checkbox
-                        id="same-address"
-                        checked={formData.is_same_as_business || false}
-                        onCheckedChange={(c) => {
-                          // ★수정: handleFieldChange -> handleFieldChangeObject (여러 필드 동시 업데이트)
-                          handleFieldChangeObject({
-                            is_same_as_business: !!c,
-                            business_address: c
-                              ? formData.home_address
-                              : formData.business_address,
-                            business_address_detail: c
-                              ? formData.home_address_detail
-                              : formData.business_address_detail,
-                          });
-                        }}
-                        disabled={isReadOnly}
-                        className={cn(
-                          "h-3.5 w-3.5",
-                          isReadOnly && "opacity-50 cursor-not-allowed",
-                        )}
-                      />
-                      <Label
-                        htmlFor="same-address"
-                        className="text-xs text-gray-400"
-                      >
-                        사업장동일
-                      </Label>
-                    </div>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        {CARRIERS.map((c) => (
+                          <SelectItem key={c} value={c} className="text-gray-200 text-xs">{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Row 3: 자택주소 검색 (전체 너비) */}
+                <div>
+                  <Label className="text-[10px] text-gray-400">자택주소</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      value={formData.home_address || ""}
+                      readOnly
+                      className={cn(
+                        "border-gray-600 text-gray-200 flex-1 h-7 text-xs",
+                        isReadOnly ? "bg-gray-700 opacity-70" : "bg-gray-800",
+                      )}
+                      placeholder="주소 검색"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowHomeAddressSearch(true)}
+                      disabled={isReadOnly}
+                      className={cn("border-gray-600 h-7 w-7 p-0", isReadOnly && "opacity-50 cursor-not-allowed")}
+                    >
+                      <Search className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Row 4: 상세주소 | 자가 | 사업장동일 */}
+                <div className="flex gap-1.5 items-end">
+                  <div className="flex-1">
+                    <Label className="text-[10px] text-gray-400">상세주소</Label>
+                    <Input
+                      value={formData.home_address_detail || ""}
+                      onChange={(e) => handleFieldChange({ home_address_detail: e.target.value })}
+                      disabled={isReadOnly}
+                      className={cn(
+                        "border-gray-600 text-gray-200 h-7 text-xs",
+                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                      )}
+                      placeholder="동/호수"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 h-7">
+                    <Checkbox
+                      id="home-owned"
+                      checked={formData.is_home_owned || false}
+                      onCheckedChange={(c) => handleFieldChange({ is_home_owned: !!c })}
+                      disabled={isReadOnly}
+                      className={cn("h-3 w-3", isReadOnly && "opacity-50 cursor-not-allowed")}
+                    />
+                    <Label htmlFor="home-owned" className="text-[10px] text-gray-400">자가</Label>
+                  </div>
+                  <div className="flex items-center gap-1 h-7">
+                    <Checkbox
+                      id="same-address"
+                      checked={formData.is_same_as_business || false}
+                      onCheckedChange={(c) => {
+                        handleFieldChangeObject({
+                          is_same_as_business: !!c,
+                          business_address: c ? formData.home_address : formData.business_address,
+                          business_address_detail: c ? formData.home_address_detail : formData.business_address_detail,
+                        });
+                      }}
+                      disabled={isReadOnly}
+                      className={cn("h-3 w-3", isReadOnly && "opacity-50 cursor-not-allowed")}
+                    />
+                    <Label htmlFor="same-address" className="text-[10px] text-gray-400">사업장동일</Label>
                   </div>
                 </div>
 
@@ -1270,66 +1184,43 @@ export function CustomerDetailModal({
                   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg w-[400px] overflow-hidden">
                       <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b">
-                        <span className="font-medium text-gray-700">
-                          자택 주소 검색
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowHomeAddressSearch(false)}
-                          className="text-gray-600"
-                        >
+                        <span className="font-medium text-gray-700">자택 주소 검색</span>
+                        <Button variant="ghost" size="icon" onClick={() => setShowHomeAddressSearch(false)} className="text-gray-600">
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
                       <div className="p-4">
-                        <DaumPostcodeEmbed
-                          onComplete={(data) => {
-                            handleFieldChange({ home_address: data.address });
-                            setShowHomeAddressSearch(false);
-                          }}
-                        />
+                        <DaumPostcodeEmbed onComplete={(data) => { handleFieldChange({ home_address: data.address }); setShowHomeAddressSearch(false); }} />
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* 사업자 정보 그룹 (Border Box) */}
-              <div className="border border-gray-700 rounded-lg p-1.5 space-y-1 ml-[6px] mr-[6px] pl-[10px] pr-[10px] pt-[10px] pb-[10px] mt-[0px] mb-[0px]">
-                <h3 className="text-xs font-semibold text-emerald-400">
-                  사업자 정보
-                </h3>
+              {/* 사업자 정보 그룹 (Border Box) - 10줄 압축 배치 */}
+              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 mt-1">
+                <h3 className="text-xs font-semibold text-emerald-400 mb-1">사업자 정보</h3>
 
-                {/* Row 3-1: 상호명, 개업일 - grid-cols-2 gap-3 items-end (Row 2와 동일) */}
-                <div className="grid grid-cols-2 gap-3 items-end">
-                  <div>
-                    <Label className="text-xs text-gray-400">상호명</Label>
+                {/* Row 5: 상호명 | 개업일 */}
+                <div className="flex gap-1.5 items-end">
+                  <div className="flex-1">
+                    <Label className="text-[10px] text-gray-400">상호명</Label>
                     <Input
                       value={formData.company_name || ""}
-                      onChange={(e) =>
-                        handleFieldChange({ company_name: e.target.value })
-                      }
+                      onChange={(e) => handleFieldChange({ company_name: e.target.value })}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
                       )}
                       data-testid="input-company-name"
                     />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <Label className="text-xs text-gray-400">개업일</Label>
+                  <div className="w-32">
+                    <div className="flex items-center gap-1">
+                      <Label className="text-[10px] text-gray-400">개업일</Label>
                       {formData.founding_date && formData.over_7_years && (
-                        <Badge
-                          variant="secondary"
-                          className="text-[9px] px-1 py-0 bg-orange-600/20 text-orange-400 leading-tight"
-                        >
-                          7년초과
-                        </Badge>
+                        <Badge variant="secondary" className="text-[8px] px-0.5 py-0 bg-orange-600/20 text-orange-400 leading-tight">7년초과</Badge>
                       )}
                     </div>
                     <Input
@@ -1338,230 +1229,172 @@ export function CustomerDetailModal({
                       onChange={(e) => handleFoundingDateChange(e.target.value)}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
                       )}
                     />
                   </div>
                 </div>
 
-                {/* Row 3-2: 업종, 종목 - grid-cols-2 gap-3 items-center, h-9 강제 */}
-                <div className="grid grid-cols-2 gap-3 items-center">
-                  <div>
-                    <Label className="text-xs text-gray-400">업종</Label>
-                    <Select
-                      value={formData.business_type || "기타"}
-                      onValueChange={(v) =>
-                        handleFieldChange({ business_type: v })
-                      }
-                      disabled={isReadOnly}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          "border-gray-600 text-gray-200 h-9 text-sm",
-                          isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
-                        )}
-                      >
+                {/* Row 6: 업종 | 종목 */}
+                <div className="flex gap-1.5 items-end">
+                  <div className="flex-1">
+                    <Label className="text-[10px] text-gray-400">업종</Label>
+                    <Select value={formData.business_type || "기타"} onValueChange={(v) => handleFieldChange({ business_type: v })} disabled={isReadOnly}>
+                      <SelectTrigger className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
-                        {BUSINESS_TYPES.map((t) => (
-                          <SelectItem
-                            key={t}
-                            value={t}
-                            className="text-gray-200 text-sm"
-                          >
-                            {t}
-                          </SelectItem>
-                        ))}
+                        {BUSINESS_TYPES.map((t) => (<SelectItem key={t} value={t} className="text-gray-200 text-xs">{t}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">종목</Label>
+                  <div className="flex-1">
+                    <Label className="text-[10px] text-gray-400">종목</Label>
                     <Input
                       value={formData.business_item || ""}
-                      onChange={(e) =>
-                        handleFieldChange({ business_item: e.target.value })
-                      }
+                      onChange={(e) => handleFieldChange({ business_item: e.target.value })}
                       disabled={isReadOnly}
-                      className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
-                      )}
+                      className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
                     />
                   </div>
                 </div>
 
-                {/* Row 3-3: 사업자번호 | 재도전+혁신 - grid-cols-2 gap-3 items-center, h-9 강제 */}
-                <div className="grid grid-cols-2 gap-3 items-center">
-                  <div>
-                    <Label className="text-xs text-gray-400">사업자번호</Label>
+                {/* Row 7: 사업자번호 | 재도전 | 혁신 */}
+                <div className="flex gap-1.5 items-end">
+                  <div className="flex-1">
+                    <Label className="text-[10px] text-gray-400">사업자번호</Label>
                     <Input
                       value={formData.business_registration_number || ""}
-                      onChange={(e) =>
-                        handleFieldChange({
-                          business_registration_number: e.target.value,
-                        })
-                      }
+                      onChange={(e) => handleFieldChange({ business_registration_number: e.target.value })}
                       disabled={isReadOnly}
-                      className={cn(
-                        "border-gray-600 text-gray-200 h-9 text-sm",
-                        isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
-                      )}
+                      className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
                       placeholder="000-00-00000"
                     />
                   </div>
-                  <div className="flex flex-row gap-2">
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-400">재도전</Label>
-                      <Select
-                        value={formData.retry_type || "해당없음"}
-                        onValueChange={(v) =>
-                          handleFieldChange({ retry_type: v })
-                        }
-                        disabled={isReadOnly}
-                      >
-                        <SelectTrigger
-                          className={cn(
-                            "border-gray-600 text-gray-200 h-9 text-sm",
-                            isReadOnly
-                              ? "bg-gray-700 cursor-not-allowed opacity-70"
-                              : "bg-gray-800",
-                          )}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-700">
-                          {RETRY_OPTIONS.map((o) => (
-                            <SelectItem
-                              key={o}
-                              value={o}
-                              className="text-gray-200 text-sm"
-                            >
-                              {o}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-400">혁신</Label>
-                      <Select
-                        value={formData.innovation_type || "해당없음"}
-                        onValueChange={(v) =>
-                          handleFieldChange({ innovation_type: v })
-                        }
-                        disabled={isReadOnly}
-                      >
-                        <SelectTrigger
-                          className={cn(
-                            "border-gray-600 text-gray-200 h-9 text-sm",
-                            isReadOnly
-                              ? "bg-gray-700 cursor-not-allowed opacity-70"
-                              : "bg-gray-800",
-                          )}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-700">
-                          {INNOVATION_OPTIONS.map((o) => (
-                            <SelectItem
-                              key={o}
-                              value={o}
-                              className="text-gray-200 text-sm"
-                            >
-                              {o}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="w-24">
+                    <Label className="text-[10px] text-gray-400">재도전</Label>
+                    <Select value={formData.retry_type || "해당없음"} onValueChange={(v) => handleFieldChange({ retry_type: v })} disabled={isReadOnly}>
+                      <SelectTrigger className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        {RETRY_OPTIONS.map((o) => (<SelectItem key={o} value={o} className="text-gray-200 text-xs">{o}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-24">
+                    <Label className="text-[10px] text-gray-400">혁신</Label>
+                    <Select value={formData.innovation_type || "해당없음"} onValueChange={(v) => handleFieldChange({ innovation_type: v })} disabled={isReadOnly}>
+                      <SelectTrigger className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        {INNOVATION_OPTIONS.map((o) => (<SelectItem key={o} value={o} className="text-gray-200 text-xs">{o}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
-                {/* Row 3-4: 사업장 소재지, 상세주소, 자가여부 */}
-                <div className="space-y-1.5">
-                  <div className="flex gap-1.5">
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-400">
-                        사업장 소재지
-                      </Label>
-                      <div className="flex gap-1.5">
-                        <Input
-                          value={formData.business_address || ""}
-                          readOnly
-                          className={cn(
-                            "border-gray-600 text-gray-200 flex-1 h-8 text-sm",
-                            isReadOnly
-                              ? "bg-gray-700 opacity-70"
-                              : "bg-gray-800",
-                          )}
-                          placeholder="주소 검색"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowBusinessAddressSearch(true)}
-                          className={cn(
-                            "border-gray-600 h-8 w-8 p-0",
-                            isReadOnly && "opacity-50 cursor-not-allowed",
-                          )}
-                          disabled={formData.is_same_as_business || isReadOnly}
-                        >
-                          <Search className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+                {/* Row 8: 사업장소재지 검색 (전체 너비) */}
+                <div>
+                  <Label className="text-[10px] text-gray-400">사업장 소재지</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      value={formData.business_address || ""}
+                      readOnly
+                      className={cn("border-gray-600 text-gray-200 flex-1 h-7 text-xs", isReadOnly ? "bg-gray-700 opacity-70" : "bg-gray-800")}
+                      placeholder="주소 검색"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowBusinessAddressSearch(true)}
+                      className={cn("border-gray-600 h-7 w-7 p-0", isReadOnly && "opacity-50 cursor-not-allowed")}
+                      disabled={formData.is_same_as_business || isReadOnly}
+                    >
+                      <Search className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Row 9: 상세주소 | 자가 */}
+                <div className="flex gap-1.5 items-end">
+                  <div className="flex-1">
+                    <Label className="text-[10px] text-gray-400">상세주소</Label>
+                    <Input
+                      value={formData.business_address_detail || ""}
+                      onChange={(e) => handleFieldChange({ business_address_detail: e.target.value })}
+                      className={cn("border-gray-600 text-gray-200 h-7 text-xs", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                      placeholder="동/호수"
+                      disabled={formData.is_same_as_business || isReadOnly}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 h-7">
+                    <Checkbox
+                      id="business-owned"
+                      checked={formData.is_business_owned || false}
+                      onCheckedChange={(c) => handleFieldChange({ is_business_owned: !!c })}
+                      disabled={isReadOnly}
+                      className={cn("h-3 w-3", isReadOnly && "opacity-50 cursor-not-allowed")}
+                    />
+                    <Label htmlFor="business-owned" className="text-[10px] text-gray-400">자가</Label>
+                  </div>
+                </div>
+
+                {/* Row 10: 최근 매출 | Y-1 매출 | Y-2 매출 | Y-3 매출 (4등분) */}
+                <div className="grid grid-cols-4 gap-1">
+                  <div>
+                    <Label className="text-[10px] text-gray-400">최근 매출</Label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={formData.recent_sales || ""}
+                        onChange={(e) => handleFieldChange({ recent_sales: Number(e.target.value) })}
+                        disabled={isReadOnly}
+                        className={cn("border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                      />
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">억</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <div className="flex-1 min-w-[100px]">
-                      <Label className="text-xs text-gray-400">상세주소</Label>
+                  <div>
+                    <Label className="text-[10px] text-gray-400">Y-1 매출</Label>
+                    <div className="relative">
                       <Input
-                        value={formData.business_address_detail || ""}
-                        onChange={(e) =>
-                          handleFieldChange({
-                            business_address_detail: e.target.value,
-                          })
-                        }
-                        className={cn(
-                          "border-gray-600 text-gray-200 h-8 text-sm",
-                          isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
-                        )}
-                        placeholder="동/호수"
-                        disabled={formData.is_same_as_business || isReadOnly}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5 pt-4">
-                      <Checkbox
-                        id="business-owned"
-                        checked={formData.is_business_owned || false}
-                        onCheckedChange={(c) =>
-                          handleFieldChange({ is_business_owned: !!c })
-                        }
+                        type="number"
+                        value={formData.sales_y1 || ""}
+                        onChange={(e) => handleFieldChange({ sales_y1: Number(e.target.value) })}
                         disabled={isReadOnly}
-                        className={cn(
-                          "h-3.5 w-3.5",
-                          isReadOnly && "opacity-50 cursor-not-allowed",
-                        )}
+                        className={cn("border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
                       />
-                      <Label
-                        htmlFor="business-owned"
-                        className="text-xs text-gray-400"
-                      >
-                        자가
-                      </Label>
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">억</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-gray-400">Y-2 매출</Label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={formData.sales_y2 || ""}
+                        onChange={(e) => handleFieldChange({ sales_y2: Number(e.target.value) })}
+                        disabled={isReadOnly}
+                        className={cn("border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                      />
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">억</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-gray-400">Y-3 매출</Label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={formData.sales_y3 || ""}
+                        onChange={(e) => handleFieldChange({ sales_y3: Number(e.target.value) })}
+                        disabled={isReadOnly}
+                        className={cn("border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                      />
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">억</span>
                     </div>
                   </div>
                 </div>
@@ -1571,139 +1404,23 @@ export function CustomerDetailModal({
                   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg w-[400px] overflow-hidden">
                       <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b">
-                        <span className="font-medium text-gray-700">
-                          사업장 주소 검색
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowBusinessAddressSearch(false)}
-                          className="text-gray-600"
-                        >
+                        <span className="font-medium text-gray-700">사업장 주소 검색</span>
+                        <Button variant="ghost" size="icon" onClick={() => setShowBusinessAddressSearch(false)} className="text-gray-600">
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
                       <div className="p-4">
-                        <DaumPostcodeEmbed
-                          onComplete={(data) => {
-                            handleFieldChange({
-                              business_address: data.address,
-                            });
-                            setShowBusinessAddressSearch(false);
-                          }}
-                        />
+                        <DaumPostcodeEmbed onComplete={(data) => { handleFieldChange({ business_address: data.address }); setShowBusinessAddressSearch(false); }} />
                       </div>
                     </div>
                   </div>
                 )}
-
-                {/* Row 3-5: 매출 - grid-cols-2로 변경 */}
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <Label className="text-xs text-gray-400">최근 매출</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={formData.recent_sales || ""}
-                        onChange={(e) =>
-                          handleFieldChange({
-                            recent_sales: Number(e.target.value),
-                          })
-                        }
-                        disabled={isReadOnly}
-                        className={cn(
-                          "border-gray-600 text-gray-200 pr-6 h-8 text-sm w-full",
-                          isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
-                        )}
-                      />
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
-                        억
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Y-1 매출</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={formData.sales_y1 || ""}
-                        onChange={(e) =>
-                          handleFieldChange({
-                            sales_y1: Number(e.target.value),
-                          })
-                        }
-                        disabled={isReadOnly}
-                        className={cn(
-                          "border-gray-600 text-gray-200 pr-6 h-8 text-sm w-full",
-                          isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
-                        )}
-                      />
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
-                        억
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <Label className="text-xs text-gray-400">Y-2 매출</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={formData.sales_y2 || ""}
-                        onChange={(e) =>
-                          handleFieldChange({
-                            sales_y2: Number(e.target.value),
-                          })
-                        }
-                        disabled={isReadOnly}
-                        className={cn(
-                          "border-gray-600 text-gray-200 pr-6 h-8 text-sm w-full",
-                          isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
-                        )}
-                      />
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
-                        억
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Y-3 매출</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={formData.sales_y3 || ""}
-                        onChange={(e) =>
-                          handleFieldChange({
-                            sales_y3: Number(e.target.value),
-                          })
-                        }
-                        disabled={isReadOnly}
-                        className={cn(
-                          "border-gray-600 text-gray-200 pr-6 h-8 text-sm w-full",
-                          isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
-                        )}
-                      />
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
-                        억
-                      </span>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
 
-          {/* Section 2: 중앙 패널 - 문서 뷰어 (flex-1, 100% 높이) */}
-          <div className="flex-1 h-full bg-gray-950 flex flex-col overflow-hidden border-r border-gray-700">
+          {/* Section 2: 중앙 패널 - 문서 뷰어 (40%, A4 비율) */}
+          <div className="w-[40%] flex-1 h-full bg-gray-950 flex flex-col overflow-hidden border-r border-gray-700">
             {/* Document Header - 상태 변경 드롭다운 포함 */}
             <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
               <div className="flex items-center gap-2 flex-1 overflow-x-auto">
@@ -1984,8 +1701,8 @@ export function CustomerDetailModal({
               </div>
           </div>
 
-          {/* Section 3: 우측 패널 - 커뮤니케이션 (22%) */}
-          <div className="w-[22%] min-w-[280px] h-full flex flex-col overflow-hidden">
+          {/* Section 3: 우측 패널 - 커뮤니케이션 (25%) */}
+          <div className="w-[25%] min-w-[280px] h-full flex flex-col overflow-hidden">
             {/* 상단 50%: 메모/변경이력 탭 */}
             <div className="h-1/2 flex flex-col border-b border-gray-700">
               {/* Tab Headers */}
