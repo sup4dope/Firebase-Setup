@@ -16,6 +16,8 @@ import {
   UserCog,
   Lock,
   ChevronDown,
+  ExternalLink,
+  Download,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -57,7 +59,7 @@ import {
 import { format, differenceInYears, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import {
   doc,
   updateDoc,
@@ -461,6 +463,61 @@ export function CustomerDetailModal({
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // [추가] 파일 삭제 함수
+  const handleDeleteFile = async (docToDelete: CustomerDocument) => {
+    if (!window.confirm(`"${docToDelete.file_name}" 파일을 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      // 1. Storage에서 실제 파일 삭제
+      const storageRef = ref(storage, docToDelete.file_url);
+      try {
+        await deleteObject(storageRef);
+      } catch (storageError) {
+        console.warn("Storage 파일 삭제 실패 (이미 삭제되었거나 존재하지 않음):", storageError);
+      }
+
+      // 2. 로컬 상태 업데이트
+      const updatedDocs = documents.filter(d => d.id !== docToDelete.id);
+      setDocuments(updatedDocs);
+      setSelectedDocument(null);
+
+      // 3. Firestore 업데이트 (기존 고객일 경우)
+      if (formData.id) {
+        const customerRef = doc(db, "customers", formData.id);
+        await updateDoc(customerRef, {
+          documents: updatedDocs
+        });
+
+        // 로컬 formData 동기화
+        setFormData(prev => ({ ...prev, documents: updatedDocs }));
+
+        // 대시보드 알림
+        if (onSave) {
+          onSave({ id: formData.id, documents: updatedDocs });
+        }
+
+        // 로그 기록
+        await addDoc(collection(db, "counseling_logs"), {
+          customer_id: formData.id,
+          action_type: "document_delete",
+          description: `파일 삭제: ${docToDelete.file_name}`,
+          changed_by_name: currentUser?.name || "관리자",
+          changed_at: new Date(),
+          type: "log"
+        });
+      } else {
+        setFormData(prev => ({ ...prev, documents: updatedDocs }));
+      }
+
+      alert("파일이 삭제되었습니다.");
+    } catch (error) {
+      console.error("파일 삭제 실패:", error);
+      alert("파일 삭제 중 오류가 발생했습니다.");
     }
   };
 
@@ -1704,64 +1761,124 @@ export function CustomerDetailModal({
               <div
                 {...getRootProps()}
                 className={cn(
-                  "flex-1 p-4 overflow-auto bg-gray-950/50 transition-all",
+                  "flex-1 flex flex-col overflow-hidden bg-gray-950/50 transition-all",
                   isDragActive &&
                     "border-2 border-dashed border-blue-500 bg-blue-500/10",
                 )}
               >
                 <input {...getInputProps()} />
-                {isDragActive ? (
-                  <div className="h-full flex items-center justify-center text-blue-400">
-                    <div className="text-center">
-                      <Upload className="w-16 h-16 mx-auto mb-4 animate-pulse" />
-                      <p className="text-lg font-medium">
-                        파일을 여기에 놓으세요
-                      </p>
+                
+                {/* 선택된 파일 헤더 - 파일명 + 액션 버튼 */}
+                {selectedDocument && !isDragActive && (
+                  <div className="shrink-0 px-4 py-2 border-b border-gray-700 bg-gray-900/50 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                      <span className="text-sm text-gray-300 truncate">
+                        {selectedDocument.file_name}
+                      </span>
                     </div>
-                  </div>
-                ) : selectedDocument ? (
-                  <div className="h-full flex items-center justify-center">
-                    {selectedDocument.file_type.includes("pdf") ? (
-                      <iframe
-                        src={selectedDocument.file_url}
-                        className="w-full h-full rounded border border-gray-700"
-                        title={selectedDocument.file_name}
-                      />
-                    ) : selectedDocument.file_type.includes("image") ? (
-                      <img
-                        src={selectedDocument.file_url}
-                        alt={selectedDocument.file_name}
-                        className="max-w-full max-h-full object-contain rounded"
-                      />
-                    ) : (
-                      <div className="text-gray-500 text-center">
-                        <FileText className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                        <p>미리보기를 지원하지 않는 파일 형식입니다</p>
-                        <a
-                          href={selectedDocument.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-400 hover:underline mt-2 inline-block"
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* 새 창에서 열기 */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.open(selectedDocument.file_url, '_blank')}
+                        title="새 창에서 열기"
+                        data-testid="button-open-new-window"
+                      >
+                        <ExternalLink className="w-4 h-4 text-gray-400" />
+                      </Button>
+                      {/* 다운로드 */}
+                      <a
+                        href={selectedDocument.file_url}
+                        download={selectedDocument.file_name}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="다운로드"
+                          data-testid="button-download-file"
                         >
-                          다운로드
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div
-                    className="h-full flex items-center justify-center text-gray-500 cursor-pointer"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <div className="text-center border-2 border-dashed border-gray-700 rounded-lg p-8">
-                      <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                      <p>파일을 드래그하거나 클릭하여 업로드하세요</p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        PDF, PNG, JPG 지원
-                      </p>
+                          <Download className="w-4 h-4 text-gray-400" />
+                        </Button>
+                      </a>
+                      {/* 삭제 버튼 - 읽기전용이 아닐 때만 */}
+                      {!isReadOnly && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteFile(selectedDocument)}
+                          title="파일 삭제"
+                          className="text-red-400 hover:text-red-300"
+                          data-testid="button-delete-file"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
+
+                {/* 뷰어 본문 영역 */}
+                <div className="flex-1 p-4 overflow-auto">
+                  {isDragActive ? (
+                    <div className="h-full flex items-center justify-center text-blue-400">
+                      <div className="text-center">
+                        <Upload className="w-16 h-16 mx-auto mb-4 animate-pulse" />
+                        <p className="text-lg font-medium">
+                          파일을 여기에 놓으세요
+                        </p>
+                      </div>
+                    </div>
+                  ) : selectedDocument ? (
+                    <div className="h-full flex items-center justify-center">
+                      {selectedDocument.file_type.startsWith("image/") ? (
+                        <img
+                          src={selectedDocument.file_url}
+                          alt={selectedDocument.file_name}
+                          className="max-w-full max-h-full object-contain rounded"
+                        />
+                      ) : selectedDocument.file_type === "application/pdf" ? (
+                        <iframe
+                          src={selectedDocument.file_url}
+                          className="w-full h-full rounded border border-gray-700"
+                          title={selectedDocument.file_name}
+                        />
+                      ) : (
+                        <div className="text-gray-500 text-center">
+                          <FileText className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                          <p className="mb-4">미리보기를 지원하지 않는 파일 형식입니다</p>
+                          <a
+                            href={selectedDocument.file_url}
+                            download={selectedDocument.file_name}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="outline" size="sm">
+                              <Download className="w-4 h-4 mr-2" />
+                              다운로드
+                            </Button>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      className="h-full flex items-center justify-center text-gray-500 cursor-pointer"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <div className="text-center border-2 border-dashed border-gray-700 rounded-lg p-8">
+                        <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                        <p>파일을 드래그하거나 클릭하여 업로드하세요</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          PDF, PNG, JPG 지원
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
