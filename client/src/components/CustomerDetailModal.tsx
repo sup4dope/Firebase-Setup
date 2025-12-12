@@ -287,6 +287,7 @@ export function CustomerDetailModal({
         })) || [],
       );
       setDocuments(customer.documents || []);
+      setSelectedDocument(null); // 이전 고객의 선택된 문서 초기화
     } else if (isNewCustomer) {
       setFormData({
         name: "",
@@ -315,6 +316,7 @@ export function CustomerDetailModal({
       });
       setMemos([]);
       setDocuments([]);
+      setSelectedDocument(null); // 뷰어 초기화
     }
     setAiMessages([]);
   }, [customer, isNewCustomer, currentUser]);
