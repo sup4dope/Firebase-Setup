@@ -58,10 +58,11 @@ export const calculateKPI = (
     return isSameMonth(createdAt, date) || isBefore(createdAt, monthEnd);
   });
   
-  // Current contracts: customers that reached status 4-3 (계약완료) this month
+  // Current contracts: customers that reached contract completion status this month (한글 상태명)
+  const contractStatuses = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
   const contractLogs = statusLogs.filter(log => {
     const changedAt = log.changed_at instanceof Date ? log.changed_at : new Date(log.changed_at);
-    return log.new_status === '4-3' && 
+    return contractStatuses.includes(log.new_status) && 
            isSameMonth(changedAt, date) &&
            !isBefore(changedAt, monthStart);
   });

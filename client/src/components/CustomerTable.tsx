@@ -34,164 +34,41 @@ import { MemoModal } from './MemoModal';
 import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Customer, UserRole, StatusCode, CustomerMemo } from '@shared/types';
-import { STATUS_LABELS } from '@shared/types';
+import { STATUS_OPTIONS, STATUS_STYLES, getStatusStyle, FUNNEL_GROUPS } from '@/lib/constants';
 
-// Funnel stages synced with FunnelChart (excluding 'all')
-const MENU_STAGES = [
-  { id: '1', label: '상담대기' },
-  { id: 'target', label: '희망타겟' },
-  { id: '2', label: '계약완료' },
-  { id: '3', label: '서류취합' },
-  { id: '4', label: '신청완료' },
-  { id: '5', label: '집행완료' },
-];
-
-// Sub-statuses synced with FunnelChart
-const MENU_SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
-  '1': [
-    { id: '1-1', label: '쓰레기통' },
-    { id: '0-1', label: '단기부재' },
-    { id: '0-2', label: '장기부재' },
-  ],
-  'target': [
-    { id: '1-2-1', label: '업력미달' },
-    { id: '1-2-2', label: '최근대출' },
-    { id: '1-2-3', label: '인증미동의(국세청)' },
-    { id: '1-2-4', label: '인증미동의(공여내역)' },
-    { id: '1-3-1', label: '진행기간 미동의' },
-    { id: '1-3-2', label: '자문료 미동의' },
-    { id: '1-3-3', label: '계약금미동의(선불)' },
-    { id: '1-3-4', label: '계약금미동의(후불)' },
-  ],
-  '2': [
-    { id: '2-1', label: '계약완료(선불)' },
-    { id: '2-2', label: '계약완료(외주)' },
-    { id: '2-3', label: '계약완료(후불)' },
-  ],
-  '3': [
-    { id: '3-1', label: '서류취합완료(선불)' },
-    { id: '3-2', label: '서류취합완료(외주)' },
-    { id: '3-3', label: '서류취합완료(후불)' },
-  ],
-  '4': [
-    { id: '4-1', label: '신청완료(선불)' },
-    { id: '4-2', label: '신청완료(외주)' },
-    { id: '4-3', label: '신청완료(후불)' },
-  ],
-  '5': [
-    { id: '5-1', label: '집행완료' },
-    { id: '5-2', label: '집행완료(외주)' },
-    { id: '5-3', label: '최종부결' },
-  ],
-};
-
-// Nested statuses for 1-1 (쓰레기통 상세사유)
+// 쓰레기통 상세사유 (한글)
 const TRASH_REASONS = [
-  { id: '1-1-1', label: '거절사유 미파악' },
-  { id: '1-1-2', label: '인증불가' },
-  { id: '1-1-3', label: '정부기관 오인' },
-  { id: '1-1-4', label: '기타자금 오인' },
-  { id: '1-1-5', label: '불가업종' },
-  { id: '1-1-6', label: '매출없음' },
-  { id: '1-1-7', label: '신용점수 미달' },
-  { id: '1-1-8', label: '차입금초과' },
+  { id: '거절사유 미파악', label: '거절사유 미파악' },
+  { id: '인증불가', label: '인증불가' },
+  { id: '정부기관 오인', label: '정부기관 오인' },
+  { id: '기타자금 오인', label: '기타자금 오인' },
+  { id: '불가업종', label: '불가업종' },
+  { id: '매출없음', label: '매출없음' },
+  { id: '신용점수 미달', label: '신용점수 미달' },
+  { id: '차입금초과', label: '차입금초과' },
 ];
 
-// Build flat list of all status options for native select - SHORT NAMES ONLY
-const buildStatusOptions = (): { value: string; label: string; category: string }[] => {
-  const options: { value: string; label: string; category: string }[] = [];
-  
-  MENU_STAGES.forEach(stage => {
-    const subs = MENU_SUB_STATUSES[stage.id] || [];
-    
-    subs.forEach(sub => {
-      if (sub.id === '1-1') {
-        // 쓰레기통 has nested reasons - add only the leaf nodes
-        TRASH_REASONS.forEach(reason => {
-          options.push({ value: reason.id, label: reason.label, category: stage.label });
-        });
-      } else {
-        // Regular sub-status - show only the short label
-        options.push({ value: sub.id, label: sub.label, category: stage.label });
-      }
-    });
-  });
-  
-  return options;
-};
-
-const STATUS_OPTIONS = buildStatusOptions();
-
-// Get display label for a status code
-const getStatusDisplayLabel = (statusCode: string): string => {
-  // Check trash reasons first
-  const trashReason = TRASH_REASONS.find(r => r.id === statusCode);
-  if (trashReason) return trashReason.label;
-  
-  // Check sub-statuses
-  for (const stageId of Object.keys(MENU_SUB_STATUSES)) {
-    const sub = MENU_SUB_STATUSES[stageId]?.find(s => s.id === statusCode);
-    if (sub) return sub.label;
-  }
-  
-  return statusCode;
-};
-
-// Color mapping for status badges based on top-level category
-const STAGE_COLORS: Record<string, string> = {
-  '1': 'bg-purple-600 text-white',      // 상담대기
-  'target': 'bg-yellow-600 text-white', // 희망타겟
-  '2': 'bg-green-600 text-white',       // 계약완료
-  '3': 'bg-blue-600 text-white',        // 서류취합
-  '4': 'bg-orange-600 text-white',      // 신청완료
-  '5': 'bg-teal-600 text-white',        // 집행완료
-};
-
-// Get status badge info: short label + color class
+// 상태 배지 정보 가져오기 (한글 상태명 기반)
 const getStatusBadgeInfo = (statusCode: string): { label: string; colorClass: string; category: string } => {
-  // Determine the top-level category from status code
-  let category = '';
-  let label = statusCode;
+  // 상태 스타일 가져오기
+  const style = getStatusStyle(statusCode);
   
-  // Check trash reasons (1-1-X format)
-  if (statusCode.startsWith('1-1-')) {
-    const reason = TRASH_REASONS.find(r => r.id === statusCode);
-    if (reason) {
-      label = reason.label;
-      category = '1'; // 상담대기
-    }
-  }
-  // Check sub-statuses
-  else {
-    for (const [stageId, subs] of Object.entries(MENU_SUB_STATUSES)) {
-      const sub = subs.find(s => s.id === statusCode);
-      if (sub) {
-        label = sub.label;
-        category = stageId;
-        break;
-      }
-    }
-  }
+  // 카테고리 결정
+  let category = '기타';
+  if (statusCode === '상담대기') category = '상담';
+  else if (FUNNEL_GROUPS['쓰레기통']?.includes(statusCode)) category = '거절';
+  else if (statusCode === '단기부재' || statusCode === '장기부재') category = '부재';
+  else if (FUNNEL_GROUPS['희망타겟']?.includes(statusCode)) category = '희망타겟';
+  else if (FUNNEL_GROUPS['계약완료']?.includes(statusCode)) category = '계약';
+  else if (FUNNEL_GROUPS['서류취합']?.includes(statusCode)) category = '서류';
+  else if (FUNNEL_GROUPS['신청완료']?.includes(statusCode)) category = '신청';
+  else if (FUNNEL_GROUPS['집행완료_그룹']?.includes(statusCode)) category = '집행';
   
-  // Special cases for absence statuses
-  if (statusCode === '0-1' || statusCode === '0-2') {
-    const sub = MENU_SUB_STATUSES['1']?.find(s => s.id === statusCode);
-    if (sub) {
-      label = sub.label;
-      category = '1'; // 상담대기
-    }
-  }
-  
-  // 1-1 (쓰레기통) without specific reason
-  if (statusCode === '1-1') {
-    label = '쓰레기통';
-    category = '1';
-  }
-  
-  const colorClass = STAGE_COLORS[category] || 'bg-gray-600 text-white';
-  const categoryName = MENU_STAGES.find(s => s.id === category)?.label || '기타';
-  
-  return { label, colorClass, category: categoryName };
+  return {
+    label: statusCode, // 한글 상태명 그대로 표시
+    colorClass: `${style.bg} ${style.text}`,
+    category,
+  };
 };
 
 interface CustomerTableProps {
@@ -209,21 +86,13 @@ interface CustomerTableProps {
 
 const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
+// 스테이지 이름 가져오기 (한글 상태명 기반)
 const getStageName = (stageId: string | null): string => {
   if (!stageId) return '전체';
-  const stageMap: Record<string, string> = {
-    'all': '전체',
-    '1': '상담대기',
-    'target': '희망타겟',
-    '2': '계약완료',
-    '3': '서류취합',
-    '4': '신청완료',
-    '5': '집행완료',
-    '1-1': '쓰레기통',
-    '0-1': '단기부재',
-    '0-2': '장기부재',
-  };
-  return stageMap[stageId] || STATUS_LABELS[stageId as StatusCode] || stageId;
+  if (stageId === 'all') return '전체';
+  if (stageId === '집행완료_그룹') return '집행완료';
+  // 한글 상태명은 그대로 반환
+  return stageId;
 };
 
 export function CustomerTable({
@@ -396,24 +265,27 @@ export function CustomerTable({
                           position="popper"
                           sideOffset={5}
                         >
-                          {/* 상담대기 그룹 */}
+                          {/* 상담 그룹 */}
                           <SelectGroup>
-                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1">상담대기</SelectLabel>
-                            {MENU_SUB_STATUSES['1']?.filter(s => s.id !== '1-1').map(sub => (
-                              <SelectItem 
-                                key={sub.id} 
-                                value={sub.id}
-                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
-                              >
-                                {sub.label}
-                              </SelectItem>
-                            ))}
-                            {/* 쓰레기통 하위 사유들 */}
+                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1">상담</SelectLabel>
+                            <SelectItem value="상담대기" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">상담대기</SelectItem>
+                          </SelectGroup>
+
+                          {/* 부재 그룹 */}
+                          <SelectGroup>
+                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">부재</SelectLabel>
+                            <SelectItem value="단기부재" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">단기부재</SelectItem>
+                            <SelectItem value="장기부재" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">장기부재</SelectItem>
+                          </SelectGroup>
+
+                          {/* 거절 그룹 (쓰레기통) */}
+                          <SelectGroup>
+                            <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">거절</SelectLabel>
                             {TRASH_REASONS.map(reason => (
                               <SelectItem 
                                 key={reason.id} 
                                 value={reason.id}
-                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-6 text-xs"
+                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4 text-xs"
                               >
                                 {reason.label}
                               </SelectItem>
@@ -423,71 +295,46 @@ export function CustomerTable({
                           {/* 희망타겟 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">희망타겟</SelectLabel>
-                            {MENU_SUB_STATUSES['target']?.map(sub => (
-                              <SelectItem 
-                                key={sub.id} 
-                                value={sub.id}
-                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
-                              >
-                                {sub.label}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="업력미달" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">업력미달</SelectItem>
+                            <SelectItem value="최근대출" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">최근대출</SelectItem>
+                            <SelectItem value="인증미동의(국세청)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">인증미동의(국세청)</SelectItem>
+                            <SelectItem value="인증미동의(공여내역)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">인증미동의(공여내역)</SelectItem>
+                            <SelectItem value="진행기간 미동의" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">진행기간 미동의</SelectItem>
+                            <SelectItem value="자문료 미동의" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">자문료 미동의</SelectItem>
+                            <SelectItem value="계약금미동의(선불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약금미동의(선불)</SelectItem>
+                            <SelectItem value="계약금미동의(후불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약금미동의(후불)</SelectItem>
                           </SelectGroup>
 
                           {/* 계약완료 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">계약완료</SelectLabel>
-                            {MENU_SUB_STATUSES['2']?.map(sub => (
-                              <SelectItem 
-                                key={sub.id} 
-                                value={sub.id}
-                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
-                              >
-                                {sub.label}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="계약완료(선불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약완료(선불)</SelectItem>
+                            <SelectItem value="계약완료(외주)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약완료(외주)</SelectItem>
+                            <SelectItem value="계약완료(후불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약완료(후불)</SelectItem>
                           </SelectGroup>
 
                           {/* 서류취합 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">서류취합</SelectLabel>
-                            {MENU_SUB_STATUSES['3']?.map(sub => (
-                              <SelectItem 
-                                key={sub.id} 
-                                value={sub.id}
-                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
-                              >
-                                {sub.label}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="서류취합완료(선불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">서류취합완료(선불)</SelectItem>
+                            <SelectItem value="서류취합완료(외주)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">서류취합완료(외주)</SelectItem>
+                            <SelectItem value="서류취합완료(후불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">서류취합완료(후불)</SelectItem>
                           </SelectGroup>
 
                           {/* 신청완료 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">신청완료</SelectLabel>
-                            {MENU_SUB_STATUSES['4']?.map(sub => (
-                              <SelectItem 
-                                key={sub.id} 
-                                value={sub.id}
-                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
-                              >
-                                {sub.label}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="신청완료(선불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(선불)</SelectItem>
+                            <SelectItem value="신청완료(외주)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(외주)</SelectItem>
+                            <SelectItem value="신청완료(후불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(후불)</SelectItem>
                           </SelectGroup>
 
                           {/* 집행완료 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">집행완료</SelectLabel>
-                            {MENU_SUB_STATUSES['5']?.map(sub => (
-                              <SelectItem 
-                                key={sub.id} 
-                                value={sub.id}
-                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4"
-                              >
-                                {sub.label}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="집행완료" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료</SelectItem>
+                            <SelectItem value="집행완료(외주)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료(외주)</SelectItem>
+                            <SelectItem value="최종부결" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">최종부결</SelectItem>
                           </SelectGroup>
                         </SelectContent>
                       </Select>

@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import { STATUS_LABELS } from '@shared/types';
+import { STATUS_OPTIONS } from '@/lib/constants';
 import type { Customer, User, Team, StatusCode, UserRole } from '@shared/types';
 
 const customerSchema = z.object({
@@ -81,7 +81,7 @@ export function CustomerForm({
       company_name: customer?.company_name || '',
       phone: customer?.phone || '',
       email: customer?.email || '',
-      status_code: customer?.status_code || '1-1',
+      status_code: customer?.status_code || '상담대기',
       manager_id: customer?.manager_id || currentUser.uid,
       team_id: customer?.team_id || currentUser.team_id || '',
       entry_date: customer?.entry_date || new Date().toISOString().split('T')[0],
@@ -195,9 +195,9 @@ export function CustomerForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Object.entries(STATUS_LABELS).map(([code, label]) => (
-                          <SelectItem key={code} value={code}>
-                            {label}
+                        {STATUS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

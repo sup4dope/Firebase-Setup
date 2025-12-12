@@ -30,7 +30,7 @@ import type {
   StatusCode,
   CustomerHistoryLog,
 } from '@shared/types';
-import { STATUS_LABELS } from '@shared/types';
+// STATUS_LABELS removed - using Korean status names directly
 
 // Helper to convert Firestore timestamp to Date
 const toDate = (timestamp: Timestamp | Date | string): Date => {
@@ -224,10 +224,11 @@ export const updateCustomerStatus = async (
   const batch = writeBatch(db);
   
   // Update customer status
+  const contractStatuses = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
   batch.update(doc(db, 'customers', customerId), { 
     status_code: newStatus,
-    // If reaching contract completion for the first time
-    ...(newStatus === '4-3' && { contract_completion_date: new Date().toISOString().split('T')[0] })
+    // If reaching contract completion for the first time (한글 상태명)
+    ...(contractStatuses.includes(newStatus) && { contract_completion_date: new Date().toISOString().split('T')[0] })
   });
   
   // Create status log
@@ -245,16 +246,15 @@ export const updateCustomerStatus = async (
   
   // Add customer history log for audit trail
   try {
-    const oldLabel = STATUS_LABELS[previousStatus] || previousStatus;
-    const newLabel = STATUS_LABELS[newStatus] || newStatus;
+    // 한글 상태명을 그대로 사용
     await addCustomerHistoryLog({
       customer_id: customerId,
       action_type: 'status_change',
-      description: `상태 변경: ${oldLabel} → ${newLabel}`,
+      description: `상태 변경: ${previousStatus} → ${newStatus}`,
       changed_by: userId,
       changed_by_name: userName,
-      old_value: oldLabel,
-      new_value: newLabel,
+      old_value: previousStatus,
+      new_value: newStatus,
     });
   } catch (error) {
     console.error('Error adding history log:', error);

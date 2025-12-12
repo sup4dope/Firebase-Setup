@@ -27,6 +27,7 @@ import {
 import { Plus, Search, RefreshCw } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { addDoc, collection } from 'firebase/firestore';
+import { FUNNEL_GROUPS } from '@/lib/constants';
 import type { Customer, User, Team, Holiday, StatusLog, StatusCode, InsertCustomer } from '@shared/types';
 
 export default function Dashboard() {
@@ -105,13 +106,20 @@ export default function Dashboard() {
     return calculateKPI(customers, statusLogs, holidays);
   }, [customers, statusLogs, holidays]);
 
-  // Filter customers
+  // Filter customers (한글 상태명 기반)
   const filteredCustomers = useMemo(() => {
     let result = customers;
 
-    // Filter by stage
+    // Filter by stage using FUNNEL_GROUPS
     if (selectedStage) {
-      result = result.filter(c => c.status_code.startsWith(selectedStage));
+      const groupStatuses = FUNNEL_GROUPS[selectedStage];
+      if (groupStatuses && groupStatuses.length > 0) {
+        // 그룹에 포함된 상태들로 필터링
+        result = result.filter(c => groupStatuses.includes(c.status_code));
+      } else {
+        // 단일 상태로 정확히 매칭
+        result = result.filter(c => c.status_code === selectedStage);
+      }
     }
 
     // Filter by search query

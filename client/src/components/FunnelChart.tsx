@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { FUNNEL_GROUPS, STATUS_STYLES, getStatusStyle } from '@/lib/constants';
 import type { Customer } from '@shared/types';
 
 interface FunnelChartProps {
@@ -9,69 +10,67 @@ interface FunnelChartProps {
   onStageClick: (stage: string | null) => void;
 }
 
-// Main stages with border accent colors
+// 메인 퍼널 단계 (한글 상태명 기반)
 const MAIN_STAGES = [
-  { id: 'all', label: '전체', borderColor: 'border-gray-500' },
-  { id: '1', label: '상담대기', borderColor: 'border-purple-500' },
-  { id: 'target', label: '희망타겟', borderColor: 'border-yellow-500' },
-  { id: '2', label: '계약완료', borderColor: 'border-green-500' },
-  { id: '3', label: '서류취합', borderColor: 'border-blue-500' },
-  { id: '4', label: '신청완료', borderColor: 'border-orange-500' },
-  { id: '5', label: '집행완료', borderColor: 'border-teal-500' },
+  { id: 'all', label: '전체', borderColor: 'border-gray-500', bgColor: 'bg-gray-500/20' },
+  { id: '상담대기', label: '상담대기', borderColor: 'border-purple-500', bgColor: 'bg-purple-500/20' },
+  { id: '희망타겟', label: '희망타겟', borderColor: 'border-yellow-500', bgColor: 'bg-yellow-500/20' },
+  { id: '계약완료', label: '계약완료', borderColor: 'border-emerald-500', bgColor: 'bg-emerald-500/20' },
+  { id: '서류취합', label: '서류취합', borderColor: 'border-blue-500', bgColor: 'bg-blue-500/20' },
+  { id: '신청완료', label: '신청완료', borderColor: 'border-indigo-500', bgColor: 'bg-indigo-500/20' },
+  { id: '집행완료_그룹', label: '집행완료', borderColor: 'border-teal-500', bgColor: 'bg-teal-500/20' },
 ];
 
-// Sub-statuses with left border accent colors
+// 하위 상태 정의 (한글 상태명 사용)
 const SUB_STATUSES: Record<string, { id: string; label: string; accentColor: string }[]> = {
-  '1': [
-    { id: '1-1', label: '쓰레기통', accentColor: 'border-l-red-500' },
-    { id: '0-1', label: '단기부재', accentColor: 'border-l-gray-400' },
-    { id: '0-2', label: '장기부재', accentColor: 'border-l-gray-400' },
+  '상담대기': [
+    { id: '쓰레기통', label: '쓰레기통', accentColor: 'border-l-red-500' },
+    { id: '단기부재', label: '단기부재', accentColor: 'border-l-orange-400' },
+    { id: '장기부재', label: '장기부재', accentColor: 'border-l-amber-400' },
   ],
-  'target': [
-    { id: '1-2-1', label: '업력미달', accentColor: 'border-l-yellow-400' },
-    { id: '1-2-2', label: '최근대출', accentColor: 'border-l-yellow-400' },
-    { id: '1-2-3', label: '인증미동의(국세청)', accentColor: 'border-l-yellow-400' },
-    { id: '1-2-4', label: '인증미동의(공여내역)', accentColor: 'border-l-yellow-400' },
-    { id: '1-3-1', label: '진행기간 미동의', accentColor: 'border-l-yellow-400' },
-    { id: '1-3-2', label: '자문료 미동의', accentColor: 'border-l-yellow-400' },
-    { id: '1-3-3', label: '계약금미동의(선불)', accentColor: 'border-l-yellow-400' },
-    { id: '1-3-4', label: '계약금미동의(후불)', accentColor: 'border-l-yellow-400' },
+  '희망타겟': [
+    { id: '업력미달', label: '업력미달', accentColor: 'border-l-yellow-400' },
+    { id: '최근대출', label: '최근대출', accentColor: 'border-l-yellow-400' },
+    { id: '인증미동의(국세청)', label: '인증미동의(국세청)', accentColor: 'border-l-yellow-400' },
+    { id: '인증미동의(공여내역)', label: '인증미동의(공여내역)', accentColor: 'border-l-yellow-400' },
+    { id: '진행기간 미동의', label: '진행기간 미동의', accentColor: 'border-l-yellow-400' },
+    { id: '자문료 미동의', label: '자문료 미동의', accentColor: 'border-l-yellow-400' },
+    { id: '계약금미동의(선불)', label: '계약금미동의(선불)', accentColor: 'border-l-yellow-400' },
+    { id: '계약금미동의(후불)', label: '계약금미동의(후불)', accentColor: 'border-l-yellow-400' },
   ],
-  '2': [
-    { id: '2-1', label: '계약완료(선불)', accentColor: 'border-l-green-400' },
-    { id: '2-2', label: '계약완료(외주)', accentColor: 'border-l-green-400' },
-    { id: '2-3', label: '계약완료(후불)', accentColor: 'border-l-green-400' },
+  '계약완료': [
+    { id: '계약완료(선불)', label: '계약완료(선불)', accentColor: 'border-l-emerald-400' },
+    { id: '계약완료(외주)', label: '계약완료(외주)', accentColor: 'border-l-green-400' },
+    { id: '계약완료(후불)', label: '계약완료(후불)', accentColor: 'border-l-emerald-400' },
   ],
-  '3': [
-    { id: '3-1', label: '서류취합완료(선불)', accentColor: 'border-l-blue-400' },
-    { id: '3-2', label: '서류취합완료(외주)', accentColor: 'border-l-blue-400' },
-    { id: '3-3', label: '서류취합완료(후불)', accentColor: 'border-l-blue-400' },
+  '서류취합': [
+    { id: '서류취합완료(선불)', label: '서류취합완료(선불)', accentColor: 'border-l-blue-400' },
+    { id: '서류취합완료(외주)', label: '서류취합완료(외주)', accentColor: 'border-l-sky-400' },
+    { id: '서류취합완료(후불)', label: '서류취합완료(후불)', accentColor: 'border-l-blue-400' },
   ],
-  '4': [
-    { id: '4-1', label: '신청완료(선불)', accentColor: 'border-l-orange-400' },
-    { id: '4-2', label: '신청완료(외주)', accentColor: 'border-l-orange-400' },
-    { id: '4-3', label: '신청완료(후불)', accentColor: 'border-l-orange-400' },
+  '신청완료': [
+    { id: '신청완료(선불)', label: '신청완료(선불)', accentColor: 'border-l-indigo-400' },
+    { id: '신청완료(외주)', label: '신청완료(외주)', accentColor: 'border-l-violet-400' },
+    { id: '신청완료(후불)', label: '신청완료(후불)', accentColor: 'border-l-indigo-400' },
   ],
-  '5': [
-    { id: '5-1', label: '집행완료', accentColor: 'border-l-teal-400' },
-    { id: '5-2', label: '집행완료(외주)', accentColor: 'border-l-teal-400' },
-    { id: '5-3', label: '최종부결', accentColor: 'border-l-red-500' },
+  '집행완료_그룹': [
+    { id: '집행완료', label: '집행완료', accentColor: 'border-l-teal-400' },
+    { id: '집행완료(외주)', label: '집행완료(외주)', accentColor: 'border-l-cyan-400' },
+    { id: '최종부결', label: '최종부결', accentColor: 'border-l-red-500' },
   ],
 };
 
-// Nested statuses for 1-1 (쓰레기통 상세사유)
-const NESTED_STATUSES: Record<string, { id: string; label: string }[]> = {
-  '1-1': [
-    { id: '1-1-1', label: '거절사유 미파악' },
-    { id: '1-1-2', label: '인증불가' },
-    { id: '1-1-3', label: '정부기관 오인' },
-    { id: '1-1-4', label: '기타자금 오인' },
-    { id: '1-1-5', label: '불가업종' },
-    { id: '1-1-6', label: '매출없음' },
-    { id: '1-1-7', label: '신용점수 미달' },
-    { id: '1-1-8', label: '차입금초과' },
-  ],
-};
+// 쓰레기통 상세사유 (한글)
+const TRASH_REASONS = [
+  { id: '거절사유 미파악', label: '거절사유 미파악' },
+  { id: '인증불가', label: '인증불가' },
+  { id: '정부기관 오인', label: '정부기관 오인' },
+  { id: '기타자금 오인', label: '기타자금 오인' },
+  { id: '불가업종', label: '불가업종' },
+  { id: '매출없음', label: '매출없음' },
+  { id: '신용점수 미달', label: '신용점수 미달' },
+  { id: '차입금초과', label: '차입금초과' },
+];
 
 export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelChartProps) {
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
@@ -92,18 +91,26 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
 
   const totalCount = customers.length;
 
+  // 상위 그룹 카운트 (FUNNEL_GROUPS 사용)
   const getStageCount = (stageId: string): number => {
     if (stageId === 'all') return customers.length;
-    if (stageId === 'target') {
-      return customers.filter(c => 
-        c.status_code.startsWith('1-2') || c.status_code.startsWith('1-3')
-      ).length;
+    
+    const groupStatuses = FUNNEL_GROUPS[stageId];
+    if (groupStatuses && groupStatuses.length > 0) {
+      return customers.filter(c => groupStatuses.includes(c.status_code)).length;
     }
-    return customers.filter(c => c.status_code.startsWith(stageId)).length;
+    
+    // 단일 상태
+    return customers.filter(c => c.status_code === stageId).length;
   };
 
+  // 하위 상태 카운트
   const getSubStatusCount = (subId: string): number => {
-    return customers.filter(c => c.status_code === subId || c.status_code.startsWith(subId)).length;
+    const groupStatuses = FUNNEL_GROUPS[subId];
+    if (groupStatuses && groupStatuses.length > 0) {
+      return customers.filter(c => groupStatuses.includes(c.status_code)).length;
+    }
+    return customers.filter(c => c.status_code === subId).length;
   };
 
   const getPercentage = (count: number): string => {
@@ -126,11 +133,11 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
           const isExpanded = expandedStages.has(stage.id);
           const hasSubStatuses = SUB_STATUSES[stage.id] && SUB_STATUSES[stage.id].length > 0;
           const count = getStageCount(stage.id);
-          const isAlwaysExpanded = stage.id === '1';
+          const isAlwaysExpanded = stage.id === '상담대기';
 
           return (
             <div key={stage.id} className="contents">
-              {/* Arrow wrapper - 고정폭 래퍼 (첫 번째 제외) */}
+              {/* Arrow wrapper */}
               {index > 0 && (
                 <div className="w-8 h-16 flex items-center justify-center shrink-0">
                   <ChevronRight className="w-5 h-5 text-gray-500" />
@@ -189,7 +196,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                   <div className="mt-2 flex flex-col gap-1 w-full">
                     {SUB_STATUSES[stage.id].map((sub) => {
                       const subCount = getSubStatusCount(sub.id);
-                      const isTrash = sub.id === '1-1';
+                      const isTrash = sub.id === '쓰레기통';
                       
                       return (
                         <div key={sub.id} className="flex flex-col gap-1 w-full">
@@ -224,10 +231,10 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                             </span>
                           </button>
                           
-                          {/* Nested 쓰레기통 상세사유 */}
-                          {isTrash && expandedTrash && NESTED_STATUSES['1-1'] && (
+                          {/* 쓰레기통 상세사유 */}
+                          {isTrash && expandedTrash && (
                             <div className="flex flex-col gap-1 w-full pl-2">
-                              {NESTED_STATUSES['1-1'].map((nested) => {
+                              {TRASH_REASONS.map((nested) => {
                                 const nestedCount = getSubStatusCount(nested.id);
                                 return (
                                   <button

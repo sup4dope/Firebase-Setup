@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { STATUS_LABELS } from '@shared/types';
+import { getStatusStyle, FUNNEL_GROUPS } from '@/lib/constants';
 import type { StatusLog, StatusCode } from '@shared/types';
 
 interface StatusHistoryDialogProps {
@@ -21,17 +21,10 @@ interface StatusHistoryDialogProps {
   customerName?: string;
 }
 
+// 한글 상태명 기반 색상 가져오기
 const getStatusColor = (statusCode: StatusCode): string => {
-  const prefix = statusCode.charAt(0);
-  switch (prefix) {
-    case '0': return 'bg-destructive/10 text-destructive border-destructive/20';
-    case '1': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20';
-    case '2': return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
-    case '3': return 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20';
-    case '4': return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
-    case '5': return 'bg-green-600/10 text-green-700 dark:text-green-400 border-green-600/20';
-    default: return '';
-  }
+  const style = getStatusStyle(statusCode);
+  return `${style.bg} ${style.text} ${style.border || ''}`;
 };
 
 export function StatusHistoryDialog({
@@ -75,20 +68,20 @@ export function StatusHistoryDialog({
                       <div className="absolute left-2 top-1 w-4 h-4 rounded-full bg-background border-2 border-primary z-10" />
                       
                       <div className="bg-card border rounded-lg p-4 space-y-3">
-                        {/* Status change badges */}
+                        {/* Status change badges - 한글 상태명 그대로 표시 */}
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge 
                             variant="outline" 
                             className={cn("text-xs", getStatusColor(log.previous_status))}
                           >
-                            {STATUS_LABELS[log.previous_status]}
+                            {log.previous_status}
                           </Badge>
                           <ArrowRight className="w-4 h-4 text-muted-foreground" />
                           <Badge 
                             variant="outline" 
                             className={cn("text-xs", getStatusColor(log.new_status))}
                           >
-                            {STATUS_LABELS[log.new_status]}
+                            {log.new_status}
                           </Badge>
                         </div>
                         
