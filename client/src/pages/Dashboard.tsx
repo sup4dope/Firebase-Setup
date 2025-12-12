@@ -239,6 +239,37 @@ export default function Dashboard() {
     }
   };
 
+  // Handle processing org change from dashboard table
+  const handleProcessingOrgChange = async (customerId: string, newOrg: string) => {
+    try {
+      await updateCustomer(customerId, {
+        processing_org: newOrg,
+        updated_at: new Date(),
+      });
+      
+      // Update local state
+      setCustomers(prev =>
+        prev.map(c => c.id === customerId ? {
+          ...c,
+          processing_org: newOrg,
+          updated_at: new Date(),
+        } : c)
+      );
+      
+      toast({
+        title: '성공',
+        description: '진행기관이 변경되었습니다.',
+      });
+    } catch (error) {
+      console.error('Error updating processing org:', error);
+      toast({
+        title: '오류',
+        description: '진행기관 변경 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Handle adding memo from dashboard table (syncs with detail modal chat history)
   const handleAddMemo = async (customerId: string, content: string) => {
     if (!user) return;
@@ -518,6 +549,7 @@ export default function Dashboard() {
             onDelete={handleDeleteCustomer}
             onViewHistory={handleViewHistory}
             onCustomerClick={handleCustomerClick}
+            onProcessingOrgChange={handleProcessingOrgChange}
             onAddMemo={handleAddMemo}
           />
         </div>
