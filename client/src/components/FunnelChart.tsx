@@ -222,7 +222,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
   return (
     <div className="space-y-4 w-full">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-justify pl-[4px] pr-[4px]">상태 분류</h3>
+        <h3 className="text-lg font-semibold text-justify pl-[0px] pr-[0px]">상태 분류</h3>
         <div className="text-sm text-muted-foreground">
           전체 {customers.length}건
         </div>
