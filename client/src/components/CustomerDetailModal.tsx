@@ -1729,41 +1729,8 @@ export function CustomerDetailModal({
             {/* Bottom Section - h-[40%] min-h-0 overflow-hidden with Tabs */}
             <div className="h-[40%] min-h-0 overflow-hidden flex flex-col">
               {/* Tab Headers */}
-              <div className="h-10 shrink-0 border-b border-gray-700 bg-gray-800/30 flex items-center justify-between px-2">
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setActiveBottomTab("memo")}
-                    className={cn(
-                      "h-8 px-3 text-sm",
-                      activeBottomTab === "memo"
-                        ? "bg-blue-600/20 text-blue-400"
-                        : "text-gray-400",
-                    )}
-                    data-testid="tab-memo"
-                  >
-                    <UserIcon className="w-4 h-4 mr-1.5" />
-                    상담 메모
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setActiveBottomTab("history")}
-                    className={cn(
-                      "h-8 px-3 text-sm",
-                      activeBottomTab === "history"
-                        ? "bg-orange-600/20 text-orange-400"
-                        : "text-gray-400",
-                    )}
-                    data-testid="tab-history"
-                  >
-                    <History className="w-4 h-4 mr-1.5" />
-                    변경 이력
-                  </Button>
-                </div>
-
-                {/* 상태 변경 드롭다운 - 읽기전용이 아닐 때만 표시 */}
+              <div className="h-10 shrink-0 border-b border-gray-700 bg-gray-800/30 flex items-center px-2 gap-2">
+                {/* 상태 변경 드롭다운 - 읽기전용이 아닐 때만 표시 (왼쪽) */}
                 {!isReadOnly && formData.id && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -1782,7 +1749,7 @@ export function CustomerDetailModal({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent 
-                      align="end" 
+                      align="start" 
                       className="w-48 max-h-80 overflow-y-auto bg-gray-900 border-gray-700"
                     >
                       {(() => {
@@ -1793,6 +1760,17 @@ export function CustomerDetailModal({
                           return acc;
                         }, {} as Record<string, typeof STATUS_OPTIONS>);
 
+                        const GROUP_COLORS: Record<string, string> = {
+                          "상담": "text-purple-300",
+                          "부재": "text-orange-300",
+                          "거절": "text-rose-300",
+                          "희망타겟": "text-yellow-300",
+                          "계약": "text-emerald-300",
+                          "서류": "text-blue-300",
+                          "신청": "text-indigo-300",
+                          "집행": "text-teal-300",
+                        };
+
                         return Object.entries(groups).map(([groupName, options], groupIndex) => (
                           <DropdownMenuGroup key={groupName}>
                             {groupIndex > 0 && <DropdownMenuSeparator className="bg-gray-700" />}
@@ -1800,7 +1778,7 @@ export function CustomerDetailModal({
                               {groupName}
                             </DropdownMenuLabel>
                             {options.map((option) => {
-                              const style = getStatusStyle(option.value);
+                              const groupColor = GROUP_COLORS[option.group || ""] || "text-gray-300";
                               const isSelected = formData.status_code === option.value;
                               return (
                                 <DropdownMenuItem
@@ -1842,7 +1820,7 @@ export function CustomerDetailModal({
                                   )}
                                   data-testid={`status-option-${option.value}`}
                                 >
-                                  <span className={style.text}>{option.label}</span>
+                                  <span className={groupColor}>{option.label}</span>
                                   {isSelected && <Check className="w-4 h-4 text-blue-400" />}
                                 </DropdownMenuItem>
                               );
@@ -1853,6 +1831,38 @@ export function CustomerDetailModal({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
+
+                {/* 탭 버튼들 */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveBottomTab("memo")}
+                  className={cn(
+                    "h-8 px-3 text-sm",
+                    activeBottomTab === "memo"
+                      ? "bg-blue-600/20 text-blue-400"
+                      : "text-gray-400",
+                  )}
+                  data-testid="tab-memo"
+                >
+                  <UserIcon className="w-4 h-4 mr-1.5" />
+                  상담 메모
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveBottomTab("history")}
+                  className={cn(
+                    "h-8 px-3 text-sm",
+                    activeBottomTab === "history"
+                      ? "bg-orange-600/20 text-orange-400"
+                      : "text-gray-400",
+                  )}
+                  data-testid="tab-history"
+                >
+                  <History className="w-4 h-4 mr-1.5" />
+                  변경 이력
+                </Button>
               </div>
 
               {/* Tab Content */}
