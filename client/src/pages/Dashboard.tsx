@@ -478,7 +478,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
       {/* Main Content Area - Scrollable */}
       <div className="flex-1 overflow-auto p-4 space-y-4 bg-background">
         {/* Funnel Chart - Wide and centered */}
@@ -491,7 +490,7 @@ export default function Dashboard() {
         {/* Customer List Section */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-200">
+            <h2 className="text-lg font-semibold text-gray-200 pl-[4px] pr-[4px]">
               고객 목록 
               <span className="text-sm font-normal text-gray-500 ml-2">
                 ({filteredCustomers.length}명)
@@ -523,7 +522,6 @@ export default function Dashboard() {
           />
         </div>
       </div>
-
       {/* Customer Form Dialog */}
       <CustomerForm
         open={customerFormOpen}
@@ -539,7 +537,6 @@ export default function Dashboard() {
         onSubmit={editingCustomer ? handleUpdateCustomer : handleCreateCustomer}
         isLoading={formLoading}
       />
-
       {/* Status History Dialog */}
       <StatusHistoryDialog
         open={historyDialogOpen}
@@ -547,7 +544,6 @@ export default function Dashboard() {
         logs={selectedCustomerLogs}
         customerName={selectedCustomerName}
       />
-
       {/* Customer Detail Modal */}
       <CustomerDetailModal
         isOpen={detailModalOpen}
