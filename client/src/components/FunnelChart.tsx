@@ -187,7 +187,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
     );
   };
 
-  // 하위 상태 칩 렌더링 (배경 투명, 텍스트/테두리는 부모 테마 색상)
+  // 하위 상태 칩 렌더링 (어두운 glassmorphism 배경 + 부모 테마 테두리)
   const renderSubStatus = (sub: { id: string; label: string }, parentTheme: string) => {
     const theme = getTheme(parentTheme);
     const subCount = getSubStatusCount(sub.id);
@@ -199,16 +199,16 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         className={cn(
           "w-full h-10 rounded-md border-l-4 transition-all duration-200",
           "flex items-center justify-between px-3",
-          "bg-transparent",
-          theme.text,
+          "bg-slate-900/60 backdrop-blur-sm",
+          "text-gray-200",
           theme.accent,
-          "hover:bg-white/5 hover:shadow-md",
+          "hover:bg-slate-800/80 hover:shadow-md",
           selectedStage === sub.id && "ring-2 ring-primary"
         )}
         data-testid={`button-funnel-${sub.id}`}
       >
         <span className="font-medium text-xs truncate">{sub.label}</span>
-        <span className={cn("text-xs flex-shrink-0", theme.text)}>
+        <span className="text-xs text-gray-400 flex-shrink-0">
           {subCount} ({getPercentage(subCount)})
         </span>
       </button>
@@ -247,7 +247,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
             false
           )}
 
-          {/* 부재중 그룹 - 항상 노출 (배경 투명, 텍스트/테두리는 부모 테마 색상) */}
+          {/* 부재중 그룹 - 항상 노출 (어두운 glassmorphism 배경 + 부모 테마 테두리) */}
           <div className="flex flex-col gap-1">
             {ABSENCE_STATUSES.map((absence) => {
               const absenceCount = getSubStatusCount(absence.id);
@@ -260,16 +260,16 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                   className={cn(
                     "w-full h-10 rounded-md border-l-4 transition-all duration-200",
                     "flex items-center justify-between px-3",
-                    "bg-transparent",
-                    theme.text,
+                    "bg-slate-900/60 backdrop-blur-sm",
+                    "text-gray-200",
                     theme.accent,
-                    "hover:bg-white/5 hover:shadow-md",
+                    "hover:bg-slate-800/80 hover:shadow-md",
                     selectedStage === absence.id && "ring-2 ring-primary"
                   )}
                   data-testid={`button-funnel-${absence.id}`}
                 >
                   <span className="font-medium text-xs">{absence.label}</span>
-                  <span className={cn("text-xs", theme.text)}>
+                  <span className="text-xs text-gray-400">
                     {absenceCount} ({getPercentage(absenceCount)})
                   </span>
                 </button>
