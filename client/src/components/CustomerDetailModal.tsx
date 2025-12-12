@@ -15,6 +15,7 @@ import {
   ArrowRight,
   UserCog,
   Lock,
+  ChevronDown,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -35,6 +36,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { STATUS_OPTIONS, getStatusStyle } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
   Customer,
@@ -1718,37 +1729,130 @@ export function CustomerDetailModal({
             {/* Bottom Section - h-[40%] min-h-0 overflow-hidden with Tabs */}
             <div className="h-[40%] min-h-0 overflow-hidden flex flex-col">
               {/* Tab Headers */}
-              <div className="h-10 shrink-0 border-b border-gray-700 bg-gray-800/30 flex items-center px-2 gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setActiveBottomTab("memo")}
-                  className={cn(
-                    "h-8 px-3 text-sm",
-                    activeBottomTab === "memo"
-                      ? "bg-blue-600/20 text-blue-400"
-                      : "text-gray-400",
-                  )}
-                  data-testid="tab-memo"
-                >
-                  <UserIcon className="w-4 h-4 mr-1.5" />
-                  상담 메모
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setActiveBottomTab("history")}
-                  className={cn(
-                    "h-8 px-3 text-sm",
-                    activeBottomTab === "history"
-                      ? "bg-orange-600/20 text-orange-400"
-                      : "text-gray-400",
-                  )}
-                  data-testid="tab-history"
-                >
-                  <History className="w-4 h-4 mr-1.5" />
-                  변경 이력
-                </Button>
+              <div className="h-10 shrink-0 border-b border-gray-700 bg-gray-800/30 flex items-center justify-between px-2">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveBottomTab("memo")}
+                    className={cn(
+                      "h-8 px-3 text-sm",
+                      activeBottomTab === "memo"
+                        ? "bg-blue-600/20 text-blue-400"
+                        : "text-gray-400",
+                    )}
+                    data-testid="tab-memo"
+                  >
+                    <UserIcon className="w-4 h-4 mr-1.5" />
+                    상담 메모
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveBottomTab("history")}
+                    className={cn(
+                      "h-8 px-3 text-sm",
+                      activeBottomTab === "history"
+                        ? "bg-orange-600/20 text-orange-400"
+                        : "text-gray-400",
+                    )}
+                    data-testid="tab-history"
+                  >
+                    <History className="w-4 h-4 mr-1.5" />
+                    변경 이력
+                  </Button>
+                </div>
+
+                {/* 상태 변경 드롭다운 - 읽기전용이 아닐 때만 표시 */}
+                {!isReadOnly && formData.id && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "h-8 px-3 text-sm gap-1.5",
+                          "border-gray-600 bg-gray-800/50",
+                          getStatusStyle(formData.status_code || "상담대기").text
+                        )}
+                        data-testid="button-status-dropdown"
+                      >
+                        {formData.status_code || "상담대기"}
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="w-48 max-h-80 overflow-y-auto bg-gray-900 border-gray-700"
+                    >
+                      {(() => {
+                        const groups = STATUS_OPTIONS.reduce((acc, option) => {
+                          const group = option.group || "기타";
+                          if (!acc[group]) acc[group] = [];
+                          acc[group].push(option);
+                          return acc;
+                        }, {} as Record<string, typeof STATUS_OPTIONS>);
+
+                        return Object.entries(groups).map(([groupName, options], groupIndex) => (
+                          <DropdownMenuGroup key={groupName}>
+                            {groupIndex > 0 && <DropdownMenuSeparator className="bg-gray-700" />}
+                            <DropdownMenuLabel className="text-xs text-gray-500 px-2 py-1">
+                              {groupName}
+                            </DropdownMenuLabel>
+                            {options.map((option) => {
+                              const style = getStatusStyle(option.value);
+                              const isSelected = formData.status_code === option.value;
+                              return (
+                                <DropdownMenuItem
+                                  key={option.value}
+                                  onClick={async () => {
+                                    if (formData.id && formData.status_code !== option.value) {
+                                      const oldStatus = formData.status_code;
+                                      setFormData(prev => ({ ...prev, status_code: option.value as StatusCode }));
+                                      
+                                      try {
+                                        await updateDoc(doc(db, "customers", formData.id!), {
+                                          status_code: option.value,
+                                          updated_at: new Date(),
+                                        });
+                                        
+                                        await addDoc(collection(db, "customer_history_logs"), {
+                                          customer_id: formData.id,
+                                          action_type: "status_change",
+                                          description: `상태 변경: ${oldStatus} → ${option.value}`,
+                                          old_value: oldStatus,
+                                          new_value: option.value,
+                                          changed_by_id: currentUser?.uid || "",
+                                          changed_by_name: currentUser?.name || "",
+                                          changed_at: new Date(),
+                                        });
+                                        
+                                        const logs = await getCustomerHistoryLogs(formData.id!);
+                                        setHistoryLogs(logs);
+                                      } catch (error) {
+                                        console.error("상태 변경 실패:", error);
+                                        setFormData(prev => ({ ...prev, status_code: oldStatus }));
+                                      }
+                                    }
+                                  }}
+                                  className={cn(
+                                    "flex items-center justify-between cursor-pointer",
+                                    "hover:bg-gray-800",
+                                    isSelected && "bg-gray-800"
+                                  )}
+                                  data-testid={`status-option-${option.value}`}
+                                >
+                                  <span className={style.text}>{option.label}</span>
+                                  {isSelected && <Check className="w-4 h-4 text-blue-400" />}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuGroup>
+                        ));
+                      })()}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
 
               {/* Tab Content */}
