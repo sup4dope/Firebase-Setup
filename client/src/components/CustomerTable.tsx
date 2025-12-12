@@ -48,11 +48,21 @@ const TRASH_REASONS = [
   { id: '차입금초과', label: '차입금초과' },
 ];
 
-// 상태 배지 정보 가져오기 (한글 상태명 기반)
+// 그룹별 통일된 색상 (대시보드 영업 퍼널과 동일)
+const GROUP_COLORS: Record<string, { bg: string; text: string }> = {
+  '상담': { bg: 'bg-purple-500/20', text: 'text-purple-300' },
+  '부재': { bg: 'bg-orange-500/20', text: 'text-orange-300' },
+  '거절': { bg: 'bg-rose-500/20', text: 'text-rose-300' },
+  '희망타겟': { bg: 'bg-yellow-500/20', text: 'text-yellow-300' },
+  '계약': { bg: 'bg-emerald-500/20', text: 'text-emerald-300' },
+  '서류': { bg: 'bg-blue-500/20', text: 'text-blue-300' },
+  '신청': { bg: 'bg-indigo-500/20', text: 'text-indigo-300' },
+  '집행': { bg: 'bg-teal-500/20', text: 'text-teal-300' },
+  '기타': { bg: 'bg-gray-500/20', text: 'text-gray-300' },
+};
+
+// 상태 배지 정보 가져오기 (한글 상태명 기반, 그룹 색상 통일)
 const getStatusBadgeInfo = (statusCode: string): { label: string; colorClass: string; category: string } => {
-  // 상태 스타일 가져오기
-  const style = getStatusStyle(statusCode);
-  
   // 카테고리 결정
   let category = '기타';
   if (statusCode === '상담대기') category = '상담';
@@ -64,9 +74,12 @@ const getStatusBadgeInfo = (statusCode: string): { label: string; colorClass: st
   else if (FUNNEL_GROUPS['신청완료']?.includes(statusCode)) category = '신청';
   else if (FUNNEL_GROUPS['집행완료_그룹']?.includes(statusCode)) category = '집행';
   
+  // 그룹 색상 사용 (통일)
+  const groupStyle = GROUP_COLORS[category] || GROUP_COLORS['기타'];
+  
   return {
     label: statusCode, // 한글 상태명 그대로 표시
-    colorClass: `${style.bg} ${style.text}`,
+    colorClass: `${groupStyle.bg} ${groupStyle.text}`,
     category,
   };
 };
