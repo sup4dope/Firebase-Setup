@@ -22,11 +22,6 @@ interface StatusHistoryDialogProps {
 }
 
 const getStatusColor = (statusCode: StatusCode): string => {
-  // ★ '1-0'(상담대기/신규)만 보라색으로 특별 처리
-  if (statusCode === '1-0') {
-    return 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20';
-  }
-  
   const prefix = statusCode.charAt(0);
   switch (prefix) {
     case '0': return 'bg-destructive/10 text-destructive border-destructive/20';
