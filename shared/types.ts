@@ -20,50 +20,12 @@ export interface Team {
   created_at: Date;
 }
 
-// Customer status codes
-// 0-X: 드롭아웃/부재
-// 1-X: 상담 진행
-// 2-X: 서류 준비
-// 3-X: 심사 중
-// 4-X: 계약 진행
-// 5-X: 집행 완료
-export type StatusCode = 
-  | '0-1' | '0-2' | '0-3' // 드롭아웃: 단기부재, 장기부재, 거절
-  | '1-1' | '1-2' | '1-3' // 상담: 대기, 진행중, 완료
-  | '2-1' | '2-2' | '2-3' // 서류: 요청, 수집중, 완료
-  | '3-1' | '3-2' | '3-3' // 심사: 접수, 진행중, 완료
-  | '4-1' | '4-2' | '4-3' // 계약: 조건협의, 서명대기, 완료
-  | '5-1' | '5-2'; // 집행: 대기, 완료
+// Customer status - 한글 자연어 상태명 사용
+// 이제 '1-1' 같은 숫자 코드 대신 '상담대기', '단기부재' 같은 한글 텍스트를 직접 사용
+export type StatusCode = string;
 
-// Status code labels
-export const STATUS_LABELS: Record<StatusCode, string> = {
-  '0-1': '단기부재',
-  '0-2': '장기부재',
-  '0-3': '거절',
-  '1-1': '상담대기',
-  '1-2': '상담진행',
-  '1-3': '상담완료',
-  '2-1': '서류요청',
-  '2-2': '서류수집',
-  '2-3': '서류완료',
-  '3-1': '심사접수',
-  '3-2': '심사진행',
-  '3-3': '심사완료',
-  '4-1': '조건협의',
-  '4-2': '서명대기',
-  '4-3': '계약완료',
-  '5-1': '집행대기',
-  '5-2': '집행완료',
-};
-
-// Funnel stages (main categories)
-export const FUNNEL_STAGES = [
-  { code: '1', label: '상담', icon: 'MessageCircle' },
-  { code: '2', label: '서류', icon: 'FileText' },
-  { code: '3', label: '심사', icon: 'Search' },
-  { code: '4', label: '계약', icon: 'FileSignature' },
-  { code: '5', label: '집행', icon: 'CheckCircle' },
-] as const;
+// 기본 상태값
+export const DEFAULT_STATUS = "상담대기";
 
 // Customer (Firestore: customers collection)
 export interface Customer {
