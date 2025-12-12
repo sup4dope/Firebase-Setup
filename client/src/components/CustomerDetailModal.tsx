@@ -1840,10 +1840,10 @@ export function CustomerDetailModal({
                           alt={selectedDocument.file_name}
                           className="max-w-full max-h-full object-contain rounded"
                         />
-                      ) : selectedDocument.file_type === "application/pdf" ? (
+                      ) : selectedDocument.file_type === "application/pdf" || selectedDocument.file_type.includes("pdf") ? (
                         <iframe
-                          src={selectedDocument.file_url}
-                          className="w-full h-full rounded border border-gray-700"
+                          src={`https://docs.google.com/gview?url=${encodeURIComponent(selectedDocument.file_url)}&embedded=true`}
+                          className="w-full h-full rounded border border-gray-700 bg-white"
                           title={selectedDocument.file_name}
                         />
                       ) : (
