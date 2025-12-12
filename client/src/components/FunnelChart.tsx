@@ -211,7 +211,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         )}
         data-testid={`button-funnel-${sub.id}`}
       >
-        <span className="font-medium text-xs truncate">{sub.label}</span>
+        <span className="font-medium text-xs truncate text-[#e5e7eb]">{sub.label}</span>
         <span className={cn("text-xs flex-shrink-0", isRejection ? "text-red-400" : "text-gray-400")}>
           {subCount} ({getPercentage(subCount)})
         </span>
