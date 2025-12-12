@@ -187,7 +187,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
     );
   };
 
-  // 하위 상태 칩 렌더링 (부모 테마 색상 100% 상속)
+  // 하위 상태 칩 렌더링 (배경 투명, 텍스트/테두리는 부모 테마 색상)
   const renderSubStatus = (sub: { id: string; label: string }, parentTheme: string) => {
     const theme = getTheme(parentTheme);
     const subCount = getSubStatusCount(sub.id);
@@ -199,10 +199,10 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         className={cn(
           "w-full h-10 rounded-md border-l-4 transition-all duration-200",
           "flex items-center justify-between px-3",
-          theme.bg,
+          "bg-transparent",
           theme.text,
           theme.accent,
-          "hover:brightness-125 hover:shadow-md",
+          "hover:bg-white/5 hover:shadow-md",
           selectedStage === sub.id && "ring-2 ring-primary"
         )}
         data-testid={`button-funnel-${sub.id}`}
@@ -247,7 +247,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
             false
           )}
 
-          {/* 부재중 그룹 - 항상 노출 (부모 테마 색상 100% 상속) */}
+          {/* 부재중 그룹 - 항상 노출 (배경 투명, 텍스트/테두리는 부모 테마 색상) */}
           <div className="flex flex-col gap-1">
             {ABSENCE_STATUSES.map((absence) => {
               const absenceCount = getSubStatusCount(absence.id);
@@ -260,10 +260,10 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                   className={cn(
                     "w-full h-10 rounded-md border-l-4 transition-all duration-200",
                     "flex items-center justify-between px-3",
-                    theme.bg,
+                    "bg-transparent",
                     theme.text,
                     theme.accent,
-                    "hover:brightness-125 hover:shadow-md",
+                    "hover:bg-white/5 hover:shadow-md",
                     selectedStage === absence.id && "ring-2 ring-primary"
                   )}
                   data-testid={`button-funnel-${absence.id}`}
@@ -284,7 +284,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                 onClick={() => onStageClick('쓰레기통')}
                 className={cn(
                   "w-full h-12 rounded-md border-2 transition-all duration-300",
-                  "flex items-center justify-between px-3",
+                  "flex items-center justify-between pl-3 pr-10",
                   "bg-slate-900/50 backdrop-blur-sm text-white",
                   STAGE_THEMES.쓰레기통.border,
                   "hover:shadow-lg hover:bg-slate-800/70",
@@ -304,7 +304,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                   setTrashExpanded(!trashExpanded);
                 }}
                 className={cn(
-                  "absolute right-1 top-1/2 -translate-y-1/2",
+                  "absolute right-2 top-1/2 -translate-y-1/2",
                   "w-6 h-6 rounded-full",
                   "flex items-center justify-center",
                   "transition-all duration-200",
