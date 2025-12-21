@@ -998,64 +998,94 @@ export function CustomerDetailModal({
                   고객 정보
                 </h3>
 
-                {/* Row 1: 이름 | 신용점수 | 주민번호 앞 | 주민번호 뒤 (12분할 그리드) */}
-                <div className="grid grid-cols-12 gap-1 items-end">
-                  <div className="col-span-2">
+                {/* Row 1: 이름(29%) | 신용점수(21%) | 주민번호 앞(25%) | 주민번호 뒤(25%) = 총 100% */}
+                <div className="flex gap-1.5 items-end">
+                  {/* 이름: 기존 약 33%에서 29%로 살짝 축소 */}
+                  <div className="w-[29%]">
                     <Label className="text-[10px] text-gray-400">이름</Label>
                     <Input
                       value={formData.name || ""}
-                      onChange={(e) => handleFieldChange({ name: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({ name: e.target.value })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                       data-testid="input-customer-name"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <Label className="text-[10px] text-gray-400">신용점수</Label>
+
+                  {/* 신용점수: 기존 약 17%에서 21%로 살짝 확대 */}
+                  <div className="w-[21%]">
+                    <Label className="text-[10px] text-gray-400">
+                      신용점수
+                    </Label>
                     <Input
                       type="number"
                       value={formData.credit_score || ""}
-                      onChange={(e) => handleFieldChange({ credit_score: Number(e.target.value) })}
+                      onChange={(e) =>
+                        handleFieldChange({
+                          credit_score: Number(e.target.value),
+                        })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                     />
                   </div>
-                  <div className="col-span-4">
-                    <Label className="text-[10px] text-gray-400">주민번호(앞)</Label>
+
+                  {/* 주민번호(앞): 완벽한 25% 유지 */}
+                  <div className="w-[25%]">
+                    <Label className="text-[10px] text-gray-400">
+                      주민번호(앞)
+                    </Label>
                     <Input
                       maxLength={6}
                       value={formData.ssn_front || ""}
-                      onChange={(e) => handleFieldChange({ ssn_front: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({ ssn_front: e.target.value })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                       placeholder="YYMMDD"
                     />
                   </div>
-                  <div className="col-span-4">
-                    <Label className="text-[10px] text-gray-400">주민번호(뒤)</Label>
+
+                  {/* 주민번호(뒤): 완벽한 25% 유지 */}
+                  <div className="w-[25%]">
+                    <Label className="text-[10px] text-gray-400">
+                      주민번호(뒤)
+                    </Label>
                     <Input
                       maxLength={7}
                       value={formData.ssn_back || ""}
-                      onChange={(e) => handleFieldChange({ ssn_back: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({ ssn_back: e.target.value })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                       placeholder="0000000"
                     />
                   </div>
                 </div>
-
                 {/* Row 2: 연락처 (010-0000-0000) | 통신사 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
@@ -1063,41 +1093,53 @@ export function CustomerDetailModal({
                     <div className="flex items-center gap-0.5">
                       <Input
                         value={formData.phone_part1 || "010"}
-                        onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
+                        onChange={(e) =>
+                          handleFieldChange({ phone_part1: e.target.value })
+                        }
                         onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
-                          "border-gray-600 text-gray-200 h-7 text-xs text-center w-12",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          "border-gray-600 text-gray-200 h-7 text-xs text-center w-16",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       />
                       <span className="text-gray-500 text-xs">-</span>
                       <Input
                         maxLength={4}
                         value={formData.phone_part2 || ""}
-                        onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
+                        onChange={(e) =>
+                          handleFieldChange({ phone_part2: e.target.value })
+                        }
                         onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       />
                       <span className="text-gray-500 text-xs">-</span>
                       <Input
                         maxLength={4}
                         value={formData.phone_part3 || ""}
-                        onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
+                        onChange={(e) =>
+                          handleFieldChange({ phone_part3: e.target.value })
+                        }
                         onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       />
                     </div>
                   </div>
-                  <div className="w-[100px]">
+                  <div className="w-[140px]">
                     <Label className="text-[10px] text-gray-400">통신사</Label>
                     <Select
                       value={formData.carrier || "SKT"}
@@ -1262,7 +1304,7 @@ export function CustomerDetailModal({
               </div>
 
               {/* 사업자 정보 그룹 (Border Box) - 10줄 압축 배치 */}
-              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 pl-[8px] pr-[8px] pt-[12px] pb-[12px] mt-[30px] mb-[30px]">
+              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 pl-[8px] pr-[8px] pt-[12px] pb-[12px] mt-[20px] mb-[20px]">
                 <h3 className="text-xs font-semibold text-emerald-400 mb-1">
                   사업자 정보
                 </h3>
@@ -1321,20 +1363,30 @@ export function CustomerDetailModal({
                     <Label className="text-[10px] text-gray-400">업종</Label>
                     <Select
                       value={formData.business_type || "기타"}
-                      onValueChange={(v) => handleFieldChange({ business_type: v })}
+                      onValueChange={(v) =>
+                        handleFieldChange({ business_type: v })
+                      }
                       disabled={isReadOnly}
                     >
                       <SelectTrigger
                         className={cn(
                           "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
                         {BUSINESS_TYPES.map((t) => (
-                          <SelectItem key={t} value={t} className="text-gray-200 text-xs">{t}</SelectItem>
+                          <SelectItem
+                            key={t}
+                            value={t}
+                            className="text-gray-200 text-xs"
+                          >
+                            {t}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1343,11 +1395,15 @@ export function CustomerDetailModal({
                     <Label className="text-[10px] text-gray-400">종목</Label>
                     <Input
                       value={formData.business_item || ""}
-                      onChange={(e) => handleFieldChange({ business_item: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({ business_item: e.target.value })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                     />
                   </div>
@@ -1356,14 +1412,22 @@ export function CustomerDetailModal({
                 {/* Row 7: 사업자번호 | 재도전 | 혁신 (12분할 그리드 - 6:3:3) */}
                 <div className="grid grid-cols-12 gap-1 items-end">
                   <div className="col-span-6">
-                    <Label className="text-[10px] text-gray-400">사업자번호</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      사업자번호
+                    </Label>
                     <Input
                       value={formData.business_registration_number || ""}
-                      onChange={(e) => handleFieldChange({ business_registration_number: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({
+                          business_registration_number: e.target.value,
+                        })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                       placeholder="000-00-00000"
                     />
@@ -1372,20 +1436,30 @@ export function CustomerDetailModal({
                     <Label className="text-[10px] text-gray-400">재도전</Label>
                     <Select
                       value={formData.retry_type || "해당없음"}
-                      onValueChange={(v) => handleFieldChange({ retry_type: v })}
+                      onValueChange={(v) =>
+                        handleFieldChange({ retry_type: v })
+                      }
                       disabled={isReadOnly}
                     >
                       <SelectTrigger
                         className={cn(
                           "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
                         {RETRY_OPTIONS.map((o) => (
-                          <SelectItem key={o} value={o} className="text-gray-200 text-xs">{o}</SelectItem>
+                          <SelectItem
+                            key={o}
+                            value={o}
+                            className="text-gray-200 text-xs"
+                          >
+                            {o}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1394,20 +1468,30 @@ export function CustomerDetailModal({
                     <Label className="text-[10px] text-gray-400">혁신</Label>
                     <Select
                       value={formData.innovation_type || "해당없음"}
-                      onValueChange={(v) => handleFieldChange({ innovation_type: v })}
+                      onValueChange={(v) =>
+                        handleFieldChange({ innovation_type: v })
+                      }
                       disabled={isReadOnly}
                     >
                       <SelectTrigger
                         className={cn(
                           "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
                         {INNOVATION_OPTIONS.map((o) => (
-                          <SelectItem key={o} value={o} className="text-gray-200 text-xs">{o}</SelectItem>
+                          <SelectItem
+                            key={o}
+                            value={o}
+                            className="text-gray-200 text-xs"
+                          >
+                            {o}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
