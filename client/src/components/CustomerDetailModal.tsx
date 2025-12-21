@@ -59,7 +59,12 @@ import {
 import { format, differenceInYears, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
 import {
   doc,
   updateDoc,
@@ -431,20 +436,20 @@ export function CustomerDetailModal({
       // 5. [핵심] Firestore 즉시 저장 (기존 고객일 경우)
       if (formData.id) {
         const customerRef = doc(db, "customers", formData.id);
-        
+
         // (1) DB에 arrayUnion으로 추가 (덮어쓰기 방지)
         await updateDoc(customerRef, {
-          documents: arrayUnion(newDoc)
+          documents: arrayUnion(newDoc),
         });
 
         // (2) 로컬 formData 동기화 (자동저장 충돌 방지)
-        setFormData(prev => ({ ...prev, documents: updatedDocs }));
+        setFormData((prev) => ({ ...prev, documents: updatedDocs }));
 
         // (3) 대시보드 알림
         if (onSave) {
           onSave({ id: formData.id, documents: updatedDocs });
         }
-        
+
         // (4) 로그 기록
         await addDoc(collection(db, "counseling_logs"), {
           customer_id: formData.id,
@@ -452,13 +457,12 @@ export function CustomerDetailModal({
           description: `파일 업로드: ${file.name}`,
           changed_by_name: currentUser?.name || "관리자",
           changed_at: new Date(),
-          type: "log"
+          type: "log",
         });
       } else {
         // 신규 고객일 경우: formData에만 담아둠 (저장 버튼 누를 때 같이 저장됨)
-        setFormData(prev => ({ ...prev, documents: updatedDocs }));
+        setFormData((prev) => ({ ...prev, documents: updatedDocs }));
       }
-
     } catch (error) {
       console.error("파일 업로드 실패:", error);
       alert("파일 업로드 중 오류가 발생했습니다.");
@@ -470,7 +474,9 @@ export function CustomerDetailModal({
 
   // [추가] 파일 삭제 함수
   const handleDeleteFile = async (docToDelete: CustomerDocument) => {
-    if (!window.confirm(`"${docToDelete.file_name}" 파일을 삭제하시겠습니까?`)) {
+    if (
+      !window.confirm(`"${docToDelete.file_name}" 파일을 삭제하시겠습니까?`)
+    ) {
       return;
     }
 
@@ -480,11 +486,14 @@ export function CustomerDetailModal({
       try {
         await deleteObject(storageRef);
       } catch (storageError) {
-        console.warn("Storage 파일 삭제 실패 (이미 삭제되었거나 존재하지 않음):", storageError);
+        console.warn(
+          "Storage 파일 삭제 실패 (이미 삭제되었거나 존재하지 않음):",
+          storageError,
+        );
       }
 
       // 2. 로컬 상태 업데이트
-      const updatedDocs = documents.filter(d => d.id !== docToDelete.id);
+      const updatedDocs = documents.filter((d) => d.id !== docToDelete.id);
       setDocuments(updatedDocs);
       setSelectedDocument(null);
 
@@ -492,11 +501,11 @@ export function CustomerDetailModal({
       if (formData.id) {
         const customerRef = doc(db, "customers", formData.id);
         await updateDoc(customerRef, {
-          documents: updatedDocs
+          documents: updatedDocs,
         });
 
         // 로컬 formData 동기화
-        setFormData(prev => ({ ...prev, documents: updatedDocs }));
+        setFormData((prev) => ({ ...prev, documents: updatedDocs }));
 
         // 대시보드 알림
         if (onSave) {
@@ -510,10 +519,10 @@ export function CustomerDetailModal({
           description: `파일 삭제: ${docToDelete.file_name}`,
           changed_by_name: currentUser?.name || "관리자",
           changed_at: new Date(),
-          type: "log"
+          type: "log",
         });
       } else {
-        setFormData(prev => ({ ...prev, documents: updatedDocs }));
+        setFormData((prev) => ({ ...prev, documents: updatedDocs }));
       }
 
       alert("파일이 삭제되었습니다.");
@@ -947,7 +956,7 @@ export function CustomerDetailModal({
         {/* Main Content - 3단 레이아웃 (좌-중-우) */}
         <div className="flex-1 flex flex-row h-[calc(100%-4rem)] overflow-hidden">
           {/* Section 1: 좌측 패널 - 상세 정보 입력 (35%) */}
-          <div className="w-[35%] min-w-[400px] h-full border-r border-gray-700 overflow-y-auto">
+          <div className="w-[25%] min-w-[260px] h-full border-r border-gray-700 overflow-y-auto">
             <div className="p-1.5 space-y-1">
               {/* 유입경로 (최상단) - 1. 상단에 바짝 붙임 */}
               <div className="space-y-0.5 ml-[6px] mr-[6px] pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
@@ -985,7 +994,9 @@ export function CustomerDetailModal({
 
               {/* 고객 정보 그룹 (Border Box) - 10줄 압축 배치 */}
               <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5">
-                <h3 className="text-xs font-semibold text-blue-400 mb-1">고객 정보</h3>
+                <h3 className="text-xs font-semibold text-blue-400 mb-1">
+                  고객 정보
+                </h3>
 
                 {/* Row 1: 이름 | 신용점수 | 주민번호 앞 | 주민번호 뒤 */}
                 <div className="flex gap-1.5 items-end">
@@ -993,52 +1004,76 @@ export function CustomerDetailModal({
                     <Label className="text-[10px] text-gray-400">이름</Label>
                     <Input
                       value={formData.name || ""}
-                      onChange={(e) => handleFieldChange({ name: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({ name: e.target.value })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                       data-testid="input-customer-name"
                     />
                   </div>
                   <div className="w-16">
-                    <Label className="text-[10px] text-gray-400">신용점수</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      신용점수
+                    </Label>
                     <Input
                       type="number"
                       value={formData.credit_score || ""}
-                      onChange={(e) => handleFieldChange({ credit_score: Number(e.target.value) })}
+                      onChange={(e) =>
+                        handleFieldChange({
+                          credit_score: Number(e.target.value),
+                        })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                     />
                   </div>
                   <div className="w-20">
-                    <Label className="text-[10px] text-gray-400">주민번호(앞)</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      주민번호(앞)
+                    </Label>
                     <Input
                       maxLength={6}
                       value={formData.ssn_front || ""}
-                      onChange={(e) => handleFieldChange({ ssn_front: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({ ssn_front: e.target.value })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                       placeholder="YYMMDD"
                     />
                   </div>
                   <div className="w-20">
-                    <Label className="text-[10px] text-gray-400">주민번호(뒤)</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      주민번호(뒤)
+                    </Label>
                     <Input
                       maxLength={7}
                       value={formData.ssn_back || ""}
-                      onChange={(e) => handleFieldChange({ ssn_back: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({ ssn_back: e.target.value })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                       placeholder="0000000"
                     />
@@ -1052,36 +1087,48 @@ export function CustomerDetailModal({
                     <div className="flex items-center gap-0.5">
                       <Input
                         value={formData.phone_part1 || "010"}
-                        onChange={(e) => handleFieldChange({ phone_part1: e.target.value })}
+                        onChange={(e) =>
+                          handleFieldChange({ phone_part1: e.target.value })
+                        }
                         onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       />
                       <span className="text-gray-500 text-xs">-</span>
                       <Input
                         maxLength={4}
                         value={formData.phone_part2 || ""}
-                        onChange={(e) => handleFieldChange({ phone_part2: e.target.value })}
+                        onChange={(e) =>
+                          handleFieldChange({ phone_part2: e.target.value })
+                        }
                         onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       />
                       <span className="text-gray-500 text-xs">-</span>
                       <Input
                         maxLength={4}
                         value={formData.phone_part3 || ""}
-                        onChange={(e) => handleFieldChange({ phone_part3: e.target.value })}
+                        onChange={(e) =>
+                          handleFieldChange({ phone_part3: e.target.value })
+                        }
                         onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
                           "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       />
                     </div>
@@ -1096,14 +1143,22 @@ export function CustomerDetailModal({
                       <SelectTrigger
                         className={cn(
                           "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                          isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
                         )}
                       >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
                         {CARRIERS.map((c) => (
-                          <SelectItem key={c} value={c} className="text-gray-200 text-xs">{c}</SelectItem>
+                          <SelectItem
+                            key={c}
+                            value={c}
+                            className="text-gray-200 text-xs"
+                          >
+                            {c}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1129,7 +1184,10 @@ export function CustomerDetailModal({
                       size="sm"
                       onClick={() => setShowHomeAddressSearch(true)}
                       disabled={isReadOnly}
-                      className={cn("border-gray-600 h-7 w-7 p-0", isReadOnly && "opacity-50 cursor-not-allowed")}
+                      className={cn(
+                        "border-gray-600 h-7 w-7 p-0",
+                        isReadOnly && "opacity-50 cursor-not-allowed",
+                      )}
                     >
                       <Search className="w-3 h-3" />
                     </Button>
@@ -1139,14 +1197,22 @@ export function CustomerDetailModal({
                 {/* Row 4: 상세주소 | 자가 | 사업장동일 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
-                    <Label className="text-[10px] text-gray-400">상세주소</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      상세주소
+                    </Label>
                     <Input
                       value={formData.home_address_detail || ""}
-                      onChange={(e) => handleFieldChange({ home_address_detail: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({
+                          home_address_detail: e.target.value,
+                        })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                       placeholder="동/호수"
                     />
@@ -1155,11 +1221,21 @@ export function CustomerDetailModal({
                     <Checkbox
                       id="home-owned"
                       checked={formData.is_home_owned || false}
-                      onCheckedChange={(c) => handleFieldChange({ is_home_owned: !!c })}
+                      onCheckedChange={(c) =>
+                        handleFieldChange({ is_home_owned: !!c })
+                      }
                       disabled={isReadOnly}
-                      className={cn("h-3 w-3", isReadOnly && "opacity-50 cursor-not-allowed")}
+                      className={cn(
+                        "h-3 w-3",
+                        isReadOnly && "opacity-50 cursor-not-allowed",
+                      )}
                     />
-                    <Label htmlFor="home-owned" className="text-[10px] text-gray-400">자가</Label>
+                    <Label
+                      htmlFor="home-owned"
+                      className="text-[10px] text-gray-400"
+                    >
+                      자가
+                    </Label>
                   </div>
                   <div className="flex items-center gap-1 h-7">
                     <Checkbox
@@ -1168,14 +1244,26 @@ export function CustomerDetailModal({
                       onCheckedChange={(c) => {
                         handleFieldChangeObject({
                           is_same_as_business: !!c,
-                          business_address: c ? formData.home_address : formData.business_address,
-                          business_address_detail: c ? formData.home_address_detail : formData.business_address_detail,
+                          business_address: c
+                            ? formData.home_address
+                            : formData.business_address,
+                          business_address_detail: c
+                            ? formData.home_address_detail
+                            : formData.business_address_detail,
                         });
                       }}
                       disabled={isReadOnly}
-                      className={cn("h-3 w-3", isReadOnly && "opacity-50 cursor-not-allowed")}
+                      className={cn(
+                        "h-3 w-3",
+                        isReadOnly && "opacity-50 cursor-not-allowed",
+                      )}
                     />
-                    <Label htmlFor="same-address" className="text-[10px] text-gray-400">사업장동일</Label>
+                    <Label
+                      htmlFor="same-address"
+                      className="text-[10px] text-gray-400"
+                    >
+                      사업장동일
+                    </Label>
                   </div>
                 </div>
 
@@ -1184,13 +1272,25 @@ export function CustomerDetailModal({
                   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg w-[400px] overflow-hidden">
                       <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b">
-                        <span className="font-medium text-gray-700">자택 주소 검색</span>
-                        <Button variant="ghost" size="icon" onClick={() => setShowHomeAddressSearch(false)} className="text-gray-600">
+                        <span className="font-medium text-gray-700">
+                          자택 주소 검색
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowHomeAddressSearch(false)}
+                          className="text-gray-600"
+                        >
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
                       <div className="p-4">
-                        <DaumPostcodeEmbed onComplete={(data) => { handleFieldChange({ home_address: data.address }); setShowHomeAddressSearch(false); }} />
+                        <DaumPostcodeEmbed
+                          onComplete={(data) => {
+                            handleFieldChange({ home_address: data.address });
+                            setShowHomeAddressSearch(false);
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1198,8 +1298,10 @@ export function CustomerDetailModal({
               </div>
 
               {/* 사업자 정보 그룹 (Border Box) - 10줄 압축 배치 */}
-              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 mt-1">
-                <h3 className="text-xs font-semibold text-emerald-400 mb-1">사업자 정보</h3>
+              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 pl-[8px] pr-[8px] pt-[12px] pb-[12px] mt-[30px] mb-[30px]">
+                <h3 className="text-xs font-semibold text-emerald-400 mb-1">
+                  사업자 정보
+                </h3>
 
                 {/* Row 5: 상호명 | 개업일 */}
                 <div className="flex gap-1.5 items-end">
@@ -1207,20 +1309,31 @@ export function CustomerDetailModal({
                     <Label className="text-[10px] text-gray-400">상호명</Label>
                     <Input
                       value={formData.company_name || ""}
-                      onChange={(e) => handleFieldChange({ company_name: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({ company_name: e.target.value })
+                      }
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                       data-testid="input-company-name"
                     />
                   </div>
                   <div className="w-32">
                     <div className="flex items-center gap-1">
-                      <Label className="text-[10px] text-gray-400">개업일</Label>
+                      <Label className="text-[10px] text-gray-400">
+                        개업일
+                      </Label>
                       {formData.founding_date && formData.over_7_years && (
-                        <Badge variant="secondary" className="text-[8px] px-0.5 py-0 bg-orange-600/20 text-orange-400 leading-tight">7년초과</Badge>
+                        <Badge
+                          variant="secondary"
+                          className="text-[8px] px-0.5 py-0 bg-orange-600/20 text-orange-400 leading-tight"
+                        >
+                          7년초과
+                        </Badge>
                       )}
                     </div>
                     <Input
@@ -1230,7 +1343,9 @@ export function CustomerDetailModal({
                       disabled={isReadOnly}
                       className={cn(
                         "border-gray-600 text-gray-200 h-7 text-xs w-full",
-                        isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
                       )}
                     />
                   </div>
@@ -1240,12 +1355,33 @@ export function CustomerDetailModal({
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
                     <Label className="text-[10px] text-gray-400">업종</Label>
-                    <Select value={formData.business_type || "기타"} onValueChange={(v) => handleFieldChange({ business_type: v })} disabled={isReadOnly}>
-                      <SelectTrigger className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}>
+                    <Select
+                      value={formData.business_type || "기타"}
+                      onValueChange={(v) =>
+                        handleFieldChange({ business_type: v })
+                      }
+                      disabled={isReadOnly}
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
+                        )}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
-                        {BUSINESS_TYPES.map((t) => (<SelectItem key={t} value={t} className="text-gray-200 text-xs">{t}</SelectItem>))}
+                        {BUSINESS_TYPES.map((t) => (
+                          <SelectItem
+                            key={t}
+                            value={t}
+                            className="text-gray-200 text-xs"
+                          >
+                            {t}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1253,9 +1389,16 @@ export function CustomerDetailModal({
                     <Label className="text-[10px] text-gray-400">종목</Label>
                     <Input
                       value={formData.business_item || ""}
-                      onChange={(e) => handleFieldChange({ business_item: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({ business_item: e.target.value })
+                      }
                       disabled={isReadOnly}
-                      className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                      className={cn(
+                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
+                      )}
                     />
                   </div>
                 </div>
@@ -1263,34 +1406,87 @@ export function CustomerDetailModal({
                 {/* Row 7: 사업자번호 | 재도전 | 혁신 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
-                    <Label className="text-[10px] text-gray-400">사업자번호</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      사업자번호
+                    </Label>
                     <Input
                       value={formData.business_registration_number || ""}
-                      onChange={(e) => handleFieldChange({ business_registration_number: e.target.value })}
+                      onChange={(e) =>
+                        handleFieldChange({
+                          business_registration_number: e.target.value,
+                        })
+                      }
                       disabled={isReadOnly}
-                      className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                      className={cn(
+                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
+                      )}
                       placeholder="000-00-00000"
                     />
                   </div>
                   <div className="w-24">
                     <Label className="text-[10px] text-gray-400">재도전</Label>
-                    <Select value={formData.retry_type || "해당없음"} onValueChange={(v) => handleFieldChange({ retry_type: v })} disabled={isReadOnly}>
-                      <SelectTrigger className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}>
+                    <Select
+                      value={formData.retry_type || "해당없음"}
+                      onValueChange={(v) =>
+                        handleFieldChange({ retry_type: v })
+                      }
+                      disabled={isReadOnly}
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
+                        )}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
-                        {RETRY_OPTIONS.map((o) => (<SelectItem key={o} value={o} className="text-gray-200 text-xs">{o}</SelectItem>))}
+                        {RETRY_OPTIONS.map((o) => (
+                          <SelectItem
+                            key={o}
+                            value={o}
+                            className="text-gray-200 text-xs"
+                          >
+                            {o}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="w-24">
                     <Label className="text-[10px] text-gray-400">혁신</Label>
-                    <Select value={formData.innovation_type || "해당없음"} onValueChange={(v) => handleFieldChange({ innovation_type: v })} disabled={isReadOnly}>
-                      <SelectTrigger className={cn("border-gray-600 text-gray-200 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}>
+                    <Select
+                      value={formData.innovation_type || "해당없음"}
+                      onValueChange={(v) =>
+                        handleFieldChange({ innovation_type: v })
+                      }
+                      disabled={isReadOnly}
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
+                        )}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
-                        {INNOVATION_OPTIONS.map((o) => (<SelectItem key={o} value={o} className="text-gray-200 text-xs">{o}</SelectItem>))}
+                        {INNOVATION_OPTIONS.map((o) => (
+                          <SelectItem
+                            key={o}
+                            value={o}
+                            className="text-gray-200 text-xs"
+                          >
+                            {o}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1298,12 +1494,17 @@ export function CustomerDetailModal({
 
                 {/* Row 8: 사업장소재지 검색 (전체 너비) */}
                 <div>
-                  <Label className="text-[10px] text-gray-400">사업장 소재지</Label>
+                  <Label className="text-[10px] text-gray-400">
+                    사업장 소재지
+                  </Label>
                   <div className="flex gap-1">
                     <Input
                       value={formData.business_address || ""}
                       readOnly
-                      className={cn("border-gray-600 text-gray-200 flex-1 h-7 text-xs", isReadOnly ? "bg-gray-700 opacity-70" : "bg-gray-800")}
+                      className={cn(
+                        "border-gray-600 text-gray-200 flex-1 h-7 text-xs",
+                        isReadOnly ? "bg-gray-700 opacity-70" : "bg-gray-800",
+                      )}
                       placeholder="주소 검색"
                     />
                     <Button
@@ -1311,7 +1512,10 @@ export function CustomerDetailModal({
                       variant="outline"
                       size="sm"
                       onClick={() => setShowBusinessAddressSearch(true)}
-                      className={cn("border-gray-600 h-7 w-7 p-0", isReadOnly && "opacity-50 cursor-not-allowed")}
+                      className={cn(
+                        "border-gray-600 h-7 w-7 p-0",
+                        isReadOnly && "opacity-50 cursor-not-allowed",
+                      )}
                       disabled={formData.is_same_as_business || isReadOnly}
                     >
                       <Search className="w-3 h-3" />
@@ -1322,11 +1526,22 @@ export function CustomerDetailModal({
                 {/* Row 9: 상세주소 | 자가 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
-                    <Label className="text-[10px] text-gray-400">상세주소</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      상세주소
+                    </Label>
                     <Input
                       value={formData.business_address_detail || ""}
-                      onChange={(e) => handleFieldChange({ business_address_detail: e.target.value })}
-                      className={cn("border-gray-600 text-gray-200 h-7 text-xs", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                      onChange={(e) =>
+                        handleFieldChange({
+                          business_address_detail: e.target.value,
+                        })
+                      }
+                      className={cn(
+                        "border-gray-600 text-gray-200 h-7 text-xs",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
+                      )}
                       placeholder="동/호수"
                       disabled={formData.is_same_as_business || isReadOnly}
                     />
@@ -1335,66 +1550,128 @@ export function CustomerDetailModal({
                     <Checkbox
                       id="business-owned"
                       checked={formData.is_business_owned || false}
-                      onCheckedChange={(c) => handleFieldChange({ is_business_owned: !!c })}
+                      onCheckedChange={(c) =>
+                        handleFieldChange({ is_business_owned: !!c })
+                      }
                       disabled={isReadOnly}
-                      className={cn("h-3 w-3", isReadOnly && "opacity-50 cursor-not-allowed")}
+                      className={cn(
+                        "h-3 w-3",
+                        isReadOnly && "opacity-50 cursor-not-allowed",
+                      )}
                     />
-                    <Label htmlFor="business-owned" className="text-[10px] text-gray-400">자가</Label>
+                    <Label
+                      htmlFor="business-owned"
+                      className="text-[10px] text-gray-400"
+                    >
+                      자가
+                    </Label>
                   </div>
                 </div>
 
                 {/* Row 10: 최근 매출 | Y-1 매출 | Y-2 매출 | Y-3 매출 (4등분) */}
                 <div className="grid grid-cols-4 gap-1">
                   <div>
-                    <Label className="text-[10px] text-gray-400">최근 매출</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      최근 매출
+                    </Label>
                     <div className="relative">
                       <Input
                         type="number"
                         value={formData.recent_sales || ""}
-                        onChange={(e) => handleFieldChange({ recent_sales: Number(e.target.value) })}
+                        onChange={(e) =>
+                          handleFieldChange({
+                            recent_sales: Number(e.target.value),
+                          })
+                        }
                         disabled={isReadOnly}
-                        className={cn("border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                        className={cn(
+                          "border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
+                        )}
                       />
-                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">억</span>
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">
+                        억
+                      </span>
                     </div>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-gray-400">Y-1 매출</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      Y-1 매출
+                    </Label>
                     <div className="relative">
                       <Input
                         type="number"
                         value={formData.sales_y1 || ""}
-                        onChange={(e) => handleFieldChange({ sales_y1: Number(e.target.value) })}
+                        onChange={(e) =>
+                          handleFieldChange({
+                            sales_y1: Number(e.target.value),
+                          })
+                        }
                         disabled={isReadOnly}
-                        className={cn("border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                        className={cn(
+                          "border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
+                        )}
                       />
-                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">억</span>
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">
+                        억
+                      </span>
                     </div>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-gray-400">Y-2 매출</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      Y-2 매출
+                    </Label>
                     <div className="relative">
                       <Input
                         type="number"
                         value={formData.sales_y2 || ""}
-                        onChange={(e) => handleFieldChange({ sales_y2: Number(e.target.value) })}
+                        onChange={(e) =>
+                          handleFieldChange({
+                            sales_y2: Number(e.target.value),
+                          })
+                        }
                         disabled={isReadOnly}
-                        className={cn("border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                        className={cn(
+                          "border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
+                        )}
                       />
-                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">억</span>
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">
+                        억
+                      </span>
                     </div>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-gray-400">Y-3 매출</Label>
+                    <Label className="text-[10px] text-gray-400">
+                      Y-3 매출
+                    </Label>
                     <div className="relative">
                       <Input
                         type="number"
                         value={formData.sales_y3 || ""}
-                        onChange={(e) => handleFieldChange({ sales_y3: Number(e.target.value) })}
+                        onChange={(e) =>
+                          handleFieldChange({
+                            sales_y3: Number(e.target.value),
+                          })
+                        }
                         disabled={isReadOnly}
-                        className={cn("border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full", isReadOnly ? "bg-gray-700 cursor-not-allowed opacity-70" : "bg-gray-800")}
+                        className={cn(
+                          "border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full",
+                          isReadOnly
+                            ? "bg-gray-700 cursor-not-allowed opacity-70"
+                            : "bg-gray-800",
+                        )}
                       />
-                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">억</span>
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">
+                        억
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1404,13 +1681,27 @@ export function CustomerDetailModal({
                   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg w-[400px] overflow-hidden">
                       <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b">
-                        <span className="font-medium text-gray-700">사업장 주소 검색</span>
-                        <Button variant="ghost" size="icon" onClick={() => setShowBusinessAddressSearch(false)} className="text-gray-600">
+                        <span className="font-medium text-gray-700">
+                          사업장 주소 검색
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowBusinessAddressSearch(false)}
+                          className="text-gray-600"
+                        >
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
                       <div className="p-4">
-                        <DaumPostcodeEmbed onComplete={(data) => { handleFieldChange({ business_address: data.address }); setShowBusinessAddressSearch(false); }} />
+                        <DaumPostcodeEmbed
+                          onComplete={(data) => {
+                            handleFieldChange({
+                              business_address: data.address,
+                            });
+                            setShowBusinessAddressSearch(false);
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1420,7 +1711,7 @@ export function CustomerDetailModal({
           </div>
 
           {/* Section 2: 중앙 패널 - 문서 뷰어 (40%, A4 비율) */}
-          <div className="w-[40%] flex-1 h-full bg-gray-950 flex flex-col overflow-hidden border-r border-gray-700">
+          <div className="flex-1 h-full bg-gray-950 flex flex-col overflow-hidden border-r border-gray-700">
             {/* Document Header - 상태 변경 드롭다운 포함 */}
             <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
               <div className="flex items-center gap-2 flex-1 overflow-x-auto">
@@ -1451,9 +1742,7 @@ export function CustomerDetailModal({
                     <Button
                       key={doc.id}
                       variant={
-                        selectedDocument?.id === doc.id
-                          ? "secondary"
-                          : "ghost"
+                        selectedDocument?.id === doc.id ? "secondary" : "ghost"
                       }
                       size="sm"
                       onClick={() => setSelectedDocument(doc)}
@@ -1481,7 +1770,7 @@ export function CustomerDetailModal({
                       className={cn(
                         "h-8 px-3 text-sm gap-1.5 shrink-0",
                         "border-gray-600 bg-gray-800/50",
-                        getStatusStyle(formData.status_code || "상담대기").text
+                        getStatusStyle(formData.status_code || "상담대기").text,
                       )}
                       data-testid="button-status-dropdown"
                     >
@@ -1489,216 +1778,258 @@ export function CustomerDetailModal({
                       <ChevronDown className="w-3.5 h-3.5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent 
-                    align="end" 
+                  <DropdownMenuContent
+                    align="end"
                     className="w-48 max-h-80 overflow-y-auto bg-gray-900 border-gray-700"
                   >
                     {(() => {
-                      const groups = STATUS_OPTIONS.reduce((acc, option) => {
-                        const group = option.group || "기타";
-                        if (!acc[group]) acc[group] = [];
-                        acc[group].push(option);
-                        return acc;
-                      }, {} as Record<string, typeof STATUS_OPTIONS>);
+                      const groups = STATUS_OPTIONS.reduce(
+                        (acc, option) => {
+                          const group = option.group || "기타";
+                          if (!acc[group]) acc[group] = [];
+                          acc[group].push(option);
+                          return acc;
+                        },
+                        {} as Record<string, typeof STATUS_OPTIONS>,
+                      );
 
                       const GROUP_COLORS: Record<string, string> = {
-                        "상담": "text-purple-300",
-                        "부재": "text-orange-300",
-                        "거절": "text-rose-300",
-                        "희망타겟": "text-yellow-300",
-                        "계약": "text-emerald-300",
-                        "서류": "text-blue-300",
-                        "신청": "text-indigo-300",
-                        "집행": "text-teal-300",
+                        상담: "text-purple-300",
+                        부재: "text-orange-300",
+                        거절: "text-rose-300",
+                        희망타겟: "text-yellow-300",
+                        계약: "text-emerald-300",
+                        서류: "text-blue-300",
+                        신청: "text-indigo-300",
+                        집행: "text-teal-300",
                       };
 
-                      return Object.entries(groups).map(([groupName, options], groupIndex) => (
-                        <DropdownMenuGroup key={groupName}>
-                          {groupIndex > 0 && <DropdownMenuSeparator className="bg-gray-700" />}
-                          <DropdownMenuLabel className="text-xs text-gray-500 px-2 py-1">
-                            {groupName}
-                          </DropdownMenuLabel>
-                          {options.map((option) => {
-                            const groupColor = option.value === "최종부결" 
-                              ? "text-red-300" 
-                              : (GROUP_COLORS[option.group || ""] || "text-gray-300");
-                            const isSelected = formData.status_code === option.value;
-                            return (
-                              <DropdownMenuItem
-                                key={option.value}
-                                onClick={async () => {
-                                  if (formData.id && formData.status_code !== option.value) {
-                                    const oldStatus = formData.status_code;
-                                    setFormData(prev => ({ ...prev, status_code: option.value as StatusCode }));
-                                    
-                                    try {
-                                      await updateDoc(doc(db, "customers", formData.id!), {
-                                        status_code: option.value,
-                                        updated_at: new Date(),
-                                      });
-                                      
-                                      await addDoc(collection(db, "customer_history_logs"), {
-                                        customer_id: formData.id,
-                                        action_type: "status_change",
-                                        description: `상태 변경: ${oldStatus} → ${option.value}`,
-                                        old_value: oldStatus,
-                                        new_value: option.value,
-                                        changed_by_id: currentUser?.uid || "",
-                                        changed_by_name: currentUser?.name || "",
-                                        changed_at: new Date(),
-                                      });
-                                      
-                                      const logs = await getCustomerHistoryLogs(formData.id!);
-                                      setHistoryLogs(logs);
-                                    } catch (error) {
-                                      console.error("상태 변경 실패:", error);
-                                      setFormData(prev => ({ ...prev, status_code: oldStatus }));
+                      return Object.entries(groups).map(
+                        ([groupName, options], groupIndex) => (
+                          <DropdownMenuGroup key={groupName}>
+                            {groupIndex > 0 && (
+                              <DropdownMenuSeparator className="bg-gray-700" />
+                            )}
+                            <DropdownMenuLabel className="text-xs text-gray-500 px-2 py-1">
+                              {groupName}
+                            </DropdownMenuLabel>
+                            {options.map((option) => {
+                              const groupColor =
+                                option.value === "최종부결"
+                                  ? "text-red-300"
+                                  : GROUP_COLORS[option.group || ""] ||
+                                    "text-gray-300";
+                              const isSelected =
+                                formData.status_code === option.value;
+                              return (
+                                <DropdownMenuItem
+                                  key={option.value}
+                                  onClick={async () => {
+                                    if (
+                                      formData.id &&
+                                      formData.status_code !== option.value
+                                    ) {
+                                      const oldStatus = formData.status_code;
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        status_code: option.value as StatusCode,
+                                      }));
+
+                                      try {
+                                        await updateDoc(
+                                          doc(db, "customers", formData.id!),
+                                          {
+                                            status_code: option.value,
+                                            updated_at: new Date(),
+                                          },
+                                        );
+
+                                        await addDoc(
+                                          collection(
+                                            db,
+                                            "customer_history_logs",
+                                          ),
+                                          {
+                                            customer_id: formData.id,
+                                            action_type: "status_change",
+                                            description: `상태 변경: ${oldStatus} → ${option.value}`,
+                                            old_value: oldStatus,
+                                            new_value: option.value,
+                                            changed_by_id:
+                                              currentUser?.uid || "",
+                                            changed_by_name:
+                                              currentUser?.name || "",
+                                            changed_at: new Date(),
+                                          },
+                                        );
+
+                                        const logs =
+                                          await getCustomerHistoryLogs(
+                                            formData.id!,
+                                          );
+                                        setHistoryLogs(logs);
+                                      } catch (error) {
+                                        console.error("상태 변경 실패:", error);
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          status_code: oldStatus,
+                                        }));
+                                      }
                                     }
-                                  }
-                                }}
-                                className={cn(
-                                  "flex items-center justify-between cursor-pointer",
-                                  "hover:bg-gray-800",
-                                  isSelected && "bg-gray-800"
-                                )}
-                                data-testid={`status-option-${option.value}`}
-                              >
-                                <span className={groupColor}>{option.label}</span>
-                                {isSelected && <Check className="w-4 h-4 text-blue-400" />}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuGroup>
-                      ));
+                                  }}
+                                  className={cn(
+                                    "flex items-center justify-between cursor-pointer",
+                                    "hover:bg-gray-800",
+                                    isSelected && "bg-gray-800",
+                                  )}
+                                  data-testid={`status-option-${option.value}`}
+                                >
+                                  <span className={groupColor}>
+                                    {option.label}
+                                  </span>
+                                  {isSelected && (
+                                    <Check className="w-4 h-4 text-blue-400" />
+                                  )}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuGroup>
+                        ),
+                      );
                     })()}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
             </div>
 
-              {/* Document Viewer with Drag & Drop */}
-              <div
-                {...getRootProps()}
-                className={cn(
-                  "flex-1 flex flex-col overflow-hidden bg-gray-950/50 transition-all",
-                  isDragActive &&
-                    "border-2 border-dashed border-blue-500 bg-blue-500/10",
-                )}
-              >
-                <input {...getInputProps()} />
-                
-                {/* 선택된 파일 헤더 - 파일명 + 액션 버튼 */}
-                {selectedDocument && !isDragActive && (
-                  <div className="shrink-0 px-4 py-2 border-b border-gray-700 bg-gray-900/50 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="w-4 h-4 text-gray-400 shrink-0" />
-                      <span className="text-sm text-gray-300 truncate">
-                        {selectedDocument.file_name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {/* 새 창에서 열기 */}
+            {/* Document Viewer with Drag & Drop */}
+            <div
+              {...getRootProps()}
+              className={cn(
+                "flex-1 flex flex-col overflow-hidden bg-gray-950/50 transition-all",
+                isDragActive &&
+                  "border-2 border-dashed border-blue-500 bg-blue-500/10",
+              )}
+            >
+              <input {...getInputProps()} />
+
+              {/* 선택된 파일 헤더 - 파일명 + 액션 버튼 */}
+              {selectedDocument && !isDragActive && (
+                <div className="shrink-0 px-4 py-2 border-b border-gray-700 bg-gray-900/50 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className="text-sm text-gray-300 truncate">
+                      {selectedDocument.file_name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* 새 창에서 열기 */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        window.open(selectedDocument.file_url, "_blank")
+                      }
+                      title="새 창에서 열기"
+                      data-testid="button-open-new-window"
+                    >
+                      <ExternalLink className="w-4 h-4 text-gray-400" />
+                    </Button>
+                    {/* 다운로드 */}
+                    <a
+                      href={selectedDocument.file_url}
+                      download={selectedDocument.file_name}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => window.open(selectedDocument.file_url, '_blank')}
-                        title="새 창에서 열기"
-                        data-testid="button-open-new-window"
+                        title="다운로드"
+                        data-testid="button-download-file"
                       >
-                        <ExternalLink className="w-4 h-4 text-gray-400" />
+                        <Download className="w-4 h-4 text-gray-400" />
                       </Button>
-                      {/* 다운로드 */}
-                      <a
-                        href={selectedDocument.file_url}
-                        download={selectedDocument.file_name}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    </a>
+                    {/* 삭제 버튼 - 읽기전용이 아닐 때만 */}
+                    {!isReadOnly && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteFile(selectedDocument)}
+                        title="파일 삭제"
+                        className="text-red-400 hover:text-red-300"
+                        data-testid="button-delete-file"
                       >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="다운로드"
-                          data-testid="button-download-file"
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 뷰어 본문 영역 */}
+              <div className="flex-1 p-4 overflow-auto">
+                {isDragActive ? (
+                  <div className="h-full flex items-center justify-center text-blue-400">
+                    <div className="text-center">
+                      <Upload className="w-16 h-16 mx-auto mb-4 animate-pulse" />
+                      <p className="text-lg font-medium">
+                        파일을 여기에 놓으세요
+                      </p>
+                    </div>
+                  </div>
+                ) : selectedDocument ? (
+                  <div className="h-full flex items-center justify-center">
+                    {selectedDocument.file_type.startsWith("image/") ? (
+                      <img
+                        src={selectedDocument.file_url}
+                        alt={selectedDocument.file_name}
+                        className="max-w-full max-h-full object-contain rounded"
+                      />
+                    ) : selectedDocument.file_type === "application/pdf" ||
+                      selectedDocument.file_type.includes("pdf") ? (
+                      <iframe
+                        src={`https://docs.google.com/gview?url=${encodeURIComponent(selectedDocument.file_url)}&embedded=true`}
+                        className="w-full h-full rounded border border-gray-700 bg-white"
+                        title={selectedDocument.file_name}
+                      />
+                    ) : (
+                      <div className="text-gray-500 text-center">
+                        <FileText className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                        <p className="mb-4">
+                          미리보기를 지원하지 않는 파일 형식입니다
+                        </p>
+                        <a
+                          href={selectedDocument.file_url}
+                          download={selectedDocument.file_name}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
-                          <Download className="w-4 h-4 text-gray-400" />
-                        </Button>
-                      </a>
-                      {/* 삭제 버튼 - 읽기전용이 아닐 때만 */}
-                      {!isReadOnly && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteFile(selectedDocument)}
-                          title="파일 삭제"
-                          className="text-red-400 hover:text-red-300"
-                          data-testid="button-delete-file"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                          <Button variant="outline" size="sm">
+                            <Download className="w-4 h-4 mr-2" />
+                            다운로드
+                          </Button>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    className="h-full flex items-center justify-center text-gray-500 cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="text-center border-2 border-dashed border-gray-700 rounded-lg p-8">
+                      <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                      <p>파일을 드래그하거나 클릭하여 업로드하세요</p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        PDF, PNG, JPG 지원
+                      </p>
                     </div>
                   </div>
                 )}
-
-                {/* 뷰어 본문 영역 */}
-                <div className="flex-1 p-4 overflow-auto">
-                  {isDragActive ? (
-                    <div className="h-full flex items-center justify-center text-blue-400">
-                      <div className="text-center">
-                        <Upload className="w-16 h-16 mx-auto mb-4 animate-pulse" />
-                        <p className="text-lg font-medium">
-                          파일을 여기에 놓으세요
-                        </p>
-                      </div>
-                    </div>
-                  ) : selectedDocument ? (
-                    <div className="h-full flex items-center justify-center">
-                      {selectedDocument.file_type.startsWith("image/") ? (
-                        <img
-                          src={selectedDocument.file_url}
-                          alt={selectedDocument.file_name}
-                          className="max-w-full max-h-full object-contain rounded"
-                        />
-                      ) : selectedDocument.file_type === "application/pdf" || selectedDocument.file_type.includes("pdf") ? (
-                        <iframe
-                          src={`https://docs.google.com/gview?url=${encodeURIComponent(selectedDocument.file_url)}&embedded=true`}
-                          className="w-full h-full rounded border border-gray-700 bg-white"
-                          title={selectedDocument.file_name}
-                        />
-                      ) : (
-                        <div className="text-gray-500 text-center">
-                          <FileText className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                          <p className="mb-4">미리보기를 지원하지 않는 파일 형식입니다</p>
-                          <a
-                            href={selectedDocument.file_url}
-                            download={selectedDocument.file_name}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="outline" size="sm">
-                              <Download className="w-4 h-4 mr-2" />
-                              다운로드
-                            </Button>
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div
-                      className="h-full flex items-center justify-center text-gray-500 cursor-pointer"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <div className="text-center border-2 border-dashed border-gray-700 rounded-lg p-8">
-                        <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                        <p>파일을 드래그하거나 클릭하여 업로드하세요</p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          PDF, PNG, JPG 지원
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
+            </div>
           </div>
 
           {/* Section 3: 우측 패널 - 커뮤니케이션 (25%) */}
@@ -1799,7 +2130,7 @@ export function CustomerDetailModal({
                   </div>
                 ) : (
                   /* History Tab Content */
-                  <div className="h-full overflow-y-auto p-3 bg-gray-900/50">
+                  (<div className="h-full overflow-y-auto p-3 bg-gray-900/50">
                     {isLoadingHistory ? (
                       <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-6 h-6 animate-spin text-orange-400" />
@@ -1843,7 +2174,10 @@ export function CustomerDetailModal({
                                   {log.changed_by_name || "시스템"}
                                 </span>
                                 <span className="text-xs text-gray-500">
-                                  {safeFormatDate(log.changed_at, "MM/dd HH:mm")}
+                                  {safeFormatDate(
+                                    log.changed_at,
+                                    "MM/dd HH:mm",
+                                  )}
                                 </span>
                               </div>
                               <div className="bg-gray-800/50 border border-gray-700 rounded-lg px-2 py-1.5">
@@ -1873,7 +2207,7 @@ export function CustomerDetailModal({
                         ))}
                       </div>
                     )}
-                  </div>
+                  </div>)
                 )}
               </div>
             </div>
