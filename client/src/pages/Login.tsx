@@ -43,9 +43,7 @@ export default function Login() {
           </div>
           <div className="space-y-2">
             <CardTitle className="text-2xl font-bold">경영지원그륩 이음 CRM</CardTitle>
-            <CardDescription className="text-base">
-              고객 관리 및 영업 현황을 한눈에 파악하세요
-            </CardDescription>
+            <CardDescription className="text-base">Management Support Group Yieum CRM</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
