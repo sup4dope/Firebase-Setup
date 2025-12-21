@@ -1304,7 +1304,7 @@ export function CustomerDetailModal({
               </div>
 
               {/* 사업자 정보 그룹 (Border Box) - 10줄 압축 배치 */}
-              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 pl-[8px] pr-[8px] mt-[20px] mb-[20px] pt-[16px] pb-[16px]">
+              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 pl-[8px] pr-[8px] pt-[16px] pb-[16px] mt-[30px] mb-[30px]">
                 <h3 className="text-xs font-semibold text-emerald-400 mb-1">
                   사업자 정보
                 </h3>
