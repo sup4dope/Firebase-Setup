@@ -993,7 +993,7 @@ export function CustomerDetailModal({
               </div>
 
               {/* 고객 정보 그룹 (Border Box) - 10줄 압축 배치 */}
-              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 pt-[12px] pb-[12px] mt-[35px] mb-[35px]">
+              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 mt-[30px] mb-[30px] pt-[12px] pb-[12px]">
                 <h3 className="text-xs font-semibold text-blue-400 mb-1">
                   고객 정보
                 </h3>
@@ -2130,7 +2130,7 @@ export function CustomerDetailModal({
                   </div>
                 ) : (
                   /* History Tab Content */
-                  (<div className="h-full overflow-y-auto p-3 bg-gray-900/50">
+                  <div className="h-full overflow-y-auto p-3 bg-gray-900/50">
                     {isLoadingHistory ? (
                       <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-6 h-6 animate-spin text-orange-400" />
@@ -2207,7 +2207,7 @@ export function CustomerDetailModal({
                         ))}
                       </div>
                     )}
-                  </div>)
+                  </div>
                 )}
               </div>
             </div>
