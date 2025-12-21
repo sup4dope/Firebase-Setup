@@ -993,7 +993,7 @@ export function CustomerDetailModal({
               </div>
 
               {/* 고객 정보 그룹 (Border Box) - 10줄 압축 배치 */}
-              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5">
+              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 mt-[30px] mb-[30px] pt-[12px] pb-[12px]">
                 <h3 className="text-xs font-semibold text-blue-400 mb-1">
                   고객 정보
                 </h3>
