@@ -690,3 +690,120 @@ export const updateTodoItem = async (id: string, data: Partial<TodoItem>): Promi
 export const deleteTodoItem = async (id: string): Promise<void> => {
   await deleteDoc(doc(db, 'todo_list', id));
 };
+
+// ============ Customer Info Logs (자문료율, 계약금, 집행금액 변경 이력) ============
+
+export interface CustomerInfoLog {
+  id: string;
+  customer_id: string;
+  field_name: 'commission_rate' | 'contract_amount' | 'execution_amount';
+  old_value: string;
+  new_value: string;
+  changed_by: string;
+  changed_by_name: string;
+  changed_at: Timestamp;
+}
+
+// 정보 변경 이력 조회
+export const getCustomerInfoLogs = async (customerId: string): Promise<CustomerInfoLog[]> => {
+  const q = query(
+    collection(db, 'customer_info_logs'),
+    where('customer_id', '==', customerId),
+    orderBy('changed_at', 'desc')
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => ({
+    id: docSnap.id,
+    ...docSnap.data(),
+  } as CustomerInfoLog));
+};
+
+// 정보 변경 이력 추가
+export const addCustomerInfoLog = async (log: Omit<CustomerInfoLog, 'id' | 'changed_at'>): Promise<void> => {
+  await addDoc(collection(db, 'customer_info_logs'), {
+    ...log,
+    changed_at: Timestamp.now(),
+  });
+};
+
+// 고객 정보 수정 (자문료율, 계약금, 집행금액) 및 변경 이력 기록
+export const updateCustomerInfo = async (
+  customerId: string,
+  updates: {
+    commission_rate?: number;
+    contract_amount?: number;
+    execution_amount?: number;
+  },
+  currentCustomer: Customer,
+  changedBy: string,
+  changedByName: string
+): Promise<void> => {
+  const batch = writeBatch(db);
+  const customerRef = doc(db, 'customers', customerId);
+  
+  // 변경된 필드만 업데이트
+  const fieldsToUpdate: Record<string, any> = {};
+  const logsToAdd: Omit<CustomerInfoLog, 'id' | 'changed_at'>[] = [];
+  
+  if (updates.commission_rate !== undefined) {
+    const oldValue = currentCustomer.commission_rate || currentCustomer.contract_fee_rate || 0;
+    if (Number(oldValue) !== updates.commission_rate) {
+      fieldsToUpdate.commission_rate = updates.commission_rate;
+      logsToAdd.push({
+        customer_id: customerId,
+        field_name: 'commission_rate',
+        old_value: String(oldValue),
+        new_value: String(updates.commission_rate),
+        changed_by: changedBy,
+        changed_by_name: changedByName,
+      });
+    }
+  }
+  
+  if (updates.contract_amount !== undefined) {
+    const oldValue = currentCustomer.contract_amount || currentCustomer.deposit_amount || 0;
+    if (Number(oldValue) !== updates.contract_amount) {
+      fieldsToUpdate.contract_amount = updates.contract_amount;
+      logsToAdd.push({
+        customer_id: customerId,
+        field_name: 'contract_amount',
+        old_value: String(oldValue),
+        new_value: String(updates.contract_amount),
+        changed_by: changedBy,
+        changed_by_name: changedByName,
+      });
+    }
+  }
+  
+  if (updates.execution_amount !== undefined) {
+    const oldValue = currentCustomer.execution_amount || 0;
+    if (Number(oldValue) !== updates.execution_amount) {
+      fieldsToUpdate.execution_amount = updates.execution_amount;
+      logsToAdd.push({
+        customer_id: customerId,
+        field_name: 'execution_amount',
+        old_value: String(oldValue),
+        new_value: String(updates.execution_amount),
+        changed_by: changedBy,
+        changed_by_name: changedByName,
+      });
+    }
+  }
+  
+  // 변경사항이 있을 때만 업데이트
+  if (Object.keys(fieldsToUpdate).length > 0) {
+    batch.update(customerRef, fieldsToUpdate);
+    
+    // 변경 이력 추가
+    for (const log of logsToAdd) {
+      const logRef = doc(collection(db, 'customer_info_logs'));
+      batch.set(logRef, {
+        ...log,
+        changed_at: Timestamp.now(),
+      });
+    }
+    
+    await batch.commit();
+  }
+};

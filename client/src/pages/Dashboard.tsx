@@ -9,6 +9,8 @@ import { CustomerTable } from '@/components/CustomerTable';
 import { CustomerForm } from '@/components/CustomerForm';
 import { StatusHistoryDialog } from '@/components/StatusHistoryDialog';
 import { CustomerDetailModal } from '@/components/CustomerDetailModal';
+import { CustomerInfoEditModal } from '@/components/CustomerInfoEditModal';
+import { CustomerInfoHistoryModal } from '@/components/CustomerInfoHistoryModal';
 import { useToast } from '@/hooks/use-toast';
 import { calculateKPI } from '@/lib/kpi';
 import {
@@ -23,6 +25,7 @@ import {
   updateCustomer,
   deleteCustomer,
   updateCustomerStatus,
+  updateCustomerInfo,
 } from '@/lib/firestore';
 import { Plus, Search, RefreshCw } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -61,6 +64,11 @@ export default function Dashboard() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isNewCustomerModal, setIsNewCustomerModal] = useState(false);
   const [detailModalInitialTab, setDetailModalInitialTab] = useState<'memo' | 'history'>('memo');
+
+  // Info edit/history modal states
+  const [infoEditModalOpen, setInfoEditModalOpen] = useState(false);
+  const [infoHistoryModalOpen, setInfoHistoryModalOpen] = useState(false);
+  const [infoEditCustomer, setInfoEditCustomer] = useState<Customer | null>(null);
 
   // Status change modal states (for dashboard table)
   const [statusChangeModal, setStatusChangeModal] = useState<{
@@ -358,11 +366,9 @@ export default function Dashboard() {
   const handleViewHistory = async (customerId: string) => {
     const customer = customers.find(c => c.id === customerId);
     if (customer) {
-      // Open detail modal with history tab selected
-      setSelectedCustomer(customer);
-      setIsNewCustomerModal(false);
-      setDetailModalInitialTab('history');
-      setDetailModalOpen(true);
+      // Open info history modal (자문료율/계약금/집행금액 변경 이력)
+      setInfoEditCustomer(customer);
+      setInfoHistoryModalOpen(true);
     }
   };
 
@@ -461,8 +467,48 @@ export default function Dashboard() {
   };
 
   const handleEdit = (customer: Customer) => {
-    setEditingCustomer(customer);
-    setCustomerFormOpen(true);
+    setInfoEditCustomer(customer);
+    setInfoEditModalOpen(true);
+  };
+
+  const handleInfoEditSave = async (
+    customerId: string,
+    data: { commission_rate: number; contract_amount: number; execution_amount: number }
+  ) => {
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer || !user) return;
+
+    try {
+      await updateCustomerInfo(
+        customerId,
+        data,
+        customer,
+        user.uid,
+        user.name
+      );
+
+      // Update local state
+      setCustomers(prev =>
+        prev.map(c =>
+          c.id === customerId
+            ? { ...c, ...data }
+            : c
+        )
+      );
+
+      toast({
+        title: '성공',
+        description: '정보가 수정되었습니다.',
+      });
+    } catch (error) {
+      console.error('Error updating customer info:', error);
+      toast({
+        title: '오류',
+        description: '정보 수정 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
   };
 
   // Open detail modal when clicking on customer name
@@ -719,6 +765,27 @@ export default function Dashboard() {
         onSave={handleDetailModalSave}
         onDelete={isSuperAdmin ? handleDetailModalDelete : undefined}
         initialTab={detailModalInitialTab}
+      />
+
+      {/* Customer Info Edit Modal */}
+      <CustomerInfoEditModal
+        open={infoEditModalOpen}
+        onClose={() => {
+          setInfoEditModalOpen(false);
+          setInfoEditCustomer(null);
+        }}
+        customer={infoEditCustomer}
+        onSave={handleInfoEditSave}
+      />
+
+      {/* Customer Info History Modal */}
+      <CustomerInfoHistoryModal
+        open={infoHistoryModalOpen}
+        onClose={() => {
+          setInfoHistoryModalOpen(false);
+          setInfoEditCustomer(null);
+        }}
+        customer={infoEditCustomer}
       />
 
       {/* Status Change Confirmation Modal (for dashboard table) */}
