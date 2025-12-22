@@ -156,7 +156,7 @@ export default function Stats() {
   const metrics = useMemo(() => {
     const totalInflow = filteredCustomers.length;
     
-    // 계약 성과: 계약 이력이 있는 고객들
+    // 계약 성과: status_logs에 '계약완료' 기록이 있는 모든 고객 (현재 상태 무관)
     const contractedCustomers = filteredCustomers.filter(c => 
       customerIdsWithContractHistory.has(c.id)
     );
@@ -164,22 +164,23 @@ export default function Stats() {
     const contractRate = totalInflow > 0 ? (contractedCount / totalInflow) * 100 : 0;
     
     // 계약 성과 추가 지표: deposit_amount 합계 (만원 단위), contract_fee_rate 평균
+    // Number() 처리로 문자열 결합 방지, || 0으로 누락 데이터 처리
     const totalDepositAmount = contractedCustomers.reduce((sum, c) => 
-      sum + (c.deposit_amount || 0), 0
+      sum + (Number(c.deposit_amount) || 0), 0
     );
     const validFeeRates = contractedCustomers.filter(c => 
-      c.contract_fee_rate && c.contract_fee_rate > 0
+      c.contract_fee_rate && Number(c.contract_fee_rate) > 0
     );
     const avgContractFeeRate = validFeeRates.length > 0 
-      ? validFeeRates.reduce((sum, c) => sum + (c.contract_fee_rate || 0), 0) / validFeeRates.length 
+      ? validFeeRates.reduce((sum, c) => sum + (Number(c.contract_fee_rate) || 0), 0) / validFeeRates.length 
       : 0;
 
     // 집행 완료: 현재 상태가 '집행완료'인 고객들
     const executedCustomers = filteredCustomers.filter(c => c.status_code === EXECUTION_STATUS);
     const executedCount = executedCustomers.length;
-    // execution_amount는 만원 단위로 저장
+    // execution_amount는 만원 단위로 저장, Number() 처리
     const totalExecutionAmount = executedCustomers.reduce((sum, c) => 
-      sum + (c.execution_amount || 0), 0
+      sum + (Number(c.execution_amount) || 0), 0
     );
 
     // 집행 예정: 계약완료(선불/후불/외주) 또는 신청완료 상태
@@ -187,13 +188,11 @@ export default function Stats() {
       CONTRACT_STATUSES.includes(c.status_code) || c.status_code === '신청완료'
     );
     const pendingExecutionCount = pendingExecutionCustomers.length;
-    // 집행 예정 고객들의 예상 집행금액(contract_amount 또는 approved_amount 기반)
-    const avgPendingExecutionAmount = pendingExecutionCount > 0
-      ? pendingExecutionCustomers.reduce((sum, c) => {
-          // contract_amount가 있으면 사용, 없으면 approved_amount/10000 (원→만원 변환)
-          const amount = c.contract_amount || (c.approved_amount ? c.approved_amount / 10000 : 0);
-          return sum + amount;
-        }, 0) / pendingExecutionCount
+    
+    // 평균 예상금액: (집행완료된 고객의 execution_amount 총합) / (집행완료 건수)
+    // 집행완료 데이터 기반으로 예상 금액 산출
+    const avgPendingExecutionAmount = executedCount > 0
+      ? totalExecutionAmount / executedCount
       : 0;
 
     const avgConversionRate = totalInflow > 0 ? (executedCount / totalInflow) * 100 : 0;
