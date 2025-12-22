@@ -706,17 +706,20 @@ export interface CustomerInfoLog {
 
 // 정보 변경 이력 조회
 export const getCustomerInfoLogs = async (customerId: string): Promise<CustomerInfoLog[]> => {
+  // 복합 인덱스 없이 조회 후 클라이언트에서 정렬
   const q = query(
     collection(db, 'customer_info_logs'),
-    where('customer_id', '==', customerId),
-    orderBy('changed_at', 'desc')
+    where('customer_id', '==', customerId)
   );
   
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docSnap => ({
+  const logs = snapshot.docs.map(docSnap => ({
     id: docSnap.id,
     ...docSnap.data(),
   } as CustomerInfoLog));
+  
+  // 클라이언트에서 changed_at 기준 내림차순 정렬
+  return logs.sort((a, b) => b.changed_at.toMillis() - a.changed_at.toMillis());
 };
 
 // 정보 변경 이력 추가
