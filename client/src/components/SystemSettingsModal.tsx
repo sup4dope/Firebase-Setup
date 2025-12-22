@@ -232,7 +232,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl h-[80vh] bg-gray-900 border-gray-700 text-gray-100 flex flex-col">
+        <DialogContent className="max-w-4xl h-[85vh] bg-gray-900 border-gray-700 text-gray-100 flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-100 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-blue-400" />
@@ -276,38 +276,38 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 </Button>
               </div>
 
-              <ScrollArea className="flex-1">
+              <ScrollArea className="flex-1 min-h-[400px]">
                 {loading ? (
                   <div className="text-center py-8 text-gray-500">로딩 중...</div>
                 ) : (
                   <Table>
                     <TableHeader>
-                      <TableRow className="border-gray-700">
-                        <TableHead className="text-gray-400">이름</TableHead>
-                        <TableHead className="text-gray-400">이메일</TableHead>
-                        <TableHead className="text-gray-400">연락처</TableHead>
-                        <TableHead className="text-gray-400">소속팀</TableHead>
-                        <TableHead className="text-gray-400">직급</TableHead>
-                        <TableHead className="text-gray-400">상태</TableHead>
-                        <TableHead className="text-gray-400 text-right">관리</TableHead>
+                      <TableRow className="border-gray-700 h-10">
+                        <TableHead className="text-gray-400 py-2">이름</TableHead>
+                        <TableHead className="text-gray-400 py-2">이메일</TableHead>
+                        <TableHead className="text-gray-400 py-2">연락처</TableHead>
+                        <TableHead className="text-gray-400 py-2">소속팀</TableHead>
+                        <TableHead className="text-gray-400 py-2">직급</TableHead>
+                        <TableHead className="text-gray-400 py-2">상태</TableHead>
+                        <TableHead className="text-gray-400 py-2 text-right">관리</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {users.map((user) => (
-                        <TableRow key={user.docId || user.uid} className="border-gray-700">
-                          <TableCell className="text-gray-200 font-medium">
+                        <TableRow key={user.docId || user.uid} className="border-gray-700 h-12">
+                          <TableCell className="text-gray-200 font-medium py-2">
                             {user.name}
                           </TableCell>
-                          <TableCell className="text-gray-300 text-sm">
+                          <TableCell className="text-gray-300 text-sm py-2">
                             {user.email}
                           </TableCell>
-                          <TableCell className="text-gray-300 text-sm">
+                          <TableCell className="text-gray-300 text-sm py-2">
                             {user.phone || '-'}
                           </TableCell>
-                          <TableCell className="text-gray-300 text-sm">
+                          <TableCell className="text-gray-300 text-sm py-2">
                             {user.team_name || '-'}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2">
                             <Select
                               value={user.role}
                               onValueChange={(v) => handleRoleChange(user, v as UserRole)}
@@ -322,7 +322,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2">
                             <Select
                               value={user.status || '재직'}
                               onValueChange={(v) => handleStatusChange(user, v as UserStatus)}
@@ -339,7 +339,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right py-2">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -381,7 +381,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 </Button>
               </div>
 
-              <ScrollArea className="flex-1">
+              <ScrollArea className="flex-1 min-h-[400px]">
                 {loading ? (
                   <div className="text-center py-8 text-gray-500">로딩 중...</div>
                 ) : teams.length === 0 ? (
@@ -391,7 +391,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 ) : (
                   <Table>
                     <TableHeader>
-                      <TableRow className="border-gray-700">
+                      <TableRow className="border-gray-700 h-10">
                         <TableHead className="text-gray-400">팀명</TableHead>
                         <TableHead className="text-gray-400">소속 직원 수</TableHead>
                         <TableHead className="text-gray-400 text-right">관리</TableHead>
