@@ -539,7 +539,7 @@ export default function Stats() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">담당자별 성과</CardTitle>
+              <CardTitle className="text-lg">담당자별 부정데이터</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
