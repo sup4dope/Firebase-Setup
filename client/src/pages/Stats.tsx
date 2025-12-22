@@ -173,12 +173,14 @@ export default function Stats() {
     let validFeeRateCount = 0;
 
     contractedCustomers.forEach(c => {
-      // 1. 계약금 합산: deposit_amount 필드 강제 숫자 변환
-      const depositAmt = Number(c.deposit_amount) || 0;
+      // 1. 계약금 합산: contract_amount 필드 사용 (상태변경 모달에서 저장하는 필드)
+      // deposit_amount가 있으면 우선 사용, 없으면 contract_amount 사용
+      const depositAmt = Number(c.deposit_amount) || Number(c.contract_amount) || 0;
       totalDepositAmount += depositAmt;
       
-      // 2. 자문료율 합산: contract_fee_rate 필드 강제 숫자 변환 (0보다 큰 경우만 평균 대상)
-      const feeRate = Number(c.contract_fee_rate) || 0;
+      // 2. 자문료율 합산: commission_rate 필드 사용 (상태변경 모달에서 저장하는 필드)
+      // contract_fee_rate가 있으면 우선 사용, 없으면 commission_rate 사용
+      const feeRate = Number(c.contract_fee_rate) || Number(c.commission_rate) || 0;
       if (feeRate > 0) {
         totalFeeRateSum += feeRate;
         validFeeRateCount += 1;
