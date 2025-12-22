@@ -291,7 +291,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 </Button>
               </div>
 
-              <ScrollArea className="flex-1 min-h-[400px]">
+              <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="text-center py-8 text-gray-500">로딩 중...</div>
                 ) : (
@@ -390,7 +390,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                     </TableBody>
                   </Table>
                 )}
-              </ScrollArea>
+              </div>
             </TabsContent>
 
             <TabsContent value="teams" className="flex-1 overflow-hidden flex flex-col mt-4">
@@ -413,7 +413,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 </Button>
               </div>
 
-              <ScrollArea className="flex-1 min-h-[400px]">
+              <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="text-center py-8 text-gray-500">로딩 중...</div>
                 ) : teams.length === 0 ? (
@@ -462,7 +462,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                     </TableBody>
                   </Table>
                 )}
-              </ScrollArea>
+              </div>
             </TabsContent>
           </Tabs>
         </DialogContent>
