@@ -2,7 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, Timestamp } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getStorage } from "firebase/storage";
 import { CustomerHistoryLog } from "@shared/types";
 
 const firebaseConfig = {
@@ -45,23 +45,6 @@ export async function getCustomerHistoryLogs(customerId: string): Promise<Custom
       changed_at: data.changed_at?.toDate() || new Date(),
     } as CustomerHistoryLog;
   });
-}
-
-// Upload memo image to Firebase Storage
-export async function uploadMemoImage(
-  customerId: string,
-  file: Blob,
-  fileName: string
-): Promise<string> {
-  const timestamp = Date.now();
-  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const storagePath = `memo_images/${customerId}/${timestamp}_${sanitizedFileName}`;
-  const storageRef = ref(storage, storagePath);
-  
-  await uploadBytes(storageRef, file);
-  const downloadURL = await getDownloadURL(storageRef);
-  
-  return downloadURL;
 }
 
 export default app;
