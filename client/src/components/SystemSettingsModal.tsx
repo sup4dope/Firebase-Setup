@@ -500,22 +500,30 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
 
               <div>
                 <Label className="text-gray-400 text-sm">소속 팀</Label>
-                <Select
-                  value={newEmployee.team_id}
-                  onValueChange={(v) => setNewEmployee({ ...newEmployee, team_id: v })}
-                >
-                  <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 mt-1">
-                    <SelectValue placeholder="팀 선택 (선택사항)" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="" className="text-gray-400">없음</SelectItem>
-                    {teams.map((team) => (
-                      <SelectItem key={team.id} value={team.id} className="text-gray-200">
-                        {team.team_name || team.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {teams.filter(t => t.id && t.id.trim() !== '').length === 0 ? (
+                  <div className="mt-1 p-2 bg-gray-800 border border-gray-600 rounded-md text-gray-500 text-sm">
+                    먼저 팀을 생성해주세요
+                  </div>
+                ) : (
+                  <Select
+                    value={newEmployee.team_id || 'none'}
+                    onValueChange={(v) => setNewEmployee({ ...newEmployee, team_id: v === 'none' ? '' : v })}
+                  >
+                    <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 mt-1">
+                      <SelectValue placeholder="팀 선택 (선택사항)" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="none" className="text-gray-400">없음</SelectItem>
+                      {teams
+                        .filter((team) => team.id && team.id.trim() !== '' && team.team_id && team.team_id.trim() !== '')
+                        .map((team) => (
+                          <SelectItem key={team.id} value={team.id} className="text-gray-200">
+                            {team.team_name || team.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
 
