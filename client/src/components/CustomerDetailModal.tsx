@@ -284,7 +284,7 @@ export function CustomerDetailModal({
       const phoneParts = customer.phone?.split("-") || ["010", "", ""];
       setFormData({
         ...customer,
-        entry_source: customer.entry_source || "광고랜딩명",
+        entry_source: customer.entry_source || "광고",
         ssn_front: customer.ssn_front || "",
         ssn_back: customer.ssn_back || "",
         phone_part1: phoneParts[0] || "010",
@@ -339,7 +339,7 @@ export function CustomerDetailModal({
         approved_amount: 0,
         commission_rate: 0,
         processing_org: "미등록",
-        entry_source: "광고랜딩명",
+        entry_source: "광고",
         phone_part1: "010",
         carrier: "SKT",
         business_type: "기타",
@@ -758,7 +758,7 @@ export function CustomerDetailModal({
         home_address_detail: dataToSave.home_address_detail || "",
         is_home_owned: dataToSave.is_home_owned || false,
         is_same_as_business: dataToSave.is_same_as_business || false,
-        entry_source: dataToSave.entry_source || "광고랜딩명",
+        entry_source: dataToSave.entry_source || "광고",
         business_type: dataToSave.business_type || "기타",
         business_item: dataToSave.business_item || "",
         retry_type: dataToSave.retry_type || "해당없음",
@@ -983,7 +983,7 @@ export function CustomerDetailModal({
                   유입경로
                 </Label>
                 <Select
-                  value={formData.entry_source || "광고랜딩명"}
+                  value={formData.entry_source || "광고"}
                   onValueChange={(v) => handleFieldChange({ entry_source: v })}
                   disabled={isReadOnly}
                 >
