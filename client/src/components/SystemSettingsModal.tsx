@@ -247,15 +247,15 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl h-[85vh] bg-gray-900 border-gray-700 text-gray-100 flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl h-[85vh] bg-gray-900 border-gray-700 text-gray-100 flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-xl font-bold text-gray-100 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-blue-400" />
               시스템 설정
             </DialogTitle>
           </DialogHeader>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
             <TabsList className="grid w-full grid-cols-2 bg-gray-800 shrink-0">
               <TabsTrigger
                 value="employees"
@@ -275,8 +275,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="employees" className="flex-1 overflow-hidden flex flex-col mt-4 min-h-0 data-[state=active]:flex">
-              <div className="flex items-center justify-between mb-4">
+            <TabsContent value="employees" className="flex-1 flex flex-col mt-4 min-h-0" style={{ display: activeTab === 'employees' ? 'flex' : 'none' }}>
+              <div className="flex items-center justify-between mb-4 shrink-0">
                 <p className="text-sm text-gray-400">
                   등록된 직원: {users.length}명
                 </p>
@@ -291,7 +291,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 </Button>
               </div>
 
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto min-h-0">
                 {loading ? (
                   <div className="text-center py-8 text-gray-500">로딩 중...</div>
                 ) : (
@@ -393,8 +393,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
               </div>
             </TabsContent>
 
-            <TabsContent value="teams" className="flex-1 overflow-hidden flex flex-col mt-4 min-h-0 data-[state=active]:flex">
-              <div className="flex items-center gap-2 mb-4">
+            <TabsContent value="teams" className="flex-1 flex flex-col mt-4 min-h-0" style={{ display: activeTab === 'teams' ? 'flex' : 'none' }}>
+              <div className="flex items-center gap-2 mb-4 shrink-0">
                 <Input
                   value={newTeamName}
                   onChange={(e) => setNewTeamName(e.target.value)}
@@ -413,7 +413,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 </Button>
               </div>
 
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto min-h-0">
                 {loading ? (
                   <div className="text-center py-8 text-gray-500">로딩 중...</div>
                 ) : teams.length === 0 ? (
