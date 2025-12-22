@@ -160,39 +160,35 @@ export default function Stats() {
     const totalInflow = filteredCustomers.length;
     
     // [1] 계약 성과: status_logs에 '계약완료' 기록이 있는 모든 고객 (현재 상태 무관)
-    // 현재 상태가 '집행완료'여도 과거 계약 이력이 있으면 포함
+    // 현재 상태가 '집행완료'여도 과거 계약 이력이 있으면 반드시 포함
     const contractedCustomers = filteredCustomers.filter(c => 
       customerIdsWithContractHistory.has(c.id)
     );
     const contractedCount = contractedCustomers.length;
     const contractRate = totalInflow > 0 ? (contractedCount / totalInflow) * 100 : 0;
     
-    // [2] 보조 지표: 계약 이력 고객들의 deposit_amount 합계, contract_fee_rate 평균
-    // Number() 처리로 문자열 결합 방지, || 0으로 누락 데이터 처리
+    // [2] 계약 보조지표 계산
     let totalDepositAmount = 0;
     let totalFeeRateSum = 0;
     let validFeeRateCount = 0;
 
     contractedCustomers.forEach(c => {
-      // deposit_amount 합산 (만원 단위)
+      // 1. 계약금 합산: deposit_amount 필드 강제 숫자 변환
       const depositAmt = Number(c.deposit_amount) || 0;
       totalDepositAmount += depositAmt;
       
-      // contract_fee_rate 평균 계산 (유효한 값만)
+      // 2. 자문료율 합산: contract_fee_rate 필드 강제 숫자 변환 (0보다 큰 경우만 평균 대상)
       const feeRate = Number(c.contract_fee_rate) || 0;
       if (feeRate > 0) {
         totalFeeRateSum += feeRate;
         validFeeRateCount += 1;
       }
-      
-      console.log(`[Stats] 계약 고객: ${c.name}, deposit_amount=${depositAmt}, contract_fee_rate=${feeRate}`);
     });
 
-    const avgContractFeeRate = validFeeRateCount > 0 
-      ? totalFeeRateSum / validFeeRateCount 
-      : 0;
+    const avgContractFeeRate = validFeeRateCount > 0 ? totalFeeRateSum / validFeeRateCount : 0;
     
-    console.log(`[Stats] 총 계약금액: ${totalDepositAmount}만원, 평균 자문료: ${avgContractFeeRate}%`);
+    // 데이터 검증 로그
+    console.log("계약합산결과:", { totalDepositAmount, avgContractFeeRate, count: contractedCustomers.length });
 
     // 집행 완료: 현재 상태가 '집행완료'인 고객들
     const executedCustomers = filteredCustomers.filter(c => c.status_code === EXECUTION_STATUS);
