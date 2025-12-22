@@ -757,8 +757,7 @@ export default function Dashboard() {
           setSelectedCustomer(null);
           setIsNewCustomerModal(false);
           setDetailModalInitialTab('memo');
-          // 모달 닫을 때 대시보드 데이터 새로고침
-          fetchData();
+          // 모달 내에서 onSave를 통해 로컬 상태가 이미 업데이트되므로 전체 새로고침 불필요
         }}
         customer={selectedCustomer}
         isNewCustomer={isNewCustomerModal}
