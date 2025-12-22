@@ -58,10 +58,6 @@ import {
   CustomerHistoryLog,
 } from "@shared/types";
 import { format, differenceInYears, parseISO } from "date-fns";
-import { ko } from "date-fns/locale";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon } from "lucide-react";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { TodoForm } from "@/components/TodoForm";
 import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
@@ -1351,7 +1347,7 @@ export function CustomerDetailModal({
                       data-testid="input-company-name"
                     />
                   </div>
-                  <div className="w-[120px]">
+                  <div className="w-32">
                     <div className="flex items-center gap-1">
                       <Label className="text-[10px] text-gray-400">
                         개업일
@@ -1365,41 +1361,18 @@ export function CustomerDetailModal({
                         </Badge>
                       )}
                     </div>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={isReadOnly}
-                          className={cn(
-                            "w-full justify-start text-left font-normal border-gray-600 text-xs px-2",
-                            isReadOnly
-                              ? "bg-gray-700 cursor-not-allowed opacity-70"
-                              : "bg-gray-800",
-                            !formData.founding_date && "text-muted-foreground"
-                          )}
-                          data-testid="button-founding-date"
-                        >
-                          <CalendarIcon className="mr-1.5 h-3 w-3" />
-                          {formData.founding_date
-                            ? format(parseISO(formData.founding_date), 'yyyy-MM-dd', { locale: ko })
-                            : '날짜 선택'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-gray-800 border-gray-600" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={formData.founding_date ? parseISO(formData.founding_date) : undefined}
-                          onSelect={(date) => {
-                            if (date) {
-                              handleFoundingDateChange(format(date, 'yyyy-MM-dd'));
-                            }
-                          }}
-                          initialFocus
-                          locale={ko}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <Input
+                      type="date"
+                      value={formData.founding_date || ""}
+                      onChange={(e) => handleFoundingDateChange(e.target.value)}
+                      disabled={isReadOnly}
+                      className={cn(
+                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        isReadOnly
+                          ? "bg-gray-700 cursor-not-allowed opacity-70"
+                          : "bg-gray-800",
+                      )}
+                    />
                   </div>
                 </div>
 
