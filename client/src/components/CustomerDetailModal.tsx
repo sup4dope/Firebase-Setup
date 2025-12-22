@@ -1347,7 +1347,7 @@ export function CustomerDetailModal({
                       data-testid="input-company-name"
                     />
                   </div>
-                  <div className="w-32">
+                  <div className="w-36 min-w-[144px]">
                     <div className="flex items-center gap-1">
                       <Label className="text-[10px] text-gray-400">
                         개업일
