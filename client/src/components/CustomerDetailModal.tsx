@@ -142,7 +142,7 @@ function safeFormatDate(date: any, formatStr: string): string {
   }
 }
 
-const ENTRY_SOURCES = ["광고랜딩명", "외주", "고객소개"];
+const ENTRY_SOURCES = ["광고", "외주", "고객소개", "승인복제"];
 const CARRIERS = ["SKT", "KT", "LG", "SKT알뜰폰", "KT알뜰폰", "LG알뜰폰"];
 const BUSINESS_TYPES = [
   "음식점",
