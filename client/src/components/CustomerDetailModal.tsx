@@ -2127,7 +2127,7 @@ export function CustomerDetailModal({
                     data-testid="button-add-todo"
                   >
                     <Plus className="w-4 h-4 mr-1" />
-                    TO-DO+
+                    TO-DO
                   </Button>
                 )}
               </div>
