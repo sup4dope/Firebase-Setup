@@ -1816,7 +1816,16 @@ export function CustomerDetailModal({
                     className="w-48 max-h-80 overflow-y-auto bg-gray-900 border-gray-700"
                   >
                     {(() => {
-                      const groups = STATUS_OPTIONS.reduce(
+                      // staff 사용자는 집행완료 상태로 변경 불가 (team_leader, super_admin만 가능)
+                      const canChangeToExecution = currentUser?.role === 'team_leader' || currentUser?.role === 'super_admin';
+                      const filteredOptions = STATUS_OPTIONS.filter(option => {
+                        if (option.value.includes('집행완료') && !canChangeToExecution) {
+                          return false;
+                        }
+                        return true;
+                      });
+                      
+                      const groups = filteredOptions.reduce(
                         (acc, option) => {
                           const group = option.group || "기타";
                           if (!acc[group]) acc[group] = [];
