@@ -14,7 +14,6 @@ import {
   writeBatch,
   limit,
 } from 'firebase/firestore';
-import { format } from 'date-fns';
 import { db, addCustomerHistoryLog } from './firebase';
 import type {
   User,
@@ -395,86 +394,54 @@ export const getStatusLogs = async (customerId?: string): Promise<StatusLog[]> =
   } as StatusLog));
 };
 
-// Todos (todo_list 컬렉션 사용)
-// TodoItem을 Todo 형식으로 변환하는 헬퍼 함수
-const convertTodoItemToTodo = (docSnap: any): Todo => {
-  const data = docSnap.data();
-  const dueDate = toDate(data.due_date);
-  return {
-    id: docSnap.id,
-    content: data.title || '',
-    assigned_to: data.assigned_to || data.created_by || '',
-    assigned_to_name: data.assigned_to_name || data.created_by_name,
-    assigned_by: data.created_by || '',
-    assigned_by_name: data.created_by_name,
-    customer_id: data.customer_id,
-    customer_name: data.customer_name,
-    due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : '',
-    is_completed: data.status === '완료',
-    created_at: toDate(data.created_at) || new Date(),
-    // 추가 필드 (TodoItem 전용)
-    priority: data.priority,
-    memo: data.memo,
-    status: data.status,
-  } as Todo & { priority?: string; memo?: string; status?: string };
-};
-
+// Todos
 export const getTodos = async (): Promise<Todo[]> => {
-  const q = query(collection(db, 'todo_list'), orderBy('due_date', 'asc'));
+  const q = query(collection(db, 'todos'), orderBy('due_date', 'asc'));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(convertTodoItemToTodo);
+  return snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    created_at: toDate(doc.data().created_at),
+  } as Todo));
 };
 
 export const getTodosByUser = async (userId: string): Promise<Todo[]> => {
-  // created_by (이메일) 또는 assigned_to (uid)로 필터링
   const q = query(
-    collection(db, 'todo_list'),
+    collection(db, 'todos'),
+    where('assigned_to', '==', userId),
     orderBy('due_date', 'asc')
   );
   const snapshot = await getDocs(q);
-  // 클라이언트 측에서 필터링 (uid 또는 이메일 매칭)
-  return snapshot.docs
-    .filter(doc => {
-      const data = doc.data();
-      return data.assigned_to === userId || data.created_by === userId;
-    })
-    .map(convertTodoItemToTodo);
+  return snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    created_at: toDate(doc.data().created_at),
+  } as Todo));
 };
 
 export const getTodosByTeam = async (teamId: string): Promise<Todo[]> => {
-  // 팀 사용자 이메일 목록 가져오기
+  // First get all users in the team
   const users = await getUsersByTeam(teamId);
-  const userEmails = users.map(u => u.email);
   const userIds = users.map(u => u.uid);
   
-  if (users.length === 0) return [];
+  if (userIds.length === 0) return [];
   
   const q = query(
-    collection(db, 'todo_list'),
+    collection(db, 'todos'),
+    where('assigned_to', 'in', userIds),
     orderBy('due_date', 'asc')
   );
   const snapshot = await getDocs(q);
-  // 클라이언트 측에서 팀원 필터링
-  return snapshot.docs
-    .filter(doc => {
-      const data = doc.data();
-      return userEmails.includes(data.created_by) || userIds.includes(data.assigned_to);
-    })
-    .map(convertTodoItemToTodo);
+  return snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    created_at: toDate(doc.data().created_at),
+  } as Todo));
 };
 
 export const createTodo = async (todo: InsertTodo): Promise<Todo> => {
-  const docRef = await addDoc(collection(db, 'todo_list'), {
-    title: todo.content,
-    created_by: todo.assigned_by,
-    created_by_name: todo.assigned_by_name,
-    assigned_to: todo.assigned_to,
-    assigned_to_name: todo.assigned_to_name,
-    customer_id: todo.customer_id,
-    customer_name: todo.customer_name,
-    due_date: Timestamp.fromDate(new Date(todo.due_date)),
-    priority: 'normal',
-    status: '진행중',
+  const docRef = await addDoc(collection(db, 'todos'), {
+    ...todo,
     created_at: Timestamp.now(),
   });
   return {
@@ -485,17 +452,11 @@ export const createTodo = async (todo: InsertTodo): Promise<Todo> => {
 };
 
 export const updateTodo = async (id: string, data: Partial<Todo>): Promise<void> => {
-  const updateData: Record<string, any> = {};
-  if (data.content !== undefined) updateData.title = data.content;
-  if (data.is_completed !== undefined) updateData.status = data.is_completed ? '완료' : '진행중';
-  if (data.due_date !== undefined) updateData.due_date = Timestamp.fromDate(new Date(data.due_date));
-  if (data.customer_id !== undefined) updateData.customer_id = data.customer_id;
-  if (data.customer_name !== undefined) updateData.customer_name = data.customer_name;
-  await updateDoc(doc(db, 'todo_list', id), updateData);
+  await updateDoc(doc(db, 'todos', id), data);
 };
 
 export const deleteTodo = async (id: string): Promise<void> => {
-  await deleteDoc(doc(db, 'todo_list', id));
+  await deleteDoc(doc(db, 'todos', id));
 };
 
 // Holidays
