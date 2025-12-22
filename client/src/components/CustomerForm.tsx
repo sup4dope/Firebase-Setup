@@ -240,11 +240,13 @@ export function CustomerForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {teams.map(team => (
-                          <SelectItem key={team.id} value={team.id}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
+                        {teams
+                          .filter(team => team.id && team.id.trim() !== '')
+                          .map(team => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -269,11 +271,13 @@ export function CustomerForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {availableManagers.map(user => (
-                          <SelectItem key={user.uid} value={user.uid}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {availableManagers
+                          .filter(user => user.uid && user.uid.trim() !== '')
+                          .map(user => (
+                            <SelectItem key={user.uid} value={user.uid}>
+                              {user.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

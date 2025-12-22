@@ -81,11 +81,18 @@ export default function Stats() {
     fetchData();
   }, []);
 
+  // 유효한 팀 목록 (id가 존재하는 팀만)
+  const validTeams = useMemo(() => {
+    return teams.filter(t => t.id && t.id.trim() !== '');
+  }, [teams]);
+
+  // 유효한 직원 목록 (uid가 존재하는 직원만)
   const filteredStaffOptions = useMemo(() => {
+    let filtered = users.filter(u => u.uid && u.uid.trim() !== '');
     if (selectedTeam === 'all') {
-      return users.filter(u => u.role !== 'super_admin' || isSuperAdmin);
+      return filtered.filter(u => u.role !== 'super_admin' || isSuperAdmin);
     }
-    return users.filter(u => u.team_id === selectedTeam);
+    return filtered.filter(u => u.team_id === selectedTeam);
   }, [users, selectedTeam, isSuperAdmin]);
 
   const filteredCustomers = useMemo(() => {
@@ -316,13 +323,13 @@ export default function Stats() {
               <>
                 <div className="flex items-center gap-2">
                   <Label className="text-sm text-muted-foreground whitespace-nowrap">소속팀</Label>
-                  <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                  <Select value={selectedTeam || 'all'} onValueChange={setSelectedTeam}>
                     <SelectTrigger className="w-[140px]" data-testid="select-team">
                       <SelectValue placeholder="전체 팀" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">전체 팀</SelectItem>
-                      {teams.map(team => (
+                      {validTeams.map(team => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.team_name || team.name}
                         </SelectItem>
@@ -333,7 +340,7 @@ export default function Stats() {
 
                 <div className="flex items-center gap-2">
                   <Label className="text-sm text-muted-foreground whitespace-nowrap">담당자</Label>
-                  <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+                  <Select value={selectedStaff || 'all'} onValueChange={setSelectedStaff}>
                     <SelectTrigger className="w-[140px]" data-testid="select-staff">
                       <SelectValue placeholder="전체 직원" />
                     </SelectTrigger>

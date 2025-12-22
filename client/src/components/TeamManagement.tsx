@@ -261,11 +261,13 @@ export function TeamManagement({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">미배정</SelectItem>
-                          {teams.map(team => (
-                            <SelectItem key={team.id} value={team.id}>
-                              {team.name}
-                            </SelectItem>
-                          ))}
+                          {teams
+                            .filter(team => team.id && team.id.trim() !== '')
+                            .map(team => (
+                              <SelectItem key={team.id} value={team.id}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     ) : (
