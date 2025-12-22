@@ -1351,7 +1351,7 @@ export function CustomerDetailModal({
                       data-testid="input-company-name"
                     />
                   </div>
-                  <div className="w-36">
+                  <div className="w-[120px]">
                     <div className="flex items-center gap-1">
                       <Label className="text-[10px] text-gray-400">
                         개업일
@@ -1369,9 +1369,10 @@ export function CustomerDetailModal({
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
+                          size="sm"
                           disabled={isReadOnly}
                           className={cn(
-                            "w-full h-7 text-xs justify-start text-left font-normal border-gray-600",
+                            "w-full justify-start text-left font-normal border-gray-600 text-xs px-2",
                             isReadOnly
                               ? "bg-gray-700 cursor-not-allowed opacity-70"
                               : "bg-gray-800",
@@ -1379,7 +1380,7 @@ export function CustomerDetailModal({
                           )}
                           data-testid="button-founding-date"
                         >
-                          <CalendarIcon className="mr-2 h-3 w-3" />
+                          <CalendarIcon className="mr-1.5 h-3 w-3" />
                           {formData.founding_date
                             ? format(parseISO(formData.founding_date), 'yyyy-MM-dd', { locale: ko })
                             : '날짜 선택'}
