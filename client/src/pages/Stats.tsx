@@ -214,6 +214,14 @@ export default function Stats() {
 
     const avgConversionRate = totalInflow > 0 ? (executedCount / totalInflow) * 100 : 0;
 
+    // 유입경로별 통계
+    const entrySourceStats = {
+      광고: filteredCustomers.filter(c => c.entry_source === '광고' || c.entry_source === '광고랜딩명').length,
+      외주: filteredCustomers.filter(c => c.entry_source === '외주').length,
+      고객소개: filteredCustomers.filter(c => c.entry_source === '고객소개').length,
+      승인복제: filteredCustomers.filter(c => c.entry_source === '승인복제').length,
+    };
+
     return {
       totalInflow,
       contractRate,
@@ -225,6 +233,7 @@ export default function Stats() {
       pendingExecutionCount,
       avgPendingExecutionAmount,
       avgConversionRate,
+      entrySourceStats,
     };
   }, [filteredCustomers, customerIdsWithContractHistory]);
 
@@ -434,6 +443,21 @@ export default function Stats() {
                   <p className="text-xs text-muted-foreground mt-1">건</p>
                 </div>
                 <Users className="w-10 h-10 text-indigo-500 opacity-80" />
+              </div>
+              {/* 보조 지표: 유입경로별 건수 및 비율 */}
+              <div className="mt-3 pt-3 border-t border-indigo-500/10 space-y-1">
+                <p className="text-xs text-gray-500">
+                  광고 {metrics.entrySourceStats.광고}건 / {metrics.totalInflow > 0 ? ((metrics.entrySourceStats.광고 / metrics.totalInflow) * 100).toFixed(1) : 0}%
+                </p>
+                <p className="text-xs text-gray-500">
+                  외주 {metrics.entrySourceStats.외주}건 / {metrics.totalInflow > 0 ? ((metrics.entrySourceStats.외주 / metrics.totalInflow) * 100).toFixed(1) : 0}%
+                </p>
+                <p className="text-xs text-gray-500">
+                  고객소개 {metrics.entrySourceStats.고객소개}건 / {metrics.totalInflow > 0 ? ((metrics.entrySourceStats.고객소개 / metrics.totalInflow) * 100).toFixed(1) : 0}%
+                </p>
+                <p className="text-xs text-gray-500">
+                  승인복제 {metrics.entrySourceStats.승인복제}건 / {metrics.totalInflow > 0 ? ((metrics.entrySourceStats.승인복제 / metrics.totalInflow) * 100).toFixed(1) : 0}%
+                </p>
               </div>
             </CardContent>
           </Card>
