@@ -328,7 +328,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                           const search = employeeSearch.toLowerCase();
                           return (
                             user.name?.toLowerCase().includes(search) ||
-                            user.email?.toLowerCase().includes(search)
+                            user.email?.toLowerCase().includes(search) ||
+                            user.phone?.toLowerCase().includes(search)
                           );
                         })
                         .map((user) => (
