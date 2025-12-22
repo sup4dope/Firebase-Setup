@@ -60,7 +60,7 @@ import {
 import { format, differenceInYears, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { TodoForm } from "@/components/TodoForm";
-import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
+import { storage, db, getCustomerHistoryLogs, uploadMemoImage } from "@/lib/firebase";
 import {
   ref,
   uploadBytes,
@@ -82,6 +82,7 @@ import {
 interface MemoItem {
   id: string;
   content: string;
+  image_url?: string;
   author_id: string;
   author_name: string;
   created_at: Date;
@@ -254,7 +255,11 @@ export function CustomerDetailModal({
   // Memo state
   const [memos, setMemos] = useState<MemoItem[]>([]);
   const [newMemo, setNewMemo] = useState("");
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [enlargedImageUrl, setEnlargedImageUrl] = useState<string | null>(null);
   const memoScrollRef = useRef<HTMLDivElement>(null);
+  const memoInputRef = useRef<HTMLInputElement>(null);
 
   // AI Chat state
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([]);
@@ -310,6 +315,7 @@ export function CustomerDetailModal({
         customer.memo_history?.map((m, i) => ({
           id: `memo_${i}`,
           content: m.content,
+          image_url: (m as any).image_url,
           author_id: m.author_id,
           author_name: m.author_name,
           created_at:
@@ -608,22 +614,61 @@ export function CustomerDetailModal({
     return input;
   };
 
+  // Handle image paste in memo input
+  const handleMemoPaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          setPendingImage(file);
+        }
+        return;
+      }
+    }
+  };
+
   // Handle memo submit - saves immediately to Firestore and syncs with dashboard
   // [Gemini 최종 완결] 대시보드 싱크 불일치 해결 버전
   const handleMemoSubmit = async () => {
-    // 1. 유효성 검사
-    if (!newMemo.trim() || !currentUser) return;
+    // 1. 유효성 검사 (텍스트 또는 이미지가 있어야 함)
+    if (!newMemo.trim() && !pendingImage) return;
+    if (!currentUser) return;
 
     // ★ 자동저장 팀킬 방지
     debouncedSave.cancel();
 
     const content = newMemo.trim();
     const now = new Date();
+    let imageUrl: string | undefined;
+
+    // 이미지 업로드 처리
+    if (pendingImage && formData.id) {
+      setIsUploadingImage(true);
+      try {
+        imageUrl = await uploadMemoImage(
+          formData.id,
+          pendingImage,
+          pendingImage.name || 'pasted_image.png'
+        );
+      } catch (error) {
+        console.error("이미지 업로드 실패:", error);
+        setIsUploadingImage(false);
+        return;
+      }
+      setIsUploadingImage(false);
+      setPendingImage(null);
+    }
 
     // 2. 새 메모 객체 생성
     const newLog: MemoItem = {
       id: `memo_${Date.now()}`,
-      content,
+      content: content || (imageUrl ? "[이미지]" : ""),
+      image_url: imageUrl,
       author_id: currentUser.uid,
       author_name: currentUser.name || "관리자",
       created_at: now,
@@ -649,7 +694,8 @@ export function CustomerDetailModal({
       if (formData.id) {
         await addDoc(collection(db, "counseling_logs"), {
           customer_id: formData.id,
-          content: content,
+          content: content || (imageUrl ? "[이미지]" : ""),
+          image_url: imageUrl,
           author_name: currentUser.name || "관리자",
           created_at: now,
           type: "memo",
@@ -661,6 +707,7 @@ export function CustomerDetailModal({
         // (1) DB 저장용 데이터 정제
         const historyForDB = updatedHistory.map((m) => ({
           content: m.content,
+          image_url: m.image_url,
           author_id: m.author_id,
           author_name: m.author_name,
           created_at: m.created_at,
@@ -669,8 +716,8 @@ export function CustomerDetailModal({
 
         // (2) DB 업데이트 (덮어쓰기)
         await updateDoc(doc(db, "customers", formData.id), {
-          recent_memo: content,
-          latest_memo: content,
+          recent_memo: content || (imageUrl ? "[이미지]" : ""),
+          latest_memo: content || (imageUrl ? "[이미지]" : ""),
           last_memo_date: now,
           memo_history: safeHistory, // DB에도 저장하고
         });
@@ -678,8 +725,8 @@ export function CustomerDetailModal({
         // (3) 로컬 formData 동기화
         setFormData((prev) => ({
           ...prev,
-          recent_memo: content,
-          latest_memo: content,
+          recent_memo: content || (imageUrl ? "[이미지]" : ""),
+          latest_memo: content || (imageUrl ? "[이미지]" : ""),
           last_memo_date: now,
           memo_history: updatedHistory,
         }));
@@ -690,8 +737,8 @@ export function CustomerDetailModal({
         if (onSave) {
           onSave({
             id: formData.id,
-            recent_memo: content,
-            latest_memo: content,
+            recent_memo: content || (imageUrl ? "[이미지]" : ""),
+            latest_memo: content || (imageUrl ? "[이미지]" : ""),
             last_memo_date: now,
             memo_history: updatedHistory, // ★ 이 한 줄이 빠져서 계속 증발했던 겁니다!
           });
@@ -2167,9 +2214,20 @@ export function CustomerDetailModal({
                               </span>
                             </div>
                             <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
-                              <p className="text-sm text-gray-200 whitespace-pre-wrap">
-                                {memo.content}
-                              </p>
+                              {memo.image_url && (
+                                <img
+                                  src={memo.image_url}
+                                  alt="메모 이미지"
+                                  className="max-w-full max-h-40 rounded cursor-pointer mb-1 hover:opacity-80 transition-opacity"
+                                  onClick={() => setEnlargedImageUrl(memo.image_url!)}
+                                  data-testid={`memo-image-${memo.id}`}
+                                />
+                              )}
+                              {memo.content && memo.content !== "[이미지]" && (
+                                <p className="text-sm text-gray-200 whitespace-pre-wrap">
+                                  {memo.content}
+                                </p>
+                              )}
                             </div>
                           </div>
                         ))
@@ -2177,27 +2235,53 @@ export function CustomerDetailModal({
                     </div>
 
                     {/* Memo Input */}
-                    <div className="shrink-0 border-t border-gray-700 bg-gray-800/30 flex items-center px-2 py-2 gap-1.5">
-                      <Input
-                        value={newMemo}
-                        onChange={(e) => setNewMemo(e.target.value)}
-                        placeholder="메모 입력..."
-                        className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleMemoSubmit();
-                          }
-                        }}
-                      />
-                      <Button
-                        onClick={handleMemoSubmit}
-                        disabled={!newMemo.trim()}
-                        size="icon"
-                        className="shrink-0"
-                      >
-                        <Send className="w-4 h-4" />
-                      </Button>
+                    <div className="shrink-0 border-t border-gray-700 bg-gray-800/30 px-2 py-2">
+                      {/* 이미지 미리보기 */}
+                      {pendingImage && (
+                        <div className="mb-2 relative inline-block">
+                          <img
+                            src={URL.createObjectURL(pendingImage)}
+                            alt="붙여넣은 이미지"
+                            className="max-h-20 rounded border border-gray-600"
+                          />
+                          <Button
+                            size="icon"
+                            variant="destructive"
+                            className="absolute -top-2 -right-2 h-5 w-5 rounded-full"
+                            onClick={() => setPendingImage(null)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          ref={memoInputRef}
+                          value={newMemo}
+                          onChange={(e) => setNewMemo(e.target.value)}
+                          placeholder="메모 입력... (Ctrl+V로 이미지 붙여넣기)"
+                          className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
+                          onPaste={handleMemoPaste}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleMemoSubmit();
+                            }
+                          }}
+                        />
+                        <Button
+                          onClick={handleMemoSubmit}
+                          disabled={!newMemo.trim() && !pendingImage}
+                          size="icon"
+                          className="shrink-0"
+                        >
+                          {isUploadingImage ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -2584,6 +2668,25 @@ export function CustomerDetailModal({
           }}
         />
       )}
+
+      {/* 이미지 확대 보기 모달 */}
+      <Dialog open={!!enlargedImageUrl} onOpenChange={() => setEnlargedImageUrl(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-2 bg-gray-900/95 border-gray-700">
+          <VisuallyHidden>
+            <DialogTitle>이미지 확대 보기</DialogTitle>
+          </VisuallyHidden>
+          {enlargedImageUrl && (
+            <div className="flex items-center justify-center">
+              <img
+                src={enlargedImageUrl}
+                alt="확대된 이미지"
+                className="max-w-full max-h-[85vh] object-contain rounded"
+                data-testid="enlarged-memo-image"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
