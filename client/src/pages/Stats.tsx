@@ -575,7 +575,9 @@ export default function Stats() {
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
-                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                      labelStyle={{ color: 'white' }}
+                      itemStyle={{ color: 'white' }}
+                      formatter={(value: number) => [`${value}`, '건수']}
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                       {funnelData.map((entry, index) => (
