@@ -27,8 +27,10 @@ import {
   Bell,
   Clock,
   Crown,
+  Cog,
 } from 'lucide-react';
 import { TodoList } from './TodoList';
+import { SystemSettingsModal } from './SystemSettingsModal';
 import { cn } from '@/lib/utils';
 import { promoteToAdmin } from '@/lib/firestore';
 import type { User, Todo, Customer, UserRole } from '@shared/types';
@@ -70,6 +72,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [location] = useLocation();
   const [isPromoting, setIsPromoting] = useState(false);
+  const [showSystemSettings, setShowSystemSettings] = useState(false);
 
   const handlePromoteToAdmin = async () => {
     if (isPromoting) return;
@@ -222,6 +225,20 @@ export function AppSidebar({
       <SidebarSeparator className="bg-gray-700" />
 
       <SidebarFooter className="p-4 bg-gray-900/30 space-y-3">
+        {/* 시스템 설정 버튼 - super_admin 전용 */}
+        {userRole === 'super_admin' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSystemSettings(true)}
+            className="w-full border-blue-500/50 text-blue-400"
+            data-testid="button-system-settings"
+          >
+            <Cog className="w-4 h-4 mr-2" />
+            시스템 설정
+          </Button>
+        )}
+
         {/* DEV ONLY: Admin Promote Button */}
         {userRole !== 'super_admin' && (
           <Button
@@ -267,6 +284,14 @@ export function AppSidebar({
           </Button>
         </div>
       </SidebarFooter>
+
+      {/* 시스템 설정 모달 */}
+      {showSystemSettings && (
+        <SystemSettingsModal
+          isOpen={showSystemSettings}
+          onClose={() => setShowSystemSettings(false)}
+        />
+      )}
     </Sidebar>
   );
 }

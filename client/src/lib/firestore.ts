@@ -92,11 +92,17 @@ export const updateUser = async (uid: string, data: Partial<User>): Promise<void
 // Teams
 export const getTeams = async (): Promise<Team[]> => {
   const snapshot = await getDocs(collection(db, 'teams'));
-  return snapshot.docs.map(doc => ({
-    ...doc.data(),
-    id: doc.id,
-    created_at: toDate(doc.data().created_at),
-  } as Team));
+  return snapshot.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      ...data,
+      id: docSnap.id,
+      team_id: data.team_id || docSnap.id,
+      team_name: data.team_name || data.name || '',
+      name: data.name || data.team_name || '',
+      created_at: toDate(data.created_at),
+    } as Team;
+  });
 };
 
 export const createTeam = async (team: InsertTeam): Promise<Team> => {
@@ -106,7 +112,9 @@ export const createTeam = async (team: InsertTeam): Promise<Team> => {
   });
   return {
     id: docRef.id,
-    ...team,
+    team_id: docRef.id,
+    team_name: team.team_name,
+    name: team.name,
     created_at: new Date(),
   };
 };
