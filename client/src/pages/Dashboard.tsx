@@ -26,8 +26,10 @@ import {
 } from '@/lib/firestore';
 import { Plus, Search, RefreshCw } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
 import { FUNNEL_GROUPS } from '@/lib/constants';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import type { Customer, User, Team, Holiday, StatusLog, StatusCode, InsertCustomer } from '@shared/types';
 
 export default function Dashboard() {
@@ -56,6 +58,29 @@ export default function Dashboard() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isNewCustomerModal, setIsNewCustomerModal] = useState(false);
   const [detailModalInitialTab, setDetailModalInitialTab] = useState<'memo' | 'history'>('memo');
+
+  // Status change modal states (for dashboard table)
+  const [statusChangeModal, setStatusChangeModal] = useState<{
+    isOpen: boolean;
+    customerId: string;
+    customerName: string;
+    currentStatus: StatusCode;
+    targetStatus: string;
+    commissionRate: number;
+    contractAmount: number;
+    executionAmount: number;
+    processingOrg: string;
+  }>({
+    isOpen: false,
+    customerId: '',
+    customerName: '',
+    currentStatus: '상담대기',
+    targetStatus: '',
+    commissionRate: 0,
+    contractAmount: 0,
+    executionAmount: 0,
+    processingOrg: '미등록',
+  });
 
   // Fetch data
   const fetchData = async () => {
@@ -186,6 +211,31 @@ export default function Dashboard() {
   const handleStatusChange = async (customerId: string, currentStatus: StatusCode, newStatus: StatusCode) => {
     if (!user) return;
 
+    // Check if this status requires additional info modal
+    const requiresModal = 
+      newStatus.includes('계약완료') ||
+      newStatus.includes('신청완료') ||
+      newStatus.includes('집행완료');
+
+    if (requiresModal) {
+      const customer = customers.find(c => c.id === customerId);
+      if (customer) {
+        setStatusChangeModal({
+          isOpen: true,
+          customerId,
+          customerName: customer.name,
+          currentStatus,
+          targetStatus: newStatus,
+          commissionRate: customer.commission_rate || 0,
+          contractAmount: customer.contract_amount || 0,
+          executionAmount: customer.execution_amount || 0,
+          processingOrg: customer.processing_org || '미등록',
+        });
+        return;
+      }
+    }
+
+    // Normal status change without modal
     try {
       await updateCustomerStatus(customerId, currentStatus, newStatus, user.uid, user.name);
       setCustomers(prev =>
@@ -194,6 +244,80 @@ export default function Dashboard() {
       // Refresh status logs
       const logs = await getStatusLogs();
       setStatusLogs(logs);
+      toast({
+        title: '성공',
+        description: '상태가 변경되었습니다.',
+      });
+    } catch (error) {
+      console.error('Error changing status:', error);
+      toast({
+        title: '오류',
+        description: '상태 변경 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle status change with additional info from modal
+  const handleStatusChangeConfirm = async () => {
+    if (!user || !statusChangeModal.customerId) return;
+
+    try {
+      // First, use updateCustomerStatus to properly create status_logs entries
+      await updateCustomerStatus(
+        statusChangeModal.customerId,
+        statusChangeModal.currentStatus,
+        statusChangeModal.targetStatus as StatusCode,
+        user.uid,
+        user.name
+      );
+
+      // Then update additional fields if provided
+      const additionalData: Record<string, any> = {};
+
+      // Only save values when they are > 0 or not default (preventing overwrites)
+      if (statusChangeModal.targetStatus.includes('계약완료')) {
+        if (statusChangeModal.commissionRate > 0) {
+          additionalData.commission_rate = statusChangeModal.commissionRate;
+        }
+        if (statusChangeModal.contractAmount > 0) {
+          additionalData.contract_amount = statusChangeModal.contractAmount;
+        }
+      }
+      if (statusChangeModal.targetStatus.includes('신청완료')) {
+        if (statusChangeModal.processingOrg && statusChangeModal.processingOrg !== '미등록') {
+          additionalData.processing_org = statusChangeModal.processingOrg;
+        }
+      }
+      if (statusChangeModal.targetStatus.includes('집행완료')) {
+        if (statusChangeModal.executionAmount > 0) {
+          additionalData.execution_amount = statusChangeModal.executionAmount;
+        }
+      }
+
+      // Update additional fields if any were set
+      if (Object.keys(additionalData).length > 0) {
+        additionalData.updated_at = new Date();
+        await updateDoc(doc(db, 'customers', statusChangeModal.customerId), additionalData);
+      }
+
+      // Update local state
+      setCustomers(prev =>
+        prev.map(c => c.id === statusChangeModal.customerId ? {
+          ...c,
+          status_code: statusChangeModal.targetStatus as StatusCode,
+          commission_rate: additionalData.commission_rate ?? c.commission_rate,
+          contract_amount: additionalData.contract_amount ?? c.contract_amount,
+          execution_amount: additionalData.execution_amount ?? c.execution_amount,
+          processing_org: additionalData.processing_org ?? c.processing_org,
+        } : c)
+      );
+
+      // Refresh status logs
+      const logs = await getStatusLogs();
+      setStatusLogs(logs);
+
+      setStatusChangeModal(prev => ({ ...prev, isOpen: false }));
       toast({
         title: '성공',
         description: '상태가 변경되었습니다.',
@@ -593,6 +717,146 @@ export default function Dashboard() {
         onDelete={isSuperAdmin ? handleDetailModalDelete : undefined}
         initialTab={detailModalInitialTab}
       />
+
+      {/* Status Change Confirmation Modal (for dashboard table) */}
+      <Dialog 
+        open={statusChangeModal.isOpen} 
+        onOpenChange={(open) => setStatusChangeModal(prev => ({ ...prev, isOpen: open }))}
+      >
+        <DialogContent className="bg-gray-900 border-gray-700 text-gray-100 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-white">
+              상태 변경 확인
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {statusChangeModal.customerName} 고객의 상태를 "{statusChangeModal.targetStatus}"(으)로 변경합니다.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-4">
+            {/* 계약완료: 자문료, 계약금 */}
+            {statusChangeModal.targetStatus.includes('계약완료') && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-sm text-gray-300">
+                    자문료 (%) <span className="text-gray-500 text-xs">(단위: %)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={statusChangeModal.commissionRate || ''}
+                      onChange={(e) =>
+                        setStatusChangeModal(prev => ({
+                          ...prev,
+                          commissionRate: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                      placeholder="예: 3.5"
+                      data-testid="input-dashboard-commission-rate"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                      %
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-gray-300">
+                    계약금액 <span className="text-gray-500 text-xs">(단위: 만원)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={statusChangeModal.contractAmount || ''}
+                      onChange={(e) =>
+                        setStatusChangeModal(prev => ({
+                          ...prev,
+                          contractAmount: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      className="bg-gray-800 border-gray-600 text-gray-200 pr-12"
+                      placeholder="예: 5000 (만원 단위로 입력)"
+                      data-testid="input-dashboard-contract-amount"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                      만원
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 신청완료: 진행기관 */}
+            {statusChangeModal.targetStatus.includes('신청완료') && (
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-300">진행기관</Label>
+                <Input
+                  type="text"
+                  value={statusChangeModal.processingOrg || ''}
+                  onChange={(e) =>
+                    setStatusChangeModal(prev => ({
+                      ...prev,
+                      processingOrg: e.target.value,
+                    }))
+                  }
+                  className="bg-gray-800 border-gray-600 text-gray-200"
+                  placeholder="예: 기업은행, 신용보증기금"
+                  data-testid="input-dashboard-processing-org"
+                />
+              </div>
+            )}
+
+            {/* 집행완료: 집행금액 */}
+            {statusChangeModal.targetStatus.includes('집행완료') && (
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-300">
+                  집행금액 <span className="text-gray-500 text-xs">(단위: 만원)</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    value={statusChangeModal.executionAmount || ''}
+                    onChange={(e) =>
+                      setStatusChangeModal(prev => ({
+                        ...prev,
+                        executionAmount: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                    className="bg-gray-800 border-gray-600 text-gray-200 pr-12"
+                    placeholder="예: 10000 (만원 단위로 입력)"
+                    data-testid="input-dashboard-execution-amount"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                    만원
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setStatusChangeModal(prev => ({ ...prev, isOpen: false }))}
+              className="border-gray-600 text-gray-300"
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleStatusChangeConfirm}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="button-dashboard-confirm-status-change"
+            >
+              확인
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
