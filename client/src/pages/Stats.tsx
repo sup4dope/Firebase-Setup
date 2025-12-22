@@ -541,7 +541,7 @@ export default function Stats() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">평균 전환율</p>
+                  <p className="text-sm text-muted-foreground">기간 내 집행률</p>
                   <p className="text-3xl font-bold text-foreground">{metrics.avgConversionRate.toFixed(1)}%</p>
                   <p className="text-xs text-muted-foreground mt-1">유입→집행</p>
                 </div>
