@@ -199,6 +199,13 @@ export default function Stats() {
     const totalExecutionAmount = executedCustomers.reduce((sum, c) => 
       sum + (Number(c.execution_amount) || 0), 0
     );
+    
+    // 총 수납금액: 자문료율(%) * 집행금액 / 100 의 총합
+    const totalCollectionAmount = executedCustomers.reduce((sum, c) => {
+      const execAmount = Number(c.execution_amount) || 0;
+      const feeRate = Number(c.contract_fee_rate) || Number(c.commission_rate) || 0;
+      return sum + (execAmount * feeRate / 100);
+    }, 0);
 
     // 집행 예정: 계약완료(선불/후불/외주) 또는 신청완료 상태
     const pendingExecutionCustomers = filteredCustomers.filter(c => 
@@ -230,6 +237,7 @@ export default function Stats() {
       avgContractFeeRate,
       executedCount,
       totalExecutionAmount,
+      totalCollectionAmount,
       pendingExecutionCount,
       avgPendingExecutionAmount,
       avgConversionRate,
@@ -496,10 +504,13 @@ export default function Stats() {
                 </div>
                 <CheckCircle2 className="w-10 h-10 text-emerald-500 opacity-80" />
               </div>
-              {/* 보조 지표: 총 집행금액 */}
-              <div className="mt-3 pt-3 border-t border-emerald-500/10">
+              {/* 보조 지표: 총 집행금액, 총 수납금액 */}
+              <div className="mt-3 pt-3 border-t border-emerald-500/10 space-y-1">
                 <p className="text-xs text-gray-500">
                   총 집행금액: {formatAmount(metrics.totalExecutionAmount).value} {formatAmount(metrics.totalExecutionAmount).unit}
+                </p>
+                <p className="text-xs text-gray-500">
+                  총 수납금액: {formatAmount(metrics.totalCollectionAmount).value} {formatAmount(metrics.totalCollectionAmount).unit}
                 </p>
               </div>
             </CardContent>
