@@ -2156,7 +2156,7 @@ export function CustomerDetailModal({
                           <p className="text-sm">상담 메모가 없습니다</p>
                         </div>
                       ) : (
-                        memos.map((memo) => (
+                        [...memos].reverse().map((memo) => (
                           <div key={memo.id} className="flex flex-col">
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className="text-xs font-medium text-blue-400">
