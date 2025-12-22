@@ -3,6 +3,9 @@
 // User roles
 export type UserRole = 'staff' | 'team_leader' | 'super_admin';
 
+// User status
+export type UserStatus = '재직' | '퇴사';
+
 // User (Firestore: users collection)
 export interface User {
   uid: string;
@@ -11,13 +14,20 @@ export interface User {
   role: UserRole;
   team_id: string | null;
   team_name: string | null;
+  phone?: string; // 연락처
+  status?: UserStatus; // 재직/퇴사 상태
+  created_at?: Date;
+  updated_at?: Date;
 }
 
 // Team (Firestore: teams collection)
 export interface Team {
   id: string;
-  name: string;
+  team_id: string; // 문서 ID와 동일
+  team_name: string; // 팀명
+  name: string; // 팀명 (호환용)
   created_at: Date;
+  updated_at?: Date;
 }
 
 // Customer status - 한글 자연어 상태명 사용
@@ -169,8 +179,8 @@ export interface KPIData {
 }
 
 // Insert types (for creating new records)
-export type InsertUser = Omit<User, 'uid'>;
-export type InsertTeam = Omit<Team, 'id' | 'created_at'>;
+export type InsertUser = Omit<User, 'uid' | 'created_at' | 'updated_at'>;
+export type InsertTeam = Omit<Team, 'id' | 'team_id' | 'created_at' | 'updated_at'>;
 export type InsertCustomer = Omit<Customer, 'id' | 'readable_id' | 'created_at'>;
 export type InsertStatusLog = Omit<StatusLog, 'id' | 'changed_at'>;
 export type InsertTodo = Omit<Todo, 'id' | 'created_at'>;
