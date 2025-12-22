@@ -6,6 +6,13 @@ export type UserRole = 'staff' | 'team_leader' | 'super_admin';
 // User status
 export type UserStatus = '재직' | '퇴사';
 
+// Login History entry
+export interface LoginHistory {
+  ip: string;
+  logged_at: Date;
+  user_agent?: string;
+}
+
 // User (Firestore: users collection)
 export interface User {
   uid: string;
@@ -16,6 +23,9 @@ export interface User {
   team_name: string | null;
   phone?: string; // 연락처
   status?: UserStatus; // 재직/퇴사 상태
+  current_ip?: string; // 현재 접속 IP
+  last_login_at?: Date; // 최근 로그인 일시
+  login_history?: LoginHistory[]; // 로그인 이력 (최근 5개)
   created_at?: Date;
   updated_at?: Date;
 }

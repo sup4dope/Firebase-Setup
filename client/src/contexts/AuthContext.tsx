@@ -5,9 +5,21 @@ import {
   signOut as firebaseSignOut,
   type User as FirebaseUser 
 } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '@/lib/firebase';
-import type { User, UserRole } from '@shared/types';
+import { updateLoginHistory } from '@/lib/firestore';
+import type { User, UserRole, LoginHistory } from '@shared/types';
+
+// IP 주소 가져오기 함수
+const fetchClientIP = async (): Promise<string> => {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip || 'Unknown';
+  } catch {
+    return 'Unknown';
+  }
+};
 
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
@@ -108,6 +120,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
           });
           userData.uid = fbUser.uid;
           userData.name = fbUser.displayName || userData.name;
+        }
+        
+        // 로그인 이력 기록 (IP 가져와서 저장)
+        try {
+          const clientIP = await fetchClientIP();
+          const existingHistory: LoginHistory[] = (userData.login_history || []).map(h => ({
+            ...h,
+            logged_at: h.logged_at instanceof Timestamp 
+              ? (h.logged_at as Timestamp).toDate() 
+              : new Date(h.logged_at as unknown as string),
+          }));
+          await updateLoginHistory(userDoc.id, clientIP, existingHistory);
+          userData.current_ip = clientIP;
+        } catch (e) {
+          console.error('Failed to update login history:', e);
         }
         
         setUser(userData);

@@ -29,6 +29,7 @@ import type {
   InsertStatusLog,
   StatusCode,
   CustomerHistoryLog,
+  LoginHistory,
 } from '@shared/types';
 // STATUS_LABELS removed - using Korean status names directly
 
@@ -87,6 +88,30 @@ export const getUsersByTeam = async (teamId: string): Promise<User[]> => {
 
 export const updateUser = async (uid: string, data: Partial<User>): Promise<void> => {
   await updateDoc(doc(db, 'users', uid), data);
+};
+
+// 로그인 이력 업데이트 (최근 5개 유지)
+export const updateLoginHistory = async (
+  userDocId: string,
+  ip: string,
+  existingHistory: LoginHistory[] = []
+): Promise<void> => {
+  const newEntry: LoginHistory = {
+    ip,
+    logged_at: new Date(),
+  };
+  
+  // 기존 이력에 새 항목 추가 후 최근 5개만 유지
+  const updatedHistory = [newEntry, ...existingHistory].slice(0, 5);
+  
+  await updateDoc(doc(db, 'users', userDocId), {
+    current_ip: ip,
+    last_login_at: Timestamp.now(),
+    login_history: updatedHistory.map(h => ({
+      ...h,
+      logged_at: h.logged_at instanceof Date ? Timestamp.fromDate(h.logged_at) : h.logged_at,
+    })),
+  });
 };
 
 // Teams

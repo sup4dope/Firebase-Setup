@@ -5,8 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { User, Mail, Building, Shield, LogOut } from 'lucide-react';
-import type { UserRole } from '@shared/types';
+import { User, Mail, Building, Shield, LogOut, Phone, Globe, History } from 'lucide-react';
+import type { UserRole, LoginHistory } from '@shared/types';
+import { Timestamp } from 'firebase/firestore';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 
 const ROLE_LABELS: Record<UserRole, string> = {
   staff: '팀원',
@@ -73,7 +76,70 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground">{ROLE_DESCRIPTIONS[user.role]}</p>
               </div>
             </div>
+
+            <div className="flex items-center gap-3">
+              <Phone className="w-5 h-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">등록된 연락처</p>
+                <p className="font-medium">{user.phone || '미등록'}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Globe className="w-5 h-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">현재 접속 IP</p>
+                <p className="font-medium font-mono text-sm">{user.current_ip || '-'}</p>
+              </div>
+            </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Login History Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <History className="w-5 h-5" />
+            로그인 이력
+          </CardTitle>
+          <CardDescription>최근 5회 접속 기록</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {user.login_history && user.login_history.length > 0 ? (
+            <div className="space-y-3">
+              {user.login_history.slice(0, 5).map((entry, index) => {
+                const loggedAt = entry.logged_at instanceof Timestamp 
+                  ? (entry.logged_at as Timestamp).toDate() 
+                  : new Date(entry.logged_at as unknown as string);
+                return (
+                  <div 
+                    key={index} 
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {format(loggedAt, 'yyyy-MM-dd (EEE) HH:mm:ss', { locale: ko })}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">{entry.ip}</p>
+                      </div>
+                    </div>
+                    {index === 0 && (
+                      <Badge variant="secondary" className="text-xs">현재</Badge>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              로그인 이력이 없습니다
+            </p>
+          )}
         </CardContent>
       </Card>
 
