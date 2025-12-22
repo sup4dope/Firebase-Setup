@@ -150,55 +150,96 @@ export const deleteTeam = async (id: string): Promise<void> => {
 
 // Customers
 export const getCustomers = async (): Promise<Customer[]> => {
-  const q = query(collection(db, 'customers'), orderBy('created_at', 'desc'));
+  // updated_at 기준 내림차순 정렬 (최근 수정순)
+  const q = query(collection(db, 'customers'), orderBy('updated_at', 'desc'));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    ...doc.data(),
-    id: doc.id,
-    created_at: toDate(doc.data().created_at),
-  } as Customer));
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      ...data,
+      id: doc.id,
+      created_at: toDate(data.created_at),
+      updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
+      daily_no: data.daily_no || null,
+    } as Customer;
+  });
 };
 
 export const getCustomersByManager = async (managerId: string): Promise<Customer[]> => {
   const q = query(
     collection(db, 'customers'),
     where('manager_id', '==', managerId),
-    orderBy('created_at', 'desc')
+    orderBy('updated_at', 'desc')
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    ...doc.data(),
-    id: doc.id,
-    created_at: toDate(doc.data().created_at),
-  } as Customer));
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      ...data,
+      id: doc.id,
+      created_at: toDate(data.created_at),
+      updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
+      daily_no: data.daily_no || null,
+    } as Customer;
+  });
 };
 
 export const getCustomersByTeam = async (teamId: string): Promise<Customer[]> => {
   const q = query(
     collection(db, 'customers'),
     where('team_id', '==', teamId),
-    orderBy('created_at', 'desc')
+    orderBy('updated_at', 'desc')
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    ...doc.data(),
-    id: doc.id,
-    created_at: toDate(doc.data().created_at),
-  } as Customer));
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      ...data,
+      id: doc.id,
+      created_at: toDate(data.created_at),
+      updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
+      daily_no: data.daily_no || null,
+    } as Customer;
+  });
+};
+
+// 당일 일련번호 채번 함수
+const generateDailyNo = async (): Promise<number> => {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  
+  // 오늘 등록된 모든 고객 수 조회 (사원 구분 없이 전체)
+  const customersRef = collection(db, 'customers');
+  const q = query(
+    customersRef,
+    where('created_at', '>=', Timestamp.fromDate(todayStart)),
+    where('created_at', '<', Timestamp.fromDate(todayEnd))
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.size + 1; // 전체 등록 수 + 1
 };
 
 export const createCustomer = async (customer: InsertCustomer): Promise<Customer> => {
   const readable_id = await generateReadableId();
+  const daily_no = await generateDailyNo();
+  const now = Timestamp.now();
+  
   const docRef = await addDoc(collection(db, 'customers'), {
     ...customer,
     readable_id,
-    created_at: Timestamp.now(),
+    daily_no,
+    created_at: now,
+    updated_at: now, // 수정일자 필드 추가
   });
   return {
     id: docRef.id,
     readable_id,
+    daily_no,
     ...customer,
     created_at: new Date(),
+    updated_at: new Date(),
   };
 };
 
@@ -208,8 +249,13 @@ export const updateCustomer = async (id: string, data: Partial<Customer>): Promi
     const cleanData = Object.fromEntries(
       Object.entries(data).filter(([_, v]) => v !== undefined)
     );
-    console.log('🔄 Firestore updateDoc called:', id, cleanData);
-    await updateDoc(doc(db, 'customers', id), cleanData);
+    // 자동으로 updated_at 갱신
+    const dataWithTimestamp = {
+      ...cleanData,
+      updated_at: Timestamp.now(),
+    };
+    console.log('🔄 Firestore updateDoc called:', id, dataWithTimestamp);
+    await updateDoc(doc(db, 'customers', id), dataWithTimestamp);
     console.log('✅ Firestore updateDoc success');
   } catch (error: any) {
     console.error('❌ Firestore updateDoc error:', error?.message || error?.code || error);

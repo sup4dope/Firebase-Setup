@@ -41,7 +41,8 @@ export const DEFAULT_STATUS = "상담대기";
 export interface Customer {
   id: string;
   readable_id: string; // YYMMDD-XXX format
-  daily_sequence: number; // 일별 순번 (해당 날짜의 전체 접수 순서, 1부터 시작)
+  daily_sequence?: number; // 일별 순번 (deprecated, use daily_no)
+  daily_no?: number; // 당일 일련번호 (전체 전산 기준)
   name: string;
   company_name: string;
   business_registration_number?: string; // 사업자등록번호

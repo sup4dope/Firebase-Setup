@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -117,6 +117,8 @@ const getStageName = (stageId: string | null): string => {
   return stageId;
 };
 
+const PAGE_SIZE = 20; // 페이지당 20개
+
 export function CustomerTable({
   customers,
   userRole,
@@ -130,6 +132,17 @@ export function CustomerTable({
   onAddMemo,
 }: CustomerTableProps) {
   const canDelete = userRole === 'super_admin';
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(customers.length / PAGE_SIZE);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const paginatedCustomers = customers.slice(startIndex, startIndex + PAGE_SIZE);
+  
+  // 필터(스테이지) 변경 시 첫 페이지로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedStage, customers.length]);
   
   // Memo modal state
   const [memoModalOpen, setMemoModalOpen] = useState(false);
@@ -220,7 +233,7 @@ export function CustomerTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {customers.map((customer, index) => (
+            {paginatedCustomers.map((customer, index) => (
               <TableRow 
                 key={customer.id} 
                 className="group hover:bg-muted/30"
@@ -231,9 +244,9 @@ export function CustomerTable({
                   {customer.entry_date}
                 </TableCell>
                 
-                {/* No - daily_sequence (일별 순번) */}
-                <TableCell className="text-center text-muted-foreground tabular-nums">
-                  {customer.daily_sequence || '-'}
+                {/* No - daily_no (당일 일련번호) */}
+                <TableCell className="text-center text-muted-foreground tabular-nums font-medium">
+                  {customer.daily_no || customer.daily_sequence || '-'}
                 </TableCell>
                 
                 {/* 고객명 - clickable */}
@@ -510,6 +523,66 @@ export function CustomerTable({
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            data-testid="button-prev-page"
+          >
+            이전
+          </Button>
+          
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+              // 표시할 페이지 범위 계산 (현재 페이지 주변 5개)
+              const showPage = 
+                page === 1 || 
+                page === totalPages || 
+                (page >= currentPage - 2 && page <= currentPage + 2);
+              
+              if (!showPage) {
+                // 생략 표시 (첫 생략과 마지막 생략만)
+                if (page === 2 || page === totalPages - 1) {
+                  return <span key={page} className="text-muted-foreground px-1">...</span>;
+                }
+                return null;
+              }
+              
+              return (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(page)}
+                  className="min-w-[36px]"
+                  data-testid={`button-page-${page}`}
+                >
+                  {page}
+                </Button>
+              );
+            })}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            data-testid="button-next-page"
+          >
+            다음
+          </Button>
+          
+          <span className="text-sm text-muted-foreground ml-4">
+            총 {customers.length}건 (페이지 {currentPage}/{totalPages})
+          </span>
+        </div>
+      )}
 
       {/* Memo Modal */}
       <MemoModal
