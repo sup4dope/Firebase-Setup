@@ -179,7 +179,7 @@ export function AppSidebar({
             <td className="py-1 px-1 text-[11px] text-gray-300 truncate max-w-[45px]">
               {customerInfo.name}
             </td>
-            <td className="py-1 px-1 text-[10px] text-gray-500 truncate max-w-[55px]">
+            <td className="py-1 px-1 text-[10px] truncate max-w-[55px] text-[#d1d5db]">
               {customerInfo.companyName}
             </td>
             <td className="py-1 px-1">
