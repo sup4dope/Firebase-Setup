@@ -631,14 +631,21 @@ export function CustomerDetailModal({
     // DB 업데이트
     if (formData.id) {
       try {
-        const historyForDB = updatedMemos.map((m) => ({
-          content: m.content || "",
-          image_url: m.image_url || null,
-          is_important: m.is_important || false,
-          author_id: m.author_id || "",
-          author_name: m.author_name || "",
-          created_at: m.created_at,
-        }));
+        // undefined 필드를 완전히 제거하고 명시적 값만 포함
+        const historyForDB = updatedMemos.map((m) => {
+          const memoObj: Record<string, any> = {
+            content: m.content || "",
+            is_important: m.is_important === true,
+            author_id: m.author_id || "",
+            author_name: m.author_name || "",
+            created_at: m.created_at,
+          };
+          // image_url은 값이 있을 때만 포함
+          if (m.image_url) {
+            memoObj.image_url = m.image_url;
+          }
+          return memoObj;
+        });
         const safeHistory = cleanData(historyForDB);
         
         await updateDoc(doc(db, "customers", formData.id), {
@@ -749,15 +756,21 @@ export function CustomerDetailModal({
 
       // 6. [고객 문서] 저장 & 대시보드 동기화
       if (formData.id) {
-        // (1) DB 저장용 데이터 정제 (undefined 방지)
-        const historyForDB = updatedHistory.map((m) => ({
-          content: m.content || "",
-          image_url: m.image_url || null,
-          is_important: m.is_important || false,
-          author_id: m.author_id || "",
-          author_name: m.author_name || "",
-          created_at: m.created_at,
-        }));
+        // (1) DB 저장용 데이터 정제 (undefined 필드 완전 제거)
+        const historyForDB = updatedHistory.map((m) => {
+          const memoObj: Record<string, any> = {
+            content: m.content || "",
+            is_important: m.is_important === true,
+            author_id: m.author_id || "",
+            author_name: m.author_name || "",
+            created_at: m.created_at,
+          };
+          // image_url은 값이 있을 때만 포함
+          if (m.image_url) {
+            memoObj.image_url = m.image_url;
+          }
+          return memoObj;
+        });
         const safeHistory = cleanData(historyForDB);
 
         // (2) DB 업데이트 (덮어쓰기)
