@@ -81,7 +81,7 @@ export function MemoModal({
                   메모 이력이 없습니다
                 </div>
               ) : (
-                memoHistory.map((memo, index) => (
+                [...memoHistory].reverse().map((memo, index) => (
                   <div
                     key={index}
                     className="bg-muted/50 rounded-lg p-3 space-y-1"
