@@ -303,14 +303,14 @@ export function CustomerTable({
                           {/* 상담 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1">상담</SelectLabel>
-                            <SelectItem value="상담대기" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">상담대기</SelectItem>
+                            <SelectItem value="상담대기" className="text-purple-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">상담대기</SelectItem>
                           </SelectGroup>
 
                           {/* 부재 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">부재</SelectLabel>
-                            <SelectItem value="단기부재" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">단기부재</SelectItem>
-                            <SelectItem value="장기부재" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">장기부재</SelectItem>
+                            <SelectItem value="단기부재" className="text-orange-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">단기부재</SelectItem>
+                            <SelectItem value="장기부재" className="text-orange-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">장기부재</SelectItem>
                           </SelectGroup>
 
                           {/* 거절 그룹 (쓰레기통) */}
@@ -320,7 +320,7 @@ export function CustomerTable({
                               <SelectItem 
                                 key={reason.id} 
                                 value={reason.id}
-                                className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4 text-xs"
+                                className="text-rose-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4 text-xs"
                               >
                                 {reason.label}
                               </SelectItem>
@@ -330,46 +330,46 @@ export function CustomerTable({
                           {/* 희망타겟 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">희망타겟</SelectLabel>
-                            <SelectItem value="업력미달" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">업력미달</SelectItem>
-                            <SelectItem value="최근대출" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">최근대출</SelectItem>
-                            <SelectItem value="인증미동의(국세청)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">인증미동의(국세청)</SelectItem>
-                            <SelectItem value="인증미동의(공여내역)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">인증미동의(공여내역)</SelectItem>
-                            <SelectItem value="진행기간 미동의" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">진행기간 미동의</SelectItem>
-                            <SelectItem value="자문료 미동의" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">자문료 미동의</SelectItem>
-                            <SelectItem value="계약금미동의(선불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약금미동의(선불)</SelectItem>
-                            <SelectItem value="계약금미동의(후불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약금미동의(후불)</SelectItem>
+                            <SelectItem value="업력미달" className="text-yellow-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">업력미달</SelectItem>
+                            <SelectItem value="최근대출" className="text-yellow-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">최근대출</SelectItem>
+                            <SelectItem value="인증미동의(국세청)" className="text-yellow-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">인증미동의(국세청)</SelectItem>
+                            <SelectItem value="인증미동의(공여내역)" className="text-yellow-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">인증미동의(공여내역)</SelectItem>
+                            <SelectItem value="진행기간 미동의" className="text-yellow-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">진행기간 미동의</SelectItem>
+                            <SelectItem value="자문료 미동의" className="text-yellow-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">자문료 미동의</SelectItem>
+                            <SelectItem value="계약금미동의(선불)" className="text-yellow-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약금미동의(선불)</SelectItem>
+                            <SelectItem value="계약금미동의(후불)" className="text-yellow-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약금미동의(후불)</SelectItem>
                           </SelectGroup>
 
                           {/* 계약완료 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">계약완료</SelectLabel>
-                            <SelectItem value="계약완료(선불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약완료(선불)</SelectItem>
-                            <SelectItem value="계약완료(외주)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약완료(외주)</SelectItem>
-                            <SelectItem value="계약완료(후불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약완료(후불)</SelectItem>
+                            <SelectItem value="계약완료(선불)" className="text-emerald-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약완료(선불)</SelectItem>
+                            <SelectItem value="계약완료(외주)" className="text-emerald-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약완료(외주)</SelectItem>
+                            <SelectItem value="계약완료(후불)" className="text-emerald-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">계약완료(후불)</SelectItem>
                           </SelectGroup>
 
                           {/* 서류취합 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">서류취합</SelectLabel>
-                            <SelectItem value="서류취합완료(선불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">서류취합완료(선불)</SelectItem>
-                            <SelectItem value="서류취합완료(외주)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">서류취합완료(외주)</SelectItem>
-                            <SelectItem value="서류취합완료(후불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">서류취합완료(후불)</SelectItem>
+                            <SelectItem value="서류취합완료(선불)" className="text-blue-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">서류취합완료(선불)</SelectItem>
+                            <SelectItem value="서류취합완료(외주)" className="text-blue-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">서류취합완료(외주)</SelectItem>
+                            <SelectItem value="서류취합완료(후불)" className="text-blue-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">서류취합완료(후불)</SelectItem>
                           </SelectGroup>
 
                           {/* 신청완료 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">신청완료</SelectLabel>
-                            <SelectItem value="신청완료(선불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(선불)</SelectItem>
-                            <SelectItem value="신청완료(외주)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(외주)</SelectItem>
-                            <SelectItem value="신청완료(후불)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(후불)</SelectItem>
+                            <SelectItem value="신청완료(선불)" className="text-cyan-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(선불)</SelectItem>
+                            <SelectItem value="신청완료(외주)" className="text-cyan-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(외주)</SelectItem>
+                            <SelectItem value="신청완료(후불)" className="text-cyan-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(후불)</SelectItem>
                           </SelectGroup>
 
                           {/* 집행완료 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">집행완료</SelectLabel>
-                            <SelectItem value="집행완료" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료</SelectItem>
-                            <SelectItem value="집행완료(외주)" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료(외주)</SelectItem>
-                            <SelectItem value="최종부결" className="text-gray-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">최종부결</SelectItem>
+                            <SelectItem value="집행완료" className="text-green-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료</SelectItem>
+                            <SelectItem value="집행완료(외주)" className="text-green-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료(외주)</SelectItem>
+                            <SelectItem value="최종부결" className="text-red-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">최종부결</SelectItem>
                           </SelectGroup>
                         </SelectContent>
                       </Select>
