@@ -256,7 +256,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
-            <TabsList className="grid w-full grid-cols-1 bg-gray-800 shrink-0">
+            <TabsList className="grid w-full grid-cols-2 bg-gray-800 shrink-0">
               <TabsTrigger
                 value="employees"
                 className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -264,6 +264,14 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
               >
                 <Users className="w-4 h-4 mr-2" />
                 직원(인사) 관리
+              </TabsTrigger>
+              <TabsTrigger
+                value="teams"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                data-testid="tab-teams"
+              >
+                <Building2 className="w-4 h-4 mr-2" />
+                팀 관리
               </TabsTrigger>
             </TabsList>
 
@@ -379,6 +387,78 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                           </TableCell>
                         </TableRow>
                       ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="teams" className="flex-1 overflow-hidden flex flex-col mt-4 min-h-0 data-[state=active]:flex">
+              <div className="flex items-center gap-2 mb-4">
+                <Input
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  placeholder="새 팀명 입력"
+                  className="flex-1 bg-gray-800 border-gray-600 text-gray-200"
+                  data-testid="input-new-team-name"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleAddTeam}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  data-testid="button-add-team"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  팀 추가
+                </Button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {loading ? (
+                  <div className="text-center py-8 text-gray-500">로딩 중...</div>
+                ) : teams.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    등록된 팀이 없습니다.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-gray-700 h-10">
+                        <TableHead className="text-gray-400">팀명</TableHead>
+                        <TableHead className="text-gray-400">소속 직원 수</TableHead>
+                        <TableHead className="text-gray-400 text-right">관리</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {teams.map((team) => {
+                        const memberCount = users.filter((u) => u.team_id === team.id).length;
+                        return (
+                          <TableRow key={team.id} className="border-gray-700">
+                            <TableCell className="text-gray-200 font-medium">
+                              {team.team_name || team.name}
+                            </TableCell>
+                            <TableCell className="text-gray-300">
+                              <Badge variant="secondary" className="bg-gray-700 text-gray-300">
+                                {memberCount}명
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setDeleteTargetTeam(team);
+                                  setShowDeleteTeamConfirm(true);
+                                }}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                data-testid={`button-delete-team-${team.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )}
@@ -523,6 +603,29 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={showDeleteTeamConfirm} onOpenChange={setShowDeleteTeamConfirm}>
+        <AlertDialogContent className="bg-gray-900 border-gray-700 text-gray-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-100">팀 삭제 확인</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              <span className="font-semibold text-red-400">{deleteTargetTeam?.team_name || deleteTargetTeam?.name}</span> 팀을 삭제하시겠습니까?
+              <br />
+              <span className="text-yellow-400">해당 팀 소속 직원들의 팀 정보가 '없음'으로 변경됩니다.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700">
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTeam}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
