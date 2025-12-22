@@ -179,6 +179,21 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     }
   };
 
+  const handleTeamChange = async (user: User & { docId?: string }, newTeamId: string) => {
+    if (!user.docId) return;
+    try {
+      const team = teams.find((t) => t.id === newTeamId);
+      await updateUserInfo(user.docId, { 
+        team_id: newTeamId === 'none' ? null : newTeamId,
+        team_name: newTeamId === 'none' ? null : (team?.team_name || team?.name || null),
+      });
+      await loadData();
+    } catch (error) {
+      console.error('Error updating team:', error);
+      alert('소속팀 변경 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleDeleteUser = async () => {
     if (!deleteTargetUser?.docId) return;
     try {
@@ -304,8 +319,25 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                           <TableCell className="text-gray-300 text-sm py-2">
                             {user.phone || '-'}
                           </TableCell>
-                          <TableCell className="text-gray-300 text-sm py-2">
-                            {user.team_name || '-'}
+                          <TableCell className="py-2">
+                            <Select
+                              value={user.team_id || 'none'}
+                              onValueChange={(v) => handleTeamChange(user, v)}
+                            >
+                              <SelectTrigger className="w-24 h-7 text-xs bg-gray-800 border-gray-600">
+                                <SelectValue placeholder="-" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-gray-800 border-gray-700">
+                                <SelectItem value="none" className="text-gray-400">-</SelectItem>
+                                {teams
+                                  .filter((team) => team.id && team.id.trim() !== '')
+                                  .map((team) => (
+                                    <SelectItem key={team.id} value={team.id} className="text-gray-200">
+                                      {team.team_name || team.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell className="py-2">
                             <Select
