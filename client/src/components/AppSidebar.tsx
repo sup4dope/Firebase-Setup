@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
+import { format } from 'date-fns';
 import {
   Sidebar,
   SidebarContent,
@@ -8,9 +9,6 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -27,22 +25,26 @@ import {
   Bell,
   Clock,
   Cog,
+  Plus,
+  AlertCircle,
+  AlertTriangle,
+  Minus,
 } from 'lucide-react';
-import { TodoList } from './TodoList';
 import { SystemSettingsModal } from './SystemSettingsModal';
 import { cn } from '@/lib/utils';
+import { getTodoItems } from '@/lib/firestore';
 
-import type { User, Todo, Customer, UserRole } from '@shared/types';
+import type { User, Customer, UserRole, TodoItem, TodoPriority } from '@shared/types';
 
 interface AppSidebarProps {
   user: User;
   userRole: UserRole;
-  todos: Todo[];
   customers: Customer[];
-  onToggleTodo: (todoId: string, completed: boolean) => void;
-  onDeleteTodo: (todoId: string) => void;
   onAddTodo: () => void;
   onSignOut: () => void;
+  onTodoClick?: (todo: TodoItem) => void;
+  onCustomerClick?: (customerId: string) => void;
+  todoRefreshTrigger?: number;
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -51,26 +53,71 @@ const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: '총관리자',
 };
 
-interface ReservationMemo {
-  id: string;
-  customer_name: string;
-  date: string;
-  time: string;
-  content: string;
-}
+const PRIORITY_ICONS: Record<TodoPriority, { icon: typeof AlertCircle; color: string }> = {
+  urgent: { icon: AlertCircle, color: 'text-red-400' },
+  normal: { icon: AlertTriangle, color: 'text-blue-400' },
+  low: { icon: Minus, color: 'text-gray-500' },
+};
 
 export function AppSidebar({
   user,
   userRole,
-  todos,
   customers,
-  onToggleTodo,
-  onDeleteTodo,
   onAddTodo,
   onSignOut,
+  onTodoClick,
+  onCustomerClick,
+  todoRefreshTrigger,
 }: AppSidebarProps) {
   const [location] = useLocation();
   const [showSystemSettings, setShowSystemSettings] = useState(false);
+  const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTodoItems = async () => {
+      try {
+        const items = await getTodoItems();
+        setTodoItems(items);
+      } catch (error) {
+        console.error('Error fetching todo items:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchTodoItems();
+  }, [todoRefreshTrigger]);
+
+  const { upcomingTodos, overdueTodos } = useMemo(() => {
+    const now = new Date();
+    const upcoming: TodoItem[] = [];
+    const overdue: TodoItem[] = [];
+
+    todoItems
+      .filter(item => item.status === '진행중')
+      .forEach(item => {
+        const dueDate = item.due_date instanceof Date ? item.due_date : new Date(item.due_date);
+        if (dueDate >= now) {
+          upcoming.push(item);
+        } else {
+          overdue.push(item);
+        }
+      });
+
+    upcoming.sort((a, b) => {
+      const dateA = a.due_date instanceof Date ? a.due_date : new Date(a.due_date);
+      const dateB = b.due_date instanceof Date ? b.due_date : new Date(b.due_date);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    overdue.sort((a, b) => {
+      const dateA = a.due_date instanceof Date ? a.due_date : new Date(a.due_date);
+      const dateB = b.due_date instanceof Date ? b.due_date : new Date(b.due_date);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    return { upcomingTodos: upcoming, overdueTodos: overdue };
+  }, [todoItems]);
 
   const mainMenuItems = [
     { href: '/', label: '고객관리', icon: Users, description: '고객 목록 및 퍼널' },
@@ -78,7 +125,54 @@ export function AppSidebar({
     { href: '/settings', label: '정보관리', icon: Settings, description: '팀/공휴일 설정' },
   ];
 
-  const reservationMemos: ReservationMemo[] = [];
+  const getCustomerInfo = (customerId?: string) => {
+    if (!customerId) return { name: '-', phone: '-' };
+    const customer = customers.find(c => c.id === customerId);
+    return {
+      name: customer?.name || '-',
+      phone: customer?.phone || '-',
+    };
+  };
+
+  const handleRowClick = (todo: TodoItem) => {
+    if (todo.customer_id && onCustomerClick) {
+      onCustomerClick(todo.customer_id);
+    } else if (onTodoClick) {
+      onTodoClick(todo);
+    }
+  };
+
+  const renderTodoRow = (todo: TodoItem) => {
+    const dueDate = todo.due_date instanceof Date ? todo.due_date : new Date(todo.due_date);
+    const customerInfo = getCustomerInfo(todo.customer_id);
+    const PriorityIcon = PRIORITY_ICONS[todo.priority].icon;
+    const priorityColor = PRIORITY_ICONS[todo.priority].color;
+
+    return (
+      <tr
+        key={todo.id}
+        className="border-b border-gray-800 hover:bg-gray-800/50 cursor-pointer transition-colors"
+        onClick={() => handleRowClick(todo)}
+        data-testid={`todo-row-${todo.id}`}
+      >
+        <td className="py-1 px-1 text-[10px] text-gray-500 whitespace-nowrap">
+          {format(dueDate, 'MM-dd')}
+        </td>
+        <td className="py-1 px-1 text-[11px] text-gray-300 truncate max-w-[50px]">
+          {customerInfo.name}
+        </td>
+        <td className="py-1 px-1 text-[10px] text-gray-500 truncate max-w-[60px]">
+          {customerInfo.phone}
+        </td>
+        <td className="py-1 px-1">
+          <div className="flex items-center gap-1 min-w-0">
+            <PriorityIcon className={cn("w-3 h-3 flex-shrink-0", priorityColor)} />
+            <span className="text-[11px] text-gray-200 truncate">{todo.title}</span>
+          </div>
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <Sidebar className="border-r border-gray-800">
@@ -95,7 +189,6 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="flex flex-col">
-        {/* Main Menu - 3 Big Buttons */}
         <SidebarGroup className="p-3">
           <div className="space-y-2">
             {mainMenuItems.map(item => {
@@ -143,63 +236,94 @@ export function AppSidebar({
 
         <SidebarSeparator className="bg-gray-700" />
 
-        {/* TODO List Section */}
         <SidebarGroup className="flex-1 overflow-hidden">
-          <SidebarGroupLabel className="text-gray-400 px-4 flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            TO-DO 리스트
+          <SidebarGroupLabel className="text-gray-400 px-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              TO-DO 리스트
+            </div>
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-600/30 text-blue-300">
+              {upcomingTodos.length}
+            </Badge>
           </SidebarGroupLabel>
-          <SidebarGroupContent className="px-3 overflow-hidden">
-            <ScrollArea className="h-[200px]">
-              <TodoList
-                todos={todos}
-                currentUserId={user.uid}
-                userRole={userRole}
-                onToggle={onToggleTodo}
-                onDelete={onDeleteTodo}
-                onAdd={onAddTodo}
-              />
+          <SidebarGroupContent className="px-2 overflow-hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start gap-2 h-7 text-xs mb-2 border-gray-700"
+              onClick={onAddTodo}
+              data-testid="button-add-todo"
+            >
+              <Plus className="w-3 h-3" />
+              새 할 일 추가
+            </Button>
+            
+            <ScrollArea className="h-[160px]">
+              {isLoading ? (
+                <div className="text-center py-4">
+                  <p className="text-xs text-gray-500">로딩 중...</p>
+                </div>
+              ) : upcomingTodos.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-xs text-gray-500">진행 중인 업무가 없습니다</p>
+                </div>
+              ) : (
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[36px]">날짜</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[50px]">성함</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[60px]">연락처</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal">제목</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {upcomingTodos.map(renderTodoRow)}
+                  </tbody>
+                </table>
+              )}
             </ScrollArea>
           </SidebarGroupContent>
         </SidebarGroup>
 
         <SidebarSeparator className="bg-gray-700" />
 
-        {/* Reservation Memo Section */}
         <SidebarGroup className="flex-1 overflow-hidden">
-          <SidebarGroupLabel className="text-gray-400 px-4 flex items-center gap-2">
-            <Bell className="w-4 h-4" />
-            예약 대기
+          <SidebarGroupLabel className="text-gray-400 px-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              예약 경과
+            </div>
+            {overdueTodos.length > 0 && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                {overdueTodos.length}
+              </Badge>
+            )}
           </SidebarGroupLabel>
-          <SidebarGroupContent className="px-3">
-            <ScrollArea className="h-[150px]">
-              {reservationMemos.length === 0 ? (
+          <SidebarGroupContent className="px-2">
+            <ScrollArea className="h-[130px]">
+              {isLoading ? (
+                <div className="text-center py-4">
+                  <p className="text-xs text-gray-500">로딩 중...</p>
+                </div>
+              ) : overdueTodos.length === 0 ? (
                 <div className="text-center py-6">
-                  <Bell className="w-8 h-8 mx-auto text-gray-600 mb-2" />
-                  <p className="text-xs text-gray-500">예약된 메모가 없습니다</p>
+                  <p className="text-xs text-gray-500">경과된 예약이 없습니다</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {reservationMemos.map(memo => (
-                    <Card 
-                      key={memo.id} 
-                      className="p-3 bg-gray-800/50 border-gray-700 cursor-pointer hover-elevate"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-200 truncate">
-                            {memo.customer_name}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">{memo.content}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-400">{memo.date}</p>
-                          <p className="text-xs text-blue-400">{memo.time}</p>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[36px]">날짜</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[50px]">성함</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[60px]">연락처</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal">제목</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overdueTodos.map(renderTodoRow)}
+                  </tbody>
+                </table>
               )}
             </ScrollArea>
           </SidebarGroupContent>
@@ -209,7 +333,6 @@ export function AppSidebar({
       <SidebarSeparator className="bg-gray-700" />
 
       <SidebarFooter className="p-4 bg-gray-900/30 space-y-3">
-        {/* 시스템 설정 버튼 - super_admin 전용 */}
         {userRole === 'super_admin' && (
           <Button
             variant="outline"
@@ -254,7 +377,6 @@ export function AppSidebar({
         </div>
       </SidebarFooter>
 
-      {/* 시스템 설정 모달 */}
       {showSystemSettings && (
         <SystemSettingsModal
           isOpen={showSystemSettings}

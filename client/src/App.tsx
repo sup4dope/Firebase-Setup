@@ -42,6 +42,7 @@ function AuthenticatedApp() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [todoFormOpen, setTodoFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [todoRefreshTrigger, setTodoRefreshTrigger] = useState(0);
 
   // Fetch data for sidebar
   useEffect(() => {
@@ -175,12 +176,10 @@ function AuthenticatedApp() {
         <AppSidebar
           user={user!}
           userRole={user!.role}
-          todos={todos}
           customers={customers}
-          onToggleTodo={handleToggleTodo}
-          onDeleteTodo={handleDeleteTodo}
           onAddTodo={() => setTodoFormOpen(true)}
           onSignOut={signOut}
+          todoRefreshTrigger={todoRefreshTrigger}
         />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between gap-4 h-14 px-4 border-b bg-background sticky top-0 z-50">
@@ -207,21 +206,8 @@ function AuthenticatedApp() {
         customers={customers}
         currentUser={user!}
         userRole={user!.role}
-        onTodoCreated={async () => {
-          // Refresh todos after creation
-          try {
-            let fetchedTodos: Todo[];
-            if (isSuperAdmin) {
-              fetchedTodos = await getTodos();
-            } else if (isTeamLeader && user!.team_id) {
-              fetchedTodos = await getTodosByTeam(user!.team_id);
-            } else {
-              fetchedTodos = await getTodosByUser(user!.uid);
-            }
-            setTodos(fetchedTodos);
-          } catch (error) {
-            console.error('Error refreshing todos:', error);
-          }
+        onTodoCreated={() => {
+          setTodoRefreshTrigger(prev => prev + 1);
         }}
       />
     </SidebarProvider>
