@@ -9,8 +9,7 @@ export const ALL_STATUS_VALUES = [
   "단기부재",
   "장기부재",
   
-  // 쓰레기통 (거절류)
-  "쓰레기통",
+  // 거절류
   "거절사유 미파악",
   "인증불가",
   "정부기관 오인",
@@ -113,8 +112,7 @@ export const STATUS_OPTIONS: { value: string; label: string; group?: string }[] 
   { value: "단기부재", label: "단기부재", group: "부재" },
   { value: "장기부재", label: "장기부재", group: "부재" },
   
-  // 쓰레기통
-  { value: "쓰레기통", label: "쓰레기통", group: "거절" },
+  // 거절
   { value: "거절사유 미파악", label: "거절사유 미파악", group: "거절" },
   { value: "인증불가", label: "인증불가", group: "거절" },
   { value: "정부기관 오인", label: "정부기관 오인", group: "거절" },
