@@ -1914,6 +1914,14 @@ export function CustomerDetailModal({
                                           },
                                         );
 
+                                        // 대시보드에 상태 변경 알림
+                                        if (onSave) {
+                                          onSave({
+                                            id: formData.id,
+                                            status_code: option.value as StatusCode,
+                                          });
+                                        }
+
                                         const logs =
                                           await getCustomerHistoryLogs(
                                             formData.id!,
@@ -2542,6 +2550,18 @@ export function CustomerDetailModal({
                     execution_amount: updateData.execution_amount ?? prev.execution_amount,
                     processing_org: updateData.processing_org ?? prev.processing_org,
                   }));
+
+                  // 대시보드에 상태 변경 알림
+                  if (onSave) {
+                    onSave({
+                      id: formData.id,
+                      status_code: statusChangeModal.targetStatus as StatusCode,
+                      commission_rate: updateData.commission_rate,
+                      contract_amount: updateData.contract_amount,
+                      execution_amount: updateData.execution_amount,
+                      processing_org: updateData.processing_org,
+                    });
+                  }
 
                   const logs = await getCustomerHistoryLogs(formData.id);
                   setHistoryLogs(logs);
