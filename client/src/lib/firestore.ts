@@ -30,6 +30,8 @@ import type {
   StatusCode,
   CustomerHistoryLog,
   LoginHistory,
+  TodoItem,
+  InsertTodoItem,
 } from '@shared/types';
 // STATUS_LABELS removed - using Korean status names directly
 
@@ -620,4 +622,71 @@ export const updateTeamAdmin = async (teamId: string, newName: string): Promise<
   });
   
   await batch.commit();
+};
+
+// ============================================
+// TODO LIST (todo_list 컬렉션)
+// ============================================
+
+// 할 일 목록 조회 (전체)
+export const getTodoItems = async (): Promise<TodoItem[]> => {
+  const q = query(collection(db, 'todo_list'), orderBy('created_at', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      ...data,
+      id: docSnap.id,
+      due_date: toDate(data.due_date),
+      created_at: toDate(data.created_at),
+    } as TodoItem;
+  });
+};
+
+// 할 일 목록 조회 (사용자별)
+export const getTodoItemsByUser = async (email: string): Promise<TodoItem[]> => {
+  const q = query(
+    collection(db, 'todo_list'),
+    where('created_by', '==', email),
+    orderBy('created_at', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      ...data,
+      id: docSnap.id,
+      due_date: toDate(data.due_date),
+      created_at: toDate(data.created_at),
+    } as TodoItem;
+  });
+};
+
+// 할 일 등록
+export const createTodoItem = async (data: InsertTodoItem): Promise<TodoItem> => {
+  const docRef = await addDoc(collection(db, 'todo_list'), {
+    ...data,
+    due_date: Timestamp.fromDate(data.due_date),
+    created_at: Timestamp.now(),
+  });
+  
+  return {
+    ...data,
+    id: docRef.id,
+    created_at: new Date(),
+  };
+};
+
+// 할 일 수정
+export const updateTodoItem = async (id: string, data: Partial<TodoItem>): Promise<void> => {
+  const updateData: Record<string, any> = { ...data };
+  if (data.due_date) {
+    updateData.due_date = Timestamp.fromDate(data.due_date);
+  }
+  await updateDoc(doc(db, 'todo_list', id), updateData);
+};
+
+// 할 일 삭제
+export const deleteTodoItem = async (id: string): Promise<void> => {
+  await deleteDoc(doc(db, 'todo_list', id));
 };

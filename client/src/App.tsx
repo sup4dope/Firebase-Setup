@@ -207,7 +207,22 @@ function AuthenticatedApp() {
         customers={customers}
         currentUser={user!}
         userRole={user!.role}
-        onSubmit={handleCreateTodo}
+        onTodoCreated={async () => {
+          // Refresh todos after creation
+          try {
+            let fetchedTodos: Todo[];
+            if (isSuperAdmin) {
+              fetchedTodos = await getTodos();
+            } else if (isTeamLeader && user!.team_id) {
+              fetchedTodos = await getTodosByTeam(user!.team_id);
+            } else {
+              fetchedTodos = await getTodosByUser(user!.uid);
+            }
+            setTodos(fetchedTodos);
+          } catch (error) {
+            console.error('Error refreshing todos:', error);
+          }
+        }}
       />
     </SidebarProvider>
   );

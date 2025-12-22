@@ -1,6 +1,9 @@
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +22,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -26,14 +32,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
-import type { User, Customer, UserRole } from '@shared/types';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Calendar as CalendarIcon, Search, Clock, AlertCircle, AlertTriangle, Minus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { createTodoItem } from '@/lib/firestore';
+import { useToast } from '@/hooks/use-toast';
+import type { User, Customer, UserRole, TodoPriority, InsertTodoItem } from '@shared/types';
 
 const todoSchema = z.object({
-  content: z.string().min(1, '내용을 입력해주세요'),
-  assigned_to: z.string().min(1, '담당자를 선택해주세요'),
+  title: z.string().min(1, '제목을 입력해주세요'),
   customer_id: z.string().optional(),
-  due_date: z.string().min(1, '마감일을 입력해주세요'),
+  due_date: z.date({ required_error: '마감 기한을 선택해주세요' }),
+  due_time: z.string().min(1, '시간을 선택해주세요'),
+  priority: z.enum(['urgent', 'normal', 'low']),
+  memo: z.string().optional(),
 });
 
 type TodoFormData = z.infer<typeof todoSchema>;
@@ -45,80 +57,126 @@ interface TodoFormProps {
   customers: Customer[];
   currentUser: User;
   userRole: UserRole;
-  onSubmit: (data: TodoFormData & { 
-    assigned_to_name?: string;
-    assigned_by: string;
-    assigned_by_name: string;
-    customer_name?: string;
-  }) => Promise<void>;
+  onSubmit?: (data: any) => Promise<void>;
   isLoading?: boolean;
+  onTodoCreated?: () => void;
 }
+
+const PRIORITY_OPTIONS: { value: TodoPriority; label: string; color: string; icon: typeof AlertCircle }[] = [
+  { value: 'urgent', label: '긴급', color: 'bg-red-500/20 text-red-400 border-red-500/50', icon: AlertCircle },
+  { value: 'normal', label: '보통', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50', icon: AlertTriangle },
+  { value: 'low', label: '낮음', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50', icon: Minus },
+];
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hour = Math.floor(i / 2);
+  const minute = (i % 2) * 30;
+  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+});
 
 export function TodoForm({
   open,
   onOpenChange,
-  users,
   customers,
   currentUser,
-  userRole,
-  onSubmit,
-  isLoading,
+  onTodoCreated,
 }: TodoFormProps) {
-  const canAssignToOthers = userRole === 'team_leader' || userRole === 'super_admin';
-
-  // Get available assignees based on role
-  const availableAssignees = userRole === 'super_admin'
-    ? users
-    : userRole === 'team_leader'
-      ? users.filter(u => u.team_id === currentUser.team_id)
-      : [currentUser];
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
 
   const form = useForm<TodoFormData>({
     resolver: zodResolver(todoSchema),
     defaultValues: {
-      content: '',
-      assigned_to: currentUser.uid,
+      title: '',
       customer_id: '',
-      due_date: new Date().toISOString().split('T')[0],
+      due_date: new Date(),
+      due_time: '09:00',
+      priority: 'normal',
+      memo: '',
     },
   });
 
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch.trim()) return customers.slice(0, 50);
+    const searchLower = customerSearch.toLowerCase();
+    return customers.filter(c =>
+      c.name.toLowerCase().includes(searchLower) ||
+      c.company_name.toLowerCase().includes(searchLower) ||
+      c.readable_id.toLowerCase().includes(searchLower)
+    ).slice(0, 50);
+  }, [customers, customerSearch]);
+
+  const selectedCustomer = useMemo(() => {
+    const customerId = form.watch('customer_id');
+    return customers.find(c => c.id === customerId);
+  }, [customers, form.watch('customer_id')]);
+
   const handleSubmit = async (data: TodoFormData) => {
-    const assignee = users.find(u => u.uid === data.assigned_to);
-    const customer = customers.find(c => c.id === data.customer_id);
-    
-    await onSubmit({
-      ...data,
-      assigned_to_name: assignee?.name,
-      assigned_by: currentUser.uid,
-      assigned_by_name: currentUser.name,
-      customer_name: customer?.name,
-    });
-    
-    form.reset();
-    onOpenChange(false);
+    setIsSubmitting(true);
+    try {
+      const [hours, minutes] = data.due_time.split(':').map(Number);
+      const dueDateTime = new Date(data.due_date);
+      dueDateTime.setHours(hours, minutes, 0, 0);
+
+      const customer = customers.find(c => c.id === data.customer_id);
+
+      const todoData: InsertTodoItem = {
+        title: data.title,
+        memo: data.memo || undefined,
+        customer_id: data.customer_id || undefined,
+        customer_name: customer?.name,
+        due_date: dueDateTime,
+        priority: data.priority,
+        status: '진행중',
+        created_by: currentUser.email,
+        created_by_name: currentUser.name,
+      };
+
+      await createTodoItem(todoData);
+
+      toast({
+        title: '할 일 등록 완료',
+        description: '새로운 할 일이 추가되었습니다.',
+      });
+
+      form.reset();
+      setCustomerSearch('');
+      onOpenChange(false);
+      onTodoCreated?.();
+    } catch (error) {
+      console.error('Error creating todo:', error);
+      toast({
+        title: '오류',
+        description: '할 일 등록 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md bg-gray-900 border-gray-700">
         <DialogHeader>
-          <DialogTitle>새 할 일 추가</DialogTitle>
+          <DialogTitle className="text-gray-100">할 일 등록</DialogTitle>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="content"
+              name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>내용 *</FormLabel>
+                  <FormLabel className="text-gray-300">제목 *</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="할 일 내용을 입력하세요" 
+                    <Input
+                      placeholder="할 일 제목 입력"
+                      className="h-8 text-sm bg-gray-800 border-gray-600"
                       {...field}
-                      data-testid="input-todo-content"
+                      data-testid="input-todo-title"
                     />
                   </FormControl>
                   <FormMessage />
@@ -128,35 +186,130 @@ export function TodoForm({
 
             <FormField
               control={form.control}
-              name="due_date"
+              name="customer_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>마감일 *</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} data-testid="input-todo-due-date" />
-                  </FormControl>
+                  <FormLabel className="text-gray-300">연결된 고객</FormLabel>
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <Input
+                        placeholder="고객 검색 (이름, 회사명, ID)"
+                        value={customerSearch}
+                        onChange={e => setCustomerSearch(e.target.value)}
+                        className="h-8 text-sm pl-8 bg-gray-800 border-gray-600"
+                        data-testid="input-customer-search"
+                      />
+                    </div>
+                    {selectedCustomer && (
+                      <div className="flex items-center gap-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded-md">
+                        <Badge variant="secondary" className="text-xs">
+                          {selectedCustomer.readable_id}
+                        </Badge>
+                        <span className="text-sm text-gray-200">{selectedCustomer.name}</span>
+                        <span className="text-xs text-gray-500">({selectedCustomer.company_name})</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto h-6 px-2 text-xs"
+                          onClick={() => {
+                            field.onChange('');
+                            setCustomerSearch('');
+                          }}
+                        >
+                          해제
+                        </Button>
+                      </div>
+                    )}
+                    {!selectedCustomer && customerSearch && (
+                      <ScrollArea className="h-32 border border-gray-700 rounded-md">
+                        <div className="p-1">
+                          {filteredCustomers.length === 0 ? (
+                            <p className="text-xs text-gray-500 text-center py-4">검색 결과가 없습니다</p>
+                          ) : (
+                            filteredCustomers.map(customer => (
+                              <button
+                                key={customer.id}
+                                type="button"
+                                className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-800 flex items-center gap-2"
+                                onClick={() => {
+                                  field.onChange(customer.id);
+                                  setCustomerSearch('');
+                                }}
+                              >
+                                <Badge variant="outline" className="text-[10px] px-1">
+                                  {customer.readable_id}
+                                </Badge>
+                                <span className="text-gray-200">{customer.name}</span>
+                                <span className="text-xs text-gray-500">({customer.company_name})</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {canAssignToOthers && (
+            <div className="grid grid-cols-2 gap-3">
               <FormField
                 control={form.control}
-                name="assigned_to"
+                name="due_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>담당자 *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel className="text-gray-300">마감 날짜 *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full h-8 text-sm justify-start text-left font-normal bg-gray-800 border-gray-600",
+                              !field.value && "text-muted-foreground"
+                            )}
+                            data-testid="button-due-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, 'yyyy-MM-dd', { locale: ko }) : '날짜 선택'}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 bg-gray-800 border-gray-600" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                          locale={ko}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="due_time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-300">마감 시간 *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-todo-assignee">
-                          <SelectValue placeholder="담당자 선택" />
+                        <SelectTrigger className="h-8 text-sm bg-gray-800 border-gray-600" data-testid="select-due-time">
+                          <Clock className="w-4 h-4 mr-2" />
+                          <SelectValue placeholder="시간 선택" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        {availableAssignees.map(user => (
-                          <SelectItem key={user.uid} value={user.uid}>
-                            {user.name}
+                      <SelectContent className="bg-gray-800 border-gray-600 max-h-48">
+                        {TIME_OPTIONS.map(time => (
+                          <SelectItem key={time} value={time}>
+                            {time}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -165,25 +318,32 @@ export function TodoForm({
                   </FormItem>
                 )}
               />
-            )}
+            </div>
 
             <FormField
               control={form.control}
-              name="customer_id"
+              name="priority"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>관련 고객 (선택)</FormLabel>
-                  <Select onValueChange={(val) => field.onChange(val === 'none' ? '' : val)} defaultValue={field.value || 'none'}>
+                  <FormLabel className="text-gray-300">우선순위 *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger data-testid="select-todo-customer">
-                        <SelectValue placeholder="고객 선택 (선택사항)" />
+                      <SelectTrigger className="h-8 text-sm bg-gray-800 border-gray-600" data-testid="select-priority">
+                        <SelectValue placeholder="우선순위 선택" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">없음</SelectItem>
-                      {customers.map(customer => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name} ({customer.company_name})
+                    <SelectContent className="bg-gray-800 border-gray-600">
+                      {PRIORITY_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          <div className="flex items-center gap-2">
+                            <option.icon className={cn(
+                              "w-4 h-4",
+                              option.value === 'urgent' && "text-red-400",
+                              option.value === 'normal' && "text-blue-400",
+                              option.value === 'low' && "text-gray-400"
+                            )} />
+                            <span>{option.label}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -193,18 +353,42 @@ export function TodoForm({
               )}
             />
 
-            <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+            <FormField
+              control={form.control}
+              name="memo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-gray-300">상세 메모</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="상세 내용을 입력하세요..."
+                      className="min-h-[80px] text-sm bg-gray-800 border-gray-600 resize-none"
+                      {...field}
+                      data-testid="input-todo-memo"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => onOpenChange(false)}
+                className="border-gray-600"
                 data-testid="button-cancel-todo"
               >
                 취소
               </Button>
-              <Button type="submit" disabled={isLoading} data-testid="button-submit-todo">
-                {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                추가
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                data-testid="button-submit-todo"
+              >
+                {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                할 일 등록
               </Button>
             </DialogFooter>
           </form>

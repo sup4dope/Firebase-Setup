@@ -189,10 +189,31 @@ export interface KPIData {
   totalBusinessDays: number;
 }
 
+// TodoItem (Firestore: todo_list collection) - 새로운 할 일 시스템
+export type TodoPriority = 'urgent' | 'normal' | 'low';
+export type TodoStatus = '진행중' | '완료' | '취소';
+
+export interface TodoItem {
+  id: string;
+  title: string;
+  memo?: string;
+  customer_id?: string;
+  customer_name?: string;
+  due_date: Date; // 날짜 + 시간 포함
+  priority: TodoPriority;
+  status: TodoStatus;
+  created_at: Date;
+  created_by: string; // 이메일
+  created_by_name?: string;
+  assigned_to?: string; // uid
+  assigned_to_name?: string;
+}
+
 // Insert types (for creating new records)
 export type InsertUser = Omit<User, 'uid' | 'created_at' | 'updated_at'>;
 export type InsertTeam = Omit<Team, 'id' | 'team_id' | 'created_at' | 'updated_at'>;
 export type InsertCustomer = Omit<Customer, 'id' | 'readable_id' | 'created_at'>;
 export type InsertStatusLog = Omit<StatusLog, 'id' | 'changed_at'>;
 export type InsertTodo = Omit<Todo, 'id' | 'created_at'>;
+export type InsertTodoItem = Omit<TodoItem, 'id' | 'created_at'>;
 export type InsertHoliday = Omit<Holiday, 'id'>;
