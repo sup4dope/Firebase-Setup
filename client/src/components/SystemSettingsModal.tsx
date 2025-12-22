@@ -325,11 +325,12 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                       {users
                         .filter((user) => {
                           if (!employeeSearch.trim()) return true;
-                          const search = employeeSearch.toLowerCase();
+                          const search = employeeSearch.toLowerCase().replace(/-/g, '');
+                          const phoneNormalized = user.phone?.replace(/-/g, '').toLowerCase() || '';
                           return (
                             user.name?.toLowerCase().includes(search) ||
                             user.email?.toLowerCase().includes(search) ||
-                            user.phone?.toLowerCase().includes(search)
+                            phoneNormalized.includes(search)
                           );
                         })
                         .map((user) => (
