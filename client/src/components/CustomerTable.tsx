@@ -364,11 +364,15 @@ export function CustomerTable({
                             <SelectItem value="신청완료(후불)" className="text-cyan-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">신청완료(후불)</SelectItem>
                           </SelectGroup>
 
-                          {/* 집행완료 그룹 */}
+                          {/* 집행완료 그룹 - 집행완료/집행완료(외주)는 team_leader, super_admin만 선택 가능 */}
                           <SelectGroup>
                             <SelectLabel className="text-gray-500 text-xs font-normal px-2 py-1 mt-1">집행완료</SelectLabel>
-                            <SelectItem value="집행완료" className="text-green-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료</SelectItem>
-                            <SelectItem value="집행완료(외주)" className="text-green-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료(외주)</SelectItem>
+                            {(userRole === 'team_leader' || userRole === 'super_admin') && (
+                              <>
+                                <SelectItem value="집행완료" className="text-green-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료</SelectItem>
+                                <SelectItem value="집행완료(외주)" className="text-green-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">집행완료(외주)</SelectItem>
+                              </>
+                            )}
                             <SelectItem value="최종부결" className="text-red-300 focus:bg-blue-600 focus:text-white cursor-pointer pl-4">최종부결</SelectItem>
                           </SelectGroup>
                         </SelectContent>
