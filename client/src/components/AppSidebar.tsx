@@ -17,6 +17,11 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Users,
   BarChart3,
   Settings,
@@ -31,6 +36,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { SystemSettingsModal } from './SystemSettingsModal';
+import { TodoDetailModal } from './TodoDetailModal';
 import { cn } from '@/lib/utils';
 import { getTodoItems } from '@/lib/firestore';
 
@@ -73,6 +79,8 @@ export function AppSidebar({
   const [showSystemSettings, setShowSystemSettings] = useState(false);
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTodo, setSelectedTodo] = useState<TodoItem | null>(null);
+  const [showTodoDetail, setShowTodoDetail] = useState(false);
 
   useEffect(() => {
     const fetchTodoItems = async () => {
@@ -126,20 +134,29 @@ export function AppSidebar({
   ];
 
   const getCustomerInfo = (customerId?: string) => {
-    if (!customerId) return { name: '-', phone: '-' };
+    if (!customerId) return { name: '-', companyName: '-' };
     const customer = customers.find(c => c.id === customerId);
     return {
       name: customer?.name || '-',
-      phone: customer?.phone || '-',
+      companyName: customer?.company_name || '-',
     };
   };
 
-  const handleRowClick = (todo: TodoItem) => {
-    if (todo.customer_id && onCustomerClick) {
-      onCustomerClick(todo.customer_id);
-    } else if (onTodoClick) {
-      onTodoClick(todo);
-    }
+  const handleRowDoubleClick = (todo: TodoItem) => {
+    setSelectedTodo(todo);
+    setShowTodoDetail(true);
+  };
+
+  const handleTodoUpdated = () => {
+    const fetchTodoItems = async () => {
+      try {
+        const items = await getTodoItems();
+        setTodoItems(items);
+      } catch (error) {
+        console.error('Error fetching todo items:', error);
+      }
+    };
+    fetchTodoItems();
   };
 
   const renderTodoRow = (todo: TodoItem) => {
@@ -149,28 +166,34 @@ export function AppSidebar({
     const priorityColor = PRIORITY_ICONS[todo.priority].color;
 
     return (
-      <tr
-        key={todo.id}
-        className="border-b border-gray-800 hover:bg-gray-800/50 cursor-pointer transition-colors"
-        onClick={() => handleRowClick(todo)}
-        data-testid={`todo-row-${todo.id}`}
-      >
-        <td className="py-1 px-1 text-[10px] text-gray-500 whitespace-nowrap">
-          {format(dueDate, 'MM-dd')}
-        </td>
-        <td className="py-1 px-1 text-[11px] text-gray-300 truncate max-w-[50px]">
-          {customerInfo.name}
-        </td>
-        <td className="py-1 px-1 text-[10px] text-gray-500 truncate max-w-[60px]">
-          {customerInfo.phone}
-        </td>
-        <td className="py-1 px-1">
-          <div className="flex items-center gap-1 min-w-0">
-            <PriorityIcon className={cn("w-3 h-3 flex-shrink-0", priorityColor)} />
-            <span className="text-[11px] text-gray-200 truncate">{todo.title}</span>
-          </div>
-        </td>
-      </tr>
+      <Tooltip key={todo.id}>
+        <TooltipTrigger asChild>
+          <tr
+            className="border-b border-gray-800 hover:bg-gray-800/50 cursor-pointer transition-colors"
+            onDoubleClick={() => handleRowDoubleClick(todo)}
+            data-testid={`todo-row-${todo.id}`}
+          >
+            <td className="py-1 px-1 text-[10px] text-gray-500 whitespace-nowrap">
+              {format(dueDate, 'MM-dd')}
+            </td>
+            <td className="py-1 px-1 text-[11px] text-gray-300 truncate max-w-[45px]">
+              {customerInfo.name}
+            </td>
+            <td className="py-1 px-1 text-[10px] text-gray-500 truncate max-w-[55px]">
+              {customerInfo.companyName}
+            </td>
+            <td className="py-1 px-1">
+              <div className="flex items-center gap-1 min-w-0">
+                <PriorityIcon className={cn("w-3 h-3 flex-shrink-0", priorityColor)} />
+                <span className="text-[11px] text-gray-200 truncate">{todo.title}</span>
+              </div>
+            </td>
+          </tr>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="bg-gray-800 border-gray-700 text-xs">
+          더블클릭하여 상세 보기
+        </TooltipContent>
+      </Tooltip>
     );
   };
 
@@ -272,8 +295,8 @@ export function AppSidebar({
                   <thead>
                     <tr className="border-b border-gray-700">
                       <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[36px]">날짜</th>
-                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[50px]">성함</th>
-                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[60px]">연락처</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[45px]">성함</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[55px]">상호명</th>
                       <th className="py-1 px-1 text-[9px] text-gray-500 font-normal">제목</th>
                     </tr>
                   </thead>
@@ -315,8 +338,8 @@ export function AppSidebar({
                   <thead>
                     <tr className="border-b border-gray-700">
                       <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[36px]">날짜</th>
-                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[50px]">성함</th>
-                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[60px]">연락처</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[45px]">성함</th>
+                      <th className="py-1 px-1 text-[9px] text-gray-500 font-normal w-[55px]">상호명</th>
                       <th className="py-1 px-1 text-[9px] text-gray-500 font-normal">제목</th>
                     </tr>
                   </thead>
@@ -383,6 +406,14 @@ export function AppSidebar({
           onClose={() => setShowSystemSettings(false)}
         />
       )}
+
+      <TodoDetailModal
+        open={showTodoDetail}
+        onOpenChange={setShowTodoDetail}
+        todo={selectedTodo}
+        onUpdated={handleTodoUpdated}
+        onDeleted={handleTodoUpdated}
+      />
     </Sidebar>
   );
 }
