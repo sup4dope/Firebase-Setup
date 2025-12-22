@@ -323,20 +323,9 @@ export function CustomerDetailModal({
         sales_y2: customer.sales_y2 || 0,
         sales_y3: customer.sales_y3 || 0,
       });
-      setMemos(
-        customer.memo_history?.map((m, i) => ({
-          id: `memo_${i}`,
-          content: m.content,
-          image_url: (m as any).image_url,
-          is_important: (m as any).is_important || false,
-          author_id: m.author_id,
-          author_name: m.author_name,
-          created_at:
-            m.created_at instanceof Date
-              ? m.created_at
-              : new Date(m.created_at),
-        })) || [],
-      );
+      // 메모는 counseling_logs에서 실시간 로드하므로 여기서 초기화하지 않음
+      // (아래 onSnapshot useEffect가 실제 Firestore ID로 메모를 로드함)
+      setMemos([]);
       setDocuments(customer.documents || []);
       setSelectedDocument(null); // 이전 고객의 선택된 문서 초기화
     } else if (isNewCustomer) {
