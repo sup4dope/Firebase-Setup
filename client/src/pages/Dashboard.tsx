@@ -757,6 +757,8 @@ export default function Dashboard() {
           setSelectedCustomer(null);
           setIsNewCustomerModal(false);
           setDetailModalInitialTab('memo');
+          // 모달 닫을 때 대시보드 데이터 새로고침
+          fetchData();
         }}
         customer={selectedCustomer}
         isNewCustomer={isNewCustomerModal}
