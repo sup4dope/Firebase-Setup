@@ -624,7 +624,7 @@ export function CustomerDetailModal({
     if (memoIndex === -1) return;
 
     const updatedMemos = memos.map(m => 
-      m.id === memoId ? { ...m, is_important: !m.is_important } : m
+      m.id === memoId ? { ...m, is_important: !(m.is_important || false) } : { ...m, is_important: m.is_important || false }
     );
     setMemos(updatedMemos);
 
@@ -632,11 +632,11 @@ export function CustomerDetailModal({
     if (formData.id) {
       try {
         const historyForDB = updatedMemos.map((m) => ({
-          content: m.content,
-          image_url: m.image_url,
-          is_important: m.is_important,
-          author_id: m.author_id,
-          author_name: m.author_name,
+          content: m.content || "",
+          image_url: m.image_url || null,
+          is_important: m.is_important || false,
+          author_id: m.author_id || "",
+          author_name: m.author_name || "",
           created_at: m.created_at,
         }));
         const safeHistory = cleanData(historyForDB);
@@ -749,13 +749,13 @@ export function CustomerDetailModal({
 
       // 6. [고객 문서] 저장 & 대시보드 동기화
       if (formData.id) {
-        // (1) DB 저장용 데이터 정제
+        // (1) DB 저장용 데이터 정제 (undefined 방지)
         const historyForDB = updatedHistory.map((m) => ({
-          content: m.content,
-          image_url: m.image_url,
-          is_important: m.is_important,
-          author_id: m.author_id,
-          author_name: m.author_name,
+          content: m.content || "",
+          image_url: m.image_url || null,
+          is_important: m.is_important || false,
+          author_id: m.author_id || "",
+          author_name: m.author_name || "",
           created_at: m.created_at,
         }));
         const safeHistory = cleanData(historyForDB);
