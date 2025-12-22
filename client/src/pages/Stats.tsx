@@ -138,42 +138,61 @@ export default function Stats() {
   const customerIdsWithContractHistory = useMemo(() => {
     const contractedIds = new Set<string>();
     
+    // 1. status_logs에서 계약완료 이력이 있는 모든 customer_id 수집
     statusLogs.forEach(log => {
       if (CONTRACT_STATUSES.includes(log.new_status)) {
         contractedIds.add(log.customer_id);
       }
     });
 
+    // 2. 현재 상태가 계약완료인 고객도 포함 (로그가 없을 경우 대비)
     filteredCustomers.forEach(c => {
       if (CONTRACT_STATUSES.includes(c.status_code)) {
         contractedIds.add(c.id);
       }
     });
 
+    console.log('[Stats] 계약 이력 고객 ID Set:', Array.from(contractedIds));
     return contractedIds;
   }, [statusLogs, filteredCustomers]);
 
   const metrics = useMemo(() => {
     const totalInflow = filteredCustomers.length;
     
-    // 계약 성과: status_logs에 '계약완료' 기록이 있는 모든 고객 (현재 상태 무관)
+    // [1] 계약 성과: status_logs에 '계약완료' 기록이 있는 모든 고객 (현재 상태 무관)
+    // 현재 상태가 '집행완료'여도 과거 계약 이력이 있으면 포함
     const contractedCustomers = filteredCustomers.filter(c => 
       customerIdsWithContractHistory.has(c.id)
     );
     const contractedCount = contractedCustomers.length;
     const contractRate = totalInflow > 0 ? (contractedCount / totalInflow) * 100 : 0;
     
-    // 계약 성과 추가 지표: deposit_amount 합계 (만원 단위), contract_fee_rate 평균
+    // [2] 보조 지표: 계약 이력 고객들의 deposit_amount 합계, contract_fee_rate 평균
     // Number() 처리로 문자열 결합 방지, || 0으로 누락 데이터 처리
-    const totalDepositAmount = contractedCustomers.reduce((sum, c) => 
-      sum + (Number(c.deposit_amount) || 0), 0
-    );
-    const validFeeRates = contractedCustomers.filter(c => 
-      c.contract_fee_rate && Number(c.contract_fee_rate) > 0
-    );
-    const avgContractFeeRate = validFeeRates.length > 0 
-      ? validFeeRates.reduce((sum, c) => sum + (Number(c.contract_fee_rate) || 0), 0) / validFeeRates.length 
+    let totalDepositAmount = 0;
+    let totalFeeRateSum = 0;
+    let validFeeRateCount = 0;
+
+    contractedCustomers.forEach(c => {
+      // deposit_amount 합산 (만원 단위)
+      const depositAmt = Number(c.deposit_amount) || 0;
+      totalDepositAmount += depositAmt;
+      
+      // contract_fee_rate 평균 계산 (유효한 값만)
+      const feeRate = Number(c.contract_fee_rate) || 0;
+      if (feeRate > 0) {
+        totalFeeRateSum += feeRate;
+        validFeeRateCount += 1;
+      }
+      
+      console.log(`[Stats] 계약 고객: ${c.name}, deposit_amount=${depositAmt}, contract_fee_rate=${feeRate}`);
+    });
+
+    const avgContractFeeRate = validFeeRateCount > 0 
+      ? totalFeeRateSum / validFeeRateCount 
       : 0;
+    
+    console.log(`[Stats] 총 계약금액: ${totalDepositAmount}만원, 평균 자문료: ${avgContractFeeRate}%`);
 
     // 집행 완료: 현재 상태가 '집행완료'인 고객들
     const executedCustomers = filteredCustomers.filter(c => c.status_code === EXECUTION_STATUS);
