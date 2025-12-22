@@ -57,7 +57,7 @@ import {
   StatusCode,
   CustomerHistoryLog,
 } from "@shared/types";
-import { format, differenceInYears, parseISO } from "date-fns";
+import { format, differenceInDays, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { TodoForm } from "@/components/TodoForm";
 import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
@@ -414,14 +414,14 @@ export function CustomerDetailModal({
     loadHistoryLogs();
   }, [activeBottomTab, customer?.id]);
 
-  // Calculate 7-year status (uses inline logic to avoid hoisting issues)
+  // Calculate 7-year status (D-2555 기준: 현재일로부터 2555일 초과 시 7년 초과)
   const handleFoundingDateChange = (date: string) => {
     const foundingDate = parseISO(date);
-    const yearsOld = differenceInYears(new Date(), foundingDate);
+    const daysOld = differenceInDays(new Date(), foundingDate);
     const updatedData = {
       ...formData,
       founding_date: date,
-      over_7_years: yearsOld > 7,
+      over_7_years: daysOld > 2555,
     };
     setFormData(updatedData);
     // debouncedSave 호출
