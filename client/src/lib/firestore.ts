@@ -410,3 +410,135 @@ export const promoteToAdmin = async (uid: string): Promise<void> => {
   const userRef = doc(db, 'users', uid);
   await updateDoc(userRef, { role: 'super_admin' });
 };
+
+// ============================================
+// 인사/조직 관리 시스템 함수
+// ============================================
+
+// 모든 사용자 조회 (관리자용)
+export const getAllUsers = async (): Promise<User[]> => {
+  const snapshot = await getDocs(collection(db, 'users'));
+  return snapshot.docs.map(docSnap => ({
+    ...docSnap.data(),
+    uid: docSnap.data().uid || docSnap.id,
+  } as User));
+};
+
+// 새 직원 등록 (화이트리스트 추가)
+export const createUser = async (userData: {
+  name: string;
+  email: string;
+  phone?: string;
+  role: 'staff' | 'team_leader' | 'super_admin';
+  team_id: string | null;
+  team_name: string | null;
+}): Promise<string> => {
+  const docRef = await addDoc(collection(db, 'users'), {
+    ...userData,
+    uid: '', // 첫 로그인 시 Firebase uid 연결됨
+    status: '재직',
+    created_at: Timestamp.now(),
+    updated_at: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+// 직원 정보 수정
+export const updateUserInfo = async (
+  docId: string,
+  data: Partial<User>
+): Promise<void> => {
+  await updateDoc(doc(db, 'users', docId), {
+    ...data,
+    updated_at: Timestamp.now(),
+  });
+};
+
+// 직원 삭제 (화이트리스트에서 제거 = 접속 차단)
+export const deleteUser = async (docId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'users', docId));
+};
+
+// 사용자 문서 ID로 조회 (이메일 기반)
+export const getUserDocIdByEmail = async (email: string): Promise<string | null> => {
+  const q = query(collection(db, 'users'), where('email', '==', email));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  return snapshot.docs[0].id;
+};
+
+// 팀 생성 (관리자용)
+export const createTeamAdmin = async (teamName: string): Promise<Team> => {
+  const docRef = await addDoc(collection(db, 'teams'), {
+    team_name: teamName,
+    name: teamName,
+    created_at: Timestamp.now(),
+    updated_at: Timestamp.now(),
+  });
+  
+  // team_id를 문서 ID와 동일하게 업데이트
+  await updateDoc(docRef, { team_id: docRef.id });
+  
+  return {
+    id: docRef.id,
+    team_id: docRef.id,
+    team_name: teamName,
+    name: teamName,
+    created_at: new Date(),
+  };
+};
+
+// 팀 삭제 (관리자용) - 소속 직원들의 team_id는 null로 처리
+export const deleteTeamAdmin = async (teamId: string): Promise<void> => {
+  const batch = writeBatch(db);
+  
+  // 해당 팀 소속 직원들의 team_id를 null로 변경
+  const usersQuery = query(collection(db, 'users'), where('team_id', '==', teamId));
+  const usersSnapshot = await getDocs(usersQuery);
+  usersSnapshot.docs.forEach(userDoc => {
+    batch.update(doc(db, 'users', userDoc.id), {
+      team_id: null,
+      team_name: null,
+      updated_at: Timestamp.now(),
+    });
+  });
+  
+  // 팀 삭제
+  batch.delete(doc(db, 'teams', teamId));
+  
+  await batch.commit();
+};
+
+// 팀 이름 수정 (관리자용)
+export const updateTeamAdmin = async (teamId: string, newName: string): Promise<void> => {
+  const batch = writeBatch(db);
+  
+  // 팀 이름 업데이트
+  batch.update(doc(db, 'teams', teamId), {
+    team_name: newName,
+    name: newName,
+    updated_at: Timestamp.now(),
+  });
+  
+  // 해당 팀 소속 직원들의 team_name도 업데이트
+  const usersQuery = query(collection(db, 'users'), where('team_id', '==', teamId));
+  const usersSnapshot = await getDocs(usersQuery);
+  usersSnapshot.docs.forEach(userDoc => {
+    batch.update(doc(db, 'users', userDoc.id), {
+      team_name: newName,
+      updated_at: Timestamp.now(),
+    });
+  });
+  
+  // 해당 팀 고객들의 team_name도 업데이트
+  const customersQuery = query(collection(db, 'customers'), where('team_id', '==', teamId));
+  const customersSnapshot = await getDocs(customersQuery);
+  customersSnapshot.docs.forEach(customerDoc => {
+    batch.update(doc(db, 'customers', customerDoc.id), {
+      team_name: newName,
+      updated_at: Timestamp.now(),
+    });
+  });
+  
+  await batch.commit();
+};
