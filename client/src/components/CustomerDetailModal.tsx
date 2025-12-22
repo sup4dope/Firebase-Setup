@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Download,
   Plus,
+  Star,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -83,6 +84,7 @@ interface MemoItem {
   id: string;
   content: string;
   image_url?: string;
+  is_important?: boolean;
   author_id: string;
   author_name: string;
   created_at: Date;
@@ -258,6 +260,7 @@ export function CustomerDetailModal({
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [enlargedImageUrl, setEnlargedImageUrl] = useState<string | null>(null);
+  const [showImportantOnly, setShowImportantOnly] = useState(false);
   const memoScrollRef = useRef<HTMLDivElement>(null);
   const memoInputRef = useRef<HTMLInputElement>(null);
 
@@ -316,6 +319,7 @@ export function CustomerDetailModal({
           id: `memo_${i}`,
           content: m.content,
           image_url: (m as any).image_url,
+          is_important: (m as any).is_important || false,
           author_id: m.author_id,
           author_name: m.author_name,
           created_at:
@@ -614,6 +618,46 @@ export function CustomerDetailModal({
     return input;
   };
 
+  // Toggle memo importance
+  const handleToggleImportant = async (memoId: string) => {
+    const memoIndex = memos.findIndex(m => m.id === memoId);
+    if (memoIndex === -1) return;
+
+    const updatedMemos = memos.map(m => 
+      m.id === memoId ? { ...m, is_important: !m.is_important } : m
+    );
+    setMemos(updatedMemos);
+
+    // DB 업데이트
+    if (formData.id) {
+      try {
+        const historyForDB = updatedMemos.map((m) => ({
+          content: m.content,
+          image_url: m.image_url,
+          is_important: m.is_important,
+          author_id: m.author_id,
+          author_name: m.author_name,
+          created_at: m.created_at,
+        }));
+        const safeHistory = cleanData(historyForDB);
+        
+        await updateDoc(doc(db, "customers", formData.id), {
+          memo_history: safeHistory,
+        });
+
+        // 부모에게 동기화
+        if (onSave) {
+          onSave({
+            id: formData.id,
+            memo_history: updatedMemos,
+          });
+        }
+      } catch (error) {
+        console.error("중요 표시 변경 실패:", error);
+      }
+    }
+  };
+
   // Handle image paste in memo input
   const handleMemoPaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
     const items = e.clipboardData?.items;
@@ -669,6 +713,7 @@ export function CustomerDetailModal({
       id: `memo_${Date.now()}`,
       content: content || (imageUrl ? "[이미지]" : ""),
       image_url: imageUrl,
+      is_important: false,
       author_id: currentUser.uid,
       author_name: currentUser.name || "관리자",
       created_at: now,
@@ -708,6 +753,7 @@ export function CustomerDetailModal({
         const historyForDB = updatedHistory.map((m) => ({
           content: m.content,
           image_url: m.image_url,
+          is_important: m.is_important,
           author_id: m.author_id,
           author_name: m.author_name,
           created_at: m.created_at,
@@ -2193,6 +2239,24 @@ export function CustomerDetailModal({
               <div className="flex-1 min-h-0 overflow-hidden">
                 {activeBottomTab === "memo" ? (
                   <div className="flex flex-col h-full">
+                    {/* 중요 메시지 필터 버튼 */}
+                    <div className="shrink-0 flex justify-end px-2 pt-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowImportantOnly(!showImportantOnly)}
+                        className={cn(
+                          "h-6 px-2 text-xs gap-1",
+                          showImportantOnly
+                            ? "text-yellow-400 bg-yellow-600/20"
+                            : "text-gray-500"
+                        )}
+                        data-testid="button-filter-important"
+                      >
+                        <Star className={cn("w-3 h-3", showImportantOnly && "fill-yellow-400")} />
+                        중요만
+                      </Button>
+                    </div>
                     {/* Memo Messages */}
                     <div
                       ref={memoScrollRef}
@@ -2203,7 +2267,9 @@ export function CustomerDetailModal({
                           <p className="text-sm">상담 메모가 없습니다</p>
                         </div>
                       ) : (
-                        memos.map((memo) => (
+                        memos
+                          .filter(memo => !showImportantOnly || memo.is_important)
+                          .map((memo) => (
                           <div key={memo.id} className="flex flex-col">
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className="text-xs font-medium text-blue-400">
@@ -2213,7 +2279,22 @@ export function CustomerDetailModal({
                                 {safeFormatDate(memo.created_at, "MM/dd HH:mm")}
                               </span>
                             </div>
-                            <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
+                            <div className="relative bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
+                              {/* 중요 표시 별표 버튼 */}
+                              <button
+                                onClick={() => handleToggleImportant(memo.id)}
+                                className="absolute -top-1 -right-1 p-0.5 rounded-full bg-gray-800/80 hover:bg-gray-700 transition-colors"
+                                data-testid={`button-toggle-important-${memo.id}`}
+                              >
+                                <Star
+                                  className={cn(
+                                    "w-3.5 h-3.5 transition-colors",
+                                    memo.is_important
+                                      ? "fill-yellow-400 text-yellow-400"
+                                      : "text-gray-500 hover:text-yellow-400"
+                                  )}
+                                />
+                              </button>
                               {memo.image_url && (
                                 <img
                                   src={memo.image_url}
