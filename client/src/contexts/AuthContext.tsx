@@ -122,19 +122,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
           userData.name = fbUser.displayName || userData.name;
         }
         
-        // 로그인 이력 기록 (IP 가져와서 저장)
-        try {
-          const clientIP = await fetchClientIP();
-          const existingHistory: LoginHistory[] = (userData.login_history || []).map(h => ({
-            ...h,
-            logged_at: h.logged_at instanceof Timestamp 
-              ? (h.logged_at as Timestamp).toDate() 
-              : new Date(h.logged_at as unknown as string),
-          }));
-          await updateLoginHistory(userDoc.id, clientIP, existingHistory);
-          userData.current_ip = clientIP;
-        } catch (e) {
-          console.error('Failed to update login history:', e);
+        // 로그인 이력 기록 (실제 로그인 시에만 - 새로고침 제외)
+        // sessionStorage를 사용해서 현재 세션에서 이미 기록했는지 확인
+        const sessionLoginKey = `login_recorded_${fbUser.uid}`;
+        const alreadyRecorded = sessionStorage.getItem(sessionLoginKey);
+        
+        if (!alreadyRecorded) {
+          try {
+            const clientIP = await fetchClientIP();
+            const existingHistory: LoginHistory[] = (userData.login_history || []).map(h => ({
+              ...h,
+              logged_at: h.logged_at instanceof Timestamp 
+                ? (h.logged_at as Timestamp).toDate() 
+                : new Date(h.logged_at as unknown as string),
+            }));
+            await updateLoginHistory(userDoc.id, clientIP, existingHistory);
+            userData.current_ip = clientIP;
+            // 세션에 기록 완료 표시
+            sessionStorage.setItem(sessionLoginKey, 'true');
+          } catch (e) {
+            console.error('Failed to update login history:', e);
+          }
+        } else {
+          // 이미 기록된 경우 현재 IP만 업데이트
+          try {
+            const clientIP = await fetchClientIP();
+            userData.current_ip = clientIP;
+          } catch (e) {
+            console.error('Failed to fetch IP:', e);
+          }
         }
         
         setUser(userData);
