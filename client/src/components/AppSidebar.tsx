@@ -173,7 +173,7 @@ export function AppSidebar({
             onDoubleClick={() => handleRowDoubleClick(todo)}
             data-testid={`todo-row-${todo.id}`}
           >
-            <td className="py-1 px-1 text-[10px] text-gray-500 whitespace-nowrap">
+            <td className="py-1 px-1 text-[10px] whitespace-nowrap text-[#d1d5db]">
               {format(dueDate, 'MM-dd')}
             </td>
             <td className="py-1 px-1 text-[11px] text-gray-300 truncate max-w-[45px]">
