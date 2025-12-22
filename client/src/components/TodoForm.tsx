@@ -75,6 +75,15 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
 });
 
+// 현재 시간을 30분 단위로 반올림
+const getRoundedTimeNow = (): string => {
+  const now = new Date();
+  const minutes = now.getMinutes();
+  const roundedMinutes = minutes < 30 ? 30 : 0;
+  const hours = minutes < 30 ? now.getHours() : (now.getHours() + 1) % 24;
+  return `${hours.toString().padStart(2, '0')}:${roundedMinutes.toString().padStart(2, '0')}`;
+};
+
 export function TodoForm({
   open,
   onOpenChange,
@@ -93,16 +102,19 @@ export function TodoForm({
       title: '',
       customer_id: defaultCustomerId || '',
       due_date: new Date(),
-      due_time: '09:00',
+      due_time: getRoundedTimeNow(),
       priority: 'normal',
       memo: '',
     },
   });
 
-  // defaultCustomerId가 변경되면 form 업데이트
+  // 모달이 열릴 때 현재 시간으로 초기화
   useEffect(() => {
-    if (open && defaultCustomerId) {
-      form.setValue('customer_id', defaultCustomerId);
+    if (open) {
+      form.setValue('due_time', getRoundedTimeNow());
+      if (defaultCustomerId) {
+        form.setValue('customer_id', defaultCustomerId);
+      }
     }
   }, [open, defaultCustomerId, form]);
 
