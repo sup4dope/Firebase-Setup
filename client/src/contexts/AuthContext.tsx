@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
   signOut as firebaseSignOut,
   type User as FirebaseUser 
 } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, googleProvider } from '@/lib/firebase';
 import type { User, UserRole } from '@shared/types';
 
@@ -38,10 +38,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const userDocIdRef = useRef<string | null>(null);
+  const statusUnsubscribeRef = useRef<(() => void) | null>(null);
+
+  // 퇴직자 로그아웃 처리 함수
+  const handleRetiredLogout = async () => {
+    window.alert("접속 권한이 없습니다. (퇴사 처리된 계정입니다)");
+    await firebaseSignOut(auth);
+    setUser(null);
+    window.location.href = '/login';
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
+      
+      // 이전 상태 리스너 정리
+      if (statusUnsubscribeRef.current) {
+        statusUnsubscribeRef.current();
+        statusUnsubscribeRef.current = null;
+      }
       
       if (fbUser) {
         // 화이트리스트 체크: 이메일로 users 컬렉션 조회
@@ -75,6 +91,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // 등록된 사용자: 문서 데이터 로드
         const userDoc = querySnapshot.docs[0];
         const userData = userDoc.data() as User;
+        userDocIdRef.current = userDoc.id;
+        
+        // 퇴직자 체크: status가 '퇴사'인 경우 접근 차단
+        if (userData.status === '퇴사') {
+          await handleRetiredLogout();
+          setLoading(false);
+          return;
+        }
         
         // uid가 아직 설정되지 않았거나 다르면 업데이트 (최초 로그인 시 uid 연결)
         if (!userData.uid || userData.uid !== fbUser.uid) {
@@ -87,14 +111,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
         
         setUser(userData);
+        
+        // 실시간 상태 감시: 관리자가 퇴사 처리하면 즉시 로그아웃
+        const userDocRef = doc(db, 'users', userDoc.id);
+        statusUnsubscribeRef.current = onSnapshot(userDocRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const updatedData = snapshot.data() as User;
+            // 퇴사 처리되면 즉시 로그아웃
+            if (updatedData.status === '퇴사') {
+              handleRetiredLogout();
+            } else {
+              // 다른 필드 변경 시 user 상태 업데이트
+              setUser(updatedData);
+            }
+          }
+        });
       } else {
         setUser(null);
+        userDocIdRef.current = null;
       }
       
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (statusUnsubscribeRef.current) {
+        statusUnsubscribeRef.current();
+      }
+    };
   }, []);
 
   const signInWithGoogle = async () => {
