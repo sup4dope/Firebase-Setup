@@ -228,7 +228,7 @@ export function CustomerTable({
               <TableHead className="w-[90px] font-semibold whitespace-nowrap">업종</TableHead>
               <TableHead className="w-[100px] font-semibold whitespace-nowrap">진행기관</TableHead>
               <TableHead className="w-[160px] font-semibold whitespace-nowrap">최근 메모</TableHead>
-              <TableHead className="w-20 font-semibold whitespace-nowrap">담당자</TableHead>
+              <TableHead className="w-20 font-semibold whitespace-nowrap text-center">담당자</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
