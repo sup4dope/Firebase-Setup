@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Users, Building2, Plus, Trash2, Pencil, UserPlus, X } from 'lucide-react';
+import { Users, Building2, Plus, Trash2, Pencil, UserPlus, X, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   getAllUsers,
@@ -88,6 +88,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     role: 'staff' as UserRole,
     team_id: '' as string,
   });
+
+  const [employeeSearch, setEmployeeSearch] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -276,10 +278,22 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
             </TabsList>
 
             <TabsContent value="employees" className="flex-1 flex flex-col mt-4 min-h-0" style={{ display: activeTab === 'employees' ? 'flex' : 'none' }}>
-              <div className="flex items-center justify-between mb-4 shrink-0">
-                <p className="text-sm text-gray-400">
-                  등록된 직원: {users.length}명
-                </p>
+              <div className="flex items-center justify-between mb-4 shrink-0 gap-4">
+                <div className="flex items-center gap-4">
+                  <p className="text-sm text-gray-400 whitespace-nowrap">
+                    등록된 직원: {users.length}명
+                  </p>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <Input
+                      value={employeeSearch}
+                      onChange={(e) => setEmployeeSearch(e.target.value)}
+                      placeholder="이름, 이메일 검색..."
+                      className="pl-8 w-48 h-8 text-sm bg-gray-800 border-gray-600 text-gray-200"
+                      data-testid="input-employee-search"
+                    />
+                  </div>
+                </div>
                 <Button
                   size="sm"
                   onClick={() => setShowAddEmployee(true)}
@@ -308,7 +322,16 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.map((user) => (
+                      {users
+                        .filter((user) => {
+                          if (!employeeSearch.trim()) return true;
+                          const search = employeeSearch.toLowerCase();
+                          return (
+                            user.name?.toLowerCase().includes(search) ||
+                            user.email?.toLowerCase().includes(search)
+                          );
+                        })
+                        .map((user) => (
                         <TableRow key={user.docId || user.uid} className="border-gray-700 h-12">
                           <TableCell className="text-gray-200 font-medium py-2">
                             {user.name}
