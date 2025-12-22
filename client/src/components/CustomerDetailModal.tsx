@@ -739,31 +739,56 @@ export function CustomerDetailModal({
     }, 100);
 
     try {
-      // 6. [로그 컬렉션] 저장
+      // 6. [로그 컬렉션] 저장 - addDoc 반환값으로 실제 ID 획득
+      let firestoreDocId: string | null = null;
       if (formData.id) {
         // ★ 중요: Firestore에는 undefined가 절대 가면 안 됨 (|| null 처리)
-        await addDoc(collection(db, "counseling_logs"), {
+        const docRef = await addDoc(collection(db, "counseling_logs"), {
           customer_id: formData.id,
           content: newLog.content,
           image_url: imageUrl || null, // undefined 대신 null 저장
           is_important: newLog.is_important || false,
+          author_id: currentUser.uid,
           author_name: currentUser.name || "관리자",
           created_at: now,
           type: "memo",
         });
+        firestoreDocId = docRef.id;
+        
+        // 로컬 상태의 임시 ID를 실제 Firestore ID로 업데이트
+        newLog.id = firestoreDocId;
+        setMemos((prev) =>
+          prev.map((m) =>
+            m.id === `memo_${now.getTime()}` ? { ...m, id: firestoreDocId! } : m,
+          ),
+        );
       }
 
       // 7. [고객 문서] 저장 & 대시보드 동기화
       if (formData.id) {
-        // (1) DB 저장용 데이터 정제 (cleanData 사용)
-        const historyForDB = updatedHistory.map((m) => ({
-          content: m.content || "",
-          is_important: m.is_important || false,
-          image_url: m.image_url || null, // undefined 방지
-          author_id: m.author_id || "",
-          author_name: m.author_name || "",
-          created_at: m.created_at,
-        }));
+        // updatedHistory에서 새 메모의 ID를 실제 Firestore ID로 교체
+        const finalHistory = updatedHistory.map((m, idx) => {
+          if (idx === updatedHistory.length - 1 && firestoreDocId) {
+            return { ...m, id: firestoreDocId };
+          }
+          return m;
+        });
+        
+        // (1) DB 저장용 데이터 정제 (cleanData 사용) - ID 포함
+        const historyForDB = finalHistory.map((m) => {
+          const obj: Record<string, any> = {
+            id: m.id, // Firestore ID 포함
+            content: m.content || "",
+            is_important: m.is_important === true,
+            author_id: m.author_id || "",
+            author_name: m.author_name || "",
+            created_at: m.created_at,
+          };
+          if (m.image_url) {
+            obj.image_url = m.image_url;
+          }
+          return obj;
+        });
         const safeHistory = cleanData(historyForDB);
 
         // (2) DB 업데이트
@@ -774,25 +799,23 @@ export function CustomerDetailModal({
           memo_history: safeHistory,
         });
 
-        // (3) 로컬 formData 동기화
+        // (3) 로컬 formData 동기화 - finalHistory 사용
         setFormData((prev) => ({
           ...prev,
           recent_memo: newLog.content,
           latest_memo: newLog.content,
           last_memo_date: now,
-          memo_history: updatedHistory,
+          memo_history: finalHistory,
         }));
 
-        // (4) ★★★ 여기가 오류의 원인이었음 (수정됨) ★★★
+        // (4) 부모에게 동기화 - cleanData로 정제된 safeHistory 사용
         if (onSave) {
-          // 부모에게 보낼 때도 undefined가 섞여있으면 부모 쪽 updateDoc에서 터짐
-          // 따라서 여기서도 cleanData()로 씻어서 보내야 함!
           onSave({
             id: formData.id,
             recent_memo: newLog.content,
             latest_memo: newLog.content,
             last_memo_date: now,
-            memo_history: cleanData(updatedHistory), // ★ cleanData 적용!
+            memo_history: safeHistory,
           });
         }
       }
