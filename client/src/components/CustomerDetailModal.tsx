@@ -636,14 +636,6 @@ export function CustomerDetailModal({
     setMemos(updatedHistory);
     setNewMemo("");
 
-    // 스크롤 이동
-    setTimeout(() => {
-      memoScrollRef.current?.scrollTo({
-        top: memoScrollRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 100);
-
     try {
       // 5. [로그 컬렉션] 저장
       if (formData.id) {
