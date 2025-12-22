@@ -30,7 +30,10 @@ import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
 import { FUNNEL_GROUPS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Customer, User, Team, Holiday, StatusLog, StatusCode, InsertCustomer } from '@shared/types';
+
+const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
 export default function Dashboard() {
   const { user, isSuperAdmin, isTeamLeader } = useAuth();
@@ -793,20 +796,32 @@ export default function Dashboard() {
             {/* 신청완료: 진행기관 */}
             {statusChangeModal.targetStatus.includes('신청완료') && (
               <div className="space-y-2">
-                <Label className="text-sm text-gray-300">진행기관</Label>
-                <Input
-                  type="text"
-                  value={statusChangeModal.processingOrg || ''}
-                  onChange={(e) =>
+                <Label className="text-sm text-gray-300">신청 기관</Label>
+                <Select
+                  value={statusChangeModal.processingOrg || '미등록'}
+                  onValueChange={(value) =>
                     setStatusChangeModal(prev => ({
                       ...prev,
-                      processingOrg: e.target.value,
+                      processingOrg: value,
                     }))
                   }
-                  className="bg-gray-800 border-gray-600 text-gray-200"
-                  placeholder="예: 기업은행, 신용보증기금"
-                  data-testid="input-dashboard-processing-org"
-                />
+                >
+                  <SelectTrigger 
+                    className="bg-gray-800 border-gray-600 text-gray-200"
+                    data-testid="select-dashboard-processing-org"
+                  >
+                    <SelectValue placeholder="기관 선택" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    {PROCESSING_ORGS.filter((org) => org && org.trim() !== '').map(
+                      (org) => (
+                        <SelectItem key={org} value={org} className="text-gray-200">
+                          {org}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
