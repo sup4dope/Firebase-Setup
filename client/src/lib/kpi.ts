@@ -48,31 +48,30 @@ export const calculateKPI = (
   holidays: Holiday[],
   date: Date = new Date()
 ): KPIData => {
-  const now = new Date();
   const monthStart = startOfMonth(date);
   const monthEnd = endOfMonth(date);
   
-  // Filter customers and logs for current month
-  const monthCustomers = customers.filter(c => {
-    const createdAt = c.created_at instanceof Date ? c.created_at : new Date(c.created_at);
-    return isSameMonth(createdAt, date) || isBefore(createdAt, monthEnd);
-  });
+  // 현재 DB에 있는 고객 ID Set (삭제되지 않은 고객만)
+  const existingCustomerIds = new Set(customers.map(c => c.id));
   
-  // Current contracts: customers that reached contract completion status this month (한글 상태명)
+  // 계약완료 상태 목록 (한글 상태명)
   const contractStatuses = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
+  
+  // 이번 달에 계약완료 상태로 변경된 로그 중, 현재 DB에 존재하는 고객만 필터링
   const contractLogs = statusLogs.filter(log => {
     const changedAt = log.changed_at instanceof Date ? log.changed_at : new Date(log.changed_at);
     return contractStatuses.includes(log.new_status) && 
            isSameMonth(changedAt, date) &&
-           !isBefore(changedAt, monthStart);
+           !isBefore(changedAt, monthStart) &&
+           existingCustomerIds.has(log.customer_id); // 현재 DB에 존재하는 고객만
   });
   
-  // Get unique customer IDs that had contract completion this month
+  // 이번 달 계약완료 고객의 고유 ID
   const uniqueContractCustomerIds = new Set(contractLogs.map(l => l.customer_id));
   const currentContracts = uniqueContractCustomerIds.size;
   
-  // Current revenue: sum of approved_amount for contracted customers this month
-  const currentRevenue = monthCustomers
+  // 현재 매출: 이번 달 계약완료한 고객들의 approved_amount 합계
+  const currentRevenue = customers
     .filter(c => uniqueContractCustomerIds.has(c.id))
     .reduce((sum, c) => sum + (c.approved_amount || 0), 0);
   
