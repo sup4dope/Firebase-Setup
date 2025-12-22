@@ -107,7 +107,6 @@ export interface Customer {
   
   // 관리 정보
   industry?: string; // 업종 (deprecated, use business_type)
-  processing_org?: string; // 진행기관
   recent_memo?: string; // 최근 메모 (대시보드 테이블 표시용)
   latest_memo?: string; // 최근 메모 (대시보드 동기화용, 호환성)
   last_memo_date?: Date; // 최근 메모 작성일 (대시보드 동기화용)

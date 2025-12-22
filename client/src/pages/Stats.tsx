@@ -155,7 +155,15 @@ export default function Stats() {
 
     const executedCustomers = filteredCustomers.filter(c => c.status_code === EXECUTION_STATUS);
     const executedCount = executedCustomers.length;
-    const totalExecutionAmount = executedCustomers.reduce((sum, c) => sum + (c.approved_amount || 0), 0);
+    // execution_amount는 만원 단위로 저장 (×10,000으로 원화 환산)
+    // 기존 데이터 호환성: execution_amount가 없으면 approved_amount 사용
+    const totalExecutionAmount = executedCustomers.reduce((sum, c) => {
+      if (c.execution_amount && c.execution_amount > 0) {
+        return sum + (c.execution_amount * 10000);
+      }
+      // fallback: 기존 approved_amount 사용 (이미 원화 단위)
+      return sum + (c.approved_amount || 0);
+    }, 0);
 
     const avgConversionRate = totalInflow > 0 ? (executedCount / totalInflow) * 100 : 0;
 
@@ -202,7 +210,13 @@ export default function Stats() {
           staffStats[c.manager_id].contracts += 1;
         }
         if (c.status_code === EXECUTION_STATUS) {
-          staffStats[c.manager_id].amount += c.approved_amount || 0;
+          // execution_amount는 만원 단위 (×10,000으로 원화 환산)
+          // 기존 데이터 호환성: execution_amount가 없으면 approved_amount 사용
+          if (c.execution_amount && c.execution_amount > 0) {
+            staffStats[c.manager_id].amount += c.execution_amount * 10000;
+          } else {
+            staffStats[c.manager_id].amount += c.approved_amount || 0;
+          }
         }
       }
     });

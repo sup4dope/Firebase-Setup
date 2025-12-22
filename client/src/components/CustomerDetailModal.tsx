@@ -2477,14 +2477,23 @@ export function CustomerDetailModal({
                 };
 
                 if (statusChangeModal.targetStatus.includes("계약완료")) {
-                  updateData.commission_rate = statusChangeModal.commissionRate;
-                  updateData.contract_amount = statusChangeModal.contractAmount;
+                  // 값이 입력된 경우에만 저장 (기존 값 유지)
+                  if (statusChangeModal.commissionRate > 0) {
+                    updateData.commission_rate = statusChangeModal.commissionRate;
+                  }
+                  if (statusChangeModal.contractAmount > 0) {
+                    updateData.contract_amount = statusChangeModal.contractAmount;
+                  }
                 }
                 if (statusChangeModal.targetStatus.includes("신청완료")) {
-                  updateData.processing_org = statusChangeModal.processingOrg;
+                  if (statusChangeModal.processingOrg && statusChangeModal.processingOrg !== "미등록") {
+                    updateData.processing_org = statusChangeModal.processingOrg;
+                  }
                 }
                 if (statusChangeModal.targetStatus.includes("집행완료")) {
-                  updateData.execution_amount = statusChangeModal.executionAmount;
+                  if (statusChangeModal.executionAmount > 0) {
+                    updateData.execution_amount = statusChangeModal.executionAmount;
+                  }
                 }
 
                 try {
