@@ -19,7 +19,6 @@ import {
   ExternalLink,
   Download,
   Plus,
-  Star,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -61,12 +60,7 @@ import {
 import { format, differenceInYears, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { TodoForm } from "@/components/TodoForm";
-import {
-  storage,
-  db,
-  getCustomerHistoryLogs,
-  uploadMemoImage,
-} from "@/lib/firebase";
+import { storage, db, getCustomerHistoryLogs, uploadMemoImage } from "@/lib/firebase";
 import {
   ref,
   uploadBytes,
@@ -89,7 +83,6 @@ interface MemoItem {
   id: string;
   content: string;
   image_url?: string;
-  is_important?: boolean;
   author_id: string;
   author_name: string;
   created_at: Date;
@@ -201,10 +194,7 @@ export function CustomerDetailModal({
 }: CustomerDetailModalProps) {
   // Role-based access control: staff users can edit only their own customers
   // staff 사용자는 본인 담당 고객만 수정 가능 (신규 고객 생성 포함)
-  const isReadOnly =
-    currentUser?.role === "staff" &&
-    !isNewCustomer &&
-    customer?.manager_id !== currentUser?.uid;
+  const isReadOnly = currentUser?.role === "staff" && !isNewCustomer && customer?.manager_id !== currentUser?.uid;
 
   // Active tab state for bottom panel
   const [activeBottomTab, setActiveBottomTab] = useState<"memo" | "history">(
@@ -265,11 +255,9 @@ export function CustomerDetailModal({
   // Memo state
   const [memos, setMemos] = useState<MemoItem[]>([]);
   const [newMemo, setNewMemo] = useState("");
-  const [isImportant, setIsImportant] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [enlargedImageUrl, setEnlargedImageUrl] = useState<string | null>(null);
-  const [showImportantOnly, setShowImportantOnly] = useState(false);
   const memoScrollRef = useRef<HTMLDivElement>(null);
   const memoInputRef = useRef<HTMLInputElement>(null);
 
@@ -323,9 +311,19 @@ export function CustomerDetailModal({
         sales_y2: customer.sales_y2 || 0,
         sales_y3: customer.sales_y3 || 0,
       });
-      // 메모는 counseling_logs에서 실시간 로드하므로 여기서 초기화하지 않음
-      // (아래 onSnapshot useEffect가 실제 Firestore ID로 메모를 로드함)
-      setMemos([]);
+      setMemos(
+        customer.memo_history?.map((m, i) => ({
+          id: `memo_${i}`,
+          content: m.content,
+          image_url: (m as any).image_url,
+          author_id: m.author_id,
+          author_name: m.author_name,
+          created_at:
+            m.created_at instanceof Date
+              ? m.created_at
+              : new Date(m.created_at),
+        })) || [],
+      );
       setDocuments(customer.documents || []);
       setSelectedDocument(null); // 이전 고객의 선택된 문서 초기화
     } else if (isNewCustomer) {
@@ -381,18 +379,13 @@ export function CustomerDetailModal({
       q,
       (snapshot) => {
         console.log(`✅ 메모 로드 성공: ${snapshot.size}개`);
-        const logs = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            content: data.content || "",
-            author_id: data.author_id || "",
-            author_name: data.author_name || "",
-            created_at: data.created_at?.toDate?.() || new Date(),
-            is_important: data.is_important === true,
-            image_url: data.image_url || undefined,
-          };
-        }) as MemoItem[];
+        const logs = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          content: doc.data().content || "",
+          author_id: doc.data().author_id || "",
+          author_name: doc.data().author_name || "",
+          created_at: doc.data().created_at?.toDate?.() || new Date(),
+        })) as MemoItem[];
         setMemos(logs);
       },
       (error) => {
@@ -621,37 +614,6 @@ export function CustomerDetailModal({
     return input;
   };
 
-  // Toggle memo importance - counseling_logs 컬렉션 직접 업데이트
-  const handleToggleImportant = async (memoId: string) => {
-    const targetMemo = memos.find((m) => m.id === memoId);
-    if (!targetMemo) return;
-
-    const newImportance = !(targetMemo.is_important === true);
-
-    // 로컬 상태 먼저 업데이트
-    setMemos((prev) =>
-      prev.map((m) =>
-        m.id === memoId ? { ...m, is_important: newImportance } : m,
-      ),
-    );
-
-    // DB 업데이트 (counseling_logs 컬렉션의 해당 문서)
-    try {
-      await updateDoc(doc(db, "counseling_logs", memoId), {
-        is_important: newImportance,
-      });
-      console.log(`✅ 메모 중요 표시 변경 성공: ${memoId} -> ${newImportance}`);
-    } catch (error) {
-      console.error("중요 표시 변경 실패:", error);
-      // 실패 시 롤백
-      setMemos((prev) =>
-        prev.map((m) =>
-          m.id === memoId ? { ...m, is_important: !newImportance } : m,
-        ),
-      );
-    }
-  };
-
   // Handle image paste in memo input
   const handleMemoPaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
     const items = e.clipboardData?.items;
@@ -659,7 +621,7 @@ export function CustomerDetailModal({
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (item.type.startsWith("image/")) {
+      if (item.type.startsWith('image/')) {
         e.preventDefault();
         const file = item.getAsFile();
         if (file) {
@@ -672,9 +634,8 @@ export function CustomerDetailModal({
 
   // Handle memo submit - saves immediately to Firestore and syncs with dashboard
   // [Gemini 최종 완결] 대시보드 싱크 불일치 해결 버전
-  // [Gemini 최종 수정] undefined 오류 해결 + 증발 방지 버전
   const handleMemoSubmit = async () => {
-    // 1. 유효성 검사 (텍스트도 없고 이미지도 없으면 리턴)
+    // 1. 유효성 검사 (텍스트 또는 이미지가 있어야 함)
     if (!newMemo.trim() && !pendingImage) return;
     if (!currentUser) return;
 
@@ -685,39 +646,40 @@ export function CustomerDetailModal({
     const now = new Date();
     let imageUrl: string | undefined;
 
-    // 2. 이미지 업로드 처리
+    // 이미지 업로드 처리
     if (pendingImage && formData.id) {
+      setIsUploadingImage(true);
       try {
         imageUrl = await uploadMemoImage(
           formData.id,
           pendingImage,
-          pendingImage.name || `pasted_image_${Date.now()}.png`,
+          pendingImage.name || 'pasted_image.png'
         );
       } catch (error) {
         console.error("이미지 업로드 실패:", error);
+        setIsUploadingImage(false);
         return;
       }
+      setIsUploadingImage(false);
+      setPendingImage(null);
     }
 
-    // 3. 새 메모 객체 생성
+    // 2. 새 메모 객체 생성
     const newLog: MemoItem = {
       id: `memo_${Date.now()}`,
       content: content || (imageUrl ? "[이미지]" : ""),
-      image_url: imageUrl, // 여기서는 undefined여도 괜찮음 (로컬 상태용)
-      is_important: isImportant,
+      image_url: imageUrl,
       author_id: currentUser.uid,
       author_name: currentUser.name || "관리자",
       created_at: now,
     };
 
-    // 4. "완전체 리스트" 생성
+    // 3. [핵심] "완전체 리스트" 생성 (기존 + 신규)
     const updatedHistory = [...memos, newLog];
 
-    // 5. UI 즉시 반영 & 초기화
+    // 4. UI 즉시 반영
     setMemos(updatedHistory);
     setNewMemo("");
-    setPendingImage(null);
-    setIsImportant(false);
 
     // 스크롤 이동
     setTimeout(() => {
@@ -728,83 +690,57 @@ export function CustomerDetailModal({
     }, 100);
 
     try {
-      // 6. [로그 컬렉션] 저장 - addDoc 반환값으로 실제 ID 획득
-      let firestoreDocId: string | null = null;
+      // 5. [로그 컬렉션] 저장
       if (formData.id) {
-        // ★ 중요: Firestore에는 undefined가 절대 가면 안 됨 (|| null 처리)
-        const docRef = await addDoc(collection(db, "counseling_logs"), {
+        await addDoc(collection(db, "counseling_logs"), {
           customer_id: formData.id,
-          content: newLog.content,
-          image_url: imageUrl || null, // undefined 대신 null 저장
-          is_important: newLog.is_important || false,
-          author_id: currentUser.uid,
+          content: content || (imageUrl ? "[이미지]" : ""),
+          image_url: imageUrl,
           author_name: currentUser.name || "관리자",
           created_at: now,
           type: "memo",
         });
-        firestoreDocId = docRef.id;
-        
-        // 로컬 상태의 임시 ID를 실제 Firestore ID로 업데이트
-        newLog.id = firestoreDocId;
-        setMemos((prev) =>
-          prev.map((m) =>
-            m.id === `memo_${now.getTime()}` ? { ...m, id: firestoreDocId! } : m,
-          ),
-        );
       }
 
-      // 7. [고객 문서] 저장 & 대시보드 동기화
+      // 6. [고객 문서] 저장 & 대시보드 동기화
       if (formData.id) {
-        // updatedHistory에서 새 메모의 ID를 실제 Firestore ID로 교체
-        const finalHistory = updatedHistory.map((m, idx) => {
-          if (idx === updatedHistory.length - 1 && firestoreDocId) {
-            return { ...m, id: firestoreDocId };
-          }
-          return m;
-        });
-        
-        // (1) DB 저장용 데이터 정제 (cleanData 사용) - ID 포함
-        const historyForDB = finalHistory.map((m) => {
-          const obj: Record<string, any> = {
-            id: m.id, // Firestore ID 포함
-            content: m.content || "",
-            is_important: m.is_important === true,
-            author_id: m.author_id || "",
-            author_name: m.author_name || "",
-            created_at: m.created_at,
-          };
-          if (m.image_url) {
-            obj.image_url = m.image_url;
-          }
-          return obj;
-        });
+        // (1) DB 저장용 데이터 정제
+        const historyForDB = updatedHistory.map((m) => ({
+          content: m.content,
+          image_url: m.image_url,
+          author_id: m.author_id,
+          author_name: m.author_name,
+          created_at: m.created_at,
+        }));
         const safeHistory = cleanData(historyForDB);
 
-        // (2) DB 업데이트
+        // (2) DB 업데이트 (덮어쓰기)
         await updateDoc(doc(db, "customers", formData.id), {
-          recent_memo: newLog.content,
-          latest_memo: newLog.content,
+          recent_memo: content || (imageUrl ? "[이미지]" : ""),
+          latest_memo: content || (imageUrl ? "[이미지]" : ""),
           last_memo_date: now,
-          memo_history: safeHistory,
+          memo_history: safeHistory, // DB에도 저장하고
         });
 
-        // (3) 로컬 formData 동기화 - finalHistory 사용
+        // (3) 로컬 formData 동기화
         setFormData((prev) => ({
           ...prev,
-          recent_memo: newLog.content,
-          latest_memo: newLog.content,
+          recent_memo: content || (imageUrl ? "[이미지]" : ""),
+          latest_memo: content || (imageUrl ? "[이미지]" : ""),
           last_memo_date: now,
-          memo_history: finalHistory,
+          memo_history: updatedHistory,
         }));
 
-        // (4) 부모에게 동기화 - cleanData로 정제된 safeHistory 사용
+        // (4) ★★★ 여기가 진짜 범인이었음!!! ★★★
+        // 대시보드(부모)에게 "말풍선 리스트도 바뀌었어!"라고 알려줘야 함.
+        // 이걸 안 알려주니까 대시보드가 옛날 리스트를 다시 내려보냈던 것임.
         if (onSave) {
           onSave({
             id: formData.id,
-            recent_memo: newLog.content,
-            latest_memo: newLog.content,
+            recent_memo: content || (imageUrl ? "[이미지]" : ""),
+            latest_memo: content || (imageUrl ? "[이미지]" : ""),
             last_memo_date: now,
-            memo_history: safeHistory,
+            memo_history: updatedHistory, // ★ 이 한 줄이 빠져서 계속 증발했던 겁니다!
           });
         }
       }
@@ -1024,7 +960,7 @@ export function CustomerDetailModal({
         <VisuallyHidden>
           <DialogTitle>
             {isNewCustomer
-              ? "s��규 고객 등록"
+              ? "신규 고객 등록"
               : `${customer?.name || "고객"} 상세정보`}
           </DialogTitle>
         </VisuallyHidden>
@@ -1928,21 +1864,14 @@ export function CustomerDetailModal({
                   >
                     {(() => {
                       // staff 사용자는 집행완료 상태로 변경 불가 (team_leader, super_admin만 가능)
-                      const canChangeToExecution =
-                        currentUser?.role === "team_leader" ||
-                        currentUser?.role === "super_admin";
-                      const filteredOptions = STATUS_OPTIONS.filter(
-                        (option) => {
-                          if (
-                            option.value.includes("집행완료") &&
-                            !canChangeToExecution
-                          ) {
-                            return false;
-                          }
-                          return true;
-                        },
-                      );
-
+                      const canChangeToExecution = currentUser?.role === 'team_leader' || currentUser?.role === 'super_admin';
+                      const filteredOptions = STATUS_OPTIONS.filter(option => {
+                        if (option.value.includes('집행완료') && !canChangeToExecution) {
+                          return false;
+                        }
+                        return true;
+                      });
+                      
                       const groups = filteredOptions.reduce(
                         (acc, option) => {
                           const group = option.group || "기타";
@@ -1998,14 +1927,10 @@ export function CustomerDetailModal({
                                         setStatusChangeModal({
                                           isOpen: true,
                                           targetStatus: option.value,
-                                          commissionRate:
-                                            formData.commission_rate || 0,
-                                          contractAmount:
-                                            formData.contract_amount || 0,
-                                          executionAmount:
-                                            formData.execution_amount || 0,
-                                          processingOrg:
-                                            formData.processing_org || "미등록",
+                                          commissionRate: formData.commission_rate || 0,
+                                          contractAmount: formData.contract_amount || 0,
+                                          executionAmount: formData.execution_amount || 0,
+                                          processingOrg: formData.processing_org || "미등록",
                                         });
                                         return;
                                       }
@@ -2268,29 +2193,6 @@ export function CustomerDetailModal({
               <div className="flex-1 min-h-0 overflow-hidden">
                 {activeBottomTab === "memo" ? (
                   <div className="flex flex-col h-full">
-                    {/* 중요 메시지 필터 버튼 */}
-                    <div className="shrink-0 flex justify-end px-2 pt-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowImportantOnly(!showImportantOnly)}
-                        className={cn(
-                          "h-6 px-2 text-xs gap-1",
-                          showImportantOnly
-                            ? "text-yellow-400 bg-yellow-600/20"
-                            : "text-gray-500",
-                        )}
-                        data-testid="button-filter-important"
-                      >
-                        <Star
-                          className={cn(
-                            "w-3 h-3",
-                            showImportantOnly && "fill-yellow-400",
-                          )}
-                        />
-                        중요만
-                      </Button>
-                    </div>
                     {/* Memo Messages */}
                     <div
                       ref={memoScrollRef}
@@ -2301,59 +2203,34 @@ export function CustomerDetailModal({
                           <p className="text-sm">상담 메모가 없습니다</p>
                         </div>
                       ) : (
-                        memos
-                          .filter(
-                            (memo) => !showImportantOnly || memo.is_important,
-                          )
-                          .map((memo) => (
-                            <div key={memo.id} className="flex flex-col">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className="text-xs font-medium text-blue-400">
-                                  {memo.author_name}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {safeFormatDate(
-                                    memo.created_at,
-                                    "MM/dd HH:mm",
-                                  )}
-                                </span>
-                              </div>
-                              <div className="relative bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
-                                {/* 중요 표시 별표 버튼 */}
-                                <button
-                                  onClick={() => handleToggleImportant(memo.id)}
-                                  className="absolute -top-1 -right-1 p-0.5 rounded-full bg-gray-800/80 hover:bg-gray-700 transition-colors"
-                                  data-testid={`button-toggle-important-${memo.id}`}
-                                >
-                                  <Star
-                                    className={cn(
-                                      "w-3.5 h-3.5 transition-colors",
-                                      memo.is_important
-                                        ? "fill-yellow-400 text-yellow-400"
-                                        : "text-gray-500 hover:text-yellow-400",
-                                    )}
-                                  />
-                                </button>
-                                {memo.image_url && (
-                                  <img
-                                    src={memo.image_url}
-                                    alt="메모 이미지"
-                                    className="max-w-full max-h-40 rounded cursor-pointer mb-1 hover:opacity-80 transition-opacity"
-                                    onClick={() =>
-                                      setEnlargedImageUrl(memo.image_url!)
-                                    }
-                                    data-testid={`memo-image-${memo.id}`}
-                                  />
-                                )}
-                                {memo.content &&
-                                  memo.content !== "[이미지]" && (
-                                    <p className="text-sm text-gray-200 whitespace-pre-wrap">
-                                      {memo.content}
-                                    </p>
-                                  )}
-                              </div>
+                        memos.map((memo) => (
+                          <div key={memo.id} className="flex flex-col">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-medium text-blue-400">
+                                {memo.author_name}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {safeFormatDate(memo.created_at, "MM/dd HH:mm")}
+                              </span>
                             </div>
-                          ))
+                            <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
+                              {memo.image_url && (
+                                <img
+                                  src={memo.image_url}
+                                  alt="메모 이미지"
+                                  className="max-w-full max-h-40 rounded cursor-pointer mb-1 hover:opacity-80 transition-opacity"
+                                  onClick={() => setEnlargedImageUrl(memo.image_url!)}
+                                  data-testid={`memo-image-${memo.id}`}
+                                />
+                              )}
+                              {memo.content && memo.content !== "[이미지]" && (
+                                <p className="text-sm text-gray-200 whitespace-pre-wrap">
+                                  {memo.content}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))
                       )}
                     </div>
 
@@ -2409,7 +2286,7 @@ export function CustomerDetailModal({
                   </div>
                 ) : (
                   /* History Tab Content */
-                  <div className="h-full overflow-y-auto p-3 bg-gray-900/50">
+                  (<div className="h-full overflow-y-auto p-3 bg-gray-900/50">
                     {isLoadingHistory ? (
                       <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-6 h-6 animate-spin text-orange-400" />
@@ -2486,7 +2363,7 @@ export function CustomerDetailModal({
                         ))}
                       </div>
                     )}
-                  </div>
+                  </div>)
                 )}
               </div>
             </div>
@@ -2654,17 +2531,13 @@ export function CustomerDetailModal({
                     <SelectValue placeholder="기관 선택" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
-                    {PROCESSING_ORGS.filter(
-                      (org) => org && org.trim() !== "",
-                    ).map((org) => (
-                      <SelectItem
-                        key={org}
-                        value={org}
-                        className="text-gray-200"
-                      >
-                        {org}
-                      </SelectItem>
-                    ))}
+                    {PROCESSING_ORGS.filter((org) => org && org.trim() !== "").map(
+                      (org) => (
+                        <SelectItem key={org} value={org} className="text-gray-200">
+                          {org}
+                        </SelectItem>
+                      )
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -2722,34 +2595,25 @@ export function CustomerDetailModal({
                 if (statusChangeModal.targetStatus.includes("계약완료")) {
                   // 값이 입력된 경우에만 저장 (기존 값 유지)
                   if (statusChangeModal.commissionRate > 0) {
-                    updateData.commission_rate =
-                      statusChangeModal.commissionRate;
+                    updateData.commission_rate = statusChangeModal.commissionRate;
                   }
                   if (statusChangeModal.contractAmount > 0) {
-                    updateData.contract_amount =
-                      statusChangeModal.contractAmount;
+                    updateData.contract_amount = statusChangeModal.contractAmount;
                   }
                 }
                 if (statusChangeModal.targetStatus.includes("신청완료")) {
-                  if (
-                    statusChangeModal.processingOrg &&
-                    statusChangeModal.processingOrg !== "미등록"
-                  ) {
+                  if (statusChangeModal.processingOrg && statusChangeModal.processingOrg !== "미등록") {
                     updateData.processing_org = statusChangeModal.processingOrg;
                   }
                 }
                 if (statusChangeModal.targetStatus.includes("집행완료")) {
                   if (statusChangeModal.executionAmount > 0) {
-                    updateData.execution_amount =
-                      statusChangeModal.executionAmount;
+                    updateData.execution_amount = statusChangeModal.executionAmount;
                   }
                 }
 
                 try {
-                  await updateDoc(
-                    doc(db, "customers", formData.id),
-                    updateData,
-                  );
+                  await updateDoc(doc(db, "customers", formData.id), updateData);
 
                   await addDoc(collection(db, "customer_history_logs"), {
                     customer_id: formData.id,
@@ -2765,14 +2629,10 @@ export function CustomerDetailModal({
                   setFormData((prev) => ({
                     ...prev,
                     status_code: statusChangeModal.targetStatus as StatusCode,
-                    commission_rate:
-                      updateData.commission_rate ?? prev.commission_rate,
-                    contract_amount:
-                      updateData.contract_amount ?? prev.contract_amount,
-                    execution_amount:
-                      updateData.execution_amount ?? prev.execution_amount,
-                    processing_org:
-                      updateData.processing_org ?? prev.processing_org,
+                    commission_rate: updateData.commission_rate ?? prev.commission_rate,
+                    contract_amount: updateData.contract_amount ?? prev.contract_amount,
+                    execution_amount: updateData.execution_amount ?? prev.execution_amount,
+                    processing_org: updateData.processing_org ?? prev.processing_org,
                   }));
 
                   const logs = await getCustomerHistoryLogs(formData.id);
@@ -2810,10 +2670,7 @@ export function CustomerDetailModal({
       )}
 
       {/* 이미지 확대 보기 모달 */}
-      <Dialog
-        open={!!enlargedImageUrl}
-        onOpenChange={() => setEnlargedImageUrl(null)}
-      >
+      <Dialog open={!!enlargedImageUrl} onOpenChange={() => setEnlargedImageUrl(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-2 bg-gray-900/95 border-gray-700">
           <VisuallyHidden>
             <DialogTitle>이미지 확대 보기</DialogTitle>
