@@ -431,7 +431,7 @@ export function CustomerTable({
                 
                 {/* 업종 */}
                 <TableCell className="text-muted-foreground text-sm">
-                  {customer.industry || '-'}
+                  {customer.business_type || customer.industry || '-'}
                 </TableCell>
                 
                 {/* 진행기관 - Dropdown */}
