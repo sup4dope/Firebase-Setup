@@ -191,8 +191,9 @@ export function CustomerDetailModal({
   initialTab = "memo",
   onTodoCreated,
 }: CustomerDetailModalProps) {
-  // Role-based access control: staff users are read-only
-  const isReadOnly = currentUser?.role === "staff" && !isNewCustomer;
+  // Role-based access control: staff users can edit only their own customers
+  // staff 사용자는 본인 담당 고객만 수정 가능 (신규 고객 생성 포함)
+  const isReadOnly = currentUser?.role === "staff" && !isNewCustomer && customer?.manager_id !== currentUser?.uid;
 
   // Active tab state for bottom panel
   const [activeBottomTab, setActiveBottomTab] = useState<"memo" | "history">(
