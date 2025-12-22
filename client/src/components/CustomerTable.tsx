@@ -484,43 +484,45 @@ export function CustomerTable({
                   {customer.manager_name || '-'}
                 </TableCell>
                 
-                {/* Actions */}
+                {/* Actions - staff 사용자에게는 숨김 */}
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        data-testid={`button-customer-menu-${customer.id}`}
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => onEdit(customer)}>
-                        <Edit className="w-4 h-4 mr-2" />
-                        정보 수정
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onViewHistory(customer.id)}>
-                        <History className="w-4 h-4 mr-2" />
-                        변경 이력
-                      </DropdownMenuItem>
+                  {userRole !== 'staff' && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid={`button-customer-menu-${customer.id}`}
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => onEdit(customer)}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          정보 수정
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onViewHistory(customer.id)}>
+                          <History className="w-4 h-4 mr-2" />
+                          변경 이력
+                        </DropdownMenuItem>
 
-                      {canDelete && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => onDelete(customer.id)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            삭제
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        {canDelete && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => onDelete(customer.id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              삭제
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
