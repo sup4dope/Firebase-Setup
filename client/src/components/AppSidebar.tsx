@@ -82,19 +82,29 @@ export function AppSidebar({
   const [selectedTodo, setSelectedTodo] = useState<TodoItem | null>(null);
   const [showTodoDetail, setShowTodoDetail] = useState(false);
 
+  const fetchTodoItems = async () => {
+    try {
+      const items = await getTodoItems();
+      setTodoItems(items);
+    } catch (error) {
+      console.error('Error fetching todo items:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchTodoItems = async () => {
-      try {
-        const items = await getTodoItems();
-        setTodoItems(items);
-      } catch (error) {
-        console.error('Error fetching todo items:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchTodoItems();
   }, [todoRefreshTrigger]);
+
+  // 전역 todoCreated 이벤트 수신 - CustomerDetailModal 등에서 발생
+  useEffect(() => {
+    const handleTodoCreated = () => {
+      fetchTodoItems();
+    };
+    window.addEventListener('todoCreated', handleTodoCreated);
+    return () => window.removeEventListener('todoCreated', handleTodoCreated);
+  }, []);
 
   const { upcomingTodos, overdueTodos } = useMemo(() => {
     const now = new Date();

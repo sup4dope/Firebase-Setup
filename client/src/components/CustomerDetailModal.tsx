@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ExternalLink,
   Download,
+  Plus,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -58,6 +59,7 @@ import {
 } from "@shared/types";
 import { format, differenceInYears, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
+import { TodoForm } from "@/components/TodoForm";
 import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
 import {
   ref,
@@ -114,9 +116,11 @@ interface CustomerDetailModalProps {
   isNewCustomer?: boolean;
   currentUser: User | null;
   users: User[];
+  customers?: Customer[]; // TO-DO 폼에서 사용
   onSave: (customer: Partial<Customer>) => Promise<string | undefined>;
   onDelete?: (customerId: string) => Promise<void>;
   initialTab?: "memo" | "history";
+  onTodoCreated?: () => void; // TO-DO 생성 후 콜백
 }
 
 // Helper to safely format dates (handles Firestore Timestamps and Date objects)
@@ -181,9 +185,11 @@ export function CustomerDetailModal({
   isNewCustomer = false,
   currentUser,
   users,
+  customers = [],
   onSave,
   onDelete,
   initialTab = "memo",
+  onTodoCreated,
 }: CustomerDetailModalProps) {
   // Role-based access control: staff users are read-only
   const isReadOnly = currentUser?.role === "staff" && !isNewCustomer;
@@ -196,6 +202,9 @@ export function CustomerDetailModal({
   // History logs state
   const [historyLogs, setHistoryLogs] = useState<CustomerHistoryLog[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // TO-DO form modal state
+  const [todoModalOpen, setTodoModalOpen] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<
@@ -2108,6 +2117,19 @@ export function CustomerDetailModal({
                   <History className="w-4 h-4 mr-1.5" />
                   변경 이력
                 </Button>
+                {/* TO-DO+ 버튼 */}
+                {customer?.id && currentUser && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setTodoModalOpen(true)}
+                    className="h-8 px-3 text-sm text-emerald-400 ml-auto"
+                    data-testid="button-add-todo"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    TO-DO+
+                  </Button>
+                )}
               </div>
 
               {/* Tab Content */}
@@ -2535,6 +2557,23 @@ export function CustomerDetailModal({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* TO-DO 추가 모달 */}
+      {currentUser && (
+        <TodoForm
+          open={todoModalOpen}
+          onOpenChange={setTodoModalOpen}
+          users={users}
+          customers={customers}
+          currentUser={currentUser}
+          userRole={currentUser.role}
+          defaultCustomerId={customer?.id}
+          onTodoCreated={() => {
+            setTodoModalOpen(false);
+            onTodoCreated?.();
+          }}
+        />
+      )}
     </Dialog>
   );
 }

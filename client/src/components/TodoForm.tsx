@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -60,6 +60,7 @@ interface TodoFormProps {
   onSubmit?: (data: any) => Promise<void>;
   isLoading?: boolean;
   onTodoCreated?: () => void;
+  defaultCustomerId?: string; // 미리 선택된 고객 ID
 }
 
 const PRIORITY_OPTIONS: { value: TodoPriority; label: string; color: string; icon: typeof AlertCircle }[] = [
@@ -80,6 +81,7 @@ export function TodoForm({
   customers,
   currentUser,
   onTodoCreated,
+  defaultCustomerId,
 }: TodoFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,13 +91,20 @@ export function TodoForm({
     resolver: zodResolver(todoSchema),
     defaultValues: {
       title: '',
-      customer_id: '',
+      customer_id: defaultCustomerId || '',
       due_date: new Date(),
       due_time: '09:00',
       priority: 'normal',
       memo: '',
     },
   });
+
+  // defaultCustomerId가 변경되면 form 업데이트
+  useEffect(() => {
+    if (open && defaultCustomerId) {
+      form.setValue('customer_id', defaultCustomerId);
+    }
+  }, [open, defaultCustomerId, form]);
 
   const filteredCustomers = useMemo(() => {
     if (!customerSearch.trim()) return customers.slice(0, 50);
@@ -144,6 +153,8 @@ export function TodoForm({
       setCustomerSearch('');
       onOpenChange(false);
       onTodoCreated?.();
+      // 전역 이벤트 발생 - AppSidebar에서 수신하여 목록 새로고침
+      window.dispatchEvent(new CustomEvent('todoCreated'));
     } catch (error) {
       console.error('Error creating todo:', error);
       toast({

@@ -762,6 +762,7 @@ export default function Dashboard() {
         isNewCustomer={isNewCustomerModal}
         currentUser={user}
         users={users}
+        customers={customers}
         onSave={handleDetailModalSave}
         onDelete={isSuperAdmin ? handleDetailModalDelete : undefined}
         initialTab={detailModalInitialTab}
