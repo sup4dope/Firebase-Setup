@@ -14,7 +14,7 @@ import {
   Users,
   TrendingUp,
   CheckCircle2,
-  Banknote,
+  Clock,
   Target,
   CalendarIcon,
   RefreshCw,
@@ -42,6 +42,15 @@ import {
 
 const CONTRACT_STATUSES = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
 const EXECUTION_STATUS = '집행완료';
+
+// 금액 포맷팅: 만원 단위 입력 → 큰 숫자는 억원 자동 변환
+function formatAmount(amountInManwon: number): { value: string; unit: string } {
+  if (amountInManwon >= 10000) {
+    // 1억 이상이면 억원으로 표시
+    return { value: (amountInManwon / 10000).toFixed(1), unit: '억원' };
+  }
+  return { value: amountInManwon.toLocaleString(), unit: '만원' };
+}
 
 export default function Stats() {
   const { user, isSuperAdmin, isTeamLeader } = useAuth();
@@ -147,23 +156,45 @@ export default function Stats() {
   const metrics = useMemo(() => {
     const totalInflow = filteredCustomers.length;
     
+    // 계약 성과: 계약 이력이 있는 고객들
     const contractedCustomers = filteredCustomers.filter(c => 
       customerIdsWithContractHistory.has(c.id)
     );
     const contractedCount = contractedCustomers.length;
     const contractRate = totalInflow > 0 ? (contractedCount / totalInflow) * 100 : 0;
+    
+    // 계약 성과 추가 지표: deposit_amount 합계 (만원 단위), contract_fee_rate 평균
+    const totalDepositAmount = contractedCustomers.reduce((sum, c) => 
+      sum + (c.deposit_amount || 0), 0
+    );
+    const validFeeRates = contractedCustomers.filter(c => 
+      c.contract_fee_rate && c.contract_fee_rate > 0
+    );
+    const avgContractFeeRate = validFeeRates.length > 0 
+      ? validFeeRates.reduce((sum, c) => sum + (c.contract_fee_rate || 0), 0) / validFeeRates.length 
+      : 0;
 
+    // 집행 완료: 현재 상태가 '집행완료'인 고객들
     const executedCustomers = filteredCustomers.filter(c => c.status_code === EXECUTION_STATUS);
     const executedCount = executedCustomers.length;
-    // execution_amount는 만원 단위로 저장 (×10,000으로 원화 환산)
-    // 기존 데이터 호환성: execution_amount가 없으면 approved_amount 사용
-    const totalExecutionAmount = executedCustomers.reduce((sum, c) => {
-      if (c.execution_amount && c.execution_amount > 0) {
-        return sum + (c.execution_amount * 10000);
-      }
-      // fallback: 기존 approved_amount 사용 (이미 원화 단위)
-      return sum + (c.approved_amount || 0);
-    }, 0);
+    // execution_amount는 만원 단위로 저장
+    const totalExecutionAmount = executedCustomers.reduce((sum, c) => 
+      sum + (c.execution_amount || 0), 0
+    );
+
+    // 집행 예정: 계약완료(선불/후불/외주) 또는 신청완료 상태
+    const pendingExecutionCustomers = filteredCustomers.filter(c => 
+      CONTRACT_STATUSES.includes(c.status_code) || c.status_code === '신청완료'
+    );
+    const pendingExecutionCount = pendingExecutionCustomers.length;
+    // 집행 예정 고객들의 예상 집행금액(contract_amount 또는 approved_amount 기반)
+    const avgPendingExecutionAmount = pendingExecutionCount > 0
+      ? pendingExecutionCustomers.reduce((sum, c) => {
+          // contract_amount가 있으면 사용, 없으면 approved_amount/10000 (원→만원 변환)
+          const amount = c.contract_amount || (c.approved_amount ? c.approved_amount / 10000 : 0);
+          return sum + amount;
+        }, 0) / pendingExecutionCount
+      : 0;
 
     const avgConversionRate = totalInflow > 0 ? (executedCount / totalInflow) * 100 : 0;
 
@@ -171,8 +202,12 @@ export default function Stats() {
       totalInflow,
       contractRate,
       contractedCount,
+      totalDepositAmount,
+      avgContractFeeRate,
       executedCount,
       totalExecutionAmount,
+      pendingExecutionCount,
+      avgPendingExecutionAmount,
       avgConversionRate,
     };
   }, [filteredCustomers, customerIdsWithContractHistory]);
@@ -210,13 +245,8 @@ export default function Stats() {
           staffStats[c.manager_id].contracts += 1;
         }
         if (c.status_code === EXECUTION_STATUS) {
-          // execution_amount는 만원 단위 (×10,000으로 원화 환산)
-          // 기존 데이터 호환성: execution_amount가 없으면 approved_amount 사용
-          if (c.execution_amount && c.execution_amount > 0) {
-            staffStats[c.manager_id].amount += c.execution_amount * 10000;
-          } else {
-            staffStats[c.manager_id].amount += c.approved_amount || 0;
-          }
+          // execution_amount는 만원 단위로 저장
+          staffStats[c.manager_id].amount += c.execution_amount || 0;
         }
       }
     });
@@ -378,6 +408,7 @@ export default function Stats() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* 1. 총 유입 */}
           <Card className="bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 border-indigo-500/20">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -391,6 +422,7 @@ export default function Stats() {
             </CardContent>
           </Card>
 
+          {/* 2. 계약 성과 */}
           <Card className="bg-gradient-to-br from-violet-500/10 to-violet-600/5 border-violet-500/20">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -401,9 +433,19 @@ export default function Stats() {
                 </div>
                 <TrendingUp className="w-10 h-10 text-violet-500 opacity-80" />
               </div>
+              {/* 보조 지표: 총 계약금액, 평균 자문료율 */}
+              <div className="mt-3 pt-3 border-t border-violet-500/10 space-y-1">
+                <p className="text-xs text-gray-500">
+                  총 계약금액: {formatAmount(metrics.totalDepositAmount).value} {formatAmount(metrics.totalDepositAmount).unit}
+                </p>
+                <p className="text-xs text-gray-500">
+                  평균 자문료: {metrics.avgContractFeeRate.toFixed(1)}%
+                </p>
+              </div>
             </CardContent>
           </Card>
 
+          {/* 3. 집행 완료 */}
           <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -414,24 +456,36 @@ export default function Stats() {
                 </div>
                 <CheckCircle2 className="w-10 h-10 text-emerald-500 opacity-80" />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">총 집행 금액</p>
-                  <p className="text-3xl font-bold text-foreground">
-                    {(metrics.totalExecutionAmount / 100000000).toFixed(1)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">억원</p>
-                </div>
-                <Banknote className="w-10 h-10 text-amber-500 opacity-80" />
+              {/* 보조 지표: 총 집행금액 */}
+              <div className="mt-3 pt-3 border-t border-emerald-500/10">
+                <p className="text-xs text-gray-500">
+                  총 집행금액: {formatAmount(metrics.totalExecutionAmount).value} {formatAmount(metrics.totalExecutionAmount).unit}
+                </p>
               </div>
             </CardContent>
           </Card>
 
+          {/* 4. 집행 예정 (신규) */}
+          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">집행 예정</p>
+                  <p className="text-3xl font-bold text-foreground">{metrics.pendingExecutionCount.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground mt-1">건</p>
+                </div>
+                <Clock className="w-10 h-10 text-amber-500 opacity-80" />
+              </div>
+              {/* 보조 지표: 평균 예상 집행금액 */}
+              <div className="mt-3 pt-3 border-t border-amber-500/10">
+                <p className="text-xs text-gray-500">
+                  평균 예상금액: {formatAmount(metrics.avgPendingExecutionAmount).value} {formatAmount(metrics.avgPendingExecutionAmount).unit}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 5. 평균 전환율 */}
           <Card className="bg-gradient-to-br from-rose-500/10 to-rose-600/5 border-rose-500/20">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -516,8 +570,8 @@ export default function Stats() {
                         orientation="right" 
                         stroke="#22c55e" 
                         fontSize={12}
-                        tickFormatter={(v) => `${(v / 100000000).toFixed(0)}억`}
-                        label={{ value: '금액(억)', angle: 90, position: 'insideRight', style: { fill: '#22c55e' } }}
+                        tickFormatter={(v) => v >= 10000 ? `${(v / 10000).toFixed(0)}억` : `${v.toLocaleString()}만`}
+                        label={{ value: '금액', angle: 90, position: 'insideRight', style: { fill: '#22c55e' } }}
                       />
                       <Tooltip 
                         contentStyle={{ 
@@ -527,7 +581,10 @@ export default function Stats() {
                         }}
                         labelStyle={{ color: 'hsl(var(--foreground))' }}
                         formatter={(value: number, name: string) => {
-                          if (name === 'amount') return [`${(value / 100000000).toFixed(2)}억`, '집행금액'];
+                          if (name === 'amount') {
+                            const formatted = formatAmount(value);
+                            return [`${formatted.value} ${formatted.unit}`, '집행금액'];
+                          }
                           return [value, '계약건수'];
                         }}
                       />

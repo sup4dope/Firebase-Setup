@@ -70,6 +70,8 @@ export interface Customer {
   approved_amount: number; // 승인 금액
   commission_rate: number; // 수수료율 (총관리자만 열람)
   contract_amount?: number; // 계약금 수령액 (만원 단위)
+  deposit_amount?: number; // 계약금액/선수금 (만원 단위)
+  contract_fee_rate?: number; // 자문료율 (%)
   execution_amount?: number; // 최종 집행 금액 (만원 단위)
   processing_org?: string; // 신청/진행기관
   contract_completion_date?: string; // 최초 계약 도달일
