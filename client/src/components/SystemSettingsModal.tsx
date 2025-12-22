@@ -255,8 +255,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
             </DialogTitle>
           </DialogHeader>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
+            <TabsList className="grid w-full grid-cols-2 bg-gray-800 shrink-0">
               <TabsTrigger
                 value="employees"
                 className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -275,7 +275,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="employees" className="flex-1 overflow-hidden flex flex-col mt-4">
+            <TabsContent value="employees" className="flex-1 overflow-hidden flex flex-col mt-4 min-h-0 data-[state=active]:flex">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-sm text-gray-400">
                   등록된 직원: {users.length}명
@@ -393,7 +393,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
               </div>
             </TabsContent>
 
-            <TabsContent value="teams" className="flex-1 overflow-hidden flex flex-col mt-4">
+            <TabsContent value="teams" className="flex-1 overflow-hidden flex flex-col mt-4 min-h-0 data-[state=active]:flex">
               <div className="flex items-center gap-2 mb-4">
                 <Input
                   value={newTeamName}
