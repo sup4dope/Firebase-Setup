@@ -16,6 +16,7 @@ import Dashboard from '@/pages/Dashboard';
 import Teams from '@/pages/Teams';
 import Holidays from '@/pages/Holidays';
 import Settings from '@/pages/Settings';
+import Stats from '@/pages/Stats';
 import NotFound from '@/pages/not-found';
 import {
   getTodos,
@@ -192,6 +193,7 @@ function AuthenticatedApp() {
               <Route path="/teams" component={Teams} />
               <Route path="/holidays" component={Holidays} />
               <Route path="/settings" component={Settings} />
+              <Route path="/stats" component={Stats} />
               <Route component={NotFound} />
             </Switch>
           </main>
