@@ -337,7 +337,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl h-[85vh] bg-background border-border text-foreground flex flex-col overflow-hidden">
+        <DialogContent className="max-w-5xl h-[85vh] bg-background border-border text-foreground flex flex-col overflow-hidden">
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
               <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-600 dark:text-blue-400" />
@@ -400,9 +400,9 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   <Table>
                     <TableHeader>
                       <TableRow className="border-border h-10">
-                        <TableHead className="text-muted-foreground py-2">이름</TableHead>
-                        <TableHead className="text-muted-foreground py-2">연락처(개인)</TableHead>
-                        <TableHead className="text-muted-foreground py-2">연락처(업무)</TableHead>
+                        <TableHead className="text-muted-foreground py-2 w-24">이름</TableHead>
+                        <TableHead className="text-muted-foreground py-2 whitespace-nowrap">연락처(개인)</TableHead>
+                        <TableHead className="text-muted-foreground py-2 whitespace-nowrap">연락처(업무)</TableHead>
                         <TableHead className="text-muted-foreground py-2">소속팀</TableHead>
                         <TableHead className="text-muted-foreground py-2">직급</TableHead>
                         <TableHead className="text-muted-foreground py-2">상태</TableHead>
@@ -426,16 +426,16 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                         .map((user) => (
                         <TableRow key={user.docId || user.uid} className="border-border h-12">
                           <TableCell 
-                            className="text-foreground font-medium py-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            className="text-foreground font-medium py-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors w-24"
                             onDoubleClick={() => handleOpenEditEmployee(user)}
                             title="더블클릭하여 수정"
                           >
                             {user.name}
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm py-2">
+                          <TableCell className="text-muted-foreground text-sm py-2 whitespace-nowrap">
                             {user.phone_personal || '-'}
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm py-2">
+                          <TableCell className="text-muted-foreground text-sm py-2 whitespace-nowrap">
                             {user.phone_work || '-'}
                           </TableCell>
                           <TableCell className="py-2">
