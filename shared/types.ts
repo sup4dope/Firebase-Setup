@@ -185,14 +185,18 @@ export interface Holiday {
 
 // KPI data for dashboard
 export interface KPIData {
-  expectedContracts: number;
-  currentContracts: number;
-  expectedRevenue: number;
-  currentRevenue: number;
+  // 계약률 관련
+  contractCount: number;         // 당월 성공(계약완료) 건수
+  totalCounselingCount: number;  // 당월 전체 상담 건수 (DB 갯수)
+  contractRate: number;          // 계약률 (%)
+  
+  // 매출 관련
+  monthlyRevenue: number;        // 당월 매출 (집행금액 총합, 만원 단위)
+  expectedRevenue: number;       // 예상 매출 (만원 단위)
+  
+  // 영업일 관련
   businessDaysElapsed: number;
   totalBusinessDays: number;
-  monthlyDbCount: number;       // 현재까지 해당 월 DB 갯수
-  expectedMonthlyDb: number;    // 예상 월말 DB 갯수
 }
 
 // TodoItem (Firestore: todo_list collection) - 새로운 할 일 시스템

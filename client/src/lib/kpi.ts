@@ -49,13 +49,12 @@ export const calculateKPI = (
   date: Date = new Date()
 ): KPIData => {
   const monthStart = startOfMonth(date);
-  const monthEnd = endOfMonth(date);
   
   // 현재 DB에 있는 고객 ID Set (삭제되지 않은 고객만)
   const existingCustomerIds = new Set(customers.map(c => c.id));
   
-  // 해당 월에 유입된 고객 수 (entry_date 기준)
-  const monthlyDbCount = customers.filter(c => {
+  // 해당 월에 유입된 고객 수 (entry_date 기준) = 전체 상담 건수
+  const totalCounselingCount = customers.filter(c => {
     if (!c.entry_date) return false;
     const entryDate = new Date(c.entry_date);
     return isSameMonth(entryDate, date);
@@ -70,41 +69,43 @@ export const calculateKPI = (
     return contractStatuses.includes(log.new_status) && 
            isSameMonth(changedAt, date) &&
            !isBefore(changedAt, monthStart) &&
-           existingCustomerIds.has(log.customer_id); // 현재 DB에 존재하는 고객만
+           existingCustomerIds.has(log.customer_id);
   });
   
-  // 이번 달 계약완료 고객의 고유 ID
+  // 이번 달 계약완료 고객의 고유 ID = 성공 건수
   const uniqueContractCustomerIds = new Set(contractLogs.map(l => l.customer_id));
-  const currentContracts = uniqueContractCustomerIds.size;
+  const contractCount = uniqueContractCustomerIds.size;
   
-  // 현재 매출: 이번 달 계약완료한 고객들의 approved_amount 합계
-  const currentRevenue = customers
-    .filter(c => uniqueContractCustomerIds.has(c.id))
-    .reduce((sum, c) => sum + (c.approved_amount || 0), 0);
+  // 계약률 계산
+  const contractRate = totalCounselingCount > 0 
+    ? Math.round((contractCount / totalCounselingCount) * 100) 
+    : 0;
+  
+  // 당월 매출: 해당 월에 유입된 고객들 중 집행완료 상태인 고객의 execution_amount 합계
+  const monthlyRevenue = customers
+    .filter(c => {
+      if (!c.entry_date) return false;
+      const entryDate = new Date(c.entry_date);
+      return isSameMonth(entryDate, date) && c.status_code === '집행완료';
+    })
+    .reduce((sum, c) => sum + (c.execution_amount || 0), 0);
   
   // Business days calculation
   const totalBusinessDays = getBusinessDaysInMonth(date, holidays);
   const businessDaysElapsed = getElapsedBusinessDays(date, holidays);
   
-  // Projected calculations
-  // 예상계약: 해당 월 DB 총 갯수를 분모로 사용
-  // 예상 총 DB = 현재 DB × (전체영업일 / 경과영업일)
-  // 예상 계약 = (현재계약 / 현재DB) × 예상 총 DB = 현재계약 × ratio (DB 비례 투영)
+  // 예상 매출: (당월 총 집행금액 / 경과영업일) × 전체영업일
   const ratio = businessDaysElapsed > 0 ? totalBusinessDays / businessDaysElapsed : 1;
-  const expectedMonthlyDb = Math.round(monthlyDbCount * ratio);
-  const contractRate = monthlyDbCount > 0 ? currentContracts / monthlyDbCount : 0;
-  const expectedContracts = Math.round(expectedMonthlyDb * contractRate);
-  const expectedRevenue = Math.round(currentRevenue * ratio);
+  const expectedRevenue = Math.round(monthlyRevenue * ratio);
   
   return {
-    expectedContracts,
-    currentContracts,
+    contractCount,
+    totalCounselingCount,
+    contractRate,
+    monthlyRevenue,
     expectedRevenue,
-    currentRevenue,
     businessDaysElapsed,
     totalBusinessDays,
-    monthlyDbCount,        // 현재까지 해당 월 DB 갯수
-    expectedMonthlyDb,     // 예상 월말 DB 갯수
   };
 };
 
