@@ -510,6 +510,14 @@ export const createUser = async (userData: {
   name: string;
   email: string;
   phone?: string;
+  phone_work?: string;
+  phone_personal?: string;
+  ssn_front?: string;
+  ssn_back?: string;
+  address?: string;
+  bank_name?: string;
+  bank_account?: string;
+  hire_date?: string;
   role: 'staff' | 'team_leader' | 'super_admin';
   team_id: string | null;
   team_name: string | null;

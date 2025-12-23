@@ -84,7 +84,14 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   const [newEmployee, setNewEmployee] = useState({
     name: '',
     email: '',
-    phone: '',
+    phone_work: '',
+    phone_personal: '',
+    ssn_front: '',
+    ssn_back: '',
+    address: '',
+    bank_name: '',
+    bank_account: '',
+    hire_date: new Date().toISOString().split('T')[0],
     role: 'staff' as UserRole,
     team_id: '' as string,
   });
@@ -138,7 +145,15 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       await createUser({
         name: newEmployee.name,
         email: newEmployee.email,
-        phone: newEmployee.phone || undefined,
+        phone: newEmployee.phone_work || undefined,
+        phone_work: newEmployee.phone_work || undefined,
+        phone_personal: newEmployee.phone_personal || undefined,
+        ssn_front: newEmployee.ssn_front || undefined,
+        ssn_back: newEmployee.ssn_back || undefined,
+        address: newEmployee.address || undefined,
+        bank_name: newEmployee.bank_name || undefined,
+        bank_account: newEmployee.bank_account || undefined,
+        hire_date: newEmployee.hire_date || undefined,
         role: newEmployee.role,
         team_id: newEmployee.team_id || null,
         team_name: team?.team_name || team?.name || null,
@@ -147,7 +162,14 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       setNewEmployee({
         name: '',
         email: '',
-        phone: '',
+        phone_work: '',
+        phone_personal: '',
+        ssn_front: '',
+        ssn_back: '',
+        address: '',
+        bank_name: '',
+        bank_account: '',
+        hire_date: new Date().toISOString().split('T')[0],
         role: 'staff',
         team_id: '',
       });
@@ -495,7 +517,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
 
       {showAddEmployee && (
         <Dialog open={showAddEmployee} onOpenChange={setShowAddEmployee}>
-          <DialogContent className="max-w-md bg-gray-900 border-gray-700 text-gray-100">
+          <DialogContent className="max-w-lg max-h-[85vh] bg-gray-900 border-gray-700 text-gray-100 overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold text-gray-100 flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-blue-400" />
@@ -527,14 +549,97 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-gray-400 text-sm">연락처(업무용)</Label>
+                  <Input
+                    value={newEmployee.phone_work}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, phone_work: e.target.value })}
+                    placeholder="010-0000-0000"
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-employee-phone-work"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-400 text-sm">연락처(개인)</Label>
+                  <Input
+                    value={newEmployee.phone_personal}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, phone_personal: e.target.value })}
+                    placeholder="010-0000-0000"
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-employee-phone-personal"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-gray-400 text-sm">주민등록번호(앞)</Label>
+                  <Input
+                    value={newEmployee.ssn_front}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, ssn_front: e.target.value })}
+                    placeholder="000000"
+                    maxLength={6}
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-employee-ssn-front"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-400 text-sm">주민등록번호(뒤)</Label>
+                  <Input
+                    type="password"
+                    value={newEmployee.ssn_back}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, ssn_back: e.target.value })}
+                    placeholder="0000000"
+                    maxLength={7}
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-employee-ssn-back"
+                  />
+                </div>
+              </div>
+
               <div>
-                <Label className="text-gray-400 text-sm">연락처</Label>
+                <Label className="text-gray-400 text-sm">거주지(주소)</Label>
                 <Input
-                  value={newEmployee.phone}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })}
-                  placeholder="010-0000-0000"
+                  value={newEmployee.address}
+                  onChange={(e) => setNewEmployee({ ...newEmployee, address: e.target.value })}
+                  placeholder="주소를 입력하세요"
                   className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
-                  data-testid="input-employee-phone"
+                  data-testid="input-employee-address"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-gray-400 text-sm">급여계좌 은행</Label>
+                  <Input
+                    value={newEmployee.bank_name}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, bank_name: e.target.value })}
+                    placeholder="은행명"
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-employee-bank-name"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-400 text-sm">계좌번호</Label>
+                  <Input
+                    value={newEmployee.bank_account}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, bank_account: e.target.value })}
+                    placeholder="계좌번호"
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-employee-bank-account"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-400 text-sm">입사일자</Label>
+                <Input
+                  type="date"
+                  value={newEmployee.hire_date}
+                  onChange={(e) => setNewEmployee({ ...newEmployee, hire_date: e.target.value })}
+                  className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                  data-testid="input-employee-hire-date"
                 />
               </div>
 
