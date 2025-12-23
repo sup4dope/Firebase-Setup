@@ -45,7 +45,8 @@ import {
   ZAxis,
   ReferenceLine,
 } from 'recharts';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, HelpCircle } from 'lucide-react';
+import { Tooltip as ShadTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // 부정데이터 그룹 정의
@@ -769,6 +770,20 @@ export default function Stats() {
                 <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                   {negativeChartPage + 1}/3
                 </span>
+                <ShadTooltip>
+                  <TooltipTrigger asChild>
+                    <button className="ml-1 text-muted-foreground hover:text-foreground transition-colors" data-testid="button-negative-help">
+                      <HelpCircle className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-sm">
+                    <div className="space-y-2">
+                      <p><strong className="text-red-500">스킬부족 (A):</strong> 상담 역량 부족으로 실패 (상담중탈락, 상담불발)</p>
+                      <p><strong className="text-orange-500">설득실패 (B):</strong> 고객 설득 실패 (서류미제출, 조건불충족)</p>
+                      <p><strong className="text-yellow-500">관리누수 (C):</strong> 진행 중 관리 미흡 (심사탈락, 대출포기)</p>
+                    </div>
+                  </TooltipContent>
+                </ShadTooltip>
               </div>
               <div className="flex items-center gap-1">
                 <Button
