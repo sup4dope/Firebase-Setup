@@ -664,11 +664,23 @@ export const getTodoItemsByUser = async (email: string): Promise<TodoItem[]> => 
 
 // 할 일 등록
 export const createTodoItem = async (data: InsertTodoItem): Promise<TodoItem> => {
-  const docRef = await addDoc(collection(db, 'todo_list'), {
-    ...data,
+  // undefined 값 제거 (Firestore는 undefined를 지원하지 않음)
+  const cleanData: Record<string, any> = {
+    title: data.title,
     due_date: Timestamp.fromDate(data.due_date),
+    priority: data.priority,
+    status: data.status,
+    created_by: data.created_by,
+    created_by_name: data.created_by_name,
     created_at: Timestamp.now(),
-  });
+  };
+  
+  // 선택적 필드는 값이 있을 때만 추가
+  if (data.memo) cleanData.memo = data.memo;
+  if (data.customer_id) cleanData.customer_id = data.customer_id;
+  if (data.customer_name) cleanData.customer_name = data.customer_name;
+  
+  const docRef = await addDoc(collection(db, 'todo_list'), cleanData);
   
   return {
     ...data,
