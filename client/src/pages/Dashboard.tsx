@@ -228,6 +228,34 @@ export default function Dashboard() {
     return result;
   }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, isSuperAdmin]);
 
+  // 퍼널 차트용 필터 (날짜/팀/담당자만 적용, 상태/검색어 제외)
+  const funnelFilteredCustomers = useMemo(() => {
+    let result = customers;
+
+    // Filter by date range (접수일자)
+    if (dateRange.from && dateRange.to) {
+      result = result.filter(c => {
+        const entryDate = parseISO(c.entry_date);
+        return isWithinInterval(entryDate, { 
+          start: startOfDay(dateRange.from!), 
+          end: endOfDay(dateRange.to!) 
+        });
+      });
+    }
+
+    // Filter by team/staff (super_admin only)
+    if (isSuperAdmin) {
+      if (selectedTeam !== 'all') {
+        result = result.filter(c => c.team_id === selectedTeam);
+      }
+      if (selectedStaff !== 'all') {
+        result = result.filter(c => c.manager_id === selectedStaff);
+      }
+    }
+
+    return result;
+  }, [customers, dateRange, selectedTeam, selectedStaff, isSuperAdmin]);
+
   // Handlers
   const handleCreateCustomer = async (data: InsertCustomer & { manager_name?: string; team_name?: string }) => {
     setFormLoading(true);
@@ -834,7 +862,7 @@ export default function Dashboard() {
       <div className="flex-1 overflow-auto p-4 space-y-4 bg-background">
         {/* Funnel Chart - Wide and centered */}
         <FunnelChart
-          customers={customers}
+          customers={funnelFilteredCustomers}
           selectedStage={selectedStage}
           onStageClick={setSelectedStage}
         />
