@@ -596,6 +596,64 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
             </DialogHeader>
 
             <div className="space-y-4 py-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-muted-foreground text-sm">입사일자</Label>
+                  <Input
+                    type="date"
+                    value={newEmployee.hire_date}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, hire_date: e.target.value })}
+                    className="bg-muted border-border text-foreground mt-1"
+                    data-testid="input-employee-hire-date"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground text-sm">직급</Label>
+                  <Select
+                    value={newEmployee.role}
+                    onValueChange={(v) => setNewEmployee({ ...newEmployee, role: v as UserRole })}
+                  >
+                    <SelectTrigger className="bg-muted border-border text-foreground mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      <SelectItem value="staff" className="text-foreground">팀원</SelectItem>
+                      <SelectItem value="team_leader" className="text-foreground">팀장</SelectItem>
+                      <SelectItem value="super_admin" className="text-foreground">총관리자</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground text-sm">소속 팀</Label>
+                  {teams.filter(t => t.id && t.id.trim() !== '').length === 0 ? (
+                    <div className="mt-1 p-2 bg-muted border border-border rounded-md text-muted-foreground text-sm">
+                      팀 없음
+                    </div>
+                  ) : (
+                    <Select
+                      value={newEmployee.team_id || 'none'}
+                      onValueChange={(v) => setNewEmployee({ ...newEmployee, team_id: v === 'none' ? '' : v })}
+                    >
+                      <SelectTrigger className="bg-muted border-border text-foreground mt-1">
+                        <SelectValue placeholder="선택" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border-border">
+                        <SelectItem value="none" className="text-muted-foreground">없음</SelectItem>
+                        {teams
+                          .filter((team) => team.id && team.id.trim() !== '' && team.team_id && team.team_id.trim() !== '')
+                          .map((team) => (
+                            <SelectItem key={team.id} value={team.id} className="text-foreground">
+                              {team.team_name || team.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <Label className="text-muted-foreground text-sm">성명 *</Label>
                 <Input
@@ -701,64 +759,6 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   />
                 </div>
               </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label className="text-muted-foreground text-sm">입사일자</Label>
-                  <Input
-                    type="date"
-                    value={newEmployee.hire_date}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, hire_date: e.target.value })}
-                    className="bg-muted border-border text-foreground mt-1"
-                    data-testid="input-employee-hire-date"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-muted-foreground text-sm">직급</Label>
-                  <Select
-                    value={newEmployee.role}
-                    onValueChange={(v) => setNewEmployee({ ...newEmployee, role: v as UserRole })}
-                  >
-                    <SelectTrigger className="bg-muted border-border text-foreground mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border-border">
-                      <SelectItem value="staff" className="text-foreground">팀원</SelectItem>
-                      <SelectItem value="team_leader" className="text-foreground">팀장</SelectItem>
-                      <SelectItem value="super_admin" className="text-foreground">총관리자</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-muted-foreground text-sm">소속 팀</Label>
-                  {teams.filter(t => t.id && t.id.trim() !== '').length === 0 ? (
-                    <div className="mt-1 p-2 bg-muted border border-border rounded-md text-muted-foreground text-sm">
-                      팀 없음
-                    </div>
-                  ) : (
-                    <Select
-                      value={newEmployee.team_id || 'none'}
-                      onValueChange={(v) => setNewEmployee({ ...newEmployee, team_id: v === 'none' ? '' : v })}
-                    >
-                      <SelectTrigger className="bg-muted border-border text-foreground mt-1">
-                        <SelectValue placeholder="선택" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover border-border">
-                        <SelectItem value="none" className="text-muted-foreground">없음</SelectItem>
-                        {teams
-                          .filter((team) => team.id && team.id.trim() !== '' && team.team_id && team.team_id.trim() !== '')
-                          .map((team) => (
-                            <SelectItem key={team.id} value={team.id} className="text-foreground">
-                              {team.team_name || team.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              </div>
             </div>
 
             <div className="flex justify-end gap-2">
@@ -792,6 +792,64 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
             </DialogHeader>
 
             <div className="space-y-4 py-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-muted-foreground text-sm">입사일자</Label>
+                  <Input
+                    type="date"
+                    value={editEmployee.hire_date}
+                    onChange={(e) => setEditEmployee({ ...editEmployee, hire_date: e.target.value })}
+                    className="bg-muted border-border text-foreground mt-1"
+                    data-testid="input-edit-employee-hire-date"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground text-sm">직급</Label>
+                  <Select
+                    value={editEmployee.role}
+                    onValueChange={(v) => setEditEmployee({ ...editEmployee, role: v as UserRole })}
+                  >
+                    <SelectTrigger className="bg-muted border-border text-foreground mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      <SelectItem value="staff" className="text-foreground">팀원</SelectItem>
+                      <SelectItem value="team_leader" className="text-foreground">팀장</SelectItem>
+                      <SelectItem value="super_admin" className="text-foreground">총관리자</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground text-sm">소속 팀</Label>
+                  {teams.filter(t => t.id && t.id.trim() !== '').length === 0 ? (
+                    <div className="mt-1 p-2 bg-muted border border-border rounded-md text-muted-foreground text-sm">
+                      팀 없음
+                    </div>
+                  ) : (
+                    <Select
+                      value={editEmployee.team_id || 'none'}
+                      onValueChange={(v) => setEditEmployee({ ...editEmployee, team_id: v === 'none' ? '' : v })}
+                    >
+                      <SelectTrigger className="bg-muted border-border text-foreground mt-1">
+                        <SelectValue placeholder="선택" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border-border">
+                        <SelectItem value="none" className="text-muted-foreground">없음</SelectItem>
+                        {teams
+                          .filter((team) => team.id && team.id.trim() !== '' && team.team_id && team.team_id.trim() !== '')
+                          .map((team) => (
+                            <SelectItem key={team.id} value={team.id} className="text-foreground">
+                              {team.team_name || team.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <Label className="text-muted-foreground text-sm">성명 *</Label>
                 <Input
@@ -892,64 +950,6 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                     className="bg-muted border-border text-foreground mt-1"
                     data-testid="input-edit-employee-bank-account"
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label className="text-muted-foreground text-sm">입사일자</Label>
-                  <Input
-                    type="date"
-                    value={editEmployee.hire_date}
-                    onChange={(e) => setEditEmployee({ ...editEmployee, hire_date: e.target.value })}
-                    className="bg-muted border-border text-foreground mt-1"
-                    data-testid="input-edit-employee-hire-date"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-muted-foreground text-sm">직급</Label>
-                  <Select
-                    value={editEmployee.role}
-                    onValueChange={(v) => setEditEmployee({ ...editEmployee, role: v as UserRole })}
-                  >
-                    <SelectTrigger className="bg-muted border-border text-foreground mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border-border">
-                      <SelectItem value="staff" className="text-foreground">팀원</SelectItem>
-                      <SelectItem value="team_leader" className="text-foreground">팀장</SelectItem>
-                      <SelectItem value="super_admin" className="text-foreground">총관리자</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-muted-foreground text-sm">소속 팀</Label>
-                  {teams.filter(t => t.id && t.id.trim() !== '').length === 0 ? (
-                    <div className="mt-1 p-2 bg-muted border border-border rounded-md text-muted-foreground text-sm">
-                      팀 없음
-                    </div>
-                  ) : (
-                    <Select
-                      value={editEmployee.team_id || 'none'}
-                      onValueChange={(v) => setEditEmployee({ ...editEmployee, team_id: v === 'none' ? '' : v })}
-                    >
-                      <SelectTrigger className="bg-muted border-border text-foreground mt-1">
-                        <SelectValue placeholder="선택" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover border-border">
-                        <SelectItem value="none" className="text-muted-foreground">없음</SelectItem>
-                        {teams
-                          .filter((team) => team.id && team.id.trim() !== '' && team.team_id && team.team_id.trim() !== '')
-                          .map((team) => (
-                            <SelectItem key={team.id} value={team.id} className="text-foreground">
-                              {team.team_name || team.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
               </div>
             </div>
