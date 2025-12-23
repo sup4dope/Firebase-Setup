@@ -711,92 +711,86 @@ export default function Dashboard() {
           </div>
           
           {/* Right Block: 필터 및 액션 (2행 구조) */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 w-fit">
             {/* Row 1: 접수일자, 소속팀, 담당자 */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
               {/* 접수일자 필터 */}
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-muted-foreground whitespace-nowrap">접수일자</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal h-9 min-w-[160px] bg-gray-800 border-gray-700 text-sm",
-                        !dateRange.from && "text-muted-foreground"
-                      )}
-                      data-testid="button-date-range-dashboard"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateRange.from ? (
-                        dateRange.to ? (
-                          <>
-                            {format(dateRange.from, 'yy.MM.dd')} - {format(dateRange.to, 'yy.MM.dd')}
-                          </>
-                        ) : (
-                          format(dateRange.from, 'yy.MM.dd')
-                        )
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">접수일자</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "justify-start text-left font-normal h-9 w-[130px] bg-gray-800 border-gray-700 text-sm",
+                      !dateRange.from && "text-muted-foreground"
+                    )}
+                    data-testid="button-date-range-dashboard"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, 'yy.MM.dd')} - {format(dateRange.to, 'yy.MM.dd')}
+                        </>
                       ) : (
-                        <span>전체 기간</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="range"
-                      selected={{ from: dateRange.from, to: dateRange.to }}
-                      onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
-                      numberOfMonths={2}
-                      locale={ko}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+                        format(dateRange.from, 'yy.MM.dd')
+                      )
+                    ) : (
+                      <span>전체 기간</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="range"
+                    selected={{ from: dateRange.from, to: dateRange.to }}
+                    onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                    numberOfMonths={2}
+                    locale={ko}
+                  />
+                </PopoverContent>
+              </Popover>
 
               {/* 소속팀/담당자 필터 (super_admin만) */}
               {isSuperAdmin && (
                 <>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground whitespace-nowrap">소속팀</Label>
-                    <Select value={selectedTeam || 'all'} onValueChange={setSelectedTeam}>
-                      <SelectTrigger className="w-[100px] h-9 bg-gray-800 border-gray-700 text-sm" data-testid="select-team-dashboard">
-                        <SelectValue placeholder="전체 팀" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">전체 팀</SelectItem>
-                        {validTeams.map(team => (
-                          <SelectItem key={team.id} value={team.id}>
-                            {team.team_name || team.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">소속팀</Label>
+                  <Select value={selectedTeam || 'all'} onValueChange={setSelectedTeam}>
+                    <SelectTrigger className="w-[90px] h-9 bg-gray-800 border-gray-700 text-sm" data-testid="select-team-dashboard">
+                      <SelectValue placeholder="전체 팀" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 팀</SelectItem>
+                      {validTeams.map(team => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.team_name || team.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground whitespace-nowrap">담당자</Label>
-                    <Select value={selectedStaff || 'all'} onValueChange={setSelectedStaff}>
-                      <SelectTrigger className="w-[100px] h-9 bg-gray-800 border-gray-700 text-sm" data-testid="select-staff-dashboard">
-                        <SelectValue placeholder="전체 직원" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">전체 직원</SelectItem>
-                        {filteredStaffOptions.map(staff => (
-                          <SelectItem key={staff.uid} value={staff.uid}>
-                            {staff.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">담당자</Label>
+                  <Select value={selectedStaff || 'all'} onValueChange={setSelectedStaff}>
+                    <SelectTrigger className="w-[90px] h-9 bg-gray-800 border-gray-700 text-sm" data-testid="select-staff-dashboard">
+                      <SelectValue placeholder="전체 직원" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 직원</SelectItem>
+                      {filteredStaffOptions.map(staff => (
+                        <SelectItem key={staff.uid} value={staff.uid}>
+                          {staff.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </>
               )}
             </div>
 
             {/* Row 2: 검색창, 새로고침, 고객추가 */}
             <div className="flex items-center gap-2">
-              {/* 검색창 - 남은 공간 차지 */}
-              <div className="relative flex-1 min-w-0">
+              {/* 검색창 */}
+              <div className="relative w-[280px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="이름, 회사명, ID 검색..."
