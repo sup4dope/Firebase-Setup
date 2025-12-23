@@ -215,7 +215,7 @@ export function AppSidebar({
             <Building2 className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-sm text-foreground">정책자금 CRM</h1>
+            <h1 className="font-bold text-sm text-foreground">MSGY CRM</h1>
             <p className="text-xs text-muted-foreground">Management Support Group Yieum</p>
           </div>
         </div>
