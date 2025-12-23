@@ -210,6 +210,8 @@ export default function Stats() {
     const managerStats: Record<string, { name: string; A: number; B: number; C: number; D: number; total: number }> = {};
     // 사유별 카운트
     const reasonCounts: Record<string, number> = {};
+    // 사유별 담당자 카운트
+    const reasonByManager: Record<string, Record<string, { name: string; count: number }>> = {};
 
     negativeCustomers.forEach(customer => {
       const statusCode = customer.status_code.trim();
@@ -227,6 +229,15 @@ export default function Stats() {
 
       // 사유별 통계 (status_code 사용)
       reasonCounts[statusCode] = (reasonCounts[statusCode] || 0) + 1;
+      
+      // 사유별 담당자 통계
+      if (!reasonByManager[statusCode]) {
+        reasonByManager[statusCode] = {};
+      }
+      if (!reasonByManager[statusCode][managerId]) {
+        reasonByManager[statusCode][managerId] = { name: managerName, count: 0 };
+      }
+      reasonByManager[statusCode][managerId].count += 1;
     });
 
     // Page 1: Stacked Bar Data (담당자별 A, B, C 비중 %)
@@ -268,11 +279,24 @@ export default function Stats() {
     const pieData = Object.entries(reasonCounts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
-      .map(([name, value], index) => ({
-        name,
-        value,
-        fill: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6366f1'][index],
-      }));
+      .map(([name, value], index) => {
+        // 해당 사유의 담당자별 통계 (상위 5명)
+        const managers = reasonByManager[name] || {};
+        const topManagers = Object.values(managers)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5)
+          .map(m => ({
+            name: m.name,
+            count: m.count,
+            percent: Math.round((m.count / value) * 100),
+          }));
+        return {
+          name,
+          value,
+          fill: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6366f1'][index],
+          topManagers,
+        };
+      });
 
     // Page 3: Scatter Data (X: D 발생률, Y: A+B 발생률)
     const scatterData = Object.entries(managerStats)
@@ -911,15 +935,34 @@ export default function Stats() {
                                 ))}
                               </Pie>
                               <Tooltip 
-                                contentStyle={{ 
-                                  backgroundColor: 'hsl(var(--card))',
-                                  border: '1px solid hsl(var(--border))',
-                                  borderRadius: '8px',
-                                  color: 'hsl(var(--card-foreground))',
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length > 0) {
+                                    const data = payload[0].payload;
+                                    return (
+                                      <div style={{
+                                        backgroundColor: 'hsl(var(--card))',
+                                        border: '1px solid hsl(var(--border))',
+                                        borderRadius: '8px',
+                                        padding: '10px 14px',
+                                        color: 'hsl(var(--card-foreground))',
+                                      }}>
+                                        <p style={{ fontWeight: 'bold', marginBottom: '6px' }}>{data.name}</p>
+                                        <p style={{ marginBottom: '8px' }}>발생 건수: {data.value}건</p>
+                                        {data.topManagers && data.topManagers.length > 0 && (
+                                          <>
+                                            <p style={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))', marginBottom: '4px' }}>담당자별 지분 TOP 5</p>
+                                            {data.topManagers.map((m: any, i: number) => (
+                                              <p key={i} style={{ fontSize: '12px' }}>
+                                                {i + 1}. {m.name}: {m.count}건 ({m.percent}%)
+                                              </p>
+                                            ))}
+                                          </>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                  return null;
                                 }}
-                                labelStyle={{ color: 'hsl(var(--card-foreground))' }}
-                                itemStyle={{ color: 'hsl(var(--card-foreground))' }}
-                                formatter={(value: number) => [`${value}건`, '발생 건수']}
                               />
                             </PieChart>
                           </ResponsiveContainer>
