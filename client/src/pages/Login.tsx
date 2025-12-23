@@ -1,15 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Building2, AlertCircle } from 'lucide-react';
 import { SiGoogle } from 'react-icons/si';
+import { kadvice } from 'kadvice';
+
+interface DailyAdvice {
+  author: string;
+  authorProfile: string;
+  message: string;
+}
 
 export default function Login() {
   const { signInWithGoogle, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [dailyAdvice, setDailyAdvice] = useState<DailyAdvice | null>(null);
+
+  useEffect(() => {
+    const advice = kadvice.getOneByDaily();
+    setDailyAdvice(advice);
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setError(null);
@@ -47,10 +60,23 @@ export default function Login() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-2 text-center text-sm text-muted-foreground">
-            <p>상담부터 집행까지 체계적인 퍼널 관리</p>
-            <p>영업일 기준 정교한 KPI 예측</p>
-            <p>팀별 권한 관리 및 협업 지원</p>
+          <div className="space-y-3 text-center">
+            {dailyAdvice ? (
+              <>
+                <p className="text-sm text-foreground leading-relaxed italic">
+                  "{dailyAdvice.message}"
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  - {dailyAdvice.author} ({dailyAdvice.authorProfile}) -
+                </p>
+              </>
+            ) : (
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>상담부터 집행까지 체계적인 퍼널 관리</p>
+                <p>영업일 기준 정교한 KPI 예측</p>
+                <p>팀별 권한 관리 및 협업 지원</p>
+              </div>
+            )}
           </div>
 
           {error && (
