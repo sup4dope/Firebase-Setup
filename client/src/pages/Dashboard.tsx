@@ -28,6 +28,7 @@ import {
   updateCustomerInfo,
 } from '@/lib/firestore';
 import { Plus, Search, RefreshCw, CalendarIcon } from 'lucide-react';
+import { DataExport } from '@/components/DataExport';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -811,6 +812,16 @@ export default function Dashboard() {
             >
               <RefreshCw className="w-4 h-4" />
             </Button>
+
+            {/* 데이터 내보내기 */}
+            {isSuperAdmin && (
+              <DataExport
+                customers={filteredCustomers}
+                users={users}
+                teams={teams}
+                isSuperAdmin={isSuperAdmin}
+              />
+            )}
             
             <Button onClick={handleNewCustomerModal} data-testid="button-add-customer">
               <Plus className="w-4 h-4 mr-2" />
