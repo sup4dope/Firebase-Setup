@@ -1736,7 +1736,7 @@ export function CustomerDetailModal({
           </div>
 
           {/* Section 2: 중앙 패널 - 문서 뷰어 (40%, A4 비율) */}
-          <div className="flex-1 h-full bg-gray-950 flex flex-col overflow-hidden border-r">
+          <div className="flex-1 h-full bg-muted/50 dark:bg-gray-950 flex flex-col overflow-hidden border-r">
             {/* Document Header - 상태 변경 드롭다운 포함 */}
             <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b bg-muted/50">
               <div className="flex items-center gap-2 flex-1 overflow-x-auto">
@@ -1965,7 +1965,7 @@ export function CustomerDetailModal({
             <div
               {...getRootProps()}
               className={cn(
-                "flex-1 flex flex-col overflow-hidden bg-gray-950/50 transition-all",
+                "flex-1 flex flex-col overflow-hidden bg-muted/30 dark:bg-gray-950/50 transition-all",
                 isDragActive &&
                   "border-2 border-dashed border-blue-500 bg-blue-500/10",
               )}
@@ -1974,7 +1974,7 @@ export function CustomerDetailModal({
 
               {/* 선택된 파일 헤더 - 파일명 + 액션 버튼 */}
               {selectedDocument && !isDragActive && (
-                <div className="shrink-0 px-4 py-2 border-b bg-gray-900/50 flex items-center justify-between gap-2">
+                <div className="shrink-0 px-4 py-2 border-b bg-muted/50 dark:bg-gray-900/50 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                     <span className="text-sm text-muted-foreground truncate">
@@ -2149,7 +2149,7 @@ export function CustomerDetailModal({
                     {/* Memo Messages */}
                     <div
                       ref={memoScrollRef}
-                      className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2 bg-gray-900/50"
+                      className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2 bg-muted/30 dark:bg-gray-900/50"
                     >
                       {memos.length === 0 ? (
                         <div className="text-center text-muted-foreground py-3">
@@ -2202,7 +2202,7 @@ export function CustomerDetailModal({
                   </div>
                 ) : (
                   /* History Tab Content */
-                  (<div className="h-full overflow-y-auto p-3 bg-gray-900/50">
+                  (<div className="h-full overflow-y-auto p-3 bg-muted/30 dark:bg-gray-900/50">
                     {isLoadingHistory ? (
                       <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-6 h-6 animate-spin text-orange-400" />
@@ -2285,7 +2285,7 @@ export function CustomerDetailModal({
             </div>
 
             {/* 하단 50%: AI 채팅 */}
-            <div className="h-1/2 flex flex-col bg-gray-950/30">
+            <div className="h-1/2 flex flex-col bg-muted/20 dark:bg-gray-950/30">
               {/* AI Header */}
               <div className="h-10 shrink-0 border-b px-3 flex items-center">
                 <span className="text-xs font-semibold text-purple-400 flex items-center gap-1.5">
