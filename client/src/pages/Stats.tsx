@@ -161,21 +161,26 @@ export default function Stats() {
     return filtered;
   }, [customers, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader, user]);
 
-  // 부정데이터 그룹화 로직 (상담불발 고객 기반)
+  // 부정데이터 그룹화 로직 (rejection_reason 필드 기반)
   const negativeDataAnalysis = useMemo(() => {
-    // rejection_reason으로 그룹 분류
-    const getGroup = (reason: string): 'A' | 'B' | 'C' | 'D' | null => {
-      if (!reason) return null;
-      for (const [key, group] of Object.entries(NEGATIVE_GROUPS)) {
-        if (group.reasons.some(r => reason.includes(r) || r.includes(reason))) {
-          return key as 'A' | 'B' | 'C' | 'D';
-        }
-      }
-      return null;
+    // 그룹 매핑 (정확한 문자열 일치)
+    const GROUP_A_REASONS = ['거절사유 미파악', '정부기관 오인'];
+    const GROUP_B_REASONS = ['인증미동의(국세청)', '인증미동의(공여내역)', '진행기간미동의', '자문료미동의', '계약금미동의(선불)', '계약금미동의(후불)'];
+    const GROUP_C_REASONS = ['단기부재', '장기부재'];
+    const GROUP_D_REASONS = ['인증불가', '불가업종', '매출없음', '신용점수미달', '차입금초과', '업력미달', '최근대출', '기타자금 오인'];
+
+    // rejection_reason으로 그룹 분류 (정확한 문자열 일치)
+    const getGroup = (reason: string): 'A' | 'B' | 'C' | 'D' => {
+      if (GROUP_A_REASONS.includes(reason)) return 'A';
+      if (GROUP_B_REASONS.includes(reason)) return 'B';
+      if (GROUP_C_REASONS.includes(reason)) return 'C';
+      if (GROUP_D_REASONS.includes(reason)) return 'D';
+      // 예외 처리: 목록에 없거나 비어있으면 Group A (거절사유 미파악)
+      return 'A';
     };
 
-    // 상담불발 상태인 고객만 필터링
-    const negativeCustomers = filteredCustomers.filter(c => c.status_code === '상담불발');
+    // rejection_reason 필드에 값이 있는 모든 고객 필터링 (status_code 체크 안함)
+    const negativeCustomers = filteredCustomers.filter(c => c.rejection_reason && c.rejection_reason.trim() !== '');
 
     // 담당자별 그룹 카운트
     const managerStats: Record<string, { name: string; A: number; B: number; C: number; D: number; total: number }> = {};
@@ -186,19 +191,18 @@ export default function Stats() {
       const reason = customer.rejection_reason || '';
       const group = getGroup(reason);
 
-      // 담당자 통계 (그룹 분류 여부와 관계없이 상담불발 고객 카운트)
+      // 담당자 통계
       const managerId = customer.manager_id || 'unknown';
       const managerName = customer.manager_name || '미지정';
       if (!managerStats[managerId]) {
         managerStats[managerId] = { name: managerName, A: 0, B: 0, C: 0, D: 0, total: 0 };
       }
       managerStats[managerId].total += 1;
+      managerStats[managerId][group] += 1;
 
-      if (group) {
-        managerStats[managerId][group] += 1;
-        // 사유별 통계
-        reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
-      }
+      // 사유별 통계
+      const displayReason = reason || '거절사유 미파악';
+      reasonCounts[displayReason] = (reasonCounts[displayReason] || 0) + 1;
     });
 
     // Page 1: Stacked Bar Data (담당자별 A, B, C 비중 %)
@@ -206,9 +210,9 @@ export default function Stats() {
       .filter(s => s.total > 0)
       .map(s => ({
         name: s.name,
-        스킬부족: s.total > 0 ? Math.round((s.A / s.total) * 100) : 0,
-        설득실패: s.total > 0 ? Math.round((s.B / s.total) * 100) : 0,
-        관리누수: s.total > 0 ? Math.round((s.C / s.total) * 100) : 0,
+        스킬부족: Math.round((s.A / s.total) * 100),
+        설득실패: Math.round((s.B / s.total) * 100),
+        관리누수: Math.round((s.C / s.total) * 100),
         A: s.A,
         B: s.B,
         C: s.C,
@@ -225,13 +229,13 @@ export default function Stats() {
         fill: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6366f1'][index],
       }));
 
-    // Page 3: Scatter Data (X: 불가피율, Y: 스킬+설득 실패율)
+    // Page 3: Scatter Data (X: D 발생률, Y: A+B 발생률)
     const scatterData = Object.entries(managerStats)
       .filter(([_, s]) => s.total > 0)
       .map(([id, s]) => ({
         name: s.name,
-        x: Math.round((s.D / s.total) * 100), // 불가피율 (DB 품질)
-        y: Math.round(((s.A + s.B) / s.total) * 100), // 상담 역량 실패율
+        x: Math.round((s.D / s.total) * 100), // D 발생률 (불가피)
+        y: Math.round(((s.A + s.B) / s.total) * 100), // A+B 발생률 (스킬+설득)
         total: s.total,
       }));
 
