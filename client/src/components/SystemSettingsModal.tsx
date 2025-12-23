@@ -401,8 +401,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                     <TableHeader>
                       <TableRow className="border-border h-10">
                         <TableHead className="text-muted-foreground py-2">이름</TableHead>
-                        <TableHead className="text-muted-foreground py-2">이메일</TableHead>
-                        <TableHead className="text-muted-foreground py-2">연락처</TableHead>
+                        <TableHead className="text-muted-foreground py-2">연락처(개인)</TableHead>
+                        <TableHead className="text-muted-foreground py-2">연락처(업무)</TableHead>
                         <TableHead className="text-muted-foreground py-2">소속팀</TableHead>
                         <TableHead className="text-muted-foreground py-2">직급</TableHead>
                         <TableHead className="text-muted-foreground py-2">상태</TableHead>
@@ -414,11 +414,13 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                         .filter((user) => {
                           if (!employeeSearch.trim()) return true;
                           const search = employeeSearch.toLowerCase().replace(/-/g, '');
-                          const phoneNormalized = user.phone?.replace(/-/g, '').toLowerCase() || '';
+                          const phonePersonalNormalized = user.phone_personal?.replace(/-/g, '').toLowerCase() || '';
+                          const phoneWorkNormalized = user.phone_work?.replace(/-/g, '').toLowerCase() || '';
                           return (
                             user.name?.toLowerCase().includes(search) ||
                             user.email?.toLowerCase().includes(search) ||
-                            phoneNormalized.includes(search)
+                            phonePersonalNormalized.includes(search) ||
+                            phoneWorkNormalized.includes(search)
                           );
                         })
                         .map((user) => (
@@ -431,10 +433,10 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                             {user.name}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm py-2">
-                            {user.email}
+                            {user.phone_personal || '-'}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm py-2">
-                            {user.phone || '-'}
+                            {user.phone_work || '-'}
                           </TableCell>
                           <TableCell className="py-2">
                             <Select
