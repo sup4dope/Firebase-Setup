@@ -831,8 +831,7 @@ export default function Stats() {
                                   <YAxis 
                                     stroke="hsl(var(--muted-foreground))" 
                                     fontSize={12}
-                                    tickFormatter={(v) => `${v}%`}
-                                    domain={[0, 100]}
+                                    tickFormatter={(v) => `${v}건`}
                                   />
                                   <Tooltip 
                                     contentStyle={{ 
@@ -840,17 +839,18 @@ export default function Stats() {
                                       border: '1px solid hsl(var(--border))',
                                       borderRadius: '8px',
                                     }}
-                                    formatter={(value: number, name: string, props: any) => {
-                                      const count = name === '스킬부족' ? props.payload.A 
-                                        : name === '설득실패' ? props.payload.B 
-                                        : props.payload.C;
-                                      return [`${value}% (${count}건)`, name];
+                                    formatter={(value: number, name: string) => {
+                                      const label = name === 'A' ? '스킬부족' : name === 'B' ? '설득실패' : '관리누수';
+                                      return [`${value}건`, label];
                                     }}
                                   />
-                                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                  <Bar dataKey="스킬부족" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} activeBar={false} />
-                                  <Bar dataKey="설득실패" stackId="a" fill="#f97316" radius={[0, 0, 0, 0]} activeBar={false} />
-                                  <Bar dataKey="관리누수" stackId="a" fill="#eab308" radius={[4, 4, 0, 0]} activeBar={false} />
+                                  <Legend 
+                                    wrapperStyle={{ paddingTop: '10px' }} 
+                                    formatter={(value) => value === 'A' ? '스킬부족' : value === 'B' ? '설득실패' : '관리누수'}
+                                  />
+                                  <Bar dataKey="A" name="A" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} activeBar={false} />
+                                  <Bar dataKey="B" name="B" stackId="a" fill="#f97316" radius={[0, 0, 0, 0]} activeBar={false} />
+                                  <Bar dataKey="C" name="C" stackId="a" fill="#eab308" radius={[4, 4, 0, 0]} activeBar={false} />
                                 </BarChart>
                               </ResponsiveContainer>
                             </div>
