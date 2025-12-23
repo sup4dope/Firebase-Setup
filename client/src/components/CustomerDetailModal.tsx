@@ -2177,12 +2177,12 @@ export function CustomerDetailModal({
                     </div>
 
                     {/* Memo Input */}
-                    <div className="shrink-0 border-t border-border bg-muted/30 flex items-center px-2 py-2 gap-1.5">
+                    <div className="shrink-0 border-t border-border bg-blue-100/50 dark:bg-blue-900/20 flex items-center px-2 py-2 gap-1.5">
                       <Input
                         value={newMemo}
                         onChange={(e) => setNewMemo(e.target.value)}
                         placeholder="메모 입력..."
-                        className="bg-transparent border-border text-foreground h-9 text-sm flex-1"
+                        className="bg-white/80 dark:bg-transparent border-blue-300 dark:border-border text-foreground h-9 text-sm flex-1"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
