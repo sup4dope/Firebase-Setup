@@ -565,7 +565,7 @@ export default function Dashboard() {
 
   const handleInfoEditSave = async (
     customerId: string,
-    data: { commission_rate: number; contract_amount: number; execution_amount: number }
+    data: { commission_rate: number; contract_amount: number; execution_amount: number; contract_date?: string }
   ) => {
     const customer = customers.find(c => c.id === customerId);
     if (!customer || !user) return;

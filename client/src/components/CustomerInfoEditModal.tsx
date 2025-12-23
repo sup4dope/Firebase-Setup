@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 import type { Customer } from '@shared/types';
 
 interface CustomerInfoEditModalProps {
@@ -20,6 +21,7 @@ interface CustomerInfoEditModalProps {
     commission_rate: number;
     contract_amount: number;
     execution_amount: number;
+    contract_date?: string;
   }) => Promise<void>;
 }
 
@@ -32,6 +34,7 @@ export function CustomerInfoEditModal({
   const [commissionRate, setCommissionRate] = useState('');
   const [contractAmount, setContractAmount] = useState('');
   const [executionAmount, setExecutionAmount] = useState('');
+  const [contractDate, setContractDate] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -39,6 +42,7 @@ export function CustomerInfoEditModal({
       setCommissionRate(String(customer.commission_rate || customer.contract_fee_rate || ''));
       setContractAmount(String(customer.contract_amount || customer.deposit_amount || ''));
       setExecutionAmount(String(customer.execution_amount || ''));
+      setContractDate((customer as any).contract_date || '');
     }
   }, [customer, open]);
 
@@ -51,6 +55,7 @@ export function CustomerInfoEditModal({
         commission_rate: Number(commissionRate) || 0,
         contract_amount: Number(contractAmount) || 0,
         execution_amount: Number(executionAmount) || 0,
+        contract_date: contractDate || undefined,
       });
       onClose();
     } catch (error) {
@@ -108,6 +113,17 @@ export function CustomerInfoEditModal({
               onChange={(e) => setExecutionAmount(e.target.value)}
               placeholder="예: 10000"
               data-testid="input-execution-amount"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="contract_date">계약일</Label>
+            <Input
+              id="contract_date"
+              type="date"
+              value={contractDate}
+              onChange={(e) => setContractDate(e.target.value)}
+              data-testid="input-contract-date"
             />
           </div>
         </div>
