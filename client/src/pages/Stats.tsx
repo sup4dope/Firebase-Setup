@@ -213,10 +213,10 @@ export default function Stats() {
     );
     const pendingExecutionCount = pendingExecutionCustomers.length;
     
-    // 평균 예상금액: (집행완료된 고객의 execution_amount 총합) / (집행완료 건수)
-    // 집행완료 데이터 기반으로 예상 금액 산출
+    // 평균 예상금액: (집행금액 / 집행건수) × 집행예정건수
+    // 집행완료 데이터 기반으로 집행예정 고객의 예상 총 금액 산출
     const avgPendingExecutionAmount = executedCount > 0
-      ? totalExecutionAmount / executedCount
+      ? (totalExecutionAmount / executedCount) * pendingExecutionCount
       : 0;
 
     const avgConversionRate = totalInflow > 0 ? (executedCount / totalInflow) * 100 : 0;
