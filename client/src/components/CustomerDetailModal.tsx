@@ -1905,6 +1905,7 @@ export function CustomerDetailModal({
                                           targetStatus: option.value,
                                           commissionRate: formData.commission_rate || 0,
                                           contractAmount: formData.contract_amount || 0,
+                                          contractDate: (formData as any).contract_date || new Date().toISOString().split('T')[0],
                                           executionAmount: formData.execution_amount || 0,
                                           executionDate: (formData as any).execution_date || new Date().toISOString().split('T')[0],
                                           processingOrg: formData.processing_org || "미등록",
