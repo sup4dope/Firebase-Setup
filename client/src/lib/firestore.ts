@@ -32,6 +32,7 @@ import type {
   LoginHistory,
   TodoItem,
   InsertTodoItem,
+  CounselingLog,
 } from '@shared/types';
 // STATUS_LABELS removed - using Korean status names directly
 
@@ -829,4 +830,25 @@ export const updateCustomerInfo = async (
     
     await batch.commit();
   }
+};
+
+// CounselingLogs
+export const getCounselingLogs = async (): Promise<CounselingLog[]> => {
+  const snapshot = await getDocs(collection(db, 'counseling_logs'));
+  return snapshot.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      customer_id: data.customer_id || '',
+      customer_name: data.customer_name || '',
+      manager_id: data.manager_id || data.changed_by || '',
+      manager_name: data.manager_name || data.changed_by_name || '',
+      type: data.type || 'status_change',
+      content: data.content || data.memo || '',
+      old_status: data.old_status || '',
+      new_status: data.new_status || '',
+      rejection_reason: data.rejection_reason || data.new_status || '',
+      created_at: data.created_at ? toDate(data.created_at) : new Date(),
+    } as CounselingLog;
+  });
 };

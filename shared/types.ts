@@ -227,6 +227,21 @@ export interface TodoItem {
   assigned_to_name?: string;
 }
 
+// CounselingLog (Firestore: counseling_logs collection) - 상담 이력 로그
+export interface CounselingLog {
+  id: string;
+  customer_id: string;
+  customer_name?: string;
+  manager_id: string;
+  manager_name?: string;
+  type: 'memo' | 'status_change' | 'contact' | 'counseling';
+  content?: string;
+  old_status?: string;
+  new_status?: string;
+  rejection_reason?: string; // 거절/실패 사유
+  created_at: Date;
+}
+
 // Insert types (for creating new records)
 export type InsertUser = Omit<User, 'uid' | 'created_at' | 'updated_at'>;
 export type InsertTeam = Omit<Team, 'id' | 'team_id' | 'created_at' | 'updated_at'>;
