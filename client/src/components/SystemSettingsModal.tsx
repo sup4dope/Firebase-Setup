@@ -691,7 +691,17 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   <Label className="text-muted-foreground text-sm">연락처(업무용)</Label>
                   <Input
                     value={newEmployee.phone_work}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, phone_work: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      let formatted = value;
+                      if (value.length > 3 && value.length <= 7) {
+                        formatted = `${value.slice(0, 3)}-${value.slice(3)}`;
+                      } else if (value.length > 7) {
+                        formatted = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
+                      }
+                      setNewEmployee({ ...newEmployee, phone_work: formatted });
+                    }}
+                    maxLength={13}
                     placeholder="010-0000-0000"
                     className="bg-muted border-border text-foreground mt-1"
                     data-testid="input-employee-phone-work"
@@ -701,7 +711,17 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   <Label className="text-muted-foreground text-sm">연락처(개인)</Label>
                   <Input
                     value={newEmployee.phone_personal}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, phone_personal: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      let formatted = value;
+                      if (value.length > 3 && value.length <= 7) {
+                        formatted = `${value.slice(0, 3)}-${value.slice(3)}`;
+                      } else if (value.length > 7) {
+                        formatted = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
+                      }
+                      setNewEmployee({ ...newEmployee, phone_personal: formatted });
+                    }}
+                    maxLength={13}
                     placeholder="010-0000-0000"
                     className="bg-muted border-border text-foreground mt-1"
                     data-testid="input-employee-phone-personal"
@@ -884,7 +904,17 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   <Label className="text-muted-foreground text-sm">연락처(업무용)</Label>
                   <Input
                     value={editEmployee.phone_work}
-                    onChange={(e) => setEditEmployee({ ...editEmployee, phone_work: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      let formatted = value;
+                      if (value.length > 3 && value.length <= 7) {
+                        formatted = `${value.slice(0, 3)}-${value.slice(3)}`;
+                      } else if (value.length > 7) {
+                        formatted = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
+                      }
+                      setEditEmployee({ ...editEmployee, phone_work: formatted });
+                    }}
+                    maxLength={13}
                     placeholder="010-0000-0000"
                     className="bg-muted border-border text-foreground mt-1"
                     data-testid="input-edit-employee-phone-work"
@@ -894,7 +924,17 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   <Label className="text-muted-foreground text-sm">연락처(개인)</Label>
                   <Input
                     value={editEmployee.phone_personal}
-                    onChange={(e) => setEditEmployee({ ...editEmployee, phone_personal: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      let formatted = value;
+                      if (value.length > 3 && value.length <= 7) {
+                        formatted = `${value.slice(0, 3)}-${value.slice(3)}`;
+                      } else if (value.length > 7) {
+                        formatted = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
+                      }
+                      setEditEmployee({ ...editEmployee, phone_personal: formatted });
+                    }}
+                    maxLength={13}
                     placeholder="010-0000-0000"
                     className="bg-muted border-border text-foreground mt-1"
                     data-testid="input-edit-employee-phone-personal"
