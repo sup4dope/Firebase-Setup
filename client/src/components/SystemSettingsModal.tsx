@@ -423,6 +423,13 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                             phoneWorkNormalized.includes(search)
                           );
                         })
+                        .sort((a, b) => {
+                          const teamA = teams.find(t => t.id === a.team_id);
+                          const teamB = teams.find(t => t.id === b.team_id);
+                          const teamNameA = teamA?.team_name || teamA?.name || '';
+                          const teamNameB = teamB?.team_name || teamB?.name || '';
+                          return teamNameA.localeCompare(teamNameB, 'ko');
+                        })
                         .map((user) => (
                         <TableRow key={user.docId || user.uid} className="border-border h-12">
                           <TableCell 
