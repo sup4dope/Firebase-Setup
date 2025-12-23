@@ -187,11 +187,11 @@ export function CustomerTable({
   if (customers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
-          <Users className="w-8 h-8 text-gray-500" />
+        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+          <Users className="w-8 h-8 text-muted-foreground" />
         </div>
-        <p className="text-lg font-medium text-gray-200">데이터가 없습니다</p>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-lg font-medium text-foreground">데이터가 없습니다</p>
+        <p className="text-sm text-muted-foreground mt-1">
           우측 상단 버튼을 눌러 고객을 추가해주세요.
         </p>
       </div>
