@@ -43,6 +43,7 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
+  ReferenceLine,
 } from 'recharts';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -120,6 +121,11 @@ export default function Stats() {
   const validTeams = useMemo(() => {
     return teams.filter(t => t.id && t.id.trim() !== '');
   }, [teams]);
+
+  // 재직중인 직원 수 (super_admin 제외, staff/team_leader만)
+  const activeStaffCount = useMemo(() => {
+    return users.filter(u => u.uid && u.uid.trim() !== '' && u.role !== 'super_admin').length;
+  }, [users]);
 
   // 유효한 직원 목록 (uid가 존재하는 직원만)
   const filteredStaffOptions = useMemo(() => {
@@ -223,7 +229,7 @@ export default function Stats() {
     });
 
     // Page 1: Stacked Bar Data (담당자별 A, B, C 비중 %)
-    const stackedBarData = Object.values(managerStats)
+    const managerData = Object.values(managerStats)
       .filter(s => s.total > 0)
       .map(s => ({
         name: s.name,
@@ -234,7 +240,28 @@ export default function Stats() {
         B: s.B,
         C: s.C,
         total: s.total,
+        isAverage: false,
       }));
+
+    // 평균 계산 (전체 부정 데이터의 평균 비율)
+    const totalA = Object.values(managerStats).reduce((sum, s) => sum + s.A, 0);
+    const totalB = Object.values(managerStats).reduce((sum, s) => sum + s.B, 0);
+    const totalC = Object.values(managerStats).reduce((sum, s) => sum + s.C, 0);
+    const grandTotal = totalA + totalB + totalC;
+    
+    const avgData = grandTotal > 0 ? {
+      name: '평균',
+      스킬부족: Math.round((totalA / grandTotal) * 100),
+      설득실패: Math.round((totalB / grandTotal) * 100),
+      관리누수: Math.round((totalC / grandTotal) * 100),
+      A: Math.round(totalA / (managerData.length || 1)),
+      B: Math.round(totalB / (managerData.length || 1)),
+      C: Math.round(totalC / (managerData.length || 1)),
+      total: Math.round(grandTotal / (managerData.length || 1)),
+      isAverage: true,
+    } : null;
+
+    const stackedBarData = avgData ? [...managerData, avgData] : managerData;
 
     // Page 2: Pie Chart Data (TOP 5 사유)
     const pieData = Object.entries(reasonCounts)
@@ -377,13 +404,20 @@ export default function Stats() {
     ).length;
     const executedCount = filteredCustomers.filter(c => c.status_code === EXECUTION_STATUS).length;
 
+    // 평균 계산 (재직중 직원 수 기준)
+    const staffCount = activeStaffCount || 1;
+    const avgWaiting = Math.round((waitingCount / staffCount) * 10) / 10;
+    const avgContracted = Math.round((contractedCount / staffCount) * 10) / 10;
+    const avgApplication = Math.round((applicationCount / staffCount) * 10) / 10;
+    const avgExecuted = Math.round((executedCount / staffCount) * 10) / 10;
+
     return [
-      { name: '상담대기', value: waitingCount, fill: '#6366f1' },
-      { name: '계약완료(이력)', value: contractedCount, fill: '#8b5cf6' },
-      { name: '신청완료', value: applicationCount, fill: '#a855f7' },
-      { name: '집행완료', value: executedCount, fill: '#22c55e' },
+      { name: '상담대기', value: waitingCount, avgValue: avgWaiting, fill: '#6366f1' },
+      { name: '계약완료(이력)', value: contractedCount, avgValue: avgContracted, fill: '#8b5cf6' },
+      { name: '신청완료', value: applicationCount, avgValue: avgApplication, fill: '#a855f7' },
+      { name: '집행완료', value: executedCount, avgValue: avgExecuted, fill: '#22c55e' },
     ];
-  }, [filteredCustomers, customerIdsWithContractHistory]);
+  }, [filteredCustomers, customerIdsWithContractHistory, activeStaffCount]);
 
   const performanceData = useMemo(() => {
     const staffStats: { [key: string]: { name: string; contracts: number; amount: number } } = {};
@@ -701,13 +735,20 @@ export default function Stats() {
                       }}
                       labelStyle={{ color: 'white' }}
                       itemStyle={{ color: 'white' }}
-                      formatter={(value: number) => [`${value}`, '건수']}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'value') return [`${value}건`, '실제'];
+                        return [`${value}건`, '인당 평균'];
+                      }}
                     />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} activeBar={false}>
+                    <Legend 
+                      formatter={(value) => value === 'value' ? '실제 건수' : '인당 평균'}
+                    />
+                    <Bar dataKey="value" name="value" radius={[0, 4, 4, 0]} activeBar={false}>
                       {funnelData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Bar>
+                    <Bar dataKey="avgValue" name="avgValue" fill="#94a3b8" radius={[0, 4, 4, 0]} activeBar={false} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
