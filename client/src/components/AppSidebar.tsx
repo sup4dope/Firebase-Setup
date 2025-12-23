@@ -372,7 +372,7 @@ export function AppSidebar({
             data-testid="button-system-settings"
           >
             <Cog className="w-4 h-4 mr-2" />
-            시스템 설정
+            인사관리
           </Button>
         )}
 
