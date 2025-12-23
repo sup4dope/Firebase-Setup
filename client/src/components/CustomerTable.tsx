@@ -48,17 +48,17 @@ const TRASH_REASONS = [
   { id: '차입금초과', label: '차입금초과' },
 ];
 
-// 그룹별 통일된 색상 (대시보드 영업 퍼널과 동일)
+// 그룹별 통일된 색상 (대시보드 영업 퍼널과 동일) - 라이트/다크 모드 지원
 const GROUP_COLORS: Record<string, { bg: string; text: string }> = {
-  '상담': { bg: 'bg-purple-500/20', text: 'text-purple-300' },
-  '부재': { bg: 'bg-orange-500/20', text: 'text-orange-300' },
-  '거절': { bg: 'bg-rose-500/20', text: 'text-rose-300' },
-  '희망타겟': { bg: 'bg-yellow-500/20', text: 'text-yellow-300' },
-  '계약': { bg: 'bg-emerald-500/20', text: 'text-emerald-300' },
-  '서류': { bg: 'bg-blue-500/20', text: 'text-blue-300' },
-  '신청': { bg: 'bg-indigo-500/20', text: 'text-indigo-300' },
-  '집행': { bg: 'bg-teal-500/20', text: 'text-teal-300' },
-  '기타': { bg: 'bg-gray-500/20', text: 'text-gray-300' },
+  '상담': { bg: 'bg-purple-500/20', text: 'text-purple-700 dark:text-purple-300' },
+  '부재': { bg: 'bg-orange-500/20', text: 'text-orange-700 dark:text-orange-300' },
+  '거절': { bg: 'bg-rose-500/20', text: 'text-rose-700 dark:text-rose-300' },
+  '희망타겟': { bg: 'bg-yellow-500/20', text: 'text-amber-700 dark:text-yellow-300' },
+  '계약': { bg: 'bg-emerald-500/20', text: 'text-emerald-700 dark:text-emerald-300' },
+  '서류': { bg: 'bg-blue-500/20', text: 'text-blue-700 dark:text-blue-300' },
+  '신청': { bg: 'bg-indigo-500/20', text: 'text-indigo-700 dark:text-indigo-300' },
+  '집행': { bg: 'bg-teal-500/20', text: 'text-teal-700 dark:text-teal-300' },
+  '기타': { bg: 'bg-gray-500/20', text: 'text-gray-700 dark:text-gray-300' },
 };
 
 // 상태 배지 정보 가져오기 (한글 상태명 기반, 그룹 색상 통일)
@@ -67,7 +67,7 @@ const getStatusBadgeInfo = (statusCode: string): { label: string; colorClass: st
   if (statusCode === '최종부결') {
     return {
       label: statusCode,
-      colorClass: 'bg-red-500/20 text-red-300',
+      colorClass: 'bg-red-500/20 text-red-700 dark:text-red-300',
       category: '집행',
     };
   }
