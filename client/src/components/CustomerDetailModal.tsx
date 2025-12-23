@@ -1875,10 +1875,24 @@ export function CustomerDetailModal({
                                       formData.id &&
                                       formData.status_code !== option.value
                                     ) {
+                                      // 계약완료: 자문료, 계약금액, 계약일이 모두 있으면 모달 스킵
+                                      const hasContractInfo = 
+                                        (formData.commission_rate && formData.commission_rate > 0) &&
+                                        (formData.contract_amount && formData.contract_amount > 0) &&
+                                        ((formData as any).contract_date);
+                                      
+                                      // 신청완료: 진행기관이 설정되어 있으면 모달 스킵
+                                      const hasProcessingOrg = 
+                                        formData.processing_org && formData.processing_org !== "미등록";
+                                      
+                                      // 집행완료: 집행금액이 있으면 모달 스킵
+                                      const hasExecutionInfo = 
+                                        formData.execution_amount && formData.execution_amount > 0;
+
                                       const requiresModal =
-                                        option.value.includes("계약완료") ||
-                                        option.value.includes("신청완료") ||
-                                        option.value.includes("집행완료");
+                                        (option.value.includes("계약완료") && !hasContractInfo) ||
+                                        (option.value.includes("신청완료") && !hasProcessingOrg) ||
+                                        (option.value.includes("집행완료") && !hasExecutionInfo);
 
                                       if (requiresModal) {
                                         setStatusChangeModal({
