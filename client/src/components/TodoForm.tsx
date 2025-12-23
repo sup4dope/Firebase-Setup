@@ -45,7 +45,7 @@ const todoSchema = z.object({
   due_date: z.date({ required_error: '마감 기한을 선택해주세요' }),
   due_time: z.string().min(1, '시간을 선택해주세요'),
   priority: z.enum(['urgent', 'normal', 'low']),
-  memo: z.string().optional(),
+  memo: z.string().optional().nullable().transform(v => v || undefined),
 });
 
 type TodoFormData = z.infer<typeof todoSchema>;
