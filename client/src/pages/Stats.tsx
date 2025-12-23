@@ -740,8 +740,8 @@ export default function Stats() {
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
-                      labelStyle={{ color: 'white' }}
-                      itemStyle={{ color: 'white' }}
+                      labelStyle={{ color: 'black' }}
+                      itemStyle={{ color: 'black' }}
                       formatter={(value: number, name: string) => {
                         if (name === 'value') return [`${value}건`, '실제'];
                         return [`${value}건`, '인당 평균'];
