@@ -95,6 +95,7 @@ export default function Dashboard() {
     contractAmount: number;
     executionAmount: number;
     processingOrg: string;
+    contractDate: string;
   }>({
     isOpen: false,
     customerId: '',
@@ -105,6 +106,7 @@ export default function Dashboard() {
     contractAmount: 0,
     executionAmount: 0,
     processingOrg: '미등록',
+    contractDate: format(new Date(), 'yyyy-MM-dd'),
   });
 
   // Fetch data
@@ -326,6 +328,7 @@ export default function Dashboard() {
           contractAmount: customer.contract_amount || 0,
           executionAmount: customer.execution_amount || 0,
           processingOrg: customer.processing_org || '미등록',
+          contractDate: (customer as any).contract_date || format(new Date(), 'yyyy-MM-dd'),
         });
         return;
       }
@@ -379,6 +382,9 @@ export default function Dashboard() {
         if (statusChangeModal.contractAmount > 0) {
           additionalData.contract_amount = statusChangeModal.contractAmount;
         }
+        if (statusChangeModal.contractDate) {
+          additionalData.contract_date = statusChangeModal.contractDate;
+        }
       }
       if (statusChangeModal.targetStatus.includes('신청완료')) {
         if (statusChangeModal.processingOrg && statusChangeModal.processingOrg !== '미등록') {
@@ -404,6 +410,7 @@ export default function Dashboard() {
           status_code: statusChangeModal.targetStatus as StatusCode,
           commission_rate: additionalData.commission_rate ?? c.commission_rate,
           contract_amount: additionalData.contract_amount ?? c.contract_amount,
+          ...(additionalData.contract_date ? { contract_date: additionalData.contract_date } : {}),
           execution_amount: additionalData.execution_amount ?? c.execution_amount,
           processing_org: additionalData.processing_org ?? c.processing_org,
         } : c)
@@ -1034,6 +1041,20 @@ export default function Dashboard() {
                       만원
                     </span>
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">계약일</Label>
+                  <Input
+                    type="date"
+                    value={statusChangeModal.contractDate || format(new Date(), 'yyyy-MM-dd')}
+                    onChange={(e) =>
+                      setStatusChangeModal(prev => ({
+                        ...prev,
+                        contractDate: e.target.value,
+                      }))
+                    }
+                    data-testid="input-dashboard-contract-date"
+                  />
                 </div>
               </>
             )}
