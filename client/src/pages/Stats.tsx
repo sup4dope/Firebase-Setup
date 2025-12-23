@@ -703,7 +703,7 @@ export default function Stats() {
                       itemStyle={{ color: 'white' }}
                       formatter={(value: number) => [`${value}`, '건수']}
                     />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} activeBar={false}>
                       {funnelData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
