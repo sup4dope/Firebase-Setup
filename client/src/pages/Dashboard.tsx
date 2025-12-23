@@ -702,26 +702,25 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-background">
-      {/* Top Header - Stats Summary + Filters (좌우 2블록 레이아웃) */}
+      {/* Top Header - Stats Summary + Filters */}
       <div className="flex-shrink-0 p-4 border-b border-gray-800 bg-gray-900/30">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Block: KPI 통계 (2×2 그리드) */}
-          <div className="w-full">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          {/* Left: KPI Summary */}
+          <div className="flex items-center gap-6">
             <KPIWidgets kpi={kpi} compact />
           </div>
           
-          {/* Right Block: 필터 및 액션 (2행 구조) */}
-          <div className="flex flex-col gap-2 w-fit">
-            {/* Row 1: 접수일자, 소속팀, 담당자 */}
+          {/* Right: Search & Filters & Actions */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* 접수일자 필터 */}
             <div className="flex items-center gap-2">
-              {/* 접수일자 필터 */}
-              <Label className="text-xs text-muted-foreground whitespace-nowrap">접수일자</Label>
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">접수일자</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
-                      "justify-start text-left font-normal h-9 w-[130px] bg-gray-800 border-gray-700 text-sm",
+                      "justify-start text-left font-normal min-w-[180px] bg-gray-800 border-gray-700",
                       !dateRange.from && "text-muted-foreground"
                     )}
                     data-testid="button-date-range-dashboard"
@@ -740,7 +739,7 @@ export default function Dashboard() {
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0" align="end">
                   <Calendar
                     mode="range"
                     selected={{ from: dateRange.from, to: dateRange.to }}
@@ -750,13 +749,15 @@ export default function Dashboard() {
                   />
                 </PopoverContent>
               </Popover>
+            </div>
 
-              {/* 소속팀/담당자 필터 (super_admin만) */}
-              {isSuperAdmin && (
-                <>
-                  <Label className="text-xs text-muted-foreground whitespace-nowrap">소속팀</Label>
+            {/* 소속팀/담당자 필터 (super_admin만) */}
+            {isSuperAdmin && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground whitespace-nowrap">소속팀</Label>
                   <Select value={selectedTeam || 'all'} onValueChange={setSelectedTeam}>
-                    <SelectTrigger className="w-[90px] h-9 bg-gray-800 border-gray-700 text-sm" data-testid="select-team-dashboard">
+                    <SelectTrigger className="w-[120px] bg-gray-800 border-gray-700" data-testid="select-team-dashboard">
                       <SelectValue placeholder="전체 팀" />
                     </SelectTrigger>
                     <SelectContent>
@@ -768,10 +769,12 @@ export default function Dashboard() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
 
-                  <Label className="text-xs text-muted-foreground whitespace-nowrap">담당자</Label>
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground whitespace-nowrap">담당자</Label>
                   <Select value={selectedStaff || 'all'} onValueChange={setSelectedStaff}>
-                    <SelectTrigger className="w-[90px] h-9 bg-gray-800 border-gray-700 text-sm" data-testid="select-staff-dashboard">
+                    <SelectTrigger className="w-[120px] bg-gray-800 border-gray-700" data-testid="select-staff-dashboard">
                       <SelectValue placeholder="전체 직원" />
                     </SelectTrigger>
                     <SelectContent>
@@ -783,40 +786,37 @@ export default function Dashboard() {
                       ))}
                     </SelectContent>
                   </Select>
-                </>
-              )}
-            </div>
+                </div>
+              </>
+            )}
 
-            {/* Row 2: 검색창, 새로고침, 고객추가 */}
-            <div className="flex items-center gap-2">
-              {/* 검색창 */}
-              <div className="relative w-[280px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="이름, 회사명, ID 검색..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9 bg-gray-800 border-gray-700 text-sm"
-                  data-testid="input-search"
-                />
-              </div>
-              
-              {/* 필터 리셋 버튼 */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={resetFilters}
-                className="h-9 w-9 border-gray-700 flex-shrink-0"
-                data-testid="button-reset-filters-dashboard"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-              
-              <Button onClick={handleNewCustomerModal} className="h-9 flex-shrink-0" data-testid="button-add-customer">
-                <Plus className="w-4 h-4 mr-1" />
-                고객 추가
-              </Button>
+            {/* 검색창 */}
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="이름, 회사명, ID 검색..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-9 bg-gray-800 border-gray-700"
+                data-testid="input-search"
+              />
             </div>
+            
+            {/* 필터 리셋 버튼 */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={resetFilters}
+              className="border-gray-700"
+              data-testid="button-reset-filters-dashboard"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+            
+            <Button onClick={handleNewCustomerModal} data-testid="button-add-customer">
+              <Plus className="w-4 h-4 mr-2" />
+              고객 추가
+            </Button>
           </div>
         </div>
       </div>
