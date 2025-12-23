@@ -115,6 +115,9 @@ export interface Customer {
   sales_y3?: number; // Y-3 매출 (억원)
   avg_revenue_3y?: number; // 3년 평균 매출 (억원)
   
+  // 상담불발 정보
+  rejection_reason?: string; // 상담불발 사유
+  
   // 관리 정보
   industry?: string; // 업종 (deprecated, use business_type)
   recent_memo?: string; // 최근 메모 (대시보드 테이블 표시용)

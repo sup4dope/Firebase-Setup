@@ -116,80 +116,6 @@ export default function Stats() {
     fetchData();
   }, []);
 
-  // 부정데이터 그룹화 로직
-  const negativeDataAnalysis = useMemo(() => {
-    // rejection_reason 또는 new_status로 그룹 분류
-    const getGroup = (reason: string): 'A' | 'B' | 'C' | 'D' | null => {
-      for (const [key, group] of Object.entries(NEGATIVE_GROUPS)) {
-        if (group.reasons.some(r => reason.includes(r) || r.includes(reason))) {
-          return key as 'A' | 'B' | 'C' | 'D';
-        }
-      }
-      return null;
-    };
-
-    // 담당자별 그룹 카운트
-    const managerStats: Record<string, { name: string; A: number; B: number; C: number; D: number; total: number }> = {};
-    // 사유별 카운트
-    const reasonCounts: Record<string, number> = {};
-
-    counselingLogs.forEach(log => {
-      const reason = log.rejection_reason || log.new_status || '';
-      if (!reason) return;
-
-      const group = getGroup(reason);
-      if (!group) return;
-
-      // 담당자 통계
-      const managerId = log.manager_id;
-      const managerName = log.manager_name || '미지정';
-      if (!managerStats[managerId]) {
-        managerStats[managerId] = { name: managerName, A: 0, B: 0, C: 0, D: 0, total: 0 };
-      }
-      managerStats[managerId][group] += 1;
-      managerStats[managerId].total += 1;
-
-      // 사유별 통계
-      reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
-    });
-
-    // Page 1: Stacked Bar Data (담당자별 A, B, C 비중 %)
-    const stackedBarData = Object.values(managerStats)
-      .filter(s => s.total > 0)
-      .map(s => ({
-        name: s.name,
-        스킬부족: s.total > 0 ? Math.round((s.A / s.total) * 100) : 0,
-        설득실패: s.total > 0 ? Math.round((s.B / s.total) * 100) : 0,
-        관리누수: s.total > 0 ? Math.round((s.C / s.total) * 100) : 0,
-        A: s.A,
-        B: s.B,
-        C: s.C,
-        total: s.total,
-      }));
-
-    // Page 2: Pie Chart Data (TOP 5 사유)
-    const pieData = Object.entries(reasonCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, value], index) => ({
-        name,
-        value,
-        fill: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6366f1'][index],
-      }));
-
-    // Page 3: Scatter Data (X: 불가피율, Y: 스킬+설득 실패율)
-    const scatterData = Object.entries(managerStats)
-      .filter(([_, s]) => s.total > 0)
-      .map(([id, s]) => ({
-        name: s.name,
-        x: Math.round((s.D / s.total) * 100), // 불가피율 (DB 품질)
-        y: Math.round(((s.A + s.B) / s.total) * 100), // 상담 역량 실패율
-        total: s.total,
-      }));
-
-    return { stackedBarData, pieData, scatterData };
-  }, [counselingLogs]);
-
   // 유효한 팀 목록 (id가 존재하는 팀만)
   const validTeams = useMemo(() => {
     return teams.filter(t => t.id && t.id.trim() !== '');
@@ -234,6 +160,83 @@ export default function Stats() {
 
     return filtered;
   }, [customers, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader, user]);
+
+  // 부정데이터 그룹화 로직 (상담불발 고객 기반)
+  const negativeDataAnalysis = useMemo(() => {
+    // rejection_reason으로 그룹 분류
+    const getGroup = (reason: string): 'A' | 'B' | 'C' | 'D' | null => {
+      if (!reason) return null;
+      for (const [key, group] of Object.entries(NEGATIVE_GROUPS)) {
+        if (group.reasons.some(r => reason.includes(r) || r.includes(reason))) {
+          return key as 'A' | 'B' | 'C' | 'D';
+        }
+      }
+      return null;
+    };
+
+    // 상담불발 상태인 고객만 필터링
+    const negativeCustomers = filteredCustomers.filter(c => c.status_code === '상담불발');
+
+    // 담당자별 그룹 카운트
+    const managerStats: Record<string, { name: string; A: number; B: number; C: number; D: number; total: number }> = {};
+    // 사유별 카운트
+    const reasonCounts: Record<string, number> = {};
+
+    negativeCustomers.forEach(customer => {
+      const reason = customer.rejection_reason || '';
+      const group = getGroup(reason);
+
+      // 담당자 통계 (그룹 분류 여부와 관계없이 상담불발 고객 카운트)
+      const managerId = customer.manager_id || 'unknown';
+      const managerName = customer.manager_name || '미지정';
+      if (!managerStats[managerId]) {
+        managerStats[managerId] = { name: managerName, A: 0, B: 0, C: 0, D: 0, total: 0 };
+      }
+      managerStats[managerId].total += 1;
+
+      if (group) {
+        managerStats[managerId][group] += 1;
+        // 사유별 통계
+        reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+      }
+    });
+
+    // Page 1: Stacked Bar Data (담당자별 A, B, C 비중 %)
+    const stackedBarData = Object.values(managerStats)
+      .filter(s => s.total > 0)
+      .map(s => ({
+        name: s.name,
+        스킬부족: s.total > 0 ? Math.round((s.A / s.total) * 100) : 0,
+        설득실패: s.total > 0 ? Math.round((s.B / s.total) * 100) : 0,
+        관리누수: s.total > 0 ? Math.round((s.C / s.total) * 100) : 0,
+        A: s.A,
+        B: s.B,
+        C: s.C,
+        total: s.total,
+      }));
+
+    // Page 2: Pie Chart Data (TOP 5 사유)
+    const pieData = Object.entries(reasonCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value], index) => ({
+        name,
+        value,
+        fill: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6366f1'][index],
+      }));
+
+    // Page 3: Scatter Data (X: 불가피율, Y: 스킬+설득 실패율)
+    const scatterData = Object.entries(managerStats)
+      .filter(([_, s]) => s.total > 0)
+      .map(([id, s]) => ({
+        name: s.name,
+        x: Math.round((s.D / s.total) * 100), // 불가피율 (DB 품질)
+        y: Math.round(((s.A + s.B) / s.total) * 100), // 상담 역량 실패율
+        total: s.total,
+      }));
+
+    return { stackedBarData, pieData, scatterData };
+  }, [filteredCustomers]);
 
   const customerIdsWithContractHistory = useMemo(() => {
     const contractedIds = new Set<string>();
