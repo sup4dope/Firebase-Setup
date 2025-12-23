@@ -21,8 +21,8 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCustomers, getTeams, getUsers, getStatusLogs } from '@/lib/firestore';
-import type { Customer, Team, User, StatusLog } from '@shared/types';
+import { getCustomers, getTeams, getUsers, getStatusLogs, getCounselingLogs } from '@/lib/firestore';
+import type { Customer, Team, User, StatusLog, CounselingLog } from '@shared/types';
 import {
   BarChart,
   Bar,
@@ -38,7 +38,29 @@ import {
   Funnel,
   LabelList,
   Cell,
+  PieChart,
+  Pie,
+  ScatterChart,
+  Scatter,
+  ZAxis,
 } from 'recharts';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// 부정데이터 그룹 정의
+const NEGATIVE_GROUPS = {
+  A: { name: '스킬부족', reasons: ['거절사유 미파악', '정부기관 오인'] },
+  B: { name: '설득실패', reasons: ['인증미동의(국세청/공여내역)', '진행기간미동의', '자문료미동의', '계약금미동의(선/후불)'] },
+  C: { name: '관리누수', reasons: ['단기부재', '장기부재'] },
+  D: { name: '불가피', reasons: ['인증불가', '불가업종', '매출없음', '신용점수미달', '차입금초과', '업력미달', '최근대출'] },
+};
+
+const GROUP_COLORS = {
+  A: '#ef4444', // red
+  B: '#f97316', // orange
+  C: '#eab308', // yellow
+  D: '#6b7280', // gray
+};
 
 const CONTRACT_STATUSES = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
 const EXECUTION_STATUS = '집행완료';
@@ -59,6 +81,8 @@ export default function Stats() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [statusLogs, setStatusLogs] = useState<StatusLog[]>([]);
+  const [counselingLogs, setCounselingLogs] = useState<CounselingLog[]>([]);
+  const [negativeChartPage, setNegativeChartPage] = useState(0);
 
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
     from: undefined,
@@ -71,16 +95,18 @@ export default function Stats() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [fetchedCustomers, fetchedTeams, fetchedUsers, fetchedLogs] = await Promise.all([
+        const [fetchedCustomers, fetchedTeams, fetchedUsers, fetchedLogs, fetchedCounselingLogs] = await Promise.all([
           getCustomers(),
           getTeams(),
           getUsers(),
           getStatusLogs(),
+          getCounselingLogs(),
         ]);
         setCustomers(fetchedCustomers);
         setTeams(fetchedTeams);
         setUsers(fetchedUsers);
         setStatusLogs(fetchedLogs);
+        setCounselingLogs(fetchedCounselingLogs);
       } catch (error) {
         console.error('Error fetching stats data:', error);
       } finally {
@@ -89,6 +115,80 @@ export default function Stats() {
     };
     fetchData();
   }, []);
+
+  // 부정데이터 그룹화 로직
+  const negativeDataAnalysis = useMemo(() => {
+    // rejection_reason 또는 new_status로 그룹 분류
+    const getGroup = (reason: string): 'A' | 'B' | 'C' | 'D' | null => {
+      for (const [key, group] of Object.entries(NEGATIVE_GROUPS)) {
+        if (group.reasons.some(r => reason.includes(r) || r.includes(reason))) {
+          return key as 'A' | 'B' | 'C' | 'D';
+        }
+      }
+      return null;
+    };
+
+    // 담당자별 그룹 카운트
+    const managerStats: Record<string, { name: string; A: number; B: number; C: number; D: number; total: number }> = {};
+    // 사유별 카운트
+    const reasonCounts: Record<string, number> = {};
+
+    counselingLogs.forEach(log => {
+      const reason = log.rejection_reason || log.new_status || '';
+      if (!reason) return;
+
+      const group = getGroup(reason);
+      if (!group) return;
+
+      // 담당자 통계
+      const managerId = log.manager_id;
+      const managerName = log.manager_name || '미지정';
+      if (!managerStats[managerId]) {
+        managerStats[managerId] = { name: managerName, A: 0, B: 0, C: 0, D: 0, total: 0 };
+      }
+      managerStats[managerId][group] += 1;
+      managerStats[managerId].total += 1;
+
+      // 사유별 통계
+      reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+    });
+
+    // Page 1: Stacked Bar Data (담당자별 A, B, C 비중 %)
+    const stackedBarData = Object.values(managerStats)
+      .filter(s => s.total > 0)
+      .map(s => ({
+        name: s.name,
+        스킬부족: s.total > 0 ? Math.round((s.A / s.total) * 100) : 0,
+        설득실패: s.total > 0 ? Math.round((s.B / s.total) * 100) : 0,
+        관리누수: s.total > 0 ? Math.round((s.C / s.total) * 100) : 0,
+        A: s.A,
+        B: s.B,
+        C: s.C,
+        total: s.total,
+      }));
+
+    // Page 2: Pie Chart Data (TOP 5 사유)
+    const pieData = Object.entries(reasonCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value], index) => ({
+        name,
+        value,
+        fill: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6366f1'][index],
+      }));
+
+    // Page 3: Scatter Data (X: 불가피율, Y: 스킬+설득 실패율)
+    const scatterData = Object.entries(managerStats)
+      .filter(([_, s]) => s.total > 0)
+      .map(([id, s]) => ({
+        name: s.name,
+        x: Math.round((s.D / s.total) * 100), // 불가피율 (DB 품질)
+        y: Math.round(((s.A + s.B) / s.total) * 100), // 상담 역량 실패율
+        total: s.total,
+      }));
+
+    return { stackedBarData, pieData, scatterData };
+  }, [counselingLogs]);
 
   // 유효한 팀 목록 (id가 존재하는 팀만)
   const validTeams = useMemo(() => {
@@ -591,61 +691,221 @@ export default function Stats() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">담당자별 부정데이터</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg">담당자별 부정데이터</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                  {negativeChartPage + 1}/3
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setNegativeChartPage(prev => Math.max(0, prev - 1))}
+                  disabled={negativeChartPage === 0}
+                  className="h-8 w-8"
+                  data-testid="button-negative-chart-prev"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setNegativeChartPage(prev => Math.min(2, prev + 1))}
+                  disabled={negativeChartPage === 2}
+                  className="h-8 w-8"
+                  data-testid="button-negative-chart-next"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                {performanceData.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    데이터가 없습니다
+              <div className="h-[300px] relative overflow-hidden">
+                {loading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={performanceData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="hsl(var(--muted-foreground))" 
-                        fontSize={11}
-                        angle={-45}
-                        textAnchor="end"
-                        height={60}
-                      />
-                      <YAxis 
-                        yAxisId="left" 
-                        stroke="#8b5cf6" 
-                        fontSize={12}
-                        label={{ value: '계약(건)', angle: -90, position: 'insideLeft', style: { fill: '#8b5cf6' } }}
-                      />
-                      <YAxis 
-                        yAxisId="right" 
-                        orientation="right" 
-                        stroke="#22c55e" 
-                        fontSize={12}
-                        tickFormatter={(v) => v >= 10000 ? `${(v / 10000).toFixed(0)}억` : `${v.toLocaleString()}만`}
-                        label={{ value: '금액', angle: 90, position: 'insideRight', style: { fill: '#22c55e' } }}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                        }}
-                        labelStyle={{ color: 'hsl(var(--foreground))' }}
-                        formatter={(value: number, name: string) => {
-                          if (name === 'amount') {
-                            const formatted = formatAmount(value);
-                            return [`${formatted.value} ${formatted.unit}`, '집행금액'];
-                          }
-                          return [value, '계약건수'];
-                        }}
-                      />
-                      <Legend />
-                      <Bar yAxisId="left" dataKey="contracts" name="계약건수" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                      <Bar yAxisId="right" dataKey="amount" name="집행금액" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <AnimatePresence mode="wait">
+                    {negativeChartPage === 0 && (
+                      <motion.div
+                        key="page-0"
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -50 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute inset-0"
+                      >
+                        {negativeDataAnalysis.stackedBarData.length === 0 ? (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            데이터가 없습니다
+                          </div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={negativeDataAnalysis.stackedBarData} layout="horizontal">
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                              <XAxis 
+                                dataKey="name" 
+                                stroke="hsl(var(--muted-foreground))" 
+                                fontSize={11}
+                                angle={-30}
+                                textAnchor="end"
+                                height={50}
+                              />
+                              <YAxis 
+                                stroke="hsl(var(--muted-foreground))" 
+                                fontSize={12}
+                                tickFormatter={(v) => `${v}%`}
+                                domain={[0, 100]}
+                              />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'hsl(var(--card))',
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '8px',
+                                }}
+                                formatter={(value: number, name: string, props: any) => {
+                                  const count = name === '스킬부족' ? props.payload.A 
+                                    : name === '설득실패' ? props.payload.B 
+                                    : props.payload.C;
+                                  return [`${value}% (${count}건)`, name];
+                                }}
+                              />
+                              <Legend />
+                              <Bar dataKey="스킬부족" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
+                              <Bar dataKey="설득실패" stackId="a" fill="#f97316" radius={[0, 0, 0, 0]} />
+                              <Bar dataKey="관리누수" stackId="a" fill="#eab308" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
+                        <p className="absolute bottom-0 left-0 right-0 text-center text-xs text-muted-foreground">
+                          담당자별 상담 실패 비중 (A: 스킬부족, B: 설득실패, C: 관리누수)
+                        </p>
+                      </motion.div>
+                    )}
+
+                    {negativeChartPage === 1 && (
+                      <motion.div
+                        key="page-1"
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -50 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute inset-0"
+                      >
+                        {negativeDataAnalysis.pieData.length === 0 ? (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            데이터가 없습니다
+                          </div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={negativeDataAnalysis.pieData}
+                                cx="50%"
+                                cy="45%"
+                                innerRadius={50}
+                                outerRadius={90}
+                                paddingAngle={2}
+                                dataKey="value"
+                                label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                labelLine={{ stroke: 'hsl(var(--muted-foreground))' }}
+                              >
+                                {negativeDataAnalysis.pieData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                                ))}
+                              </Pie>
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'hsl(var(--card))',
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '8px',
+                                }}
+                                formatter={(value: number) => [`${value}건`, '발생 건수']}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        )}
+                        <p className="absolute bottom-0 left-0 right-0 text-center text-xs text-muted-foreground">
+                          부정 데이터 발생 사유 TOP 5
+                        </p>
+                      </motion.div>
+                    )}
+
+                    {negativeChartPage === 2 && (
+                      <motion.div
+                        key="page-2"
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -50 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute inset-0"
+                      >
+                        {negativeDataAnalysis.scatterData.length === 0 ? (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            데이터가 없습니다
+                          </div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 20 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                              <XAxis 
+                                type="number" 
+                                dataKey="x" 
+                                name="불가피율" 
+                                stroke="hsl(var(--muted-foreground))" 
+                                fontSize={11}
+                                tickFormatter={(v) => `${v}%`}
+                                domain={[0, 'auto']}
+                                label={{ value: '불가피율 (DB 품질)', position: 'bottom', offset: 0, style: { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } }}
+                              />
+                              <YAxis 
+                                type="number" 
+                                dataKey="y" 
+                                name="실패율" 
+                                stroke="hsl(var(--muted-foreground))" 
+                                fontSize={11}
+                                tickFormatter={(v) => `${v}%`}
+                                domain={[0, 'auto']}
+                                label={{ value: '상담 역량 실패율', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } }}
+                              />
+                              <ZAxis type="number" dataKey="total" range={[50, 400]} name="총 건수" />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'hsl(var(--card))',
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '8px',
+                                }}
+                                formatter={(value: number, name: string) => {
+                                  if (name === '불가피율') return [`${value}%`, 'DB 품질 (불가피)'];
+                                  if (name === '실패율') return [`${value}%`, '상담 역량 실패'];
+                                  return [`${value}건`, '총 건수'];
+                                }}
+                                labelFormatter={(label) => `담당자: ${label}`}
+                              />
+                              <Scatter 
+                                name="담당자" 
+                                data={negativeDataAnalysis.scatterData} 
+                                fill="#6366f1"
+                              >
+                                {negativeDataAnalysis.scatterData.map((entry, index) => (
+                                  <Cell 
+                                    key={`cell-${index}`} 
+                                    fill={entry.y > 50 ? '#ef4444' : entry.y > 30 ? '#f97316' : '#22c55e'} 
+                                  />
+                                ))}
+                              </Scatter>
+                            </ScatterChart>
+                          </ResponsiveContainer>
+                        )}
+                        <p className="absolute bottom-0 left-0 right-0 text-center text-xs text-muted-foreground">
+                          DB 품질 vs 상담 역량 상관관계 (점 크기 = 총 건수)
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 )}
               </div>
             </CardContent>
