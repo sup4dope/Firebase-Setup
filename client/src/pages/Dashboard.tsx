@@ -94,6 +94,7 @@ export default function Dashboard() {
     commissionRate: number;
     contractAmount: number;
     executionAmount: number;
+    executionDate: string;
     processingOrg: string;
     contractDate: string;
   }>({
@@ -105,6 +106,7 @@ export default function Dashboard() {
     commissionRate: 0,
     contractAmount: 0,
     executionAmount: 0,
+    executionDate: format(new Date(), 'yyyy-MM-dd'),
     processingOrg: '미등록',
     contractDate: format(new Date(), 'yyyy-MM-dd'),
   });
@@ -327,6 +329,7 @@ export default function Dashboard() {
           commissionRate: customer.commission_rate || 0,
           contractAmount: customer.contract_amount || 0,
           executionAmount: customer.execution_amount || 0,
+          executionDate: (customer as any).execution_date || format(new Date(), 'yyyy-MM-dd'),
           processingOrg: customer.processing_org || '미등록',
           contractDate: (customer as any).contract_date || format(new Date(), 'yyyy-MM-dd'),
         });
@@ -394,6 +397,9 @@ export default function Dashboard() {
       if (statusChangeModal.targetStatus.includes('집행완료')) {
         if (statusChangeModal.executionAmount > 0) {
           additionalData.execution_amount = statusChangeModal.executionAmount;
+        }
+        if (statusChangeModal.executionDate) {
+          additionalData.execution_date = statusChangeModal.executionDate;
         }
       }
 
@@ -1088,32 +1094,48 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* 집행완료: 집행금액 */}
+            {/* 집행완료: 집행금액, 집행일 */}
             {statusChangeModal.targetStatus.includes('집행완료') && (
-              <div className="space-y-2">
-                <Label className="text-sm">
-                  집행금액 <span className="text-muted-foreground text-xs">(단위: 만원)</span>
-                </Label>
-                <div className="relative">
+              <>
+                <div className="space-y-2">
+                  <Label className="text-sm">
+                    집행금액 <span className="text-muted-foreground text-xs">(단위: 만원)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={statusChangeModal.executionAmount || ''}
+                      onChange={(e) =>
+                        setStatusChangeModal(prev => ({
+                          ...prev,
+                          executionAmount: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      className="pr-12"
+                      placeholder="예: 10000 (만원 단위로 입력)"
+                      data-testid="input-dashboard-execution-amount"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      만원
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">집행일</Label>
                   <Input
-                    type="number"
-                    min="0"
-                    value={statusChangeModal.executionAmount || ''}
+                    type="date"
+                    value={statusChangeModal.executionDate || ''}
                     onChange={(e) =>
                       setStatusChangeModal(prev => ({
                         ...prev,
-                        executionAmount: parseFloat(e.target.value) || 0,
+                        executionDate: e.target.value,
                       }))
                     }
-                    className="pr-12"
-                    placeholder="예: 10000 (만원 단위로 입력)"
-                    data-testid="input-dashboard-execution-amount"
+                    data-testid="input-dashboard-execution-date"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                    만원
-                  </span>
                 </div>
-              </div>
+              </>
             )}
           </div>
 
