@@ -50,57 +50,57 @@ export const ALL_STATUS_VALUES = [
   "최종부결",
 ] as const;
 
-// 상태별 스타일 정의 (한글 상태명을 키로 사용)
+// 상태별 스타일 정의 (한글 상태명을 키로 사용) - 라이트/다크 모드 지원
 export const STATUS_STYLES: Record<string, { bg: string; text: string; border?: string }> = {
   // 상담대기 - 보라색
-  "상담대기": { bg: "bg-purple-500/20", text: "text-purple-300", border: "border-purple-500/30" },
+  "상담대기": { bg: "bg-purple-500/20", text: "text-purple-700 dark:text-purple-300", border: "border-purple-500/30" },
   
   // 부재 - 주황색/노란색
-  "단기부재": { bg: "bg-orange-500/20", text: "text-orange-300", border: "border-orange-500/30" },
-  "장기부재": { bg: "bg-amber-500/20", text: "text-amber-300", border: "border-amber-500/30" },
+  "단기부재": { bg: "bg-orange-500/20", text: "text-orange-700 dark:text-orange-300", border: "border-orange-500/30" },
+  "장기부재": { bg: "bg-amber-500/20", text: "text-amber-700 dark:text-amber-300", border: "border-amber-500/30" },
   
   // 쓰레기통/거절류 - 빨간색/로즈
-  "쓰레기통": { bg: "bg-red-500/20", text: "text-red-300", border: "border-red-500/30" },
-  "거절사유 미파악": { bg: "bg-rose-500/20", text: "text-rose-300", border: "border-rose-500/30" },
-  "인증불가": { bg: "bg-red-500/20", text: "text-red-300", border: "border-red-500/30" },
-  "정부기관 오인": { bg: "bg-rose-500/20", text: "text-rose-300", border: "border-rose-500/30" },
-  "기타자금 오인": { bg: "bg-red-500/20", text: "text-red-300", border: "border-red-500/30" },
-  "불가업종": { bg: "bg-rose-500/20", text: "text-rose-300", border: "border-rose-500/30" },
-  "매출없음": { bg: "bg-red-500/20", text: "text-red-300", border: "border-red-500/30" },
-  "신용점수 미달": { bg: "bg-rose-500/20", text: "text-rose-300", border: "border-rose-500/30" },
-  "차입금초과": { bg: "bg-red-500/20", text: "text-red-300", border: "border-red-500/30" },
+  "쓰레기통": { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
+  "거절사유 미파악": { bg: "bg-rose-500/20", text: "text-rose-700 dark:text-rose-300", border: "border-rose-500/30" },
+  "인증불가": { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
+  "정부기관 오인": { bg: "bg-rose-500/20", text: "text-rose-700 dark:text-rose-300", border: "border-rose-500/30" },
+  "기타자금 오인": { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
+  "불가업종": { bg: "bg-rose-500/20", text: "text-rose-700 dark:text-rose-300", border: "border-rose-500/30" },
+  "매출없음": { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
+  "신용점수 미달": { bg: "bg-rose-500/20", text: "text-rose-700 dark:text-rose-300", border: "border-rose-500/30" },
+  "차입금초과": { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
   
   // 희망타겟 - 노란색
-  "업력미달": { bg: "bg-yellow-500/20", text: "text-yellow-300", border: "border-yellow-500/30" },
-  "최근대출": { bg: "bg-yellow-500/20", text: "text-yellow-300", border: "border-yellow-500/30" },
-  "인증미동의(국세청)": { bg: "bg-yellow-500/20", text: "text-yellow-300", border: "border-yellow-500/30" },
-  "인증미동의(공여내역)": { bg: "bg-yellow-500/20", text: "text-yellow-300", border: "border-yellow-500/30" },
-  "진행기간 미동의": { bg: "bg-yellow-500/20", text: "text-yellow-300", border: "border-yellow-500/30" },
-  "자문료 미동의": { bg: "bg-yellow-500/20", text: "text-yellow-300", border: "border-yellow-500/30" },
-  "계약금미동의(선불)": { bg: "bg-yellow-500/20", text: "text-yellow-300", border: "border-yellow-500/30" },
-  "계약금미동의(후불)": { bg: "bg-yellow-500/20", text: "text-yellow-300", border: "border-yellow-500/30" },
+  "업력미달": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
+  "최근대출": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
+  "인증미동의(국세청)": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
+  "인증미동의(공여내역)": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
+  "진행기간 미동의": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
+  "자문료 미동의": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
+  "계약금미동의(선불)": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
+  "계약금미동의(후불)": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
   
   // 계약완료 - 초록색/에메랄드
-  "계약완료(선불)": { bg: "bg-emerald-500/20", text: "text-emerald-300", border: "border-emerald-500/30" },
-  "계약완료(외주)": { bg: "bg-green-500/20", text: "text-green-300", border: "border-green-500/30" },
-  "계약완료(후불)": { bg: "bg-emerald-500/20", text: "text-emerald-300", border: "border-emerald-500/30" },
+  "계약완료(선불)": { bg: "bg-emerald-500/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-500/30" },
+  "계약완료(외주)": { bg: "bg-green-500/20", text: "text-green-700 dark:text-green-300", border: "border-green-500/30" },
+  "계약완료(후불)": { bg: "bg-emerald-500/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-500/30" },
   
   // 서류취합 - 파란색
-  "서류취합완료(선불)": { bg: "bg-blue-500/20", text: "text-blue-300", border: "border-blue-500/30" },
-  "서류취합완료(외주)": { bg: "bg-sky-500/20", text: "text-sky-300", border: "border-sky-500/30" },
-  "서류취합완료(후불)": { bg: "bg-blue-500/20", text: "text-blue-300", border: "border-blue-500/30" },
+  "서류취합완료(선불)": { bg: "bg-blue-500/20", text: "text-blue-700 dark:text-blue-300", border: "border-blue-500/30" },
+  "서류취합완료(외주)": { bg: "bg-sky-500/20", text: "text-sky-700 dark:text-sky-300", border: "border-sky-500/30" },
+  "서류취합완료(후불)": { bg: "bg-blue-500/20", text: "text-blue-700 dark:text-blue-300", border: "border-blue-500/30" },
   
   // 신청완료 - 인디고
-  "신청완료(선불)": { bg: "bg-indigo-500/20", text: "text-indigo-300", border: "border-indigo-500/30" },
-  "신청완료(외주)": { bg: "bg-violet-500/20", text: "text-violet-300", border: "border-violet-500/30" },
-  "신청완료(후불)": { bg: "bg-indigo-500/20", text: "text-indigo-300", border: "border-indigo-500/30" },
+  "신청완료(선불)": { bg: "bg-indigo-500/20", text: "text-indigo-700 dark:text-indigo-300", border: "border-indigo-500/30" },
+  "신청완료(외주)": { bg: "bg-violet-500/20", text: "text-violet-700 dark:text-violet-300", border: "border-violet-500/30" },
+  "신청완료(후불)": { bg: "bg-indigo-500/20", text: "text-indigo-700 dark:text-indigo-300", border: "border-indigo-500/30" },
   
   // 집행완료 - 청록색/티일
-  "집행완료": { bg: "bg-teal-500/20", text: "text-teal-300", border: "border-teal-500/30" },
-  "집행완료(외주)": { bg: "bg-cyan-500/20", text: "text-cyan-300", border: "border-cyan-500/30" },
+  "집행완료": { bg: "bg-teal-500/20", text: "text-teal-700 dark:text-teal-300", border: "border-teal-500/30" },
+  "집행완료(외주)": { bg: "bg-cyan-500/20", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-500/30" },
   
   // 최종부결 - 진한 빨간색
-  "최종부결": { bg: "bg-red-700/20", text: "text-red-400", border: "border-red-700/30" },
+  "최종부결": { bg: "bg-red-700/20", text: "text-red-800 dark:text-red-400", border: "border-red-700/30" },
 };
 
 // 상태 옵션 (드롭다운용) - value와 label 모두 한글
@@ -285,5 +285,5 @@ export const DEFAULT_STATUS = "상담대기";
 
 // 상태 스타일 가져오기 헬퍼
 export function getStatusStyle(status: string): { bg: string; text: string; border?: string } {
-  return STATUS_STYLES[status] || { bg: "bg-gray-500/20", text: "text-gray-300", border: "border-gray-500/30" };
+  return STATUS_STYLES[status] || { bg: "bg-gray-500/20", text: "text-gray-700 dark:text-gray-300", border: "border-gray-500/30" };
 }
