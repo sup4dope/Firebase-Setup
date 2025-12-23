@@ -20,18 +20,19 @@ export function KPIWidgets({ kpi, compact = false }: KPIWidgetsProps) {
     ? Math.round((kpi.businessDaysElapsed / kpi.totalBusinessDays) * 100)
     : 0;
 
-  // Compact 모드 (대시보드 상단)
+  // Compact 모드 (대시보드 상단 2×2 그리드)
   if (compact) {
     return (
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="grid grid-cols-2 gap-2 w-full">
+        {/* Row 1: 계약률, 영업일 */}
         {/* 계약률 */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-700">
-          <div className="w-8 h-8 bg-blue-600/20 rounded-md flex items-center justify-center">
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-800/60 rounded-lg border border-gray-700">
+          <div className="w-8 h-8 bg-blue-600/20 rounded-md flex items-center justify-center flex-shrink-0">
             <FileText className="w-4 h-4 text-blue-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-gray-400">계약률</p>
-            <p className="text-sm font-bold text-gray-100" data-testid="text-kpi-compact-contract-rate">
+            <p className="text-sm font-bold text-gray-100 truncate" data-testid="text-kpi-compact-contract-rate">
               {kpi.contractCount}/{kpi.totalCounselingCount}건
               <span className="text-xs font-normal text-blue-400 ml-1">
                 {kpi.contractRate}%
@@ -40,44 +41,45 @@ export function KPIWidgets({ kpi, compact = false }: KPIWidgetsProps) {
           </div>
         </div>
 
+        {/* 영업일 */}
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-800/60 rounded-lg border border-gray-700">
+          <div className="w-8 h-8 bg-purple-600/20 rounded-md flex items-center justify-center flex-shrink-0">
+            <Calendar className="w-4 h-4 text-purple-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-gray-400">영업일</p>
+            <p className="text-sm font-bold text-gray-100 truncate" data-testid="text-kpi-compact-days">
+              {kpi.businessDaysElapsed}/{kpi.totalBusinessDays}일
+              <span className="text-xs font-normal text-purple-400 ml-1">
+                {progressPercentage}%
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Row 2: 당월 매출, 예상 매출 */}
         {/* 당월 매출 */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-700">
-          <div className="w-8 h-8 bg-emerald-600/20 rounded-md flex items-center justify-center">
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-800/60 rounded-lg border border-gray-700">
+          <div className="w-8 h-8 bg-emerald-600/20 rounded-md flex items-center justify-center flex-shrink-0">
             <DollarSign className="w-4 h-4 text-emerald-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-gray-400">당월 매출</p>
-            <p className="text-sm font-bold text-gray-100" data-testid="text-kpi-compact-monthly-revenue">
+            <p className="text-sm font-bold text-gray-100 truncate" data-testid="text-kpi-compact-monthly-revenue">
               {formatAmount(kpi.monthlyRevenue)}
             </p>
           </div>
         </div>
 
         {/* 예상 매출 */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-700">
-          <div className="w-8 h-8 bg-amber-600/20 rounded-md flex items-center justify-center">
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-800/60 rounded-lg border border-gray-700">
+          <div className="w-8 h-8 bg-amber-600/20 rounded-md flex items-center justify-center flex-shrink-0">
             <TrendingUp className="w-4 h-4 text-amber-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-gray-400">예상 매출</p>
-            <p className="text-sm font-bold text-gray-100" data-testid="text-kpi-compact-expected-revenue">
+            <p className="text-sm font-bold text-gray-100 truncate" data-testid="text-kpi-compact-expected-revenue">
               {formatAmount(kpi.expectedRevenue)}
-            </p>
-          </div>
-        </div>
-
-        {/* 영업일 */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-700">
-          <div className="w-8 h-8 bg-purple-600/20 rounded-md flex items-center justify-center">
-            <Calendar className="w-4 h-4 text-purple-400" />
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">영업일</p>
-            <p className="text-sm font-bold text-gray-100" data-testid="text-kpi-compact-days">
-              {kpi.businessDaysElapsed}/{kpi.totalBusinessDays}일
-              <span className="text-xs font-normal text-purple-400 ml-1">
-                {progressPercentage}%
-              </span>
             </p>
           </div>
         </div>
