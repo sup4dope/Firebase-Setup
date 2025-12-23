@@ -27,7 +27,12 @@ import {
   updateCustomerStatus,
   updateCustomerInfo,
 } from '@/lib/firestore';
-import { Plus, Search, RefreshCw } from 'lucide-react';
+import { Plus, Search, RefreshCw, CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
 import { FUNNEL_GROUPS } from '@/lib/constants';
@@ -50,6 +55,14 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  
+  // 필터 상태 (Stats 페이지와 동일)
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  });
+  const [selectedTeam, setSelectedTeam] = useState<string>('all');
+  const [selectedStaff, setSelectedStaff] = useState<string>('all');
 
   // Form states
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
@@ -142,9 +155,52 @@ export default function Dashboard() {
     return calculateKPI(customers, statusLogs, holidays);
   }, [customers, statusLogs, holidays]);
 
+  // 유효한 팀 목록 (id가 존재하는 팀만)
+  const validTeams = useMemo(() => {
+    return teams.filter(t => t.id && t.id.trim() !== '');
+  }, [teams]);
+
+  // 유효한 직원 목록 (uid가 존재하는 직원만)
+  const filteredStaffOptions = useMemo(() => {
+    let filtered = users.filter(u => u.uid && u.uid.trim() !== '');
+    if (selectedTeam === 'all') {
+      return filtered.filter(u => u.role !== 'super_admin' || isSuperAdmin);
+    }
+    return filtered.filter(u => u.team_id === selectedTeam);
+  }, [users, selectedTeam, isSuperAdmin]);
+
+  // 필터 리셋
+  const resetFilters = () => {
+    setDateRange({ from: undefined, to: undefined });
+    setSelectedTeam('all');
+    setSelectedStaff('all');
+    setSearchQuery('');
+  };
+
   // Filter customers (한글 상태명 기반)
   const filteredCustomers = useMemo(() => {
     let result = customers;
+
+    // Filter by date range (접수일자)
+    if (dateRange.from && dateRange.to) {
+      result = result.filter(c => {
+        const entryDate = parseISO(c.entry_date);
+        return isWithinInterval(entryDate, { 
+          start: startOfDay(dateRange.from!), 
+          end: endOfDay(dateRange.to!) 
+        });
+      });
+    }
+
+    // Filter by team/staff (super_admin only)
+    if (isSuperAdmin) {
+      if (selectedTeam !== 'all') {
+        result = result.filter(c => c.team_id === selectedTeam);
+      }
+      if (selectedStaff !== 'all') {
+        result = result.filter(c => c.manager_id === selectedStaff);
+      }
+    }
 
     // Filter by stage using FUNNEL_GROUPS
     if (selectedStage) {
@@ -169,7 +225,7 @@ export default function Dashboard() {
     }
 
     return result;
-  }, [customers, selectedStage, searchQuery]);
+  }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, isSuperAdmin]);
 
   // Handlers
   const handleCreateCustomer = async (data: InsertCustomer & { manager_name?: string; team_name?: string }) => {
@@ -654,8 +710,87 @@ export default function Dashboard() {
             <KPIWidgets kpi={kpi} compact />
           </div>
           
-          {/* Right: Search & Actions */}
+          {/* Right: Search & Filters & Actions */}
           <div className="flex items-center gap-3 flex-wrap">
+            {/* 접수일자 필터 */}
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">접수일자</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "justify-start text-left font-normal min-w-[180px] bg-gray-800 border-gray-700",
+                      !dateRange.from && "text-muted-foreground"
+                    )}
+                    data-testid="button-date-range-dashboard"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, 'yy.MM.dd')} - {format(dateRange.to, 'yy.MM.dd')}
+                        </>
+                      ) : (
+                        format(dateRange.from, 'yy.MM.dd')
+                      )
+                    ) : (
+                      <span>전체 기간</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="range"
+                    selected={{ from: dateRange.from, to: dateRange.to }}
+                    onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                    numberOfMonths={2}
+                    locale={ko}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* 소속팀/담당자 필터 (super_admin만) */}
+            {isSuperAdmin && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground whitespace-nowrap">소속팀</Label>
+                  <Select value={selectedTeam || 'all'} onValueChange={setSelectedTeam}>
+                    <SelectTrigger className="w-[120px] bg-gray-800 border-gray-700" data-testid="select-team-dashboard">
+                      <SelectValue placeholder="전체 팀" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 팀</SelectItem>
+                      {validTeams.map(team => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.team_name || team.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground whitespace-nowrap">담당자</Label>
+                  <Select value={selectedStaff || 'all'} onValueChange={setSelectedStaff}>
+                    <SelectTrigger className="w-[120px] bg-gray-800 border-gray-700" data-testid="select-staff-dashboard">
+                      <SelectValue placeholder="전체 직원" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 직원</SelectItem>
+                      {filteredStaffOptions.map(staff => (
+                        <SelectItem key={staff.uid} value={staff.uid}>
+                          {staff.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {/* 검색창 */}
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -666,15 +801,18 @@ export default function Dashboard() {
                 data-testid="input-search"
               />
             </div>
+            
+            {/* 필터 리셋 버튼 */}
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              onClick={fetchData}
+              onClick={resetFilters}
               className="border-gray-700"
-              data-testid="button-refresh"
+              data-testid="button-reset-filters-dashboard"
             >
               <RefreshCw className="w-4 h-4" />
             </Button>
+            
             <Button onClick={handleNewCustomerModal} data-testid="button-add-customer">
               <Plus className="w-4 h-4 mr-2" />
               고객 추가
