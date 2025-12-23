@@ -161,36 +161,43 @@ export default function Stats() {
     return filtered;
   }, [customers, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader, user]);
 
-  // 부정데이터 그룹화 로직 (rejection_reason 필드 기반)
+  // 부정데이터 그룹화 로직 (status_code 기반 - 거절 사유가 status_code에 직접 저장됨)
   const negativeDataAnalysis = useMemo(() => {
-    // 디버깅 로그
-    console.log('[부정데이터] 전체 고객 수:', filteredCustomers.length);
-    console.log('[부정데이터] 거절사유 보유 고객:', filteredCustomers.filter(c => c.rejection_reason).length);
-    console.log('[부정데이터] 거절사유 샘플:', filteredCustomers.filter(c => c.rejection_reason).slice(0, 5).map(c => ({ id: c.id, reason: c.rejection_reason })));
+    // 그룹별 상태 코드 매핑 (정확한 문자열 일치)
+    const GROUP_A_STATUSES = ['거절사유 미파악', '정부기관 오인'];
+    const GROUP_B_STATUSES = ['인증미동의(국세청)', '인증미동의(공여내역)', '진행기간 미동의', '진행기간미동의', '자문료 미동의', '자문료미동의', '계약금미동의(선불)', '계약금미동의(후불)'];
+    const GROUP_C_STATUSES = ['단기부재', '장기부재'];
+    const GROUP_D_STATUSES = ['인증불가', '불가업종', '매출없음', '신용점수 미달', '신용점수미달', '차입금초과', '업력미달', '최근대출', '기타자금 오인'];
+    
+    // 모든 부정 상태 목록
+    const ALL_NEGATIVE_STATUSES = [...GROUP_A_STATUSES, ...GROUP_B_STATUSES, ...GROUP_C_STATUSES, ...GROUP_D_STATUSES];
 
-    // 그룹 매핑 키워드 (부분 일치 사용)
-    const GROUP_A_KEYWORDS = ['거절사유 미파악', '정부기관 오인', '미파악', '정부기관'];
-    const GROUP_B_KEYWORDS = ['인증미동의', '진행기간미동의', '자문료미동의', '계약금미동의'];
-    const GROUP_C_KEYWORDS = ['단기부재', '장기부재', '부재'];
-    const GROUP_D_KEYWORDS = ['인증불가', '불가업종', '매출없음', '신용점수미달', '차입금초과', '업력미달', '최근대출', '기타자금 오인', '기타자금'];
-
-    // rejection_reason으로 그룹 분류 (부분 일치 방식 - includes 사용)
-    const getGroup = (reason: string): 'A' | 'B' | 'C' | 'D' => {
-      const normalizedReason = reason.trim();
-      // Group D 먼저 체크 (불가피)
-      if (GROUP_D_KEYWORDS.some(keyword => normalizedReason.includes(keyword))) return 'D';
-      // Group C 체크 (단순 누수)
-      if (GROUP_C_KEYWORDS.some(keyword => normalizedReason.includes(keyword))) return 'C';
-      // Group B 체크 (설득 실패)
-      if (GROUP_B_KEYWORDS.some(keyword => normalizedReason.includes(keyword))) return 'B';
-      // Group A 체크 (스킬 부족) 또는 기본값
-      if (GROUP_A_KEYWORDS.some(keyword => normalizedReason.includes(keyword))) return 'A';
-      // 예외 처리: 목록에 없거나 비어있으면 Group A (거절사유 미파악)
-      return 'A';
+    // status_code로 그룹 분류 (정확한 문자열 일치 + 부분 일치 폴백)
+    const getGroup = (statusCode: string): 'A' | 'B' | 'C' | 'D' | null => {
+      const normalized = statusCode.trim();
+      // 정확한 일치 먼저 확인
+      if (GROUP_A_STATUSES.includes(normalized)) return 'A';
+      if (GROUP_B_STATUSES.includes(normalized)) return 'B';
+      if (GROUP_C_STATUSES.includes(normalized)) return 'C';
+      if (GROUP_D_STATUSES.includes(normalized)) return 'D';
+      // 부분 일치 폴백 (공백 차이 등 대응)
+      if (GROUP_A_STATUSES.some(s => normalized.includes(s) || s.includes(normalized))) return 'A';
+      if (GROUP_B_STATUSES.some(s => normalized.includes(s) || s.includes(normalized))) return 'B';
+      if (GROUP_C_STATUSES.some(s => normalized.includes(s) || s.includes(normalized))) return 'C';
+      if (GROUP_D_STATUSES.some(s => normalized.includes(s) || s.includes(normalized))) return 'D';
+      return null; // 부정 데이터가 아님
     };
 
-    // rejection_reason 필드에 값이 있는 모든 고객 필터링 (status_code 체크 안함)
-    const negativeCustomers = filteredCustomers.filter(c => c.rejection_reason && c.rejection_reason.trim() !== '');
+    // status_code가 부정 상태인 고객만 필터링
+    const negativeCustomers = filteredCustomers.filter(c => {
+      const group = getGroup(c.status_code);
+      return group !== null;
+    });
+
+    // 디버깅 로그
+    console.log('[부정데이터] 전체 고객 수:', filteredCustomers.length);
+    console.log('[부정데이터] 부정 상태 고객 수:', negativeCustomers.length);
+    console.log('[부정데이터] 부정 고객 샘플:', negativeCustomers.slice(0, 5).map(c => ({ id: c.id, status: c.status_code })));
 
     // 담당자별 그룹 카운트
     const managerStats: Record<string, { name: string; A: number; B: number; C: number; D: number; total: number }> = {};
@@ -198,8 +205,9 @@ export default function Stats() {
     const reasonCounts: Record<string, number> = {};
 
     negativeCustomers.forEach(customer => {
-      const reason = (customer.rejection_reason || '').trim();
-      const group = getGroup(reason);
+      const statusCode = customer.status_code.trim();
+      const group = getGroup(statusCode);
+      if (!group) return; // 부정 데이터가 아니면 스킵
 
       // 담당자 통계
       const managerId = customer.manager_id || 'unknown';
@@ -210,9 +218,8 @@ export default function Stats() {
       managerStats[managerId].total += 1;
       managerStats[managerId][group] += 1;
 
-      // 사유별 통계
-      const displayReason = reason || '거절사유 미파악';
-      reasonCounts[displayReason] = (reasonCounts[displayReason] || 0) + 1;
+      // 사유별 통계 (status_code 사용)
+      reasonCounts[statusCode] = (reasonCounts[statusCode] || 0) + 1;
     });
 
     // Page 1: Stacked Bar Data (담당자별 A, B, C 비중 %)
