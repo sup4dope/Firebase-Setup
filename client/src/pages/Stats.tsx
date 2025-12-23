@@ -846,7 +846,10 @@ export default function Stats() {
                                   backgroundColor: 'hsl(var(--card))',
                                   border: '1px solid hsl(var(--border))',
                                   borderRadius: '8px',
+                                  color: 'hsl(var(--card-foreground))',
                                 }}
+                                labelStyle={{ color: 'hsl(var(--card-foreground))' }}
+                                itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                                 formatter={(value: number) => [`${value}건`, '발생 건수']}
                               />
                             </PieChart>
