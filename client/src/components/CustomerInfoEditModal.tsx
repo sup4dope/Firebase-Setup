@@ -84,15 +84,13 @@ export function CustomerInfoEditModal({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="commission_rate">자문료율 (%)</Label>
+            <Label htmlFor="contract_date">계약일</Label>
             <Input
-              id="commission_rate"
-              type="number"
-              step="0.1"
-              value={commissionRate}
-              onChange={(e) => setCommissionRate(e.target.value)}
-              placeholder="예: 3.5"
-              data-testid="input-commission-rate"
+              id="contract_date"
+              type="date"
+              value={contractDate}
+              onChange={(e) => setContractDate(e.target.value)}
+              data-testid="input-contract-date"
             />
           </div>
           
@@ -109,25 +107,15 @@ export function CustomerInfoEditModal({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="execution_amount">집행금액 (만원)</Label>
+            <Label htmlFor="commission_rate">자문료율 (%)</Label>
             <Input
-              id="execution_amount"
+              id="commission_rate"
               type="number"
-              value={executionAmount}
-              onChange={(e) => setExecutionAmount(e.target.value)}
-              placeholder="예: 10000"
-              data-testid="input-execution-amount"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="contract_date">계약일</Label>
-            <Input
-              id="contract_date"
-              type="date"
-              value={contractDate}
-              onChange={(e) => setContractDate(e.target.value)}
-              data-testid="input-contract-date"
+              step="0.1"
+              value={commissionRate}
+              onChange={(e) => setCommissionRate(e.target.value)}
+              placeholder="예: 3.5"
+              data-testid="input-commission-rate"
             />
           </div>
           
@@ -139,6 +127,18 @@ export function CustomerInfoEditModal({
               value={executionDate}
               onChange={(e) => setExecutionDate(e.target.value)}
               data-testid="input-execution-date"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="execution_amount">집행금액 (만원)</Label>
+            <Input
+              id="execution_amount"
+              type="number"
+              value={executionAmount}
+              onChange={(e) => setExecutionAmount(e.target.value)}
+              placeholder="예: 10000"
+              data-testid="input-execution-amount"
             />
           </div>
         </div>
