@@ -839,9 +839,11 @@ export default function Stats() {
                                       border: '1px solid hsl(var(--border))',
                                       borderRadius: '8px',
                                     }}
-                                    formatter={(value: number, name: string) => {
+                                    formatter={(value: number, name: string, props: any) => {
                                       const label = name === 'A' ? '스킬부족' : name === 'B' ? '설득실패' : '관리누수';
-                                      return [`${value}건`, label];
+                                      const total = props.payload.total || 1;
+                                      const percent = Math.round((value / total) * 100);
+                                      return [`${value}건 (${percent}%)`, label];
                                     }}
                                   />
                                   <Legend 
