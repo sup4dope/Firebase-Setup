@@ -767,46 +767,50 @@ export default function Stats() {
                             데이터가 없습니다
                           </div>
                         ) : (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={negativeDataAnalysis.stackedBarData} layout="horizontal">
-                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                              <XAxis 
-                                dataKey="name" 
-                                stroke="hsl(var(--muted-foreground))" 
-                                fontSize={11}
-                                angle={-30}
-                                textAnchor="end"
-                                height={50}
-                              />
-                              <YAxis 
-                                stroke="hsl(var(--muted-foreground))" 
-                                fontSize={12}
-                                tickFormatter={(v) => `${v}%`}
-                                domain={[0, 100]}
-                              />
-                              <Tooltip 
-                                contentStyle={{ 
-                                  backgroundColor: 'hsl(var(--card))',
-                                  border: '1px solid hsl(var(--border))',
-                                  borderRadius: '8px',
-                                }}
-                                formatter={(value: number, name: string, props: any) => {
-                                  const count = name === '스킬부족' ? props.payload.A 
-                                    : name === '설득실패' ? props.payload.B 
-                                    : props.payload.C;
-                                  return [`${value}% (${count}건)`, name];
-                                }}
-                              />
-                              <Legend />
-                              <Bar dataKey="스킬부족" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} activeBar={false} />
-                              <Bar dataKey="설득실패" stackId="a" fill="#f97316" radius={[0, 0, 0, 0]} activeBar={false} />
-                              <Bar dataKey="관리누수" stackId="a" fill="#eab308" radius={[4, 4, 0, 0]} activeBar={false} />
-                            </BarChart>
-                          </ResponsiveContainer>
+                          <div className="flex flex-col h-full">
+                            <div className="flex-1">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={negativeDataAnalysis.stackedBarData} layout="horizontal" margin={{ bottom: 10 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                                  <XAxis 
+                                    dataKey="name" 
+                                    stroke="hsl(var(--muted-foreground))" 
+                                    fontSize={11}
+                                    angle={-30}
+                                    textAnchor="end"
+                                    height={50}
+                                  />
+                                  <YAxis 
+                                    stroke="hsl(var(--muted-foreground))" 
+                                    fontSize={12}
+                                    tickFormatter={(v) => `${v}%`}
+                                    domain={[0, 100]}
+                                  />
+                                  <Tooltip 
+                                    contentStyle={{ 
+                                      backgroundColor: 'hsl(var(--card))',
+                                      border: '1px solid hsl(var(--border))',
+                                      borderRadius: '8px',
+                                    }}
+                                    formatter={(value: number, name: string, props: any) => {
+                                      const count = name === '스킬부족' ? props.payload.A 
+                                        : name === '설득실패' ? props.payload.B 
+                                        : props.payload.C;
+                                      return [`${value}% (${count}건)`, name];
+                                    }}
+                                  />
+                                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                  <Bar dataKey="스킬부족" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} activeBar={false} />
+                                  <Bar dataKey="설득실패" stackId="a" fill="#f97316" radius={[0, 0, 0, 0]} activeBar={false} />
+                                  <Bar dataKey="관리누수" stackId="a" fill="#eab308" radius={[4, 4, 0, 0]} activeBar={false} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                            <p className="text-center text-xs text-muted-foreground mt-1">
+                              담당자별 상담 실패 비중 (A: 스킬부족, B: 설득실패, C: 관리누수)
+                            </p>
+                          </div>
                         )}
-                        <p className="absolute bottom-0 left-0 right-0 text-center text-xs text-muted-foreground">
-                          담당자별 상담 실패 비중 (A: 스킬부족, B: 설득실패, C: 관리누수)
-                        </p>
                       </motion.div>
                     )}
 
