@@ -995,34 +995,22 @@ export default function Dashboard() {
           </DialogHeader>
           
           <div className="space-y-4 mt-4">
-            {/* 계약완료: 자문료, 계약금 */}
+            {/* 계약완료: 계약일, 계약금액, 자문료 */}
             {statusChangeModal.targetStatus.includes('계약완료') && (
               <>
                 <div className="space-y-2">
-                  <Label className="text-sm">
-                    자문료 (%) <span className="text-muted-foreground text-xs">(단위: %)</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={statusChangeModal.commissionRate || ''}
-                      onChange={(e) =>
-                        setStatusChangeModal(prev => ({
-                          ...prev,
-                          commissionRate: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                      className="pr-8"
-                      placeholder="예: 3.5"
-                      data-testid="input-dashboard-commission-rate"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                      %
-                    </span>
-                  </div>
+                  <Label className="text-sm">계약일</Label>
+                  <Input
+                    type="date"
+                    value={statusChangeModal.contractDate || format(new Date(), 'yyyy-MM-dd')}
+                    onChange={(e) =>
+                      setStatusChangeModal(prev => ({
+                        ...prev,
+                        contractDate: e.target.value,
+                      }))
+                    }
+                    data-testid="input-dashboard-contract-date"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm">
@@ -1049,18 +1037,30 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm">계약일</Label>
-                  <Input
-                    type="date"
-                    value={statusChangeModal.contractDate || format(new Date(), 'yyyy-MM-dd')}
-                    onChange={(e) =>
-                      setStatusChangeModal(prev => ({
-                        ...prev,
-                        contractDate: e.target.value,
-                      }))
-                    }
-                    data-testid="input-dashboard-contract-date"
-                  />
+                  <Label className="text-sm">
+                    자문료 (%) <span className="text-muted-foreground text-xs">(단위: %)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={statusChangeModal.commissionRate || ''}
+                      onChange={(e) =>
+                        setStatusChangeModal(prev => ({
+                          ...prev,
+                          commissionRate: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      className="pr-8"
+                      placeholder="예: 3.5"
+                      data-testid="input-dashboard-commission-rate"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      %
+                    </span>
+                  </div>
                 </div>
               </>
             )}
