@@ -901,7 +901,10 @@ export default function Stats() {
                                   backgroundColor: 'hsl(var(--card))',
                                   border: '1px solid hsl(var(--border))',
                                   borderRadius: '8px',
+                                  color: 'hsl(var(--card-foreground))',
                                 }}
+                                labelStyle={{ color: 'hsl(var(--card-foreground))' }}
+                                itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                                 formatter={(value: number, name: string) => {
                                   if (name === '불가피율') return [`${value}%`, 'DB 품질 (불가피)'];
                                   if (name === '실패율') return [`${value}%`, '상담 역량 실패'];
