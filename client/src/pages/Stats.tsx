@@ -283,7 +283,14 @@ export default function Stats() {
         total: s.total,
       }));
 
-    return { stackedBarData, pieData, scatterData };
+    // Scatter 차트용 평균 계산
+    const totalD = Object.values(managerStats).reduce((sum, s) => sum + s.D, 0);
+    const totalAB = Object.values(managerStats).reduce((sum, s) => sum + s.A + s.B, 0);
+    const totalAll = Object.values(managerStats).reduce((sum, s) => sum + s.total, 0);
+    const avgX = totalAll > 0 ? Math.round((totalD / totalAll) * 100) : 0;
+    const avgY = totalAll > 0 ? Math.round((totalAB / totalAll) * 100) : 0;
+
+    return { stackedBarData, pieData, scatterData, scatterAvg: { avgX, avgY } };
   }, [filteredCustomers]);
 
   const customerIdsWithContractHistory = useMemo(() => {
@@ -944,6 +951,18 @@ export default function Stats() {
                                 label={{ value: '상담 역량 실패율', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } }}
                               />
                               <ZAxis type="number" dataKey="total" range={[50, 400]} name="총 건수" />
+                              <ReferenceLine 
+                                x={negativeDataAnalysis.scatterAvg.avgX} 
+                                stroke="#94a3b8" 
+                                strokeDasharray="5 5" 
+                                label={{ value: `평균 X: ${negativeDataAnalysis.scatterAvg.avgX}%`, position: 'top', fill: '#94a3b8', fontSize: 10 }}
+                              />
+                              <ReferenceLine 
+                                y={negativeDataAnalysis.scatterAvg.avgY} 
+                                stroke="#94a3b8" 
+                                strokeDasharray="5 5" 
+                                label={{ value: `평균 Y: ${negativeDataAnalysis.scatterAvg.avgY}%`, position: 'right', fill: '#94a3b8', fontSize: 10 }}
+                              />
                               <Tooltip 
                                 content={({ active, payload }) => {
                                   if (active && payload && payload.length > 0) {
