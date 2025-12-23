@@ -798,9 +798,9 @@ export default function Stats() {
                                 }}
                               />
                               <Legend />
-                              <Bar dataKey="스킬부족" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
-                              <Bar dataKey="설득실패" stackId="a" fill="#f97316" radius={[0, 0, 0, 0]} />
-                              <Bar dataKey="관리누수" stackId="a" fill="#eab308" radius={[4, 4, 0, 0]} />
+                              <Bar dataKey="스킬부족" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} activeBar={false} />
+                              <Bar dataKey="설득실패" stackId="a" fill="#f97316" radius={[0, 0, 0, 0]} activeBar={false} />
+                              <Bar dataKey="관리누수" stackId="a" fill="#eab308" radius={[4, 4, 0, 0]} activeBar={false} />
                             </BarChart>
                           </ResponsiveContainer>
                         )}
