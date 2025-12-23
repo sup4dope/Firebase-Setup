@@ -267,6 +267,7 @@ export function CustomerDetailModal({
     targetStatus: string;
     commissionRate: number;
     contractAmount: number;
+    contractDate: string;
     executionAmount: number;
     executionDate: string;
     processingOrg: string;
@@ -275,6 +276,7 @@ export function CustomerDetailModal({
     targetStatus: "",
     commissionRate: 0,
     contractAmount: 0,
+    contractDate: new Date().toISOString().split('T')[0],
     executionAmount: 0,
     executionDate: new Date().toISOString().split('T')[0],
     processingOrg: "미등록",
@@ -2406,32 +2408,23 @@ export function CustomerDetailModal({
           </DialogTitle>
 
           <div className="space-y-4">
-            {/* 계약완료 상태: 자문료%, 계약금 */}
+            {/* 계약완료 상태: 계약일, 계약금, 자문료 */}
             {statusChangeModal.targetStatus.includes("계약완료") && (
               <>
                 <div>
-                  <Label className="text-muted-foreground text-sm">자문료 (%)</Label>
-                  <div className="relative mt-1">
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      value={statusChangeModal.commissionRate || ""}
-                      onChange={(e) =>
-                        setStatusChangeModal((prev) => ({
-                          ...prev,
-                          commissionRate: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                      className="bg-muted border-border text-foreground pr-8"
-                      placeholder="예: 10.5"
-                      data-testid="input-status-commission-rate"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                      %
-                    </span>
-                  </div>
+                  <Label className="text-muted-foreground text-sm">계약일</Label>
+                  <Input
+                    type="date"
+                    value={statusChangeModal.contractDate || ""}
+                    onChange={(e) =>
+                      setStatusChangeModal((prev) => ({
+                        ...prev,
+                        contractDate: e.target.value,
+                      }))
+                    }
+                    className="mt-1 bg-muted border-border text-foreground"
+                    data-testid="input-status-contract-date"
+                  />
                 </div>
                 <div>
                   <Label className="text-muted-foreground text-sm">
@@ -2454,6 +2447,30 @@ export function CustomerDetailModal({
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                       만원
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-sm">자문료 (%)</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={statusChangeModal.commissionRate || ""}
+                      onChange={(e) =>
+                        setStatusChangeModal((prev) => ({
+                          ...prev,
+                          commissionRate: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      className="bg-muted border-border text-foreground pr-8"
+                      placeholder="예: 10.5"
+                      data-testid="input-status-commission-rate"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      %
                     </span>
                   </div>
                 </div>
@@ -2562,6 +2579,9 @@ export function CustomerDetailModal({
                   }
                   if (statusChangeModal.contractAmount > 0) {
                     updateData.contract_amount = statusChangeModal.contractAmount;
+                  }
+                  if (statusChangeModal.contractDate) {
+                    updateData.contract_date = statusChangeModal.contractDate;
                   }
                 }
                 if (statusChangeModal.targetStatus.includes("신청완료")) {
