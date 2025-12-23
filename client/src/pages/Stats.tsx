@@ -163,18 +163,28 @@ export default function Stats() {
 
   // 부정데이터 그룹화 로직 (rejection_reason 필드 기반)
   const negativeDataAnalysis = useMemo(() => {
-    // 그룹 매핑 (정확한 문자열 일치)
-    const GROUP_A_REASONS = ['거절사유 미파악', '정부기관 오인'];
-    const GROUP_B_REASONS = ['인증미동의(국세청)', '인증미동의(공여내역)', '진행기간미동의', '자문료미동의', '계약금미동의(선불)', '계약금미동의(후불)'];
-    const GROUP_C_REASONS = ['단기부재', '장기부재'];
-    const GROUP_D_REASONS = ['인증불가', '불가업종', '매출없음', '신용점수미달', '차입금초과', '업력미달', '최근대출', '기타자금 오인'];
+    // 디버깅 로그
+    console.log('[부정데이터] 전체 고객 수:', filteredCustomers.length);
+    console.log('[부정데이터] 거절사유 보유 고객:', filteredCustomers.filter(c => c.rejection_reason).length);
+    console.log('[부정데이터] 거절사유 샘플:', filteredCustomers.filter(c => c.rejection_reason).slice(0, 5).map(c => ({ id: c.id, reason: c.rejection_reason })));
 
-    // rejection_reason으로 그룹 분류 (정확한 문자열 일치)
+    // 그룹 매핑 키워드 (부분 일치 사용)
+    const GROUP_A_KEYWORDS = ['거절사유 미파악', '정부기관 오인', '미파악', '정부기관'];
+    const GROUP_B_KEYWORDS = ['인증미동의', '진행기간미동의', '자문료미동의', '계약금미동의'];
+    const GROUP_C_KEYWORDS = ['단기부재', '장기부재', '부재'];
+    const GROUP_D_KEYWORDS = ['인증불가', '불가업종', '매출없음', '신용점수미달', '차입금초과', '업력미달', '최근대출', '기타자금 오인', '기타자금'];
+
+    // rejection_reason으로 그룹 분류 (부분 일치 방식 - includes 사용)
     const getGroup = (reason: string): 'A' | 'B' | 'C' | 'D' => {
-      if (GROUP_A_REASONS.includes(reason)) return 'A';
-      if (GROUP_B_REASONS.includes(reason)) return 'B';
-      if (GROUP_C_REASONS.includes(reason)) return 'C';
-      if (GROUP_D_REASONS.includes(reason)) return 'D';
+      const normalizedReason = reason.trim();
+      // Group D 먼저 체크 (불가피)
+      if (GROUP_D_KEYWORDS.some(keyword => normalizedReason.includes(keyword))) return 'D';
+      // Group C 체크 (단순 누수)
+      if (GROUP_C_KEYWORDS.some(keyword => normalizedReason.includes(keyword))) return 'C';
+      // Group B 체크 (설득 실패)
+      if (GROUP_B_KEYWORDS.some(keyword => normalizedReason.includes(keyword))) return 'B';
+      // Group A 체크 (스킬 부족) 또는 기본값
+      if (GROUP_A_KEYWORDS.some(keyword => normalizedReason.includes(keyword))) return 'A';
       // 예외 처리: 목록에 없거나 비어있으면 Group A (거절사유 미파악)
       return 'A';
     };
@@ -188,7 +198,7 @@ export default function Stats() {
     const reasonCounts: Record<string, number> = {};
 
     negativeCustomers.forEach(customer => {
-      const reason = customer.rejection_reason || '';
+      const reason = (customer.rejection_reason || '').trim();
       const group = getGroup(reason);
 
       // 담당자 통계
