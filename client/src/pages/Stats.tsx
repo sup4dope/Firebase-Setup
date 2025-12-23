@@ -778,9 +778,9 @@ export default function Stats() {
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs text-sm">
                     <div className="space-y-2">
-                      <p><strong className="text-red-500">스킬부족 (A):</strong> 상담 역량 부족으로 실패 (상담중탈락, 상담불발)</p>
-                      <p><strong className="text-orange-500">설득실패 (B):</strong> 고객 설득 실패 (서류미제출, 조건불충족)</p>
-                      <p><strong className="text-yellow-500">관리누수 (C):</strong> 진행 중 관리 미흡 (심사탈락, 대출포기)</p>
+                      <p><strong className="text-red-500">스킬부족 (A):</strong> 상담 기본기 미달로 인한 실패 (정체성의심, 설명 미흡 등)</p>
+                      <p><strong className="text-orange-500">설득실패 (B):</strong> 고객 설득 실패 (비용 미동의, 조건 미동의 등)</p>
+                      <p><strong className="text-yellow-500">관리누수 (C):</strong> 초기 유입 후 부재누수 (부재 등 컨택 실패)</p>
                     </div>
                   </TooltipContent>
                 </ShadTooltip>
