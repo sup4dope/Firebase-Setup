@@ -54,6 +54,13 @@ export const calculateKPI = (
   // 현재 DB에 있는 고객 ID Set (삭제되지 않은 고객만)
   const existingCustomerIds = new Set(customers.map(c => c.id));
   
+  // 해당 월에 유입된 고객 수 (entry_date 기준)
+  const monthlyDbCount = customers.filter(c => {
+    if (!c.entry_date) return false;
+    const entryDate = new Date(c.entry_date);
+    return isSameMonth(entryDate, date);
+  }).length;
+  
   // 계약완료 상태 목록 (한글 상태명)
   const contractStatuses = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
   
@@ -79,9 +86,14 @@ export const calculateKPI = (
   const totalBusinessDays = getBusinessDaysInMonth(date, holidays);
   const businessDaysElapsed = getElapsedBusinessDays(date, holidays);
   
-  // Projected calculations (linear projection)
+  // Projected calculations
+  // 예상계약: 해당 월 DB 총 갯수를 분모로 사용
+  // 예상 총 DB = 현재 DB × (전체영업일 / 경과영업일)
+  // 예상 계약 = (현재계약 / 현재DB) × 예상 총 DB = 현재계약 × ratio (DB 비례 투영)
   const ratio = businessDaysElapsed > 0 ? totalBusinessDays / businessDaysElapsed : 1;
-  const expectedContracts = Math.round(currentContracts * ratio);
+  const expectedMonthlyDb = Math.round(monthlyDbCount * ratio);
+  const contractRate = monthlyDbCount > 0 ? currentContracts / monthlyDbCount : 0;
+  const expectedContracts = Math.round(expectedMonthlyDb * contractRate);
   const expectedRevenue = Math.round(currentRevenue * ratio);
   
   return {
@@ -91,6 +103,8 @@ export const calculateKPI = (
     currentRevenue,
     businessDaysElapsed,
     totalBusinessDays,
+    monthlyDbCount,        // 현재까지 해당 월 DB 갯수
+    expectedMonthlyDb,     // 예상 월말 DB 갯수
   };
 };
 

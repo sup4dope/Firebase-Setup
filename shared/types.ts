@@ -191,6 +191,8 @@ export interface KPIData {
   currentRevenue: number;
   businessDaysElapsed: number;
   totalBusinessDays: number;
+  monthlyDbCount: number;       // 현재까지 해당 월 DB 갯수
+  expectedMonthlyDb: number;    // 예상 월말 DB 갯수
 }
 
 // TodoItem (Firestore: todo_list collection) - 새로운 할 일 시스템

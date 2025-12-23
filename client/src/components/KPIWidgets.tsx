@@ -14,8 +14,9 @@ export function KPIWidgets({ kpi, compact = false }: KPIWidgetsProps) {
     ? Math.round((kpi.businessDaysElapsed / kpi.totalBusinessDays) * 100)
     : 0;
 
-  const contractProgress = kpi.expectedContracts > 0
-    ? Math.round((kpi.currentContracts / kpi.expectedContracts) * 100)
+  // 계약 진행률: 현재 계약 / 월 DB 총량
+  const contractProgress = kpi.monthlyDbCount > 0
+    ? Math.round((kpi.currentContracts / kpi.monthlyDbCount) * 100)
     : 0;
 
   const revenueProgress = kpi.expectedRevenue > 0
@@ -33,7 +34,7 @@ export function KPIWidgets({ kpi, compact = false }: KPIWidgetsProps) {
           <div>
             <p className="text-xs text-gray-400">예상 계약</p>
             <p className="text-sm font-bold text-gray-100" data-testid="text-kpi-compact-contracts">
-              {kpi.currentContracts}/{kpi.expectedContracts}건
+              {kpi.currentContracts}/{kpi.monthlyDbCount}건
               <span className="text-xs font-normal text-emerald-400 ml-1">
                 {contractProgress}%
               </span>
@@ -102,7 +103,7 @@ export function KPIWidgets({ kpi, compact = false }: KPIWidgetsProps) {
             </div>
           </div>
           <p className="text-xs text-gray-500 mt-4">
-            (현재 계약 / 경과 영업일) x 월 전체 영업일
+            (현재 계약 / 월 DB) x 예상 월말 DB ({kpi.monthlyDbCount} → {kpi.expectedMonthlyDb})
           </p>
         </CardContent>
       </Card>
