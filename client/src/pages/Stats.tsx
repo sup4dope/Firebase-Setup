@@ -904,20 +904,26 @@ export default function Stats() {
                               />
                               <ZAxis type="number" dataKey="total" range={[50, 400]} name="총 건수" />
                               <Tooltip 
-                                contentStyle={{ 
-                                  backgroundColor: 'hsl(var(--card))',
-                                  border: '1px solid hsl(var(--border))',
-                                  borderRadius: '8px',
-                                  color: 'hsl(var(--card-foreground))',
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length > 0) {
+                                    const data = payload[0].payload;
+                                    return (
+                                      <div style={{
+                                        backgroundColor: 'hsl(var(--card))',
+                                        border: '1px solid hsl(var(--border))',
+                                        borderRadius: '8px',
+                                        padding: '8px 12px',
+                                        color: 'hsl(var(--card-foreground))',
+                                      }}>
+                                        <p style={{ fontWeight: 'bold', marginBottom: '4px' }}>담당자: {data.name}</p>
+                                        <p>DB 품질 (불가피) : {data.x}%</p>
+                                        <p>상담 역량 실패 : {data.y}%</p>
+                                        <p>총 건수 : {data.total}건</p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
                                 }}
-                                labelStyle={{ color: 'hsl(var(--card-foreground))' }}
-                                itemStyle={{ color: 'hsl(var(--card-foreground))' }}
-                                formatter={(value: number, name: string) => {
-                                  if (name === '불가피율') return [`${value}%`, 'DB 품질 (불가피)'];
-                                  if (name === '실패율') return [`${value}%`, '상담 역량 실패'];
-                                  return [`${value}건`, '총 건수'];
-                                }}
-                                labelFormatter={(label) => `담당자: ${label}`}
                               />
                               <Scatter 
                                 name="담당자" 
