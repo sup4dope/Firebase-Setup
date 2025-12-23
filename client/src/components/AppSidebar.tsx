@@ -216,11 +216,10 @@ export function AppSidebar({
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="font-bold text-sm text-foreground">정책자금 CRM</h1>
-            <p className="text-xs text-muted-foreground">Policy Fund Consulting</p>
+            <p className="text-xs text-muted-foreground">Management Support Group Yieum</p>
           </div>
         </div>
       </SidebarHeader>
-
       <SidebarContent className="flex flex-col">
         <SidebarGroup className="p-3">
           <div className="space-y-2">
@@ -362,9 +361,7 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
       <SidebarSeparator />
-
       <SidebarFooter className="p-4 bg-muted/30 dark:bg-gray-900/30 space-y-3">
         {userRole === 'super_admin' && (
           <Button
@@ -409,14 +406,12 @@ export function AppSidebar({
           </Button>
         </div>
       </SidebarFooter>
-
       {showSystemSettings && (
         <SystemSettingsModal
           isOpen={showSystemSettings}
           onClose={() => setShowSystemSettings(false)}
         />
       )}
-
       <TodoDetailModal
         open={showTodoDetail}
         onOpenChange={setShowTodoDetail}
