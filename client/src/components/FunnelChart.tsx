@@ -148,16 +148,16 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
           className={cn(
             "w-full h-16 rounded-md border-2 transition-all duration-300",
             "flex flex-col items-center justify-center",
-            "bg-slate-900/50 backdrop-blur-sm text-white",
+            "bg-card dark:bg-slate-900/50 backdrop-blur-sm text-foreground dark:text-white",
             theme.border,
-            "hover:shadow-lg hover:bg-slate-800/70",
+            "hover:shadow-lg hover:bg-accent dark:hover:bg-slate-800/70",
             selectedStage === id && "ring-2 ring-primary ring-offset-2 ring-offset-background",
             id === 'all' && selectedStage === null && "ring-2 ring-primary ring-offset-2 ring-offset-background"
           )}
           data-testid={`button-funnel-${id}`}
         >
           <div className="font-bold text-sm">{label}</div>
-          <div className="text-xs text-gray-300">
+          <div className="text-xs text-muted-foreground dark:text-gray-300">
             {count}건 ({getPercentage(count)})
           </div>
         </button>
@@ -170,8 +170,8 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
               "w-6 h-6 rounded-full",
               "flex items-center justify-center",
               "transition-all duration-200",
-              "text-gray-400 hover:text-white",
-              "hover:bg-white/20"
+              "text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white",
+              "hover:bg-accent dark:hover:bg-white/20"
             )}
             data-testid={`button-toggle-${id}`}
           >
@@ -187,7 +187,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
     );
   };
 
-  // 하위 상태 칩 렌더링 (어두운 glassmorphism 배경 + 부모 테마 테두리)
+  // 하위 상태 칩 렌더링 (부모 테마 테두리)
   const renderSubStatus = (sub: { id: string; label: string }, parentTheme: string) => {
     // 최종부결은 빨간색으로 특별 처리
     const isRejection = sub.id === '최종부결';
@@ -203,16 +203,16 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         className={cn(
           "w-full h-10 rounded-md border-l-4 transition-all duration-200",
           "flex items-center justify-between px-3",
-          "bg-slate-900/60 backdrop-blur-sm",
-          isRejection ? "text-red-300" : "text-gray-200",
+          "bg-muted dark:bg-slate-900/60 backdrop-blur-sm",
+          isRejection ? "text-red-600 dark:text-red-300" : "text-foreground dark:text-gray-200",
           theme.accent,
-          "hover:bg-slate-800/80 hover:shadow-md",
+          "hover:bg-accent dark:hover:bg-slate-800/80 hover:shadow-md",
           selectedStage === sub.id && "ring-2 ring-primary"
         )}
         data-testid={`button-funnel-${sub.id}`}
       >
-        <span className="font-medium text-xs truncate text-[#e5e7eb]">{sub.label}</span>
-        <span className="text-xs flex-shrink-0 text-[#e5e7eb]">
+        <span className="font-medium text-xs truncate">{sub.label}</span>
+        <span className="text-xs flex-shrink-0 text-muted-foreground">
           {subCount} ({getPercentage(subCount)})
         </span>
       </button>
@@ -250,7 +250,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
             false
           )}
 
-          {/* 부재중 그룹 - 항상 노출 (어두운 glassmorphism 배경 + 부모 테마 테두리) */}
+          {/* 부재중 그룹 - 항상 노출 */}
           <div className="flex flex-col gap-1">
             {ABSENCE_STATUSES.map((absence) => {
               const absenceCount = getSubStatusCount(absence.id);
@@ -263,16 +263,16 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                   className={cn(
                     "w-full h-10 rounded-md border-l-4 transition-all duration-200",
                     "flex items-center justify-between px-3",
-                    "bg-slate-900/60 backdrop-blur-sm",
-                    "text-gray-200",
+                    "bg-muted dark:bg-slate-900/60 backdrop-blur-sm",
+                    "text-foreground dark:text-gray-200",
                     theme.accent,
-                    "hover:bg-slate-800/80 hover:shadow-md",
+                    "hover:bg-accent dark:hover:bg-slate-800/80 hover:shadow-md",
                     selectedStage === absence.id && "ring-2 ring-primary"
                   )}
                   data-testid={`button-funnel-${absence.id}`}
                 >
                   <span className="font-medium text-xs">{absence.label}</span>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-muted-foreground">
                     {absenceCount} ({getPercentage(absenceCount)})
                   </span>
                 </button>
@@ -288,15 +288,15 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                 className={cn(
                   "w-full h-12 rounded-md border-2 transition-all duration-300",
                   "flex items-center justify-between pl-3 pr-10",
-                  "bg-slate-900/50 backdrop-blur-sm text-white",
+                  "bg-card dark:bg-slate-900/50 backdrop-blur-sm text-foreground dark:text-white",
                   STAGE_THEMES.쓰레기통.border,
-                  "hover:shadow-lg hover:bg-slate-800/70",
+                  "hover:shadow-lg hover:bg-accent dark:hover:bg-slate-800/70",
                   selectedStage === '쓰레기통' && "ring-2 ring-primary ring-offset-2 ring-offset-background"
                 )}
                 data-testid="button-funnel-쓰레기통"
               >
                 <span className="font-bold text-sm">쓰레기통</span>
-                <span className="text-xs text-gray-300">
+                <span className="text-xs text-muted-foreground dark:text-gray-300">
                   {getStageCount('쓰레기통')}건 ({getPercentage(getStageCount('쓰레기통'))})
                 </span>
               </button>
@@ -311,8 +311,8 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                   "w-6 h-6 rounded-full",
                   "flex items-center justify-center",
                   "transition-all duration-200",
-                  "text-gray-400 hover:text-white",
-                  "hover:bg-white/20"
+                  "text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white",
+                  "hover:bg-accent dark:hover:bg-white/20"
                 )}
                 data-testid="button-toggle-쓰레기통"
               >

@@ -703,7 +703,7 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-background">
       {/* Top Header - Stats Summary + Filters */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-800 bg-gray-900/30">
+      <div className="flex-shrink-0 p-4 border-b bg-card dark:bg-gray-900/30">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           {/* Left: KPI Summary */}
           <div className="flex items-center gap-6">
@@ -720,7 +720,7 @@ export default function Dashboard() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "justify-start text-left font-normal min-w-[180px] bg-gray-800 border-gray-700",
+                      "justify-start text-left font-normal min-w-[180px]",
                       !dateRange.from && "text-muted-foreground"
                     )}
                     data-testid="button-date-range-dashboard"
@@ -757,7 +757,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <Label className="text-sm text-muted-foreground whitespace-nowrap">소속팀</Label>
                   <Select value={selectedTeam || 'all'} onValueChange={setSelectedTeam}>
-                    <SelectTrigger className="w-[120px] bg-gray-800 border-gray-700" data-testid="select-team-dashboard">
+                    <SelectTrigger className="w-[120px]" data-testid="select-team-dashboard">
                       <SelectValue placeholder="전체 팀" />
                     </SelectTrigger>
                     <SelectContent>
@@ -774,7 +774,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <Label className="text-sm text-muted-foreground whitespace-nowrap">담당자</Label>
                   <Select value={selectedStaff || 'all'} onValueChange={setSelectedStaff}>
-                    <SelectTrigger className="w-[120px] bg-gray-800 border-gray-700" data-testid="select-staff-dashboard">
+                    <SelectTrigger className="w-[120px]" data-testid="select-staff-dashboard">
                       <SelectValue placeholder="전체 직원" />
                     </SelectTrigger>
                     <SelectContent>
@@ -797,7 +797,7 @@ export default function Dashboard() {
                 placeholder="이름, 회사명, ID 검색..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-9 bg-gray-800 border-gray-700"
+                className="pl-9"
                 data-testid="input-search"
               />
             </div>
@@ -807,7 +807,6 @@ export default function Dashboard() {
               variant="ghost"
               size="icon"
               onClick={resetFilters}
-              className="border-gray-700"
               data-testid="button-reset-filters-dashboard"
             >
               <RefreshCw className="w-4 h-4" />
@@ -832,9 +831,9 @@ export default function Dashboard() {
         {/* Customer List Section */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-200 pl-[4px] pr-[4px]">
+            <h2 className="text-lg font-semibold text-foreground pl-[4px] pr-[4px]">
               고객 목록 
-              <span className="text-sm font-normal text-gray-500 ml-2">
+              <span className="text-sm font-normal text-muted-foreground ml-2">
                 ({filteredCustomers.length}명)
               </span>
             </h2>
@@ -933,12 +932,12 @@ export default function Dashboard() {
         open={statusChangeModal.isOpen} 
         onOpenChange={(open) => setStatusChangeModal(prev => ({ ...prev, isOpen: open }))}
       >
-        <DialogContent className="bg-gray-900 border-gray-700 text-gray-100 max-w-md">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-white">
+            <DialogTitle className="text-lg font-semibold">
               상태 변경 확인
             </DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription>
               {statusChangeModal.customerName} 고객의 상태를 "{statusChangeModal.targetStatus}"(으)로 변경합니다.
             </DialogDescription>
           </DialogHeader>
@@ -948,8 +947,8 @@ export default function Dashboard() {
             {statusChangeModal.targetStatus.includes('계약완료') && (
               <>
                 <div className="space-y-2">
-                  <Label className="text-sm text-gray-300">
-                    자문료 (%) <span className="text-gray-500 text-xs">(단위: %)</span>
+                  <Label className="text-sm">
+                    자문료 (%) <span className="text-muted-foreground text-xs">(단위: %)</span>
                   </Label>
                   <div className="relative">
                     <Input
@@ -964,18 +963,18 @@ export default function Dashboard() {
                           commissionRate: parseFloat(e.target.value) || 0,
                         }))
                       }
-                      className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                      className="pr-8"
                       placeholder="예: 3.5"
                       data-testid="input-dashboard-commission-rate"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                       %
                     </span>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm text-gray-300">
-                    계약금액 <span className="text-gray-500 text-xs">(단위: 만원)</span>
+                  <Label className="text-sm">
+                    계약금액 <span className="text-muted-foreground text-xs">(단위: 만원)</span>
                   </Label>
                   <div className="relative">
                     <Input
@@ -988,11 +987,11 @@ export default function Dashboard() {
                           contractAmount: parseFloat(e.target.value) || 0,
                         }))
                       }
-                      className="bg-gray-800 border-gray-600 text-gray-200 pr-12"
+                      className="pr-12"
                       placeholder="예: 5000 (만원 단위로 입력)"
                       data-testid="input-dashboard-contract-amount"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                       만원
                     </span>
                   </div>
@@ -1003,7 +1002,7 @@ export default function Dashboard() {
             {/* 신청완료: 진행기관 */}
             {statusChangeModal.targetStatus.includes('신청완료') && (
               <div className="space-y-2">
-                <Label className="text-sm text-gray-300">신청 기관</Label>
+                <Label className="text-sm">신청 기관</Label>
                 <Select
                   value={statusChangeModal.processingOrg || '미등록'}
                   onValueChange={(value) =>
@@ -1013,16 +1012,13 @@ export default function Dashboard() {
                     }))
                   }
                 >
-                  <SelectTrigger 
-                    className="bg-gray-800 border-gray-600 text-gray-200"
-                    data-testid="select-dashboard-processing-org"
-                  >
+                  <SelectTrigger data-testid="select-dashboard-processing-org">
                     <SelectValue placeholder="기관 선택" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectContent>
                     {PROCESSING_ORGS.filter((org) => org && org.trim() !== '').map(
                       (org) => (
-                        <SelectItem key={org} value={org} className="text-gray-200">
+                        <SelectItem key={org} value={org}>
                           {org}
                         </SelectItem>
                       )
@@ -1035,8 +1031,8 @@ export default function Dashboard() {
             {/* 집행완료: 집행금액 */}
             {statusChangeModal.targetStatus.includes('집행완료') && (
               <div className="space-y-2">
-                <Label className="text-sm text-gray-300">
-                  집행금액 <span className="text-gray-500 text-xs">(단위: 만원)</span>
+                <Label className="text-sm">
+                  집행금액 <span className="text-muted-foreground text-xs">(단위: 만원)</span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -1049,11 +1045,11 @@ export default function Dashboard() {
                         executionAmount: parseFloat(e.target.value) || 0,
                       }))
                     }
-                    className="bg-gray-800 border-gray-600 text-gray-200 pr-12"
+                    className="pr-12"
                     placeholder="예: 10000 (만원 단위로 입력)"
                     data-testid="input-dashboard-execution-amount"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     만원
                   </span>
                 </div>
@@ -1065,13 +1061,11 @@ export default function Dashboard() {
             <Button
               variant="outline"
               onClick={() => setStatusChangeModal(prev => ({ ...prev, isOpen: false }))}
-              className="border-gray-600 text-gray-300"
             >
               취소
             </Button>
             <Button
               onClick={handleStatusChangeConfirm}
-              className="bg-blue-600 hover:bg-blue-700"
               data-testid="button-dashboard-confirm-status-change"
             >
               확인

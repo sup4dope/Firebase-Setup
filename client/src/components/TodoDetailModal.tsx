@@ -182,9 +182,9 @@ export function TodoDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-gray-900 border-gray-700">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-gray-100 flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2">
             할 일 상세
             {todo.customer_name && (
               <Badge variant="secondary" className="text-xs">
@@ -201,11 +201,11 @@ export function TodoDetailModal({
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-300">제목 *</FormLabel>
+                  <FormLabel>제목 *</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="할 일 제목 입력"
-                      className="h-8 text-sm bg-gray-800 border-gray-600"
+                      className="h-8 text-sm"
                       {...field}
                       data-testid="input-edit-todo-title"
                     />
@@ -221,14 +221,14 @@ export function TodoDetailModal({
                 name="due_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-300">마감 날짜 *</FormLabel>
+                    <FormLabel>마감 날짜 *</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
                             variant="outline"
                             className={cn(
-                              "w-full h-8 text-sm justify-start text-left font-normal bg-gray-800 border-gray-600",
+                              "w-full h-8 text-sm justify-start text-left font-normal",
                               !field.value && "text-muted-foreground"
                             )}
                             data-testid="button-edit-due-date"
@@ -238,7 +238,7 @@ export function TodoDetailModal({
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-gray-800 border-gray-600" align="start">
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}
@@ -258,15 +258,15 @@ export function TodoDetailModal({
                 name="due_time"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-300">마감 시간 *</FormLabel>
+                    <FormLabel>마감 시간 *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger className="h-8 text-sm bg-gray-800 border-gray-600" data-testid="select-edit-due-time">
+                        <SelectTrigger className="h-8 text-sm" data-testid="select-edit-due-time">
                           <Clock className="w-4 h-4 mr-2" />
                           <SelectValue placeholder="시간 선택" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent className="bg-gray-800 border-gray-600 max-h-48">
+                      <SelectContent className="max-h-48">
                         {TIME_OPTIONS.map(time => (
                           <SelectItem key={time} value={time}>
                             {time}
@@ -285,22 +285,22 @@ export function TodoDetailModal({
               name="priority"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-300">우선순위 *</FormLabel>
+                  <FormLabel>우선순위 *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger className="h-8 text-sm bg-gray-800 border-gray-600" data-testid="select-edit-priority">
+                      <SelectTrigger className="h-8 text-sm" data-testid="select-edit-priority">
                         <SelectValue placeholder="우선순위 선택" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="bg-gray-800 border-gray-600">
+                    <SelectContent>
                       {PRIORITY_OPTIONS.map(option => (
                         <SelectItem key={option.value} value={option.value}>
                           <div className="flex items-center gap-2">
                             <option.icon className={cn(
                               "w-4 h-4",
-                              option.value === 'urgent' && "text-red-400",
-                              option.value === 'normal' && "text-blue-400",
-                              option.value === 'low' && "text-gray-400"
+                              option.value === 'urgent' && "text-red-500",
+                              option.value === 'normal' && "text-blue-500",
+                              option.value === 'low' && "text-muted-foreground"
                             )} />
                             <span>{option.label}</span>
                           </div>
@@ -318,11 +318,11 @@ export function TodoDetailModal({
               name="memo"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-300">상세 메모</FormLabel>
+                  <FormLabel>상세 메모</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="상세 내용을 입력하세요..."
-                      className="min-h-[100px] text-sm bg-gray-800 border-gray-600 resize-none"
+                      className="min-h-[100px] text-sm resize-none"
                       {...field}
                       data-testid="input-edit-todo-memo"
                     />
@@ -332,7 +332,7 @@ export function TodoDetailModal({
               )}
             />
 
-            <div className="text-xs text-gray-500 space-y-1">
+            <div className="text-xs text-muted-foreground space-y-1">
               <p>작성자: {todo.created_by_name || todo.created_by}</p>
               <p>작성일: {format(todo.created_at instanceof Date ? todo.created_at : new Date(todo.created_at), 'yyyy-MM-dd HH:mm', { locale: ko })}</p>
             </div>
@@ -355,18 +355,18 @@ export function TodoDetailModal({
                     삭제
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="bg-gray-900 border-gray-700">
+                <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-gray-100">할 일 삭제</AlertDialogTitle>
-                    <AlertDialogDescription className="text-gray-400">
+                    <AlertDialogTitle>할 일 삭제</AlertDialogTitle>
+                    <AlertDialogDescription>
                       이 할 일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel className="border-gray-600">취소</AlertDialogCancel>
+                    <AlertDialogCancel>취소</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleDelete}
-                      className="bg-red-600 hover:bg-red-700"
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                       삭제
                     </AlertDialogAction>
@@ -379,7 +379,6 @@ export function TodoDetailModal({
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
-                  className="border-gray-600"
                   data-testid="button-cancel-edit-todo"
                 >
                   취소

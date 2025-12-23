@@ -181,9 +181,9 @@ export function TodoForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-gray-900 border-gray-700">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-gray-100">할 일 등록</DialogTitle>
+          <DialogTitle>할 일 등록</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -193,11 +193,11 @@ export function TodoForm({
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-300">제목 *</FormLabel>
+                  <FormLabel>제목 *</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="할 일 제목 입력"
-                      className="h-8 text-sm bg-gray-800 border-gray-600"
+                      className="h-8 text-sm"
                       {...field}
                       data-testid="input-todo-title"
                     />
@@ -212,15 +212,15 @@ export function TodoForm({
               name="customer_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-300">연결된 고객</FormLabel>
+                  <FormLabel>연결된 고객</FormLabel>
                   <div className="space-y-2">
                     <div className="relative">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         placeholder="고객 검색 (이름, 회사명, ID)"
                         value={customerSearch}
                         onChange={e => setCustomerSearch(e.target.value)}
-                        className="h-8 text-sm pl-8 bg-gray-800 border-gray-600"
+                        className="h-8 text-sm pl-8"
                         data-testid="input-customer-search"
                       />
                     </div>
@@ -229,8 +229,8 @@ export function TodoForm({
                         <Badge variant="secondary" className="text-xs">
                           {selectedCustomer.readable_id}
                         </Badge>
-                        <span className="text-sm text-gray-200">{selectedCustomer.name}</span>
-                        <span className="text-xs text-gray-500">({selectedCustomer.company_name})</span>
+                        <span className="text-sm">{selectedCustomer.name}</span>
+                        <span className="text-xs text-muted-foreground">({selectedCustomer.company_name})</span>
                         <Button
                           type="button"
                           variant="ghost"
@@ -246,16 +246,16 @@ export function TodoForm({
                       </div>
                     )}
                     {!selectedCustomer && customerSearch && (
-                      <ScrollArea className="h-32 border border-gray-700 rounded-md">
+                      <ScrollArea className="h-32 border rounded-md">
                         <div className="p-1">
                           {filteredCustomers.length === 0 ? (
-                            <p className="text-xs text-gray-500 text-center py-4">검색 결과가 없습니다</p>
+                            <p className="text-xs text-muted-foreground text-center py-4">검색 결과가 없습니다</p>
                           ) : (
                             filteredCustomers.map(customer => (
                               <button
                                 key={customer.id}
                                 type="button"
-                                className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-800 flex items-center gap-2"
+                                className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent flex items-center gap-2"
                                 onClick={() => {
                                   field.onChange(customer.id);
                                   setCustomerSearch('');
@@ -264,8 +264,8 @@ export function TodoForm({
                                 <Badge variant="outline" className="text-[10px] px-1">
                                   {customer.readable_id}
                                 </Badge>
-                                <span className="text-gray-200">{customer.name}</span>
-                                <span className="text-xs text-gray-500">({customer.company_name})</span>
+                                <span>{customer.name}</span>
+                                <span className="text-xs text-muted-foreground">({customer.company_name})</span>
                               </button>
                             ))
                           )}
@@ -284,14 +284,14 @@ export function TodoForm({
                 name="due_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-300">마감 날짜 *</FormLabel>
+                    <FormLabel>마감 날짜 *</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
                             variant="outline"
                             className={cn(
-                              "w-full h-8 text-sm justify-start text-left font-normal bg-gray-800 border-gray-600",
+                              "w-full h-8 text-sm justify-start text-left font-normal",
                               !field.value && "text-muted-foreground"
                             )}
                             data-testid="button-due-date"
@@ -301,7 +301,7 @@ export function TodoForm({
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-gray-800 border-gray-600" align="start">
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}
@@ -321,15 +321,15 @@ export function TodoForm({
                 name="due_time"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-300">마감 시간 *</FormLabel>
+                    <FormLabel>마감 시간 *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger className="h-8 text-sm bg-gray-800 border-gray-600" data-testid="select-due-time">
+                        <SelectTrigger className="h-8 text-sm" data-testid="select-due-time">
                           <Clock className="w-4 h-4 mr-2" />
                           <SelectValue placeholder="시간 선택" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent className="bg-gray-800 border-gray-600 max-h-48">
+                      <SelectContent className="max-h-48">
                         {TIME_OPTIONS.map(time => (
                           <SelectItem key={time} value={time}>
                             {time}
@@ -348,22 +348,22 @@ export function TodoForm({
               name="priority"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-300">우선순위 *</FormLabel>
+                  <FormLabel>우선순위 *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger className="h-8 text-sm bg-gray-800 border-gray-600" data-testid="select-priority">
+                      <SelectTrigger className="h-8 text-sm" data-testid="select-priority">
                         <SelectValue placeholder="우선순위 선택" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="bg-gray-800 border-gray-600">
+                    <SelectContent>
                       {PRIORITY_OPTIONS.map(option => (
                         <SelectItem key={option.value} value={option.value}>
                           <div className="flex items-center gap-2">
                             <option.icon className={cn(
                               "w-4 h-4",
-                              option.value === 'urgent' && "text-red-400",
-                              option.value === 'normal' && "text-blue-400",
-                              option.value === 'low' && "text-gray-400"
+                              option.value === 'urgent' && "text-red-500",
+                              option.value === 'normal' && "text-blue-500",
+                              option.value === 'low' && "text-muted-foreground"
                             )} />
                             <span>{option.label}</span>
                           </div>
@@ -381,11 +381,11 @@ export function TodoForm({
               name="memo"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-300">상세 메모</FormLabel>
+                  <FormLabel>상세 메모</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="상세 내용을 입력하세요..."
-                      className="min-h-[80px] text-sm bg-gray-800 border-gray-600 resize-none"
+                      className="min-h-[80px] text-sm resize-none"
                       {...field}
                       data-testid="input-todo-memo"
                     />
@@ -400,7 +400,6 @@ export function TodoForm({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="border-gray-600"
                 data-testid="button-cancel-todo"
               >
                 취소
