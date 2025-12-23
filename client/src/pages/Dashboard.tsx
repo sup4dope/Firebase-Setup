@@ -1094,9 +1094,23 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* 집행완료: 집행금액, 집행일 */}
+            {/* 집행완료: 집행일, 집행금액 */}
             {statusChangeModal.targetStatus.includes('집행완료') && (
               <>
+                <div className="space-y-2">
+                  <Label className="text-sm">집행일</Label>
+                  <Input
+                    type="date"
+                    value={statusChangeModal.executionDate || ''}
+                    onChange={(e) =>
+                      setStatusChangeModal(prev => ({
+                        ...prev,
+                        executionDate: e.target.value,
+                      }))
+                    }
+                    data-testid="input-dashboard-execution-date"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label className="text-sm">
                     집행금액 <span className="text-muted-foreground text-xs">(단위: 만원)</span>
@@ -1120,20 +1134,6 @@ export default function Dashboard() {
                       만원
                     </span>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm">집행일</Label>
-                  <Input
-                    type="date"
-                    value={statusChangeModal.executionDate || ''}
-                    onChange={(e) =>
-                      setStatusChangeModal(prev => ({
-                        ...prev,
-                        executionDate: e.target.value,
-                      }))
-                    }
-                    data-testid="input-dashboard-execution-date"
-                  />
                 </div>
               </>
             )}
