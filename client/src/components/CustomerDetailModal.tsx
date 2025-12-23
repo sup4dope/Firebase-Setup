@@ -1440,11 +1440,19 @@ export function CustomerDetailModal({
                     </Label>
                     <Input
                       value={formData.business_registration_number || ""}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        let formatted = value;
+                        if (value.length > 3 && value.length <= 5) {
+                          formatted = `${value.slice(0, 3)}-${value.slice(3)}`;
+                        } else if (value.length > 5) {
+                          formatted = `${value.slice(0, 3)}-${value.slice(3, 5)}-${value.slice(5, 10)}`;
+                        }
                         handleFieldChange({
-                          business_registration_number: e.target.value,
-                        })
-                      }
+                          business_registration_number: formatted,
+                        });
+                      }}
+                      maxLength={12}
                       disabled={isReadOnly}
                       className={cn(
                         "border-border text-foreground h-7 text-xs w-full",
