@@ -2334,12 +2334,12 @@ export function CustomerDetailModal({
               </div>
 
               {/* AI Input */}
-              <div className="shrink-0 border-t border-border bg-purple-900/10 flex items-center px-2 py-2 gap-1.5">
+              <div className="shrink-0 border-t border-border bg-purple-100/50 dark:bg-purple-900/20 flex items-center px-2 py-2 gap-1.5">
                 <Input
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
                   placeholder="AI에게 질문하기..."
-                  className="bg-transparent border-border text-foreground h-9 text-sm flex-1"
+                  className="bg-white/80 dark:bg-transparent border-purple-300 dark:border-border text-foreground h-9 text-sm flex-1"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
