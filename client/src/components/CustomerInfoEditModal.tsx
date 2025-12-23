@@ -22,6 +22,7 @@ interface CustomerInfoEditModalProps {
     contract_amount: number;
     execution_amount: number;
     contract_date?: string;
+    execution_date?: string;
   }) => Promise<void>;
 }
 
@@ -35,6 +36,7 @@ export function CustomerInfoEditModal({
   const [contractAmount, setContractAmount] = useState('');
   const [executionAmount, setExecutionAmount] = useState('');
   const [contractDate, setContractDate] = useState('');
+  const [executionDate, setExecutionDate] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export function CustomerInfoEditModal({
       setContractAmount(String(customer.contract_amount || customer.deposit_amount || ''));
       setExecutionAmount(String(customer.execution_amount || ''));
       setContractDate((customer as any).contract_date || '');
+      setExecutionDate((customer as any).execution_date || '');
     }
   }, [customer, open]);
 
@@ -56,6 +59,7 @@ export function CustomerInfoEditModal({
         contract_amount: Number(contractAmount) || 0,
         execution_amount: Number(executionAmount) || 0,
         contract_date: contractDate || undefined,
+        execution_date: executionDate || undefined,
       });
       onClose();
     } catch (error) {
@@ -124,6 +128,17 @@ export function CustomerInfoEditModal({
               value={contractDate}
               onChange={(e) => setContractDate(e.target.value)}
               data-testid="input-contract-date"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="execution_date">집행일</Label>
+            <Input
+              id="execution_date"
+              type="date"
+              value={executionDate}
+              onChange={(e) => setExecutionDate(e.target.value)}
+              data-testid="input-execution-date"
             />
           </div>
         </div>

@@ -717,7 +717,7 @@ export const deleteTodoItem = async (id: string): Promise<void> => {
 export interface CustomerInfoLog {
   id: string;
   customer_id: string;
-  field_name: 'commission_rate' | 'contract_amount' | 'execution_amount' | 'contract_date';
+  field_name: 'commission_rate' | 'contract_amount' | 'execution_amount' | 'contract_date' | 'execution_date';
   old_value: string;
   new_value: string;
   changed_by: string;
@@ -751,7 +751,7 @@ export const addCustomerInfoLog = async (log: Omit<CustomerInfoLog, 'id' | 'chan
   });
 };
 
-// 고객 정보 수정 (자문료율, 계약금, 집행금액, 계약일) 및 변경 이력 기록
+// 고객 정보 수정 (자문료율, 계약금, 집행금액, 계약일, 집행일) 및 변경 이력 기록
 export const updateCustomerInfo = async (
   customerId: string,
   updates: {
@@ -759,6 +759,7 @@ export const updateCustomerInfo = async (
     contract_amount?: number;
     execution_amount?: number;
     contract_date?: string;
+    execution_date?: string;
   },
   currentCustomer: Customer,
   changedBy: string,
@@ -825,6 +826,21 @@ export const updateCustomerInfo = async (
         field_name: 'contract_date',
         old_value: String(oldValue || '미설정'),
         new_value: String(updates.contract_date),
+        changed_by: changedBy,
+        changed_by_name: changedByName,
+      });
+    }
+  }
+  
+  if (updates.execution_date !== undefined) {
+    const oldValue = (currentCustomer as any).execution_date || '';
+    if (oldValue !== updates.execution_date) {
+      fieldsToUpdate.execution_date = updates.execution_date;
+      logsToAdd.push({
+        customer_id: customerId,
+        field_name: 'execution_date',
+        old_value: String(oldValue || '미설정'),
+        new_value: String(updates.execution_date),
         changed_by: changedBy,
         changed_by_name: changedByName,
       });

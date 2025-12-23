@@ -268,6 +268,7 @@ export function CustomerDetailModal({
     commissionRate: number;
     contractAmount: number;
     executionAmount: number;
+    executionDate: string;
     processingOrg: string;
   }>({
     isOpen: false,
@@ -275,6 +276,7 @@ export function CustomerDetailModal({
     commissionRate: 0,
     contractAmount: 0,
     executionAmount: 0,
+    executionDate: new Date().toISOString().split('T')[0],
     processingOrg: "미등록",
   });
 
@@ -1885,9 +1887,10 @@ export function CustomerDetailModal({
                                       const hasProcessingOrg = 
                                         formData.processing_org && formData.processing_org !== "미등록";
                                       
-                                      // 집행완료: 집행금액이 있으면 모달 스킵
+                                      // 집행완료: 집행금액과 집행일이 모두 있으면 모달 스킵
                                       const hasExecutionInfo = 
-                                        formData.execution_amount && formData.execution_amount > 0;
+                                        (formData.execution_amount && formData.execution_amount > 0) &&
+                                        ((formData as any).execution_date);
 
                                       const requiresModal =
                                         (option.value.includes("계약완료") && !hasContractInfo) ||
@@ -1901,6 +1904,7 @@ export function CustomerDetailModal({
                                           commissionRate: formData.commission_rate || 0,
                                           contractAmount: formData.contract_amount || 0,
                                           executionAmount: formData.execution_amount || 0,
+                                          executionDate: (formData as any).execution_date || new Date().toISOString().split('T')[0],
                                           processingOrg: formData.processing_org || "미등록",
                                         });
                                         return;
@@ -2485,32 +2489,49 @@ export function CustomerDetailModal({
               </div>
             )}
 
-            {/* 집행완료 상태: 집행금액 */}
+            {/* 집행완료 상태: 집행금액, 집행일 */}
             {statusChangeModal.targetStatus.includes("집행완료") && (
-              <div>
-                <Label className="text-muted-foreground text-sm">
-                  최종 집행 금액 (단위: 만원)
-                </Label>
-                <div className="relative mt-1">
+              <>
+                <div>
+                  <Label className="text-muted-foreground text-sm">
+                    최종 집행 금액 (단위: 만원)
+                  </Label>
+                  <div className="relative mt-1">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={statusChangeModal.executionAmount || ""}
+                      onChange={(e) =>
+                        setStatusChangeModal((prev) => ({
+                          ...prev,
+                          executionAmount: parseInt(e.target.value) || 0,
+                        }))
+                      }
+                      className="bg-muted border-border text-foreground pr-12"
+                      placeholder="예: 10000 (만원 단위로 입력)"
+                      data-testid="input-status-execution-amount"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      만원
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-sm">집행일</Label>
                   <Input
-                    type="number"
-                    min="0"
-                    value={statusChangeModal.executionAmount || ""}
+                    type="date"
+                    value={statusChangeModal.executionDate || ""}
                     onChange={(e) =>
                       setStatusChangeModal((prev) => ({
                         ...prev,
-                        executionAmount: parseInt(e.target.value) || 0,
+                        executionDate: e.target.value,
                       }))
                     }
-                    className="bg-muted border-border text-foreground pr-12"
-                    placeholder="예: 10000 (만원 단위로 입력)"
-                    data-testid="input-status-execution-amount"
+                    className="mt-1 bg-muted border-border text-foreground"
+                    data-testid="input-status-execution-date"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                    만원
-                  </span>
                 </div>
-              </div>
+              </>
             )}
           </div>
 
@@ -2551,6 +2572,9 @@ export function CustomerDetailModal({
                 if (statusChangeModal.targetStatus.includes("집행완료")) {
                   if (statusChangeModal.executionAmount > 0) {
                     updateData.execution_amount = statusChangeModal.executionAmount;
+                  }
+                  if (statusChangeModal.executionDate) {
+                    updateData.execution_date = statusChangeModal.executionDate;
                   }
                 }
 
