@@ -739,10 +739,9 @@ export default function Stats() {
                         backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
-                        color: 'hsl(var(--card-foreground))',
                       }}
-                      labelStyle={{ color: 'hsl(var(--card-foreground))' }}
-                      itemStyle={{ color: 'hsl(var(--card-foreground))' }}
+                      labelStyle={{ color: 'white' }}
+                      itemStyle={{ color: 'white' }}
                       formatter={(value: number, name: string) => {
                         if (name === 'value') return [`${value}건`, '실제'];
                         return [`${value}건`, '인당 평균'];
