@@ -1275,6 +1275,10 @@ export function CustomerDetailModal({
                           business_address_detail: c
                             ? formData.home_address_detail
                             : formData.business_address_detail,
+                          // 자가 체크 시 사업장 자가도 동일하게 체크
+                          is_business_owned: c
+                            ? formData.is_home_owned
+                            : formData.is_business_owned,
                         });
                       }}
                       disabled={isReadOnly}
