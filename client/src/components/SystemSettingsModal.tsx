@@ -74,6 +74,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   const [loading, setLoading] = useState(true);
 
   const [showAddEmployee, setShowAddEmployee] = useState(false);
+  const [showEditEmployee, setShowEditEmployee] = useState(false);
+  const [editTargetUser, setEditTargetUser] = useState<(User & { docId?: string }) | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargetUser, setDeleteTargetUser] = useState<(User & { docId?: string }) | null>(null);
   const [deleteTargetTeam, setDeleteTargetTeam] = useState<Team | null>(null);
@@ -97,6 +99,21 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   });
 
   const [employeeSearch, setEmployeeSearch] = useState('');
+  
+  const [editEmployee, setEditEmployee] = useState({
+    name: '',
+    email: '',
+    phone_work: '',
+    phone_personal: '',
+    ssn_front: '',
+    ssn_back: '',
+    address: '',
+    bank_name: '',
+    bank_account: '',
+    hire_date: '',
+    role: 'staff' as UserRole,
+    team_id: '' as string,
+  });
 
   const loadData = async () => {
     setLoading(true);
@@ -231,6 +248,55 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     }
   };
 
+  const handleOpenEditEmployee = (user: User & { docId?: string }) => {
+    setEditTargetUser(user);
+    setEditEmployee({
+      name: user.name || '',
+      email: user.email || '',
+      phone_work: user.phone_work || user.phone || '',
+      phone_personal: user.phone_personal || '',
+      ssn_front: user.ssn_front || '',
+      ssn_back: user.ssn_back || '',
+      address: user.address || '',
+      bank_name: user.bank_name || '',
+      bank_account: user.bank_account || '',
+      hire_date: user.hire_date || '',
+      role: user.role,
+      team_id: user.team_id || '',
+    });
+    setShowEditEmployee(true);
+  };
+
+  const handleUpdateEmployee = async () => {
+    if (!editTargetUser?.docId) return;
+    
+    try {
+      const team = teams.find((t) => t.id === editEmployee.team_id);
+      await updateUserInfo(editTargetUser.docId, {
+        name: editEmployee.name,
+        phone: editEmployee.phone_work || undefined,
+        phone_work: editEmployee.phone_work || undefined,
+        phone_personal: editEmployee.phone_personal || undefined,
+        ssn_front: editEmployee.ssn_front || undefined,
+        ssn_back: editEmployee.ssn_back || undefined,
+        address: editEmployee.address || undefined,
+        bank_name: editEmployee.bank_name || undefined,
+        bank_account: editEmployee.bank_account || undefined,
+        hire_date: editEmployee.hire_date || undefined,
+        role: editEmployee.role,
+        team_id: editEmployee.team_id || null,
+        team_name: team?.team_name || team?.name || null,
+      });
+
+      setShowEditEmployee(false);
+      setEditTargetUser(null);
+      await loadData();
+    } catch (error) {
+      console.error('Error updating employee:', error);
+      alert('직원 정보 수정 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleAddTeam = async () => {
     if (!newTeamName.trim()) {
       alert('팀명을 입력하세요.');
@@ -357,7 +423,11 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                         })
                         .map((user) => (
                         <TableRow key={user.docId || user.uid} className="border-gray-700 h-12">
-                          <TableCell className="text-gray-200 font-medium py-2">
+                          <TableCell 
+                            className="text-gray-200 font-medium py-2 cursor-pointer hover:text-blue-400 transition-colors"
+                            onDoubleClick={() => handleOpenEditEmployee(user)}
+                            title="더블클릭하여 수정"
+                          >
                             {user.name}
                           </TableCell>
                           <TableCell className="text-gray-300 text-sm py-2">
@@ -703,6 +773,197 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 data-testid="button-confirm-add-employee"
               >
                 등록
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {showEditEmployee && editTargetUser && (
+        <Dialog open={showEditEmployee} onOpenChange={setShowEditEmployee}>
+          <DialogContent className="max-w-lg max-h-[85vh] bg-gray-900 border-gray-700 text-gray-100 overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-gray-100 flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-blue-400" />
+                직원 정보 수정
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div>
+                <Label className="text-gray-400 text-sm">성명 *</Label>
+                <Input
+                  value={editEmployee.name}
+                  onChange={(e) => setEditEmployee({ ...editEmployee, name: e.target.value })}
+                  placeholder="홍길동"
+                  className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                  data-testid="input-edit-employee-name"
+                />
+              </div>
+
+              <div>
+                <Label className="text-gray-400 text-sm">구글 이메일 (변경 불가)</Label>
+                <Input
+                  value={editEmployee.email}
+                  disabled
+                  className="bg-gray-700 border-gray-600 text-gray-400 mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-gray-400 text-sm">연락처(업무용)</Label>
+                  <Input
+                    value={editEmployee.phone_work}
+                    onChange={(e) => setEditEmployee({ ...editEmployee, phone_work: e.target.value })}
+                    placeholder="010-0000-0000"
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-edit-employee-phone-work"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-400 text-sm">연락처(개인)</Label>
+                  <Input
+                    value={editEmployee.phone_personal}
+                    onChange={(e) => setEditEmployee({ ...editEmployee, phone_personal: e.target.value })}
+                    placeholder="010-0000-0000"
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-edit-employee-phone-personal"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-gray-400 text-sm">주민등록번호(앞)</Label>
+                  <Input
+                    value={editEmployee.ssn_front}
+                    onChange={(e) => setEditEmployee({ ...editEmployee, ssn_front: e.target.value })}
+                    placeholder="000000"
+                    maxLength={6}
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-edit-employee-ssn-front"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-400 text-sm">주민등록번호(뒤)</Label>
+                  <Input
+                    type="password"
+                    value={editEmployee.ssn_back}
+                    onChange={(e) => setEditEmployee({ ...editEmployee, ssn_back: e.target.value })}
+                    placeholder="0000000"
+                    maxLength={7}
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-edit-employee-ssn-back"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-400 text-sm">거주지(주소)</Label>
+                <Input
+                  value={editEmployee.address}
+                  onChange={(e) => setEditEmployee({ ...editEmployee, address: e.target.value })}
+                  placeholder="주소를 입력하세요"
+                  className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                  data-testid="input-edit-employee-address"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-gray-400 text-sm">급여계좌 은행</Label>
+                  <Input
+                    value={editEmployee.bank_name}
+                    onChange={(e) => setEditEmployee({ ...editEmployee, bank_name: e.target.value })}
+                    placeholder="은행명"
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-edit-employee-bank-name"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-400 text-sm">계좌번호</Label>
+                  <Input
+                    value={editEmployee.bank_account}
+                    onChange={(e) => setEditEmployee({ ...editEmployee, bank_account: e.target.value })}
+                    placeholder="계좌번호"
+                    className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                    data-testid="input-edit-employee-bank-account"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-400 text-sm">입사일자</Label>
+                <Input
+                  type="date"
+                  value={editEmployee.hire_date}
+                  onChange={(e) => setEditEmployee({ ...editEmployee, hire_date: e.target.value })}
+                  className="bg-gray-800 border-gray-600 text-gray-200 mt-1"
+                  data-testid="input-edit-employee-hire-date"
+                />
+              </div>
+
+              <div>
+                <Label className="text-gray-400 text-sm">직급</Label>
+                <Select
+                  value={editEmployee.role}
+                  onValueChange={(v) => setEditEmployee({ ...editEmployee, role: v as UserRole })}
+                >
+                  <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="staff" className="text-gray-200">팀원</SelectItem>
+                    <SelectItem value="team_leader" className="text-gray-200">팀장</SelectItem>
+                    <SelectItem value="super_admin" className="text-gray-200">총관리자</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-gray-400 text-sm">소속 팀</Label>
+                {teams.filter(t => t.id && t.id.trim() !== '').length === 0 ? (
+                  <div className="mt-1 p-2 bg-gray-800 border border-gray-600 rounded-md text-gray-500 text-sm">
+                    먼저 팀을 생성해주세요
+                  </div>
+                ) : (
+                  <Select
+                    value={editEmployee.team_id || 'none'}
+                    onValueChange={(v) => setEditEmployee({ ...editEmployee, team_id: v === 'none' ? '' : v })}
+                  >
+                    <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-200 mt-1">
+                      <SelectValue placeholder="팀 선택 (선택사항)" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="none" className="text-gray-400">없음</SelectItem>
+                      {teams
+                        .filter((team) => team.id && team.id.trim() !== '' && team.team_id && team.team_id.trim() !== '')
+                        .map((team) => (
+                          <SelectItem key={team.id} value={team.id} className="text-gray-200">
+                            {team.team_name || team.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowEditEmployee(false)}
+                className="border-gray-600 text-gray-300"
+              >
+                취소
+              </Button>
+              <Button
+                onClick={handleUpdateEmployee}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="button-confirm-edit-employee"
+              >
+                저장
               </Button>
             </div>
           </DialogContent>
