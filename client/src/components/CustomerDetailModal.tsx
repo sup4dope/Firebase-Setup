@@ -901,7 +901,7 @@ export function CustomerDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] p-0 bg-gray-900 border-gray-700 flex flex-col overflow-hidden">
+      <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] p-0 bg-card flex flex-col overflow-hidden">
         <VisuallyHidden>
           <DialogTitle>
             {isNewCustomer
@@ -910,9 +910,9 @@ export function CustomerDetailModal({
           </DialogTitle>
         </VisuallyHidden>
         {/* Header - h-16 shrink-0 고정 */}
-        <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-gray-700 bg-gray-900/80">
+        <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b bg-card/80">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-gray-100">
+            <h2 className="text-lg font-bold text-foreground">
               {isNewCustomer
                 ? "신규 고객 등록"
                 : `${customer?.name || "고객"} 상세정보`}
@@ -920,7 +920,7 @@ export function CustomerDetailModal({
             {customer?.id && (
               <Badge
                 variant="outline"
-                className="text-gray-400 border-gray-600 text-xs"
+                className="text-muted-foreground border-border text-xs"
               >
                 {customer.id}
               </Badge>
@@ -939,7 +939,7 @@ export function CustomerDetailModal({
           <div className="flex items-center gap-3">
             {/* Auto-save status indicator - hide for read-only users */}
             {!isReadOnly && (
-              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 {saveStatus === "saving" && (
                   <>
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -975,11 +975,11 @@ export function CustomerDetailModal({
         {/* Main Content - 3단 레이아웃 (좌-중-우) */}
         <div className="flex-1 flex flex-row h-[calc(100%-4rem)] overflow-hidden">
           {/* Section 1: 좌측 패널 - 상세 정보 입력 (35%) */}
-          <div className="w-[25%] min-w-[260px] h-full border-r border-gray-700 overflow-y-auto">
+          <div className="w-[25%] min-w-[260px] h-full border-r overflow-y-auto">
             <div className="p-1.5 space-y-1">
               {/* 유입경로 (최상단) - 1. 상단에 바짝 붙임 */}
               <div className="space-y-0.5 ml-[6px] mr-[6px] pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
-                <Label className="text-xs text-gray-300 ml-[11px] mr-[11px]">
+                <Label className="text-xs text-muted-foreground ml-[11px] mr-[11px]">
                   유입경로
                 </Label>
                 <Select
@@ -989,20 +989,20 @@ export function CustomerDetailModal({
                 >
                   <SelectTrigger
                     className={cn(
-                      "border-gray-600 text-gray-200 h-8 text-sm",
+                      "border-border text-foreground h-8 text-sm",
                       isReadOnly
-                        ? "bg-gray-700 cursor-not-allowed opacity-70"
-                        : "bg-gray-800",
+                        ? "bg-muted cursor-not-allowed opacity-70"
+                        : "bg-muted",
                     )}
                   >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectContent className="bg-muted border-border">
                     {ENTRY_SOURCES.map((src) => (
                       <SelectItem
                         key={src}
                         value={src}
-                        className="text-gray-200 text-sm"
+                        className="text-foreground text-sm"
                       >
                         {src}
                       </SelectItem>
@@ -1012,7 +1012,7 @@ export function CustomerDetailModal({
               </div>
 
               {/* 고객 정보 그룹 (Border Box) - 10줄 압축 배치 */}
-              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 pt-[16px] pb-[16px] mt-[30px] mb-[30px]">
+              <div className="border rounded-lg p-2 space-y-0.5 mx-1.5 pt-[16px] pb-[16px] mt-[30px] mb-[30px]">
                 <h3 className="font-semibold text-blue-400 mb-1 text-[14px]">
                   고객 정보
                 </h3>
@@ -1021,7 +1021,7 @@ export function CustomerDetailModal({
                 <div className="flex gap-1.5 items-end">
                   {/* 이름: 기존 약 33%에서 29%로 살짝 축소 */}
                   <div className="w-[29%]">
-                    <Label className="text-[10px] text-gray-400">이름</Label>
+                    <Label className="text-[10px] text-muted-foreground">이름</Label>
                     <Input
                       value={formData.name || ""}
                       onChange={(e) =>
@@ -1029,10 +1029,10 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                       data-testid="input-customer-name"
                     />
@@ -1040,7 +1040,7 @@ export function CustomerDetailModal({
 
                   {/* 신용점수: 기존 약 17%에서 21%로 살짝 확대 */}
                   <div className="w-[21%]">
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       신용점수
                     </Label>
                     <Input
@@ -1053,17 +1053,17 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                     />
                   </div>
 
                   {/* 주민번호(앞): 완벽한 25% 유지 */}
                   <div className="w-[25%]">
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       주민번호(앞)
                     </Label>
                     <Input
@@ -1074,10 +1074,10 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                       placeholder="YYMMDD"
                     />
@@ -1085,7 +1085,7 @@ export function CustomerDetailModal({
 
                   {/* 주민번호(뒤): 완벽한 25% 유지 */}
                   <div className="w-[25%]">
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       주민번호(뒤)
                     </Label>
                     <Input
@@ -1096,10 +1096,10 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                       placeholder="0000000"
                     />
@@ -1108,7 +1108,7 @@ export function CustomerDetailModal({
                 {/* Row 2: 연락처 (010-0000-0000) | 통신사 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
-                    <Label className="text-[10px] text-gray-400">연락처</Label>
+                    <Label className="text-[10px] text-muted-foreground">연락처</Label>
                     <div className="flex items-center gap-0.5">
                       <Input
                         value={formData.phone_part1 || "010"}
@@ -1118,13 +1118,13 @@ export function CustomerDetailModal({
                         onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
-                          "border-gray-600 text-gray-200 h-7 text-xs text-center w-16",
+                          "border-border text-foreground h-7 text-xs text-center w-16",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       />
-                      <span className="text-gray-500 text-xs">-</span>
+                      <span className="text-muted-foreground text-xs">-</span>
                       <Input
                         maxLength={4}
                         value={formData.phone_part2 || ""}
@@ -1134,13 +1134,13 @@ export function CustomerDetailModal({
                         onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
-                          "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
+                          "border-border text-foreground h-7 text-xs text-center flex-1",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       />
-                      <span className="text-gray-500 text-xs">-</span>
+                      <span className="text-muted-foreground text-xs">-</span>
                       <Input
                         maxLength={4}
                         value={formData.phone_part3 || ""}
@@ -1150,16 +1150,16 @@ export function CustomerDetailModal({
                         onBlur={handleBlurSave}
                         disabled={isReadOnly}
                         className={cn(
-                          "border-gray-600 text-gray-200 h-7 text-xs text-center flex-1",
+                          "border-border text-foreground h-7 text-xs text-center flex-1",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       />
                     </div>
                   </div>
                   <div className="w-[140px]">
-                    <Label className="text-[10px] text-gray-400">통신사</Label>
+                    <Label className="text-[10px] text-muted-foreground">통신사</Label>
                     <Select
                       value={formData.carrier || "SKT"}
                       onValueChange={(v) => handleFieldChange({ carrier: v })}
@@ -1167,20 +1167,20 @@ export function CustomerDetailModal({
                     >
                       <SelectTrigger
                         className={cn(
-                          "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                          "border-border text-foreground h-7 text-xs w-full",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       >
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectContent className="bg-muted border-border">
                         {CARRIERS.map((c) => (
                           <SelectItem
                             key={c}
                             value={c}
-                            className="text-gray-200 text-xs"
+                            className="text-foreground text-xs"
                           >
                             {c}
                           </SelectItem>
@@ -1192,14 +1192,14 @@ export function CustomerDetailModal({
 
                 {/* Row 3: 자택주소 검색 (전체 너비) */}
                 <div>
-                  <Label className="text-[10px] text-gray-400">자택주소</Label>
+                  <Label className="text-[10px] text-muted-foreground">자택주소</Label>
                   <div className="flex gap-1">
                     <Input
                       value={formData.home_address || ""}
                       readOnly
                       className={cn(
-                        "border-gray-600 text-gray-200 flex-1 h-7 text-xs",
-                        isReadOnly ? "bg-gray-700 opacity-70" : "bg-gray-800",
+                        "border-border text-foreground flex-1 h-7 text-xs",
+                        isReadOnly ? "bg-muted opacity-70" : "bg-muted",
                       )}
                       placeholder="주소 검색"
                     />
@@ -1210,7 +1210,7 @@ export function CustomerDetailModal({
                       onClick={() => setShowHomeAddressSearch(true)}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 h-7 w-7 p-0",
+                        "border-border h-7 w-7 p-0",
                         isReadOnly && "opacity-50 cursor-not-allowed",
                       )}
                     >
@@ -1222,7 +1222,7 @@ export function CustomerDetailModal({
                 {/* Row 4: 상세주소 | 자가 | 사업장동일 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       상세주소
                     </Label>
                     <Input
@@ -1234,10 +1234,10 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs",
+                        "border-border text-foreground h-7 text-xs",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                       placeholder="동/호수"
                     />
@@ -1257,7 +1257,7 @@ export function CustomerDetailModal({
                     />
                     <Label
                       htmlFor="home-owned"
-                      className="text-[10px] text-gray-400"
+                      className="text-[10px] text-muted-foreground"
                     >
                       자가
                     </Label>
@@ -1285,7 +1285,7 @@ export function CustomerDetailModal({
                     />
                     <Label
                       htmlFor="same-address"
-                      className="text-[10px] text-gray-400"
+                      className="text-[10px] text-muted-foreground"
                     >
                       사업장동일
                     </Label>
@@ -1323,7 +1323,7 @@ export function CustomerDetailModal({
               </div>
 
               {/* 사업자 정보 그룹 (Border Box) - 10줄 압축 배치 */}
-              <div className="border border-gray-700 rounded-lg p-2 space-y-0.5 mx-1.5 pl-[8px] pr-[8px] pt-[16px] pb-[16px] mt-[30px] mb-[30px]">
+              <div className="border rounded-lg p-2 space-y-0.5 mx-1.5 pl-[8px] pr-[8px] pt-[16px] pb-[16px] mt-[30px] mb-[30px]">
                 <h3 className="font-semibold text-emerald-400 mb-1 text-[14px]">
                   사업자 정보
                 </h3>
@@ -1331,7 +1331,7 @@ export function CustomerDetailModal({
                 {/* Row 5: 상호명 | 개업일 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
-                    <Label className="text-[10px] text-gray-400">상호명</Label>
+                    <Label className="text-[10px] text-muted-foreground">상호명</Label>
                     <Input
                       value={formData.company_name || ""}
                       onChange={(e) =>
@@ -1339,17 +1339,17 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                       data-testid="input-company-name"
                     />
                   </div>
                   <div className="w-36 min-w-[144px]">
                     <div className="flex items-center gap-1">
-                      <Label className="text-[10px] text-gray-400">
+                      <Label className="text-[10px] text-muted-foreground">
                         개업일
                       </Label>
                       {formData.founding_date && formData.over_7_years && (
@@ -1367,10 +1367,10 @@ export function CustomerDetailModal({
                       onChange={(e) => handleFoundingDateChange(e.target.value)}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                     />
                   </div>
@@ -1379,7 +1379,7 @@ export function CustomerDetailModal({
                 {/* Row 6: 업종 | 종목 (12분할 그리드 - 각 6칸) */}
                 <div className="grid grid-cols-12 gap-1 items-end">
                   <div className="col-span-6">
-                    <Label className="text-[10px] text-gray-400">업종</Label>
+                    <Label className="text-[10px] text-muted-foreground">업종</Label>
                     <Select
                       value={formData.business_type || "기타"}
                       onValueChange={(v) =>
@@ -1389,20 +1389,20 @@ export function CustomerDetailModal({
                     >
                       <SelectTrigger
                         className={cn(
-                          "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                          "border-border text-foreground h-7 text-xs w-full",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       >
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectContent className="bg-muted border-border">
                         {BUSINESS_TYPES.map((t) => (
                           <SelectItem
                             key={t}
                             value={t}
-                            className="text-gray-200 text-xs"
+                            className="text-foreground text-xs"
                           >
                             {t}
                           </SelectItem>
@@ -1411,7 +1411,7 @@ export function CustomerDetailModal({
                     </Select>
                   </div>
                   <div className="col-span-6">
-                    <Label className="text-[10px] text-gray-400">종목</Label>
+                    <Label className="text-[10px] text-muted-foreground">종목</Label>
                     <Input
                       value={formData.business_item || ""}
                       onChange={(e) =>
@@ -1419,10 +1419,10 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                     />
                   </div>
@@ -1431,7 +1431,7 @@ export function CustomerDetailModal({
                 {/* Row 7: 사업자번호 | 재도전 | 혁신 (12분할 그리드 - 6:3:3) */}
                 <div className="grid grid-cols-12 gap-1 items-end">
                   <div className="col-span-6">
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       사업자번호
                     </Label>
                     <Input
@@ -1443,16 +1443,16 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                       placeholder="000-00-00000"
                     />
                   </div>
                   <div className="col-span-3">
-                    <Label className="text-[10px] text-gray-400">재도전</Label>
+                    <Label className="text-[10px] text-muted-foreground">재도전</Label>
                     <Select
                       value={formData.retry_type || "해당없음"}
                       onValueChange={(v) =>
@@ -1462,20 +1462,20 @@ export function CustomerDetailModal({
                     >
                       <SelectTrigger
                         className={cn(
-                          "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                          "border-border text-foreground h-7 text-xs w-full",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       >
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectContent className="bg-muted border-border">
                         {RETRY_OPTIONS.map((o) => (
                           <SelectItem
                             key={o}
                             value={o}
-                            className="text-gray-200 text-xs"
+                            className="text-foreground text-xs"
                           >
                             {o}
                           </SelectItem>
@@ -1484,7 +1484,7 @@ export function CustomerDetailModal({
                     </Select>
                   </div>
                   <div className="col-span-3">
-                    <Label className="text-[10px] text-gray-400">혁신</Label>
+                    <Label className="text-[10px] text-muted-foreground">혁신</Label>
                     <Select
                       value={formData.innovation_type || "해당없음"}
                       onValueChange={(v) =>
@@ -1494,20 +1494,20 @@ export function CustomerDetailModal({
                     >
                       <SelectTrigger
                         className={cn(
-                          "border-gray-600 text-gray-200 h-7 text-xs w-full",
+                          "border-border text-foreground h-7 text-xs w-full",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       >
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectContent className="bg-muted border-border">
                         {INNOVATION_OPTIONS.map((o) => (
                           <SelectItem
                             key={o}
                             value={o}
-                            className="text-gray-200 text-xs"
+                            className="text-foreground text-xs"
                           >
                             {o}
                           </SelectItem>
@@ -1519,7 +1519,7 @@ export function CustomerDetailModal({
 
                 {/* Row 8: 사업장소재지 검색 (전체 너비) */}
                 <div>
-                  <Label className="text-[10px] text-gray-400">
+                  <Label className="text-[10px] text-muted-foreground">
                     사업장 소재지
                   </Label>
                   <div className="flex gap-1">
@@ -1527,8 +1527,8 @@ export function CustomerDetailModal({
                       value={formData.business_address || ""}
                       readOnly
                       className={cn(
-                        "border-gray-600 text-gray-200 flex-1 h-7 text-xs",
-                        isReadOnly ? "bg-gray-700 opacity-70" : "bg-gray-800",
+                        "border-border text-foreground flex-1 h-7 text-xs",
+                        isReadOnly ? "bg-muted opacity-70" : "bg-muted",
                       )}
                       placeholder="주소 검색"
                     />
@@ -1538,7 +1538,7 @@ export function CustomerDetailModal({
                       size="sm"
                       onClick={() => setShowBusinessAddressSearch(true)}
                       className={cn(
-                        "border-gray-600 h-7 w-7 p-0",
+                        "border-border h-7 w-7 p-0",
                         isReadOnly && "opacity-50 cursor-not-allowed",
                       )}
                       disabled={formData.is_same_as_business || isReadOnly}
@@ -1551,7 +1551,7 @@ export function CustomerDetailModal({
                 {/* Row 9: 상세주소 | 자가 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       상세주소
                     </Label>
                     <Input
@@ -1562,10 +1562,10 @@ export function CustomerDetailModal({
                         })
                       }
                       className={cn(
-                        "border-gray-600 text-gray-200 h-7 text-xs",
+                        "border-border text-foreground h-7 text-xs",
                         isReadOnly
-                          ? "bg-gray-700 cursor-not-allowed opacity-70"
-                          : "bg-gray-800",
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
                       )}
                       placeholder="동/호수"
                       disabled={formData.is_same_as_business || isReadOnly}
@@ -1586,7 +1586,7 @@ export function CustomerDetailModal({
                     />
                     <Label
                       htmlFor="business-owned"
-                      className="text-[10px] text-gray-400"
+                      className="text-[10px] text-muted-foreground"
                     >
                       자가
                     </Label>
@@ -1596,7 +1596,7 @@ export function CustomerDetailModal({
                 {/* Row 10: 최근 매출 | Y-1 매출 | Y-2 매출 | Y-3 매출 (4등분) */}
                 <div className="grid grid-cols-4 gap-1">
                   <div>
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       최근 매출
                     </Label>
                     <div className="relative">
@@ -1610,19 +1610,19 @@ export function CustomerDetailModal({
                         }
                         disabled={isReadOnly}
                         className={cn(
-                          "border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full",
+                          "border-border text-foreground pr-5 h-7 text-xs w-full",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       />
-                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
                         억
                       </span>
                     </div>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       Y-1 매출
                     </Label>
                     <div className="relative">
@@ -1636,19 +1636,19 @@ export function CustomerDetailModal({
                         }
                         disabled={isReadOnly}
                         className={cn(
-                          "border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full",
+                          "border-border text-foreground pr-5 h-7 text-xs w-full",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       />
-                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
                         억
                       </span>
                     </div>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       Y-2 매출
                     </Label>
                     <div className="relative">
@@ -1662,19 +1662,19 @@ export function CustomerDetailModal({
                         }
                         disabled={isReadOnly}
                         className={cn(
-                          "border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full",
+                          "border-border text-foreground pr-5 h-7 text-xs w-full",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       />
-                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
                         억
                       </span>
                     </div>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-gray-400">
+                    <Label className="text-[10px] text-muted-foreground">
                       Y-3 매출
                     </Label>
                     <div className="relative">
@@ -1688,13 +1688,13 @@ export function CustomerDetailModal({
                         }
                         disabled={isReadOnly}
                         className={cn(
-                          "border-gray-600 text-gray-200 pr-5 h-7 text-xs w-full",
+                          "border-border text-foreground pr-5 h-7 text-xs w-full",
                           isReadOnly
-                            ? "bg-gray-700 cursor-not-allowed opacity-70"
-                            : "bg-gray-800",
+                            ? "bg-muted cursor-not-allowed opacity-70"
+                            : "bg-muted",
                         )}
                       />
-                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-500">
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
                         억
                       </span>
                     </div>
@@ -1736,9 +1736,9 @@ export function CustomerDetailModal({
           </div>
 
           {/* Section 2: 중앙 패널 - 문서 뷰어 (40%, A4 비율) */}
-          <div className="flex-1 h-full bg-gray-950 flex flex-col overflow-hidden border-r border-gray-700">
+          <div className="flex-1 h-full bg-gray-950 flex flex-col overflow-hidden border-r">
             {/* Document Header - 상태 변경 드롭다운 포함 */}
-            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
+            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b bg-muted/50">
               <div className="flex items-center gap-2 flex-1 overflow-x-auto">
                 <input
                   type="file"
@@ -1753,7 +1753,7 @@ export function CustomerDetailModal({
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading || isReadOnly}
                   className={cn(
-                    "border-gray-600 shrink-0",
+                    "border-border shrink-0",
                     isReadOnly && "opacity-50 cursor-not-allowed",
                   )}
                 >
@@ -1775,7 +1775,7 @@ export function CustomerDetailModal({
                         "shrink-0 max-w-[150px]",
                         selectedDocument?.id === doc.id
                           ? "bg-blue-600/20 text-blue-400"
-                          : "text-gray-400",
+                          : "text-muted-foreground",
                       )}
                     >
                       <FileText className="w-3 h-3 mr-1" />
@@ -1794,7 +1794,7 @@ export function CustomerDetailModal({
                       size="sm"
                       className={cn(
                         "h-8 px-3 text-sm gap-1.5 shrink-0",
-                        "border-gray-600 bg-gray-800/50",
+                        "border-border bg-muted/50",
                         getStatusStyle(formData.status_code || "상담대기").text,
                       )}
                       data-testid="button-status-dropdown"
@@ -1805,7 +1805,7 @@ export function CustomerDetailModal({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
-                    className="w-48 max-h-80 overflow-y-auto bg-gray-900 border-gray-700"
+                    className="w-48 max-h-80 overflow-y-auto bg-card"
                   >
                     {(() => {
                       // staff 사용자는 집행완료 상태로 변경 불가 (team_leader, super_admin만 가능)
@@ -1842,9 +1842,9 @@ export function CustomerDetailModal({
                         ([groupName, options], groupIndex) => (
                           <DropdownMenuGroup key={groupName}>
                             {groupIndex > 0 && (
-                              <DropdownMenuSeparator className="bg-gray-700" />
+                              <DropdownMenuSeparator className="bg-muted" />
                             )}
-                            <DropdownMenuLabel className="text-xs text-gray-500 px-2 py-1">
+                            <DropdownMenuLabel className="text-xs text-muted-foreground px-2 py-1">
                               {groupName}
                             </DropdownMenuLabel>
                             {options.map((option) => {
@@ -1852,7 +1852,7 @@ export function CustomerDetailModal({
                                 option.value === "최종부결"
                                   ? "text-red-300"
                                   : GROUP_COLORS[option.group || ""] ||
-                                    "text-gray-300";
+                                    "text-muted-foreground";
                               const isSelected =
                                 formData.status_code === option.value;
                               return (
@@ -1938,8 +1938,8 @@ export function CustomerDetailModal({
                                   }}
                                   className={cn(
                                     "flex items-center justify-between cursor-pointer",
-                                    "hover:bg-gray-800",
-                                    isSelected && "bg-gray-800",
+                                    "hover:bg-muted",
+                                    isSelected && "bg-muted",
                                   )}
                                   data-testid={`status-option-${option.value}`}
                                 >
@@ -1974,10 +1974,10 @@ export function CustomerDetailModal({
 
               {/* 선택된 파일 헤더 - 파일명 + 액션 버튼 */}
               {selectedDocument && !isDragActive && (
-                <div className="shrink-0 px-4 py-2 border-b border-gray-700 bg-gray-900/50 flex items-center justify-between gap-2">
+                <div className="shrink-0 px-4 py-2 border-b bg-gray-900/50 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="w-4 h-4 text-gray-400 shrink-0" />
-                    <span className="text-sm text-gray-300 truncate">
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm text-muted-foreground truncate">
                       {selectedDocument.file_name}
                     </span>
                   </div>
@@ -1992,7 +1992,7 @@ export function CustomerDetailModal({
                       title="새 창에서 열기"
                       data-testid="button-open-new-window"
                     >
-                      <ExternalLink className="w-4 h-4 text-gray-400" />
+                      <ExternalLink className="w-4 h-4 text-muted-foreground" />
                     </Button>
                     {/* 다운로드 */}
                     <a
@@ -2007,7 +2007,7 @@ export function CustomerDetailModal({
                         title="다운로드"
                         data-testid="button-download-file"
                       >
-                        <Download className="w-4 h-4 text-gray-400" />
+                        <Download className="w-4 h-4 text-muted-foreground" />
                       </Button>
                     </a>
                     {/* 삭제 버튼 - 읽기전용이 아닐 때만 */}
@@ -2050,11 +2050,11 @@ export function CustomerDetailModal({
                       selectedDocument.file_type.includes("pdf") ? (
                       <iframe
                         src={`https://docs.google.com/gview?url=${encodeURIComponent(selectedDocument.file_url)}&embedded=true`}
-                        className="w-full h-full rounded border border-gray-700 bg-white"
+                        className="w-full h-full rounded border bg-white"
                         title={selectedDocument.file_name}
                       />
                     ) : (
-                      <div className="text-gray-500 text-center">
+                      <div className="text-muted-foreground text-center">
                         <FileText className="w-16 h-16 mx-auto mb-4 text-gray-600" />
                         <p className="mb-4">
                           미리보기를 지원하지 않는 파일 형식입니다
@@ -2075,10 +2075,10 @@ export function CustomerDetailModal({
                   </div>
                 ) : (
                   <div
-                    className="h-full flex items-center justify-center text-gray-500 cursor-pointer"
+                    className="h-full flex items-center justify-center text-muted-foreground cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <div className="text-center border-2 border-dashed border-gray-700 rounded-lg p-8">
+                    <div className="text-center border-2 border-dashed border-border rounded-lg p-8">
                       <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
                       <p>파일을 드래그하거나 클릭하여 업로드하세요</p>
                       <p className="text-xs text-gray-600 mt-1">
@@ -2094,9 +2094,9 @@ export function CustomerDetailModal({
           {/* Section 3: 우측 패널 - 커뮤니케이션 (25%) */}
           <div className="w-[25%] min-w-[280px] h-full flex flex-col overflow-hidden">
             {/* 상단 50%: 메모/변경이력 탭 */}
-            <div className="h-1/2 flex flex-col border-b border-gray-700">
+            <div className="h-1/2 flex flex-col border-b">
               {/* Tab Headers */}
-              <div className="h-10 shrink-0 border-b border-gray-700 bg-gray-800/30 flex items-center px-2 gap-2">
+              <div className="h-10 shrink-0 border-b bg-muted/30 flex items-center px-2 gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2105,7 +2105,7 @@ export function CustomerDetailModal({
                     "h-8 px-3 text-sm",
                     activeBottomTab === "memo"
                       ? "bg-blue-600/20 text-blue-400"
-                      : "text-gray-400",
+                      : "text-muted-foreground",
                   )}
                   data-testid="tab-memo"
                 >
@@ -2120,7 +2120,7 @@ export function CustomerDetailModal({
                     "h-8 px-3 text-sm",
                     activeBottomTab === "history"
                       ? "bg-orange-600/20 text-orange-400"
-                      : "text-gray-400",
+                      : "text-muted-foreground",
                   )}
                   data-testid="tab-history"
                 >
@@ -2152,7 +2152,7 @@ export function CustomerDetailModal({
                       className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2 bg-gray-900/50"
                     >
                       {memos.length === 0 ? (
-                        <div className="text-center text-gray-500 py-3">
+                        <div className="text-center text-muted-foreground py-3">
                           <p className="text-sm">상담 메모가 없습니다</p>
                         </div>
                       ) : (
@@ -2162,12 +2162,12 @@ export function CustomerDetailModal({
                               <span className="text-xs font-medium text-blue-400">
                                 {memo.author_name}
                               </span>
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-muted-foreground">
                                 {safeFormatDate(memo.created_at, "MM/dd HH:mm")}
                               </span>
                             </div>
                             <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
-                              <p className="text-sm text-gray-200 whitespace-pre-wrap">
+                              <p className="text-sm text-foreground whitespace-pre-wrap">
                                 {memo.content}
                               </p>
                             </div>
@@ -2177,12 +2177,12 @@ export function CustomerDetailModal({
                     </div>
 
                     {/* Memo Input */}
-                    <div className="shrink-0 border-t border-gray-700 bg-gray-800/30 flex items-center px-2 py-2 gap-1.5">
+                    <div className="shrink-0 border-t border-border bg-muted/30 flex items-center px-2 py-2 gap-1.5">
                       <Input
                         value={newMemo}
                         onChange={(e) => setNewMemo(e.target.value)}
                         placeholder="메모 입력..."
-                        className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
+                        className="bg-transparent border-border text-foreground h-9 text-sm flex-1"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
@@ -2206,10 +2206,10 @@ export function CustomerDetailModal({
                     {isLoadingHistory ? (
                       <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-6 h-6 animate-spin text-orange-400" />
-                        <span className="ml-2 text-gray-400">로딩 중...</span>
+                        <span className="ml-2 text-muted-foreground">로딩 중...</span>
                       </div>
                     ) : historyLogs.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                         <History className="w-10 h-10 mb-2 text-gray-600" />
                         <p className="text-sm">변경 이력이 없습니다</p>
                       </div>
@@ -2225,7 +2225,7 @@ export function CustomerDetailModal({
                                     ? "bg-blue-600/20 text-blue-400"
                                     : log.action_type === "manager_change"
                                       ? "bg-green-600/20 text-green-400"
-                                      : "bg-gray-600/20 text-gray-400",
+                                      : "bg-gray-600/20 text-muted-foreground",
                                 )}
                               >
                                 {log.action_type === "status_change" ? (
@@ -2237,34 +2237,34 @@ export function CustomerDetailModal({
                                 )}
                               </div>
                               {index < historyLogs.length - 1 && (
-                                <div className="w-0.5 flex-1 bg-gray-700 my-1" />
+                                <div className="w-0.5 flex-1 bg-muted my-1" />
                               )}
                             </div>
                             <div className="flex-1 pb-2">
                               <div className="flex items-center gap-2 mb-0.5">
-                                <span className="text-xs font-medium text-gray-300">
+                                <span className="text-xs font-medium text-muted-foreground">
                                   {log.changed_by_name || "시스템"}
                                 </span>
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-muted-foreground">
                                   {safeFormatDate(
                                     log.changed_at,
                                     "MM/dd HH:mm",
                                   )}
                                 </span>
                               </div>
-                              <div className="bg-gray-800/50 border border-gray-700 rounded-lg px-2 py-1.5">
-                                <p className="text-xs text-gray-200">
+                              <div className="bg-muted/50 border rounded-lg px-2 py-1.5">
+                                <p className="text-xs text-foreground">
                                   {log.description}
                                 </p>
                                 {log.old_value && log.new_value && (
                                   <div className="flex items-center gap-1 mt-1 text-xs">
                                     <Badge
                                       variant="outline"
-                                      className="bg-gray-700/50 text-gray-400 border-gray-600 text-[10px] px-1"
+                                      className="bg-muted/50 text-muted-foreground border-border text-[10px] px-1"
                                     >
                                       {log.old_value}
                                     </Badge>
-                                    <ArrowRight className="w-2.5 h-2.5 text-gray-500" />
+                                    <ArrowRight className="w-2.5 h-2.5 text-muted-foreground" />
                                     <Badge
                                       variant="outline"
                                       className="bg-blue-600/20 text-blue-400 border-blue-600/30 text-[10px] px-1"
@@ -2287,7 +2287,7 @@ export function CustomerDetailModal({
             {/* 하단 50%: AI 채팅 */}
             <div className="h-1/2 flex flex-col bg-gray-950/30">
               {/* AI Header */}
-              <div className="h-10 shrink-0 border-b border-gray-700 px-3 flex items-center">
+              <div className="h-10 shrink-0 border-b px-3 flex items-center">
                 <span className="text-xs font-semibold text-purple-400 flex items-center gap-1.5">
                   <Bot className="w-3.5 h-3.5" />
                   AI 질의
@@ -2300,7 +2300,7 @@ export function CustomerDetailModal({
                 className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2"
               >
                 {aiMessages.length === 0 ? (
-                  <div className="text-center text-gray-500 py-3">
+                  <div className="text-center text-muted-foreground py-3">
                     <Bot className="w-7 h-7 mx-auto mb-1 text-purple-600/50" />
                     <p className="text-sm">AI에게 질문하세요</p>
                   </div>
@@ -2318,14 +2318,14 @@ export function CustomerDetailModal({
                           "rounded-lg px-2 py-1.5 max-w-[90%]",
                           msg.role === "user"
                             ? "bg-purple-600/30 border border-purple-600/40"
-                            : "bg-gray-700/50 border border-gray-600/50",
+                            : "bg-muted/50 border border-border/50",
                         )}
                       >
-                        <p className="text-sm text-gray-200 whitespace-pre-wrap">
+                        <p className="text-sm text-foreground whitespace-pre-wrap">
                           {msg.content}
                         </p>
                       </div>
-                      <span className="text-xs text-gray-500 mt-0.5">
+                      <span className="text-xs text-muted-foreground mt-0.5">
                         {safeFormatDate(msg.created_at, "HH:mm")}
                       </span>
                     </div>
@@ -2334,12 +2334,12 @@ export function CustomerDetailModal({
               </div>
 
               {/* AI Input */}
-              <div className="shrink-0 border-t border-gray-700 bg-purple-900/10 flex items-center px-2 py-2 gap-1.5">
+              <div className="shrink-0 border-t border-border bg-purple-900/10 flex items-center px-2 py-2 gap-1.5">
                 <Input
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
                   placeholder="AI에게 질문하기..."
-                  className="bg-transparent border-gray-600 text-gray-200 h-9 text-sm flex-1"
+                  className="bg-transparent border-border text-foreground h-9 text-sm flex-1"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -2370,8 +2370,8 @@ export function CustomerDetailModal({
           }
         }}
       >
-        <DialogContent className="max-w-md bg-gray-900 border-gray-700 text-gray-100">
-          <DialogTitle className="text-lg font-semibold text-gray-100 mb-4">
+        <DialogContent className="max-w-md bg-card text-foreground">
+          <DialogTitle className="text-lg font-semibold text-foreground mb-4">
             상태 변경: {statusChangeModal.targetStatus}
           </DialogTitle>
 
@@ -2380,7 +2380,7 @@ export function CustomerDetailModal({
             {statusChangeModal.targetStatus.includes("계약완료") && (
               <>
                 <div>
-                  <Label className="text-gray-300 text-sm">자문료 (%)</Label>
+                  <Label className="text-muted-foreground text-sm">자문료 (%)</Label>
                   <div className="relative mt-1">
                     <Input
                       type="number"
@@ -2394,17 +2394,17 @@ export function CustomerDetailModal({
                           commissionRate: parseFloat(e.target.value) || 0,
                         }))
                       }
-                      className="bg-gray-800 border-gray-600 text-gray-200 pr-8"
+                      className="bg-muted border-border text-foreground pr-8"
                       placeholder="예: 10.5"
                       data-testid="input-status-commission-rate"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                       %
                     </span>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-gray-300 text-sm">
+                  <Label className="text-muted-foreground text-sm">
                     계약금 수령액 (단위: 만원)
                   </Label>
                   <div className="relative mt-1">
@@ -2418,11 +2418,11 @@ export function CustomerDetailModal({
                           contractAmount: parseInt(e.target.value) || 0,
                         }))
                       }
-                      className="bg-gray-800 border-gray-600 text-gray-200 pr-12"
+                      className="bg-muted border-border text-foreground pr-12"
                       placeholder="예: 500 (만원 단위로 입력)"
                       data-testid="input-status-contract-amount"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                       만원
                     </span>
                   </div>
@@ -2433,7 +2433,7 @@ export function CustomerDetailModal({
             {/* 신청완료 상태: 신청기관 */}
             {statusChangeModal.targetStatus.includes("신청완료") && (
               <div>
-                <Label className="text-gray-300 text-sm">신청 기관</Label>
+                <Label className="text-muted-foreground text-sm">신청 기관</Label>
                 <Select
                   value={statusChangeModal.processingOrg}
                   onValueChange={(v) =>
@@ -2443,13 +2443,13 @@ export function CustomerDetailModal({
                     }))
                   }
                 >
-                  <SelectTrigger className="mt-1 bg-gray-800 border-gray-600 text-gray-200">
+                  <SelectTrigger className="mt-1 bg-muted border-border text-foreground">
                     <SelectValue placeholder="기관 선택" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectContent className="bg-muted border-border">
                     {PROCESSING_ORGS.filter((org) => org && org.trim() !== "").map(
                       (org) => (
-                        <SelectItem key={org} value={org} className="text-gray-200">
+                        <SelectItem key={org} value={org} className="text-foreground">
                           {org}
                         </SelectItem>
                       )
@@ -2462,7 +2462,7 @@ export function CustomerDetailModal({
             {/* 집행완료 상태: 집행금액 */}
             {statusChangeModal.targetStatus.includes("집행완료") && (
               <div>
-                <Label className="text-gray-300 text-sm">
+                <Label className="text-muted-foreground text-sm">
                   최종 집행 금액 (단위: 만원)
                 </Label>
                 <div className="relative mt-1">
@@ -2476,11 +2476,11 @@ export function CustomerDetailModal({
                         executionAmount: parseInt(e.target.value) || 0,
                       }))
                     }
-                    className="bg-gray-800 border-gray-600 text-gray-200 pr-12"
+                    className="bg-muted border-border text-foreground pr-12"
                     placeholder="예: 10000 (만원 단위로 입력)"
                     data-testid="input-status-execution-amount"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     만원
                   </span>
                 </div>
@@ -2494,7 +2494,7 @@ export function CustomerDetailModal({
               onClick={() =>
                 setStatusChangeModal((prev) => ({ ...prev, isOpen: false }))
               }
-              className="border-gray-600 text-gray-300"
+              className="border-border text-muted-foreground"
             >
               취소
             </Button>
