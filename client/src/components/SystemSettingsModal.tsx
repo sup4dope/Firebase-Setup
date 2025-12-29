@@ -773,7 +773,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                     </div>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-sm">재집행</Label>
+                    <Label className="text-muted-foreground text-sm">승인복제</Label>
                     <div className="relative mt-1">
                       <Input
                         type="number"
