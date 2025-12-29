@@ -560,19 +560,19 @@ export function CustomerDetailModal({
         // 사업자등록증 파일이 있는지 확인하고 OCR 처리
         console.log("🔍 OCR 대상 파일 검색 시작...");
         for (const uploadedFile of files) {
-          console.log(`📄 파일 확인: "${uploadedFile.name}", 타입: "${uploadedFile.type}"`);
+          console.log(`📄 파일 확인: "${uploadedFile.name}", 타입: "${uploadedFile.type}", 크기: ${uploadedFile.size}bytes`);
           
           const isBusinessReg = isBusinessRegistrationFile(uploadedFile.name);
           const isImage = uploadedFile.type.startsWith('image/');
+          const isPdf = uploadedFile.type === 'application/pdf' || uploadedFile.type.includes('pdf');
+          const isOCRSupported = isImage || isPdf;
           
-          console.log(`   -> 사업자등록증 여부: ${isBusinessReg}, 이미지 여부: ${isImage}`);
+          console.log(`   -> 사업자등록증 여부: ${isBusinessReg}, 이미지: ${isImage}, PDF: ${isPdf}, OCR지원: ${isOCRSupported}`);
           
-          if (isBusinessReg && isImage) {
-            console.log("📋 사업자등록증 이미지 파일 감지, OCR 처리 시작...");
+          if (isBusinessReg && isOCRSupported) {
+            console.log(`📋 사업자등록증 ${isPdf ? 'PDF' : '이미지'} 파일 감지, OCR 처리 시작...`);
             processBusinessRegistrationOCR(uploadedFile);
             break; // 첫 번째 사업자등록증만 처리
-          } else if (isBusinessReg && !isImage) {
-            console.log("⚠️ 사업자등록증 파일이 PDF입니다. OCR은 이미지 파일(JPG, PNG)만 지원합니다.");
           }
         }
       }

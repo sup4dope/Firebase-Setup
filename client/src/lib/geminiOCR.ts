@@ -114,15 +114,14 @@ export async function extractBusinessRegistration(
 }
 
 /**
- * 파일명에 사업자등록증 관련 키워드가 포함되어 있는지 확인
- * 더 유연한 매칭: 공백, 대소문자 무시
+ * 파일명에 '사업자등록증'이 정확히 포함되어 있는지 확인
+ * 엄격한 매칭: 공백 제거 후 '사업자등록증' 문자열 포함 여부만 체크
  */
 export function isBusinessRegistrationFile(fileName: string): boolean {
-  const normalizedName = fileName.toLowerCase().replace(/\s+/g, '');
-  const keywords = ['사업자등록증', '사업자등록', '등록증'];
-  const matched = keywords.some(keyword => normalizedName.includes(keyword));
+  const normalizedName = fileName.replace(/\s+/g, '');
+  const matched = normalizedName.includes('사업자등록증');
   
-  console.log(`🔍 파일명 체크: "${fileName}" -> 정규화: "${normalizedName}" -> 매칭: ${matched}`);
+  console.log(`🔍 파일명 체크: "${fileName}" -> 정규화: "${normalizedName}" -> '사업자등록증' 포함: ${matched}`);
   return matched;
 }
 
@@ -133,4 +132,16 @@ export function isImageFile(fileType: string): boolean {
   const isImage = fileType.startsWith('image/');
   console.log(`🔍 파일 타입 체크: "${fileType}" -> 이미지 여부: ${isImage}`);
   return isImage;
+}
+
+/**
+ * OCR 지원 파일인지 확인 (이미지 또는 PDF)
+ */
+export function isOCRSupportedFile(fileType: string): boolean {
+  const isImage = fileType.startsWith('image/');
+  const isPdf = fileType === 'application/pdf' || fileType.includes('pdf');
+  const supported = isImage || isPdf;
+  
+  console.log(`🔍 OCR 지원 파일 체크: "${fileType}" -> 이미지: ${isImage}, PDF: ${isPdf}, 지원: ${supported}`);
+  return supported;
 }
