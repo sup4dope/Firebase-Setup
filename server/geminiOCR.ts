@@ -145,9 +145,9 @@ JSON 형식으로만 응답하세요:
     console.log(`   - 요청 MIME 타입: ${mimeType}`);
     console.log(`   - 요청 데이터 크기: ${base64Data.length} bytes`);
     
-    // gemini-1.5-flash 모델 사용 (PDF 직접 지원, v1 API 사용)
-    const modelName = "gemini-1.5-flash";
-    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
+    // gemini-1.5-flash 모델 사용 (PDF 직접 지원, v1beta API)
+    const modelName = "gemini-1.5-flash-002";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
     console.log(`   - 사용 모델: ${modelName}`);
     
     const response = await fetch(apiUrl, {

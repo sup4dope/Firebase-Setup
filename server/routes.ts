@@ -32,14 +32,18 @@ export async function registerRoutes(
         res.json({ success: true, data: result });
       } else {
         console.log("❌ [라우터] OCR 실패 (결과 없음)");
-        res.json({ success: false, error: "OCR 처리에 실패했습니다. 문서를 인식할 수 없습니다." });
+        res.json({ success: false, error: "OCR 결과가 비어 있습니다.", details: "extractBusinessRegistrationFromBase64 returned null" });
       }
     } catch (error: any) {
       const errorMessage = error?.message || String(error);
+      const errorStack = error?.stack || "";
       console.error("❌ [라우터] OCR API 예외:", errorMessage);
+      console.error("   - Stack:", errorStack);
       res.status(500).json({ 
         success: false, 
-        error: errorMessage 
+        error: errorMessage,
+        stack: errorStack,
+        details: "서버에서 OCR 처리 중 예외 발생"
       });
     }
   });
