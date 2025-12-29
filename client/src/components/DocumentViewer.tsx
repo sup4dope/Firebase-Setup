@@ -143,8 +143,32 @@ function PDFViewer({ url, fileName }: { url: string; fileName: string }) {
 
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Controls */}
-      <div className="shrink-0 flex items-center justify-center gap-2 p-2 bg-muted/30 border-b">
+      {/* PDF Content */}
+      <div className="flex-1 overflow-auto flex items-start justify-center p-4 bg-muted/20">
+        {isLoading && <DocumentSkeleton type="pdf" />}
+        
+        {cachedUrl && (
+          <Document
+            file={cachedUrl}
+            onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={onDocumentLoadError}
+            loading={<DocumentSkeleton type="pdf" />}
+            className={cn(isLoading && "hidden")}
+          >
+            <Page
+              pageNumber={currentPage}
+              scale={scale}
+              loading={<DocumentSkeleton type="pdf" />}
+              renderTextLayer={false}
+              renderAnnotationLayer={false}
+              className="shadow-lg"
+            />
+          </Document>
+        )}
+      </div>
+
+      {/* Controls - 하단에 위치, 세로 여백 축소 */}
+      <div className="shrink-0 flex items-center justify-center gap-2 py-1 px-2 bg-muted/30 border-t">
         <Button 
           variant="ghost" 
           size="icon" 
@@ -176,30 +200,6 @@ function PDFViewer({ url, fileName }: { url: string; fileName: string }) {
         <Button variant="ghost" size="icon" onClick={zoomIn} disabled={scale >= 2}>
           <ZoomIn className="w-4 h-4" />
         </Button>
-      </div>
-
-      {/* PDF Content */}
-      <div className="flex-1 overflow-auto flex items-start justify-center p-4 bg-muted/20">
-        {isLoading && <DocumentSkeleton type="pdf" />}
-        
-        {cachedUrl && (
-          <Document
-            file={cachedUrl}
-            onLoadSuccess={onDocumentLoadSuccess}
-            onLoadError={onDocumentLoadError}
-            loading={<DocumentSkeleton type="pdf" />}
-            className={cn(isLoading && "hidden")}
-          >
-            <Page
-              pageNumber={currentPage}
-              scale={scale}
-              loading={<DocumentSkeleton type="pdf" />}
-              renderTextLayer={false}
-              renderAnnotationLayer={false}
-              className="shadow-lg"
-            />
-          </Document>
-        )}
       </div>
     </div>
   );
