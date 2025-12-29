@@ -624,7 +624,6 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
           </Tabs>
         </DialogContent>
       </Dialog>
-
       {showAddEmployee && (
         <Dialog open={showAddEmployee} onOpenChange={setShowAddEmployee}>
           <DialogContent className="max-w-lg max-h-[85vh] bg-background border-border text-foreground overflow-y-auto">
@@ -751,7 +750,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                     </div>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-sm">지인소개</Label>
+                    <Label className="text-muted-foreground text-sm">고객소개</Label>
                     <div className="relative mt-1">
                       <Input
                         type="number"
@@ -968,7 +967,6 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
           </DialogContent>
         </Dialog>
       )}
-
       {showEditEmployee && editTargetUser && (
         <Dialog open={showEditEmployee} onOpenChange={setShowEditEmployee}>
           <DialogContent className="max-w-lg max-h-[85vh] bg-background border-border text-foreground overflow-y-auto">
@@ -1309,7 +1307,6 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
           </DialogContent>
         </Dialog>
       )}
-
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent className="bg-background border-border text-foreground">
           <AlertDialogHeader>
@@ -1333,7 +1330,6 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       <AlertDialog open={showDeleteTeamConfirm} onOpenChange={setShowDeleteTeamConfirm}>
         <AlertDialogContent className="bg-background border-border text-foreground">
           <AlertDialogHeader>
