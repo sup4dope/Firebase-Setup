@@ -251,6 +251,11 @@ export function CustomerDetailModal({
   const [selectedDocument, setSelectedDocument] =
     useState<CustomerDocument | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+    fileName: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Memo state
@@ -434,15 +439,14 @@ export function CustomerDetailModal({
     debouncedSave(updatedData);
   };
 
-  // [수정] 파일 업로드 및 즉시 저장 함수 (압축 최적화 적용)
-  const uploadFile = async (file: File) => {
-    setIsUploading(true);
+  // [수정] 단일 파일 업로드 함수 (압축 최적화 적용) - 내부용
+  const uploadSingleFile = async (file: File): Promise<CustomerDocument | null> => {
     try {
       // 0. 파일 크기 검증
       const sizeValidation = validateFileSize(file);
       if (!sizeValidation.valid) {
-        alert(sizeValidation.message);
-        return;
+        console.warn(sizeValidation.message);
+        return null;
       }
 
       // 1. 이미지 파일인 경우 80% 품질로 압축
@@ -471,7 +475,7 @@ export function CustomerDetailModal({
 
       // 4. 문서 객체 생성
       const newDoc: CustomerDocument = {
-        id: `doc_${Date.now()}`,
+        id: `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         customer_id: formData.id || "",
         file_name: file.name,
         file_url: downloadURL,
@@ -481,46 +485,79 @@ export function CustomerDetailModal({
         uploaded_at: new Date(),
       };
 
-      // 4. UI 즉시 반영
-      const updatedDocs = [...documents, newDoc];
-      setDocuments(updatedDocs);
-      setSelectedDocument(newDoc);
+      return newDoc;
+    } catch (error) {
+      console.error(`파일 업로드 실패 (${file.name}):`, error);
+      return null;
+    }
+  };
 
-      // 5. [핵심] Firestore 즉시 저장 (기존 고객일 경우)
-      if (formData.id) {
+  // [신규] 다중 파일 업로드 함수
+  const uploadMultipleFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+    
+    setIsUploading(true);
+    const uploadedDocs: CustomerDocument[] = [];
+    let currentDocs = [...documents];
+    
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress({ current: i + 1, total: files.length, fileName: file.name });
+        
+        const newDoc = await uploadSingleFile(file);
+        if (newDoc) {
+          uploadedDocs.push(newDoc);
+          currentDocs = [...currentDocs, newDoc];
+          
+          // UI 즉시 반영
+          setDocuments(currentDocs);
+          setSelectedDocument(newDoc);
+        }
+      }
+
+      // Firestore 저장 (기존 고객일 경우)
+      if (formData.id && uploadedDocs.length > 0) {
         const customerRef = doc(db, "customers", formData.id);
 
-        // (1) DB에 arrayUnion으로 추가 (덮어쓰기 방지)
-        await updateDoc(customerRef, {
-          documents: arrayUnion(newDoc),
-        });
-
-        // (2) 로컬 formData 동기화 (자동저장 충돌 방지)
-        setFormData((prev) => ({ ...prev, documents: updatedDocs }));
-
-        // (3) 대시보드 알림
-        if (onSave) {
-          onSave({ id: formData.id, documents: updatedDocs });
+        // DB에 모든 새 문서 추가
+        for (const newDoc of uploadedDocs) {
+          await updateDoc(customerRef, {
+            documents: arrayUnion(newDoc),
+          });
         }
 
-        // (4) 로그 기록
+        // 로컬 formData 동기화
+        setFormData((prev) => ({ ...prev, documents: currentDocs }));
+
+        // 대시보드 알림
+        if (onSave) {
+          onSave({ id: formData.id, documents: currentDocs });
+        }
+
+        // 로그 기록 (한 번에)
         await addDoc(collection(db, "counseling_logs"), {
           customer_id: formData.id,
           action_type: "document_upload",
-          description: `파일 업로드: ${file.name}`,
+          description: `파일 ${uploadedDocs.length}개 업로드: ${uploadedDocs.map(d => d.file_name).join(", ")}`,
           changed_by_name: currentUser?.name || "관리자",
           changed_at: new Date(),
           type: "log",
         });
-      } else {
-        // 신규 고객일 경우: formData에만 담아둠 (저장 버튼 누를 때 같이 저장됨)
-        setFormData((prev) => ({ ...prev, documents: updatedDocs }));
+      } else if (!formData.id) {
+        // 신규 고객일 경우: formData에만 담아둠
+        setFormData((prev) => ({ ...prev, documents: currentDocs }));
+      }
+
+      if (uploadedDocs.length > 0) {
+        console.log(`✅ ${uploadedDocs.length}개 파일 업로드 완료`);
       }
     } catch (error) {
-      console.error("파일 업로드 실패:", error);
+      console.error("다중 파일 업로드 실패:", error);
       alert("파일 업로드 중 오류가 발생했습니다.");
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -585,21 +622,21 @@ export function CustomerDetailModal({
     }
   };
 
-  // Handle file input change
+  // Handle file input change (다중 파일 지원)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await uploadFile(file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await uploadMultipleFiles(Array.from(files));
   };
 
-  // Dropzone for drag & drop
+  // Dropzone for drag & drop (다중 파일 지원)
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
-        uploadFile(acceptedFiles[0]);
+        uploadMultipleFiles(acceptedFiles);
       }
     },
-    [customer?.id, currentUser],
+    [customer?.id, currentUser, documents, formData.id],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -611,6 +648,7 @@ export function CustomerDetailModal({
     },
     noClick: true, // We have a separate button for clicking
     disabled: isReadOnly, // Disable drag & drop for read-only users
+    multiple: true, // 다중 파일 선택 허용
   });
 
   // [헬퍼] 재귀적 데이터 정제 함수 (모든 깊이의 Invalid Date 제거)
@@ -1783,6 +1821,7 @@ export function CustomerDetailModal({
                   ref={fileInputRef}
                   onChange={handleFileUpload}
                   accept=".pdf,.png,.jpg,.jpeg"
+                  multiple
                   className="hidden"
                 />
                 <Button
@@ -1796,7 +1835,9 @@ export function CustomerDetailModal({
                   )}
                 >
                   <Upload className="w-4 h-4 mr-1" />
-                  {isUploading ? "업로드 중..." : "파일 업로드"}
+                  {isUploading && uploadProgress 
+                    ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})...` 
+                    : "파일 업로드"}
                 </Button>
 
                 {/* File Tabs */}
@@ -2091,6 +2132,30 @@ export function CustomerDetailModal({
                       <p className="text-lg font-medium">
                         파일을 여기에 놓으세요
                       </p>
+                      <p className="text-sm text-blue-400/70 mt-1">
+                        여러 파일을 동시에 업로드할 수 있습니다
+                      </p>
+                    </div>
+                  </div>
+                ) : isUploading && uploadProgress ? (
+                  <div className="h-full flex items-center justify-center p-4">
+                    <div className="text-center w-full max-w-xs">
+                      <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-400 animate-spin" />
+                      <p className="text-blue-400 font-medium mb-2">
+                        업로드 중... ({uploadProgress.current}/{uploadProgress.total})
+                      </p>
+                      <p className="text-sm text-muted-foreground mb-3 truncate">
+                        {uploadProgress.fileName}
+                      </p>
+                      <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-blue-500 h-full transition-all duration-300"
+                          style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {Math.round((uploadProgress.current / uploadProgress.total) * 100)}% 완료
+                      </p>
                     </div>
                   </div>
                 ) : selectedDocument ? (
@@ -2109,7 +2174,7 @@ export function CustomerDetailModal({
                       <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
                       <p>파일을 드래그하거나 클릭하여 업로드하세요</p>
                       <p className="text-xs text-gray-600 mt-1">
-                        PDF, PNG, JPG 지원
+                        PDF, PNG, JPG 지원 (다중 파일 가능)
                       </p>
                     </div>
                   </div>
