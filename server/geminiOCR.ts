@@ -83,10 +83,10 @@ export async function extractBusinessRegistrationFromBase64(
   const pureBase64 = stripBase64Header(base64Data);
   console.log(`   - 순수 Base64 길이: ${pureBase64.length}`);
   
-  // URL 고정: v1 + gemini-1.5-flash
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // URL 고정: v1 + gemini-2.0-flash-lite (API 키에서 사용 가능한 모델)
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
   
-  console.log("Final URL:", url.replace(apiKey, "MASKED"));
+  console.log("Final Request URL:", url.replace(apiKey, "MASKED"));
   
   // Body 수동 구성
   const body = {
@@ -100,7 +100,7 @@ export async function extractBusinessRegistrationFromBase64(
 
   try {
     console.log("📡 [서버] Gemini API 호출...");
-    console.log(`   - 모델: gemini-1.5-flash`);
+    console.log(`   - 모델: gemini-2.0-flash-lite`);
     console.log(`   - MIME: ${mimeType}`);
     console.log(`   - 데이터 크기: ${pureBase64.length} bytes`);
 

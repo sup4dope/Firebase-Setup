@@ -7,6 +7,37 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // 디버그: 사용 가능한 Gemini 모델 목록 조회
+  app.get("/api/debug/gemini-models", async (req, res) => {
+    console.log("🔍 [디버그] Gemini 모델 목록 조회...");
+    
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "GEMINI_API_KEY 없음" });
+    }
+    
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`;
+      console.log("Final Request URL:", url.replace(apiKey, "MASKED"));
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log("📥 모델 목록 응답:", JSON.stringify(data, null, 2).substring(0, 3000));
+      
+      if (data.models) {
+        const modelNames = data.models.map((m: any) => m.name);
+        console.log("✅ 사용 가능한 모델:", modelNames);
+        res.json({ success: true, models: modelNames, raw: data });
+      } else {
+        res.json({ success: false, error: data.error, raw: data });
+      }
+    } catch (error: any) {
+      console.error("❌ 모델 목록 조회 실패:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // OCR API endpoint for business registration extraction
   app.post("/api/ocr/business-registration", async (req, res) => {
     console.log("📥 [라우터] OCR API 요청 수신");
