@@ -25,9 +25,18 @@ export async function registerRoutes(
       }
       
       console.log("🔄 [라우터] OCR 처리 함수 호출...");
-      const result = await extractBusinessRegistrationFromBase64(base64Data, mimeType);
+      const result = await extractBusinessRegistrationFromBase64(base64Data, mimeType) as any;
       
-      if (result) {
+      // _error 필드가 있으면 에러가 발생한 것
+      if (result?._error) {
+        console.log("⚠️ [라우터] OCR 실패 (에러 발생):", result._error);
+        res.json({ 
+          success: false, 
+          error: result._error, 
+          data: result,
+          details: "OCR 처리 중 에러 발생, 빈 데이터 반환됨" 
+        });
+      } else if (result) {
         console.log("✅ [라우터] OCR 성공:", Object.keys(result));
         res.json({ success: true, data: result });
       } else {

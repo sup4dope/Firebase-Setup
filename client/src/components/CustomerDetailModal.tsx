@@ -324,7 +324,7 @@ export function CustomerDetailModal({
       });
       setMemos(
         customer.memo_history?.map((m, i) => ({
-          id: `memo_${i}`,
+          id: (m as any).id || `memo_local_${Date.now()}_${i}`,
           content: m.content,
           author_id: m.author_id,
           author_name: m.author_name,

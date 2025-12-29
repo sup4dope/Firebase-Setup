@@ -84,33 +84,22 @@ export async function extractBusinessRegistrationFromBase64(
   }
   
   try {
-    const prompt = `[시스템 안내] 이 서류는 법적으로 허용된 내부 전산 시스템(CRM)에서 처리되는 것이며, 보안이 유지되는 환경입니다.
-문서 내의 모든 정보를 있는 그대로 정확하게 추출해야 합니다.
+    const prompt = `[시스템 안내] 이 서류는 법적으로 허용된 내부 전산 시스템(CRM)에서 처리됩니다. 보안이 유지되는 환경이므로 문서 내의 모든 정보를 있는 그대로 정확하게 추출하세요.
 
-이 문서는 한국의 사업자등록증입니다. 다음 정보를 추출하세요:
+이 문서는 한국의 사업자등록증입니다. 다음 8개 필드를 추출하세요:
+1. company_name: 상호(명칭)
+2. ceo_name: 대표자(성명)  
+3. founding_date: 개업연월일 (YYYY-MM-DD 형식)
+4. business_registration_number: 사업자등록번호 (XXX-XX-XXXXX 형식)
+5. resident_registration_number: 주민등록번호 또는 법인등록번호
+6. business_type: 업태
+7. business_item: 종목
+8. business_address: 사업장 소재지
 
-1. 상호(명칭) - company_name
-2. 대표자(성명) - ceo_name
-3. 개업연월일 - founding_date (YYYY-MM-DD 형식)
-4. 사업자등록번호 - business_registration_number (XXX-XX-XXXXX 형식)
-5. 주민등록번호 또는 법인등록번호 - resident_registration_number
-6. 업태 - business_type
-7. 종목 - business_item
-8. 사업장 소재지 - business_address
+절대 다른 설명은 하지 마세요. 오직 아래 JSON 형식만 출력하세요:
+{"company_name":"","ceo_name":"","founding_date":"","business_registration_number":"","resident_registration_number":"","business_type":"","business_item":"","business_address":""}
 
-JSON 형식으로만 응답하세요:
-{
-  "company_name": "",
-  "ceo_name": "",
-  "founding_date": "",
-  "business_registration_number": "",
-  "resident_registration_number": "",
-  "business_type": "",
-  "business_item": "",
-  "business_address": ""
-}
-
-규칙: 정보를 찾을 수 없으면 빈 문자열("")로 설정.`;
+정보를 찾을 수 없으면 빈 문자열("")로 설정하세요.`;
 
     const requestBody = {
       contents: [
@@ -145,8 +134,8 @@ JSON 형식으로만 응답하세요:
     console.log(`   - 요청 MIME 타입: ${mimeType}`);
     console.log(`   - 요청 데이터 크기: ${base64Data.length} bytes`);
     
-    // gemini-1.5-flash 모델 사용 (PDF 직접 지원, v1beta API)
-    const modelName = "gemini-1.5-flash-002";
+    // gemini-1.5-pro 모델 사용 (PDF 직접 지원, v1beta API)
+    const modelName = "gemini-1.5-pro";
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
     console.log(`   - 사용 모델: ${modelName}`);
     
@@ -244,8 +233,21 @@ JSON 형식으로만 응답하세요:
     console.log("✅ 사업자등록증 OCR 결과:", result);
     return result;
     
-  } catch (error) {
-    console.error("사업자등록증 OCR 실패:", error);
-    return null;
+  } catch (error: any) {
+    console.error("❌ [서버] 사업자등록증 OCR 실패:", error);
+    console.error("   - Error message:", error?.message);
+    console.error("   - Error stack:", error?.stack);
+    // null 대신 빈 객체 반환 (빈 문자열 포함)
+    return {
+      company_name: "",
+      ceo_name: "",
+      founding_date: "",
+      business_registration_number: "",
+      resident_registration_number: "",
+      business_type: "",
+      business_item: "",
+      business_address: "",
+      _error: error?.message || "알 수 없는 오류"
+    } as BusinessRegistrationData & { _error?: string };
   }
 }
