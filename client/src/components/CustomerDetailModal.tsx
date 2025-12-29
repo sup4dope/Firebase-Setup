@@ -23,6 +23,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
 import { compressImage, validateFileSize, formatFileSize } from "@/lib/imageCompressor";
+import { extractBusinessRegistration, isBusinessRegistrationFile, type BusinessRegistrationData } from "@/lib/geminiOCR";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -267,6 +268,10 @@ export function CustomerDetailModal({
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([]);
   const [aiInput, setAiInput] = useState("");
   const aiScrollRef = useRef<HTMLDivElement>(null);
+
+  // OCR 자동 입력 하이라이트 상태
+  const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
+  const [isProcessingOCR, setIsProcessingOCR] = useState(false);
 
   // Status change modal state
   const [statusChangeModal, setStatusChangeModal] = useState<{
@@ -551,6 +556,15 @@ export function CustomerDetailModal({
 
       if (uploadedDocs.length > 0) {
         console.log(`✅ ${uploadedDocs.length}개 파일 업로드 완료`);
+        
+        // 사업자등록증 파일이 있는지 확인하고 OCR 처리
+        for (const uploadedFile of files) {
+          if (isBusinessRegistrationFile(uploadedFile.name) && uploadedFile.type.startsWith('image/')) {
+            console.log("📋 사업자등록증 파일 감지, OCR 처리 시작...");
+            processBusinessRegistrationOCR(uploadedFile);
+            break; // 첫 번째 사업자등록증만 처리
+          }
+        }
       }
     } catch (error) {
       console.error("다중 파일 업로드 실패:", error);
@@ -559,6 +573,73 @@ export function CustomerDetailModal({
       setIsUploading(false);
       setUploadProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // [신규] 사업자등록증 OCR 처리 및 자동 입력
+  const processBusinessRegistrationOCR = async (file: File) => {
+    setIsProcessingOCR(true);
+    
+    try {
+      const ocrResult = await extractBusinessRegistration(file);
+      
+      if (ocrResult) {
+        // 자동 입력할 필드들
+        const fieldsToUpdate: Partial<typeof formData> = {};
+        const newHighlightedFields = new Set<string>();
+        
+        if (ocrResult.company_name) {
+          fieldsToUpdate.company_name = ocrResult.company_name;
+          newHighlightedFields.add('company_name');
+        }
+        if (ocrResult.ceo_name) {
+          fieldsToUpdate.name = ocrResult.ceo_name;
+          newHighlightedFields.add('name');
+        }
+        if (ocrResult.founding_date) {
+          fieldsToUpdate.founding_date = ocrResult.founding_date;
+          newHighlightedFields.add('founding_date');
+        }
+        if (ocrResult.business_registration_number) {
+          fieldsToUpdate.business_registration_number = ocrResult.business_registration_number;
+          newHighlightedFields.add('business_registration_number');
+        }
+        if (ocrResult.business_type) {
+          fieldsToUpdate.business_type = ocrResult.business_type;
+          newHighlightedFields.add('business_type');
+        }
+        if (ocrResult.business_item) {
+          fieldsToUpdate.business_item = ocrResult.business_item;
+          newHighlightedFields.add('business_item');
+        }
+        if (ocrResult.business_address) {
+          fieldsToUpdate.business_address = ocrResult.business_address;
+          newHighlightedFields.add('business_address');
+        }
+        
+        // 폼 데이터 업데이트
+        if (Object.keys(fieldsToUpdate).length > 0) {
+          const updatedData = { ...formData, ...fieldsToUpdate };
+          setFormData(updatedData);
+          
+          // 하이라이트 표시
+          setHighlightedFields(newHighlightedFields);
+          
+          // 2초 후 하이라이트 제거
+          setTimeout(() => {
+            setHighlightedFields(new Set());
+          }, 2000);
+          
+          // 자동 저장 트리거
+          debouncedSave(updatedData);
+          
+          console.log("✅ 사업자등록증 정보 자동 입력 완료:", fieldsToUpdate);
+        }
+      }
+    } catch (error) {
+      console.error("사업자등록증 OCR 처리 실패:", error);
+    } finally {
+      setIsProcessingOCR(false);
     }
   };
 
@@ -1093,10 +1174,11 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-border text-foreground h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full transition-colors duration-300",
                         isReadOnly
                           ? "bg-muted cursor-not-allowed opacity-70"
                           : "bg-muted",
+                        highlightedFields.has('name') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                       )}
                       data-testid="input-customer-name"
                     />
@@ -1392,9 +1474,22 @@ export function CustomerDetailModal({
 
               {/* 사업자 정보 그룹 (Border Box) - 10줄 압축 배치 */}
               <div className="border rounded-lg p-2 space-y-0.5 mx-1.5 pl-[8px] pr-[8px] pt-[16px] pb-[16px] mt-[30px] mb-[30px]">
-                <h3 className="font-semibold text-emerald-400 mb-1 text-[14px]">
-                  사업자 정보
-                </h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-emerald-400 text-[14px]">
+                    사업자 정보
+                  </h3>
+                  {isProcessingOCR && (
+                    <div className="flex items-center gap-1 text-xs text-blue-400">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>AI 자동 인식 중...</span>
+                    </div>
+                  )}
+                  {highlightedFields.size > 0 && !isProcessingOCR && (
+                    <Badge variant="secondary" className="text-[10px] bg-yellow-500/20 text-yellow-500">
+                      자동 입력됨
+                    </Badge>
+                  )}
+                </div>
 
                 {/* Row 5: 상호명 | 개업일 */}
                 <div className="flex gap-1.5 items-end">
@@ -1407,10 +1502,11 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-border text-foreground h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full transition-colors duration-300",
                         isReadOnly
                           ? "bg-muted cursor-not-allowed opacity-70"
                           : "bg-muted",
+                        highlightedFields.has('company_name') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                       )}
                       data-testid="input-company-name"
                     />
@@ -1435,10 +1531,11 @@ export function CustomerDetailModal({
                       onChange={(e) => handleFoundingDateChange(e.target.value)}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-border text-foreground h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full transition-colors duration-300",
                         isReadOnly
                           ? "bg-muted cursor-not-allowed opacity-70"
                           : "bg-muted",
+                        highlightedFields.has('founding_date') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                       )}
                     />
                   </div>
@@ -1457,10 +1554,11 @@ export function CustomerDetailModal({
                     >
                       <SelectTrigger
                         className={cn(
-                          "border-border text-foreground h-7 text-xs w-full",
+                          "border-border text-foreground h-7 text-xs w-full transition-colors duration-300",
                           isReadOnly
                             ? "bg-muted cursor-not-allowed opacity-70"
                             : "bg-muted",
+                          highlightedFields.has('business_type') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                         )}
                       >
                         <SelectValue />
@@ -1487,10 +1585,11 @@ export function CustomerDetailModal({
                       }
                       disabled={isReadOnly}
                       className={cn(
-                        "border-border text-foreground h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full transition-colors duration-300",
                         isReadOnly
                           ? "bg-muted cursor-not-allowed opacity-70"
                           : "bg-muted",
+                        highlightedFields.has('business_item') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                       )}
                     />
                   </div>
@@ -1519,10 +1618,11 @@ export function CustomerDetailModal({
                       maxLength={12}
                       disabled={isReadOnly}
                       className={cn(
-                        "border-border text-foreground h-7 text-xs w-full",
+                        "border-border text-foreground h-7 text-xs w-full transition-colors duration-300",
                         isReadOnly
                           ? "bg-muted cursor-not-allowed opacity-70"
                           : "bg-muted",
+                        highlightedFields.has('business_registration_number') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                       )}
                       placeholder="000-00-00000"
                     />
@@ -1603,8 +1703,9 @@ export function CustomerDetailModal({
                       value={formData.business_address || ""}
                       readOnly
                       className={cn(
-                        "border-border text-foreground flex-1 h-7 text-xs",
+                        "border-border text-foreground flex-1 h-7 text-xs transition-colors duration-300",
                         isReadOnly ? "bg-muted opacity-70" : "bg-muted",
+                        highlightedFields.has('business_address') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                       )}
                       placeholder="주소 검색"
                     />
