@@ -136,52 +136,78 @@ export async function extractBusinessRegistrationFromBase64(
     };
 
     console.log("📡 [서버] Gemini API 호출 중...");
+    console.log(`   - 요청 MIME 타입: ${mimeType}`);
+    console.log(`   - 요청 데이터 크기: ${base64Data.length} bytes`);
     
-    // gemini-2.0-flash-exp 모델 사용 (PDF 지원)
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      }
-    );
+    // gemini-1.5-flash-latest 모델 사용 (PDF 직접 지원)
+    const modelName = "gemini-1.5-flash-latest";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    console.log(`   - 사용 모델: ${modelName}`);
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
 
     console.log(`📡 [서버] Gemini API 응답 상태: ${response.status}`);
 
     if (!response.ok) {
       const errorData = await response.json();
       const errorMessage = errorData?.error?.message || JSON.stringify(errorData);
-      console.error("❌ [서버] Gemini API 오류:", errorMessage);
-      throw new Error(`Gemini API 오류: ${errorMessage}`);
+      console.error("❌ [서버] Gemini API HTTP 오류:", errorMessage);
+      throw new Error(`API 호출 실패 (${response.status}): ${errorMessage}`);
     }
 
     const data: GeminiResponse = await response.json();
-    console.log("📥 [서버] Gemini 응답 수신 완료");
+    
+    // Raw 응답 전체 로그
+    console.log("📥 [서버] Gemini Raw 응답:", JSON.stringify(data, null, 2).substring(0, 1000));
     
     if (data.error) {
-      console.error("❌ [서버] Gemini API 에러:", data.error.message);
-      return null;
+      console.error("❌ [서버] Gemini 응답 에러:", data.error.message);
+      throw new Error(`AI 응답 에러: ${data.error.message}`);
     }
 
     const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    console.log("📝 [서버] Gemini 텍스트 응답:", textContent?.substring(0, 500));
+    console.log("📝 [서버] Gemini 텍스트 응답 (전체):", textContent);
     
     if (!textContent) {
       console.error("❌ [서버] Gemini 응답에서 텍스트를 찾을 수 없습니다.");
-      return null;
+      console.error("   - candidates:", JSON.stringify(data.candidates));
+      throw new Error("빈 응답 에러: AI로부터 텍스트 응답을 받지 못했습니다.");
     }
 
+    // 마크다운 코드 블록 제거 (```json ... ``` 형태)
     let jsonStr = textContent.trim();
-    const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1];
+    console.log("📝 [서버] 원본 텍스트:", jsonStr.substring(0, 500));
+    
+    // 다양한 마크다운 패턴 처리
+    const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1].trim();
+      console.log("📝 [서버] 마크다운 제거 후:", jsonStr.substring(0, 300));
     }
     
-    console.log("📝 [서버] 파싱할 JSON:", jsonStr.substring(0, 300));
-    const parsedData = JSON.parse(jsonStr);
+    // JSON 시작/끝 위치 찾기 (혹시 앞뒤에 다른 텍스트가 있을 경우)
+    const jsonStartIndex = jsonStr.indexOf('{');
+    const jsonEndIndex = jsonStr.lastIndexOf('}');
+    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+      jsonStr = jsonStr.substring(jsonStartIndex, jsonEndIndex + 1);
+      console.log("📝 [서버] JSON 추출 완료:", jsonStr.substring(0, 300));
+    }
+    
+    let parsedData;
+    try {
+      parsedData = JSON.parse(jsonStr);
+      console.log("✅ [서버] JSON 파싱 성공:", parsedData);
+    } catch (parseError: any) {
+      console.error("❌ [서버] JSON 파싱 실패:", parseError.message);
+      console.error("   - 파싱 시도한 문자열:", jsonStr);
+      throw new Error(`JSON 파싱 에러: ${parseError.message}`);
+    }
     
     const result: BusinessRegistrationData = {
       company_name: parsedData.company_name?.trim() || undefined,
