@@ -32,13 +32,14 @@ export async function registerRoutes(
         res.json({ success: true, data: result });
       } else {
         console.log("❌ [라우터] OCR 실패 (결과 없음)");
-        res.json({ success: false, error: "OCR 처리에 실패했습니다." });
+        res.json({ success: false, error: "OCR 처리에 실패했습니다. 문서를 인식할 수 없습니다." });
       }
-    } catch (error) {
-      console.error("❌ [라우터] OCR API 예외:", error);
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error);
+      console.error("❌ [라우터] OCR API 예외:", errorMessage);
       res.status(500).json({ 
         success: false, 
-        error: "서버 오류가 발생했습니다." 
+        error: errorMessage 
       });
     }
   });

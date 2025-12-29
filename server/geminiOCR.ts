@@ -84,29 +84,34 @@ export async function extractBusinessRegistrationFromBase64(
   }
   
   try {
-    const prompt = `이 사업자등록증 이미지에서 다음 정보를 정확하게 추출해주세요:
-- 상호명 (company_name)
-- 대표자명 (ceo_name)
-- 개업연월일 (founding_date)
-- 사업자등록번호 (business_registration_number)
-- 주민(법인)등록번호 (resident_registration_number)
-- 업종 (business_type)
-- 종목 (business_item)
-- 사업장 소재지 (business_address)
+    const prompt = `이 문서는 한국의 사업자등록증입니다. PDF 또는 이미지 형식일 수 있습니다.
+문서에서 다음 정보를 정확하게 추출해주세요:
 
-반드시 다음 JSON 형식으로만 응답해주세요 (다른 텍스트 없이):
+1. 상호(명칭) - company_name: 사업체의 이름
+2. 대표자(성명) - ceo_name: 대표자의 이름
+3. 개업연월일 - founding_date: 사업 시작 날짜
+4. 사업자등록번호 - business_registration_number: 10자리 번호 (XXX-XX-XXXXX 형식)
+5. 주민(법인)등록번호 - resident_registration_number: 주민등록번호 또는 법인등록번호 (매우 중요! 반드시 찾아주세요)
+6. 업태 - business_type: 사업의 업태
+7. 종목 - business_item: 사업의 종목
+8. 사업장 소재지 - business_address: 사업장의 주소
+
+반드시 아래 JSON 형식으로만 응답해주세요. 다른 설명 없이 JSON만 출력하세요:
 {
-  "company_name": "상호명",
-  "ceo_name": "대표자명",
-  "founding_date": "개업연월일",
-  "business_registration_number": "사업자등록번호",
-  "resident_registration_number": "주민또는법인등록번호",
-  "business_type": "업종",
-  "business_item": "종목",
-  "business_address": "사업장소재지"
+  "company_name": "",
+  "ceo_name": "",
+  "founding_date": "",
+  "business_registration_number": "",
+  "resident_registration_number": "",
+  "business_type": "",
+  "business_item": "",
+  "business_address": ""
 }
 
-정보를 찾을 수 없는 경우 해당 필드의 값을 빈 문자열("")로 설정해주세요.`;
+주의사항:
+- 정보를 찾을 수 없으면 빈 문자열("")로 설정
+- 주민(법인)등록번호는 사업자등록증에서 "주민등록번호" 또는 "법인등록번호" 항목을 확인
+- 날짜는 YYYY-MM-DD 형식으로 변환`;
 
     const requestBody = {
       contents: [
@@ -132,8 +137,9 @@ export async function extractBusinessRegistrationFromBase64(
 
     console.log("📡 [서버] Gemini API 호출 중...");
     
+    // gemini-2.0-flash-exp 모델 사용 (PDF 지원)
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -147,8 +153,9 @@ export async function extractBusinessRegistrationFromBase64(
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error("❌ [서버] Gemini API 오류:", JSON.stringify(errorData, null, 2));
-      return null;
+      const errorMessage = errorData?.error?.message || JSON.stringify(errorData);
+      console.error("❌ [서버] Gemini API 오류:", errorMessage);
+      throw new Error(`Gemini API 오류: ${errorMessage}`);
     }
 
     const data: GeminiResponse = await response.json();
