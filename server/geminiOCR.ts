@@ -1,6 +1,6 @@
 /**
- * Gemini 1.5 Flash API를 사용한 사업자등록증 OCR 서비스 (서버 측)
- * 직접 REST API 호출 (v1 API 버전 고정, 실패시 v1beta 재시도)
+ * Gemini API를 사용한 사업자등록증 OCR 서비스 (서버 측)
+ * 직접 REST API 호출 (v1 API 버전 고정)
  */
 
 export interface BusinessRegistrationData {
@@ -63,16 +63,15 @@ function stripBase64Header(base64Data: string): string {
   return base64Data;
 }
 
-async function callGeminiAPI(apiKey: string, apiVersion: string, pureBase64: string, mimeType: string): Promise<any> {
-  const modelName = "gemini-1.5-flash";
-  const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent?key=${apiKey}`;
+async function callGeminiAPI(apiKey: string, modelName: string, pureBase64: string, mimeType: string): Promise<any> {
+  const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
   
   console.log("Final URL:", url.replace(apiKey, "MASKED"));
   
   const body = {
     "contents": [{
       "parts": [
-        { "text": "사업자등록증 이미지에서 상호명, 대표자명, 개업일, 사업자번호, 업종, 종목, 소재지 정보를 추출해서 JSON 형식으로 응답해줘. 반드시 다음 형식으로만 응답해: {\"company_name\":\"\",\"ceo_name\":\"\",\"founding_date\":\"\",\"business_registration_number\":\"\",\"resident_registration_number\":\"\",\"business_type\":\"\",\"business_item\":\"\",\"business_address\":\"\"}" },
+        { "text": "사업자등록증에서 상호명, 대표자명, 개업일, 사업자번호, 종목, 업종, 소재지를 추출해 JSON으로 응답해줘. 반드시 다음 형식으로만 응답해: {\"company_name\":\"\",\"ceo_name\":\"\",\"founding_date\":\"\",\"business_registration_number\":\"\",\"resident_registration_number\":\"\",\"business_type\":\"\",\"business_item\":\"\",\"business_address\":\"\"}" },
         { "inline_data": { "mime_type": mimeType, "data": pureBase64 } }
       ]
     }],
@@ -88,7 +87,7 @@ async function callGeminiAPI(apiKey: string, apiVersion: string, pureBase64: str
     }
   };
 
-  console.log(`📡 [서버] Gemini API 호출 (${apiVersion})...`);
+  console.log(`📡 [서버] Gemini API 호출...`);
   console.log(`   - 모델: ${modelName}`);
   console.log(`   - MIME: ${mimeType}`);
   console.log(`   - 데이터 크기: ${pureBase64.length} bytes`);
@@ -108,6 +107,14 @@ async function callGeminiAPI(apiKey: string, apiVersion: string, pureBase64: str
   
   return { response, data };
 }
+
+// 사용 가능한 모델 목록 (우선순위 순서)
+const MODELS_TO_TRY = [
+  "gemini-1.5-flash-002",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+  "gemini-1.5-pro-002"
+];
 
 export async function extractBusinessRegistrationFromBase64(
   base64Data: string,
@@ -130,24 +137,41 @@ export async function extractBusinessRegistrationFromBase64(
   console.log(`   - 순수 Base64 길이: ${pureBase64.length}`);
   
   try {
-    // 1차 시도: v1 API
-    let result = await callGeminiAPI(apiKey, "v1", pureBase64, mimeType);
+    let result: any = null;
+    let lastError: string = "";
     
-    // 404 에러시 v1beta로 재시도
-    if (result.response.status === 404) {
-      console.log("⚠️ [서버] v1 API 404 에러, v1beta로 재시도...");
-      result = await callGeminiAPI(apiKey, "v1beta", pureBase64, mimeType);
+    // 여러 모델 순차 시도
+    for (const modelName of MODELS_TO_TRY) {
+      console.log(`🔄 [서버] 모델 시도: ${modelName}`);
+      result = await callGeminiAPI(apiKey, modelName, pureBase64, mimeType);
+      
+      // 성공 또는 429(할당량 초과) 시 중단
+      if (result.response.ok) {
+        console.log(`✅ [서버] ${modelName} 모델 성공!`);
+        break;
+      }
+      
+      // 429 할당량 초과 에러 처리
+      if (result.response.status === 429) {
+        console.error("⚠️ [서버] API 할당량 초과 (429)");
+        throw new Error("API 할당량이 초과되었습니다. 잠시 후 다시 시도해 주세요.");
+      }
+      
+      // 404 에러시 다음 모델 시도
+      if (result.response.status === 404) {
+        lastError = result.data?.error?.message || `${modelName} 모델을 찾을 수 없습니다.`;
+        console.log(`⚠️ [서버] ${modelName} 404 에러, 다음 모델 시도...`);
+        continue;
+      }
+      
+      // 기타 에러
+      lastError = result.data?.error?.message || JSON.stringify(result.data);
+      console.error(`❌ [서버] ${modelName} 에러:`, lastError);
     }
     
-    // 429 할당량 초과 에러 처리
-    if (result.response.status === 429) {
-      console.error("⚠️ [서버] API 할당량 초과 (429)");
-      throw new Error("API 할당량이 초과되었습니다. 잠시 후 다시 시도해 주세요.");
-    }
-    
-    if (!result.response.ok) {
-      const errorMessage = result.data?.error?.message || JSON.stringify(result.data);
-      throw new Error(`API 호출 실패 (${result.response.status}): ${errorMessage}`);
+    // 모든 모델 실패
+    if (!result || !result.response.ok) {
+      throw new Error(`API 호출 실패: ${lastError}`);
     }
 
     const data = result.data;
