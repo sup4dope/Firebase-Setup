@@ -64,7 +64,7 @@ function stripBase64Header(base64Data: string): string {
 }
 
 async function callGeminiAPI(apiKey: string, apiVersion: string, pureBase64: string, mimeType: string): Promise<any> {
-  const modelName = "gemini-2.0-flash";
+  const modelName = "gemini-1.5-flash";
   const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent?key=${apiKey}`;
   
   console.log("Final URL:", url.replace(apiKey, "MASKED"));
@@ -137,6 +137,12 @@ export async function extractBusinessRegistrationFromBase64(
     if (result.response.status === 404) {
       console.log("⚠️ [서버] v1 API 404 에러, v1beta로 재시도...");
       result = await callGeminiAPI(apiKey, "v1beta", pureBase64, mimeType);
+    }
+    
+    // 429 할당량 초과 에러 처리
+    if (result.response.status === 429) {
+      console.error("⚠️ [서버] API 할당량 초과 (429)");
+      throw new Error("API 할당량이 초과되었습니다. 잠시 후 다시 시도해 주세요.");
     }
     
     if (!result.response.ok) {
