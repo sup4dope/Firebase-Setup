@@ -64,7 +64,7 @@ function stripBase64Header(base64Data: string): string {
 }
 
 async function callGeminiAPI(apiKey: string, apiVersion: string, pureBase64: string, mimeType: string): Promise<any> {
-  const modelName = "gemini-1.5-flash";
+  const modelName = "gemini-2.0-flash";
   const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent?key=${apiKey}`;
   
   console.log("Final URL:", url.replace(apiKey, "MASKED"));
