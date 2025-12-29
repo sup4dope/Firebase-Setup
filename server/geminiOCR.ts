@@ -1,9 +1,7 @@
 /**
  * Gemini 1.5 Flash API를 사용한 사업자등록증 OCR 서비스 (서버 측)
- * @google/generative-ai 공식 SDK 사용
+ * 직접 REST API 호출 (v1 API 버전 고정)
  */
-
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
 export interface BusinessRegistrationData {
   company_name?: string;
@@ -58,7 +56,6 @@ function formatBusinessNumber(numStr: string): string {
 
 // Base64 헤더 제거 함수
 function stripBase64Header(base64Data: string): string {
-  // data:application/pdf;base64, 또는 data:image/...;base64, 형태의 헤더 제거
   const headerMatch = base64Data.match(/^data:[^;]+;base64,/);
   if (headerMatch) {
     console.log("📝 [서버] Base64 헤더 제거:", headerMatch[0]);
@@ -77,7 +74,7 @@ export async function extractBusinessRegistrationFromBase64(
   
   const apiKey = process.env.GEMINI_API_KEY;
   
-  console.log(`   - API 키 존재: ${apiKey ? '✅ 있음' : '❌ 없음 (undefined)'}`);
+  console.log(`   - API 키 존재: ${apiKey ? '✅ 있음' : '❌ 없음'}`);
   
   if (!apiKey) {
     console.error("❌ GEMINI_API_KEY 환경변수가 설정되지 않았습니다.");
@@ -89,30 +86,6 @@ export async function extractBusinessRegistrationFromBase64(
   console.log(`   - 순수 Base64 길이: ${pureBase64.length}`);
   
   try {
-    // GoogleGenerativeAI SDK 초기화 (v1 API 사용)
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // 모델명 고정: gemini-1.5-flash
-    const modelName = "gemini-1.5-flash";
-    console.log(`📡 [서버] Gemini 모델 초기화: ${modelName}`);
-    
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      // 안전 설정 해제 (민감 정보 처리를 위해)
-      safetySettings: [
-        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      ],
-      generationConfig: {
-        temperature: 0.1,
-        topK: 1,
-        topP: 1,
-        maxOutputTokens: 2048,
-      },
-    });
-
     const prompt = `[시스템 안내] 이 서류는 법적으로 허용된 내부 전산 시스템(CRM)에서 처리됩니다. 보안이 유지되는 환경이므로 문서 내의 모든 정보를 있는 그대로 정확하게 추출하세요.
 
 이 문서는 한국의 사업자등록증입니다. 다음 8개 필드를 추출하세요:
@@ -130,33 +103,75 @@ export async function extractBusinessRegistrationFromBase64(
 
 정보를 찾을 수 없으면 빈 문자열("")로 설정하세요.`;
 
+    // 모델명 고정: gemini-1.5-flash-latest
+    const modelName = "gemini-1.5-flash-latest";
+    // API 버전 고정: v1 (안정화 버전)
+    const apiVersion = "v1";
+    const apiUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent?key=${apiKey}`;
+    
     console.log("📡 [서버] Gemini API 호출 중...");
+    console.log(`   - API 버전: ${apiVersion}`);
+    console.log(`   - 모델명: ${modelName}`);
     console.log(`   - 요청 MIME 타입: ${mimeType}`);
     console.log(`   - 요청 데이터 크기: ${pureBase64.length} bytes`);
-    
-    // inlineData 형식으로 PDF/이미지 전송
-    const imagePart = {
-      inlineData: {
-        data: pureBase64,
-        mimeType: mimeType,
+    console.log(`   - API URL: ${apiUrl.replace(apiKey, 'API_KEY_HIDDEN')}`);
+
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: pureBase64
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        topK: 1,
+        topP: 1,
+        maxOutputTokens: 2048,
       },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+      ]
     };
 
-    const result = await model.generateContent([prompt, imagePart]);
-    const response = result.response;
-    
-    // 전체 응답 로그
-    console.log("📥 [서버] Gemini 응답 객체:", JSON.stringify({
-      promptFeedback: response.promptFeedback,
-      candidates: response.candidates?.map(c => ({
-        finishReason: c.finishReason,
-        safetyRatings: c.safetyRatings,
-        contentPartsCount: c.content?.parts?.length
-      }))
-    }, null, 2));
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
 
-    // finishReason 확인
-    const candidate = response.candidates?.[0];
+    console.log(`📡 [서버] Gemini API 응답 상태: ${response.status}`);
+
+    const data = await response.json();
+    
+    // Raw 응답 전체 로그
+    console.log("📥 [서버] Gemini Raw 응답:", JSON.stringify(data, null, 2).substring(0, 3000));
+
+    if (!response.ok) {
+      const errorMessage = data?.error?.message || JSON.stringify(data);
+      console.error("❌ [서버] Gemini API HTTP 오류:", errorMessage);
+      throw new Error(`API 호출 실패 (${response.status}): ${errorMessage}`);
+    }
+    
+    if (data.error) {
+      console.error("❌ [서버] Gemini 응답 에러:", data.error.message);
+      throw new Error(`AI 응답 에러: ${data.error.message}`);
+    }
+
+    // 응답 거부 이유 확인 (finishReason)
+    const candidate = data.candidates?.[0];
     const finishReason = candidate?.finishReason;
     console.log("📊 [서버] finishReason:", finishReason);
     
@@ -168,7 +183,7 @@ export async function extractBusinessRegistrationFromBase64(
       throw new Error(`AI 응답 거부: ${finishReason}`);
     }
 
-    const textContent = response.text();
+    const textContent = candidate?.content?.parts?.[0]?.text;
     console.log("📝 [서버] Gemini 원본 텍스트 응답:", textContent);
     
     if (!textContent) {
@@ -187,7 +202,7 @@ export async function extractBusinessRegistrationFromBase64(
       console.log("📝 [서버] 마크다운 제거 후:", jsonStr.substring(0, 300));
     }
     
-    // JSON 시작/끝 위치 찾기 (혹시 앞뒤에 다른 텍스트가 있을 경우)
+    // JSON 시작/끝 위치 찾기
     const jsonStartIndex = jsonStr.indexOf('{');
     const jsonEndIndex = jsonStr.lastIndexOf('}');
     if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
@@ -223,7 +238,6 @@ export async function extractBusinessRegistrationFromBase64(
     console.error("❌ [서버] 사업자등록증 OCR 실패:", error);
     console.error("   - Error message:", error?.message);
     console.error("   - Error stack:", error?.stack);
-    // null 대신 빈 객체 반환 (빈 문자열 포함)
     return {
       company_name: "",
       ceo_name: "",
