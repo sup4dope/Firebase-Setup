@@ -96,6 +96,13 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     hire_date: new Date().toISOString().split('T')[0],
     role: 'staff' as UserRole,
     team_id: '' as string,
+    commissionRates: {
+      teamOverride: 0,
+      ad: 0,
+      referral: 0,
+      reExecution: 0,
+      outsource: 0,
+    },
   });
 
   const [employeeSearch, setEmployeeSearch] = useState('');
@@ -113,6 +120,13 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     hire_date: '',
     role: 'staff' as UserRole,
     team_id: '' as string,
+    commissionRates: {
+      teamOverride: 0,
+      ad: 0,
+      referral: 0,
+      reExecution: 0,
+      outsource: 0,
+    },
   });
 
   const loadData = async () => {
@@ -174,6 +188,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         role: newEmployee.role,
         team_id: newEmployee.team_id || null,
         team_name: team?.team_name || team?.name || null,
+        commissionRates: newEmployee.commissionRates,
       });
 
       setNewEmployee({
@@ -189,6 +204,13 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         hire_date: new Date().toISOString().split('T')[0],
         role: 'staff',
         team_id: '',
+        commissionRates: {
+          teamOverride: 0,
+          ad: 0,
+          referral: 0,
+          reExecution: 0,
+          outsource: 0,
+        },
       });
       setShowAddEmployee(false);
       await loadData();
@@ -250,6 +272,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
 
   const handleOpenEditEmployee = (user: User & { docId?: string }) => {
     setEditTargetUser(user);
+    const userCommissionRates = (user as any).commissionRates || {};
     setEditEmployee({
       name: user.name || '',
       email: user.email || '',
@@ -263,6 +286,13 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       hire_date: user.hire_date || '',
       role: user.role,
       team_id: user.team_id || '',
+      commissionRates: {
+        teamOverride: userCommissionRates.teamOverride || 0,
+        ad: userCommissionRates.ad || 0,
+        referral: userCommissionRates.referral || 0,
+        reExecution: userCommissionRates.reExecution || 0,
+        outsource: userCommissionRates.outsource || 0,
+      },
     });
     setShowEditEmployee(true);
   };
@@ -286,6 +316,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         role: editEmployee.role,
         team_id: editEmployee.team_id || null,
         team_name: team?.team_name || team?.name || null,
+        commissionRates: editEmployee.commissionRates,
       });
 
       setShowEditEmployee(false);
@@ -663,6 +694,134 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 </div>
               </div>
 
+              {/* 수당 정책 설정 섹션 */}
+              <div className="border border-border rounded-md p-3 space-y-3">
+                <Label className="text-foreground text-sm font-medium">수당 정책 설정</Label>
+                
+                {/* 팀 오버라이딩율 - 팀장만 표시 */}
+                {newEmployee.role === 'team_leader' && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">팀 오버라이딩율</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={newEmployee.commissionRates.teamOverride || ''}
+                        onChange={(e) => setNewEmployee({
+                          ...newEmployee,
+                          commissionRates: {
+                            ...newEmployee.commissionRates,
+                            teamOverride: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-employee-team-override"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 유입 채널별 수당율 - 2x2 그리드 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-muted-foreground text-sm">광고</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={newEmployee.commissionRates.ad || ''}
+                        onChange={(e) => setNewEmployee({
+                          ...newEmployee,
+                          commissionRates: {
+                            ...newEmployee.commissionRates,
+                            ad: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-employee-commission-ad"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">지인소개</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={newEmployee.commissionRates.referral || ''}
+                        onChange={(e) => setNewEmployee({
+                          ...newEmployee,
+                          commissionRates: {
+                            ...newEmployee.commissionRates,
+                            referral: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-employee-commission-referral"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">재집행</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={newEmployee.commissionRates.reExecution || ''}
+                        onChange={(e) => setNewEmployee({
+                          ...newEmployee,
+                          commissionRates: {
+                            ...newEmployee.commissionRates,
+                            reExecution: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-employee-commission-reexecution"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">외주</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={newEmployee.commissionRates.outsource || ''}
+                        onChange={(e) => setNewEmployee({
+                          ...newEmployee,
+                          commissionRates: {
+                            ...newEmployee.commissionRates,
+                            outsource: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-employee-commission-outsource"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <Label className="text-muted-foreground text-sm">성명 *</Label>
                 <Input
@@ -876,6 +1035,134 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                       </SelectContent>
                     </Select>
                   )}
+                </div>
+              </div>
+
+              {/* 수당 정책 설정 섹션 */}
+              <div className="border border-border rounded-md p-3 space-y-3">
+                <Label className="text-foreground text-sm font-medium">수당 정책 설정</Label>
+                
+                {/* 팀 오버라이딩율 - 팀장만 표시 */}
+                {editEmployee.role === 'team_leader' && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">팀 오버라이딩율</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={editEmployee.commissionRates.teamOverride || ''}
+                        onChange={(e) => setEditEmployee({
+                          ...editEmployee,
+                          commissionRates: {
+                            ...editEmployee.commissionRates,
+                            teamOverride: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-edit-employee-team-override"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 유입 채널별 수당율 - 2x2 그리드 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-muted-foreground text-sm">광고</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={editEmployee.commissionRates.ad || ''}
+                        onChange={(e) => setEditEmployee({
+                          ...editEmployee,
+                          commissionRates: {
+                            ...editEmployee.commissionRates,
+                            ad: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-edit-employee-commission-ad"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">지인소개</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={editEmployee.commissionRates.referral || ''}
+                        onChange={(e) => setEditEmployee({
+                          ...editEmployee,
+                          commissionRates: {
+                            ...editEmployee.commissionRates,
+                            referral: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-edit-employee-commission-referral"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">재집행</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={editEmployee.commissionRates.reExecution || ''}
+                        onChange={(e) => setEditEmployee({
+                          ...editEmployee,
+                          commissionRates: {
+                            ...editEmployee.commissionRates,
+                            reExecution: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-edit-employee-commission-reexecution"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">외주</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={editEmployee.commissionRates.outsource || ''}
+                        onChange={(e) => setEditEmployee({
+                          ...editEmployee,
+                          commissionRates: {
+                            ...editEmployee.commissionRates,
+                            outsource: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="0"
+                        className="bg-muted border-border text-foreground pr-8"
+                        data-testid="input-edit-employee-commission-outsource"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
