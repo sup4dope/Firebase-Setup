@@ -225,7 +225,9 @@ export default function Dashboard() {
       result = result.filter(c =>
         c.name.toLowerCase().includes(query) ||
         c.company_name.toLowerCase().includes(query) ||
-        c.readable_id.toLowerCase().includes(query)
+        c.readable_id.toLowerCase().includes(query) ||
+        (c.phone && c.phone.replace(/-/g, '').includes(query.replace(/-/g, ''))) ||
+        ((c as any).ceo_phone && (c as any).ceo_phone.replace(/-/g, '').includes(query.replace(/-/g, '')))
       );
     }
 
@@ -836,7 +838,7 @@ export default function Dashboard() {
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="이름, 회사명, ID 검색..."
+                placeholder="이름, 회사명, ID, 연락처 검색..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-9"
