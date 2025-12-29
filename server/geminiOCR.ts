@@ -1,6 +1,6 @@
 /**
- * Gemini API를 사용한 사업자등록증 OCR 서비스 (서버 측)
- * 직접 REST API 호출 (v1 API 버전 고정)
+ * Gemini 1.5 Flash API를 사용한 사업자등록증 OCR 서비스 (서버 측)
+ * v1 API 경로 + gemini-1.5-flash 모델 고정
  */
 
 export interface BusinessRegistrationData {
@@ -63,59 +63,6 @@ function stripBase64Header(base64Data: string): string {
   return base64Data;
 }
 
-async function callGeminiAPI(apiKey: string, modelName: string, pureBase64: string, mimeType: string): Promise<any> {
-  const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
-  
-  console.log("Final URL:", url.replace(apiKey, "MASKED"));
-  
-  const body = {
-    "contents": [{
-      "parts": [
-        { "text": "사업자등록증에서 상호명, 대표자명, 개업일, 사업자번호, 종목, 업종, 소재지를 추출해 JSON으로 응답해줘. 반드시 다음 형식으로만 응답해: {\"company_name\":\"\",\"ceo_name\":\"\",\"founding_date\":\"\",\"business_registration_number\":\"\",\"resident_registration_number\":\"\",\"business_type\":\"\",\"business_item\":\"\",\"business_address\":\"\"}" },
-        { "inline_data": { "mime_type": mimeType, "data": pureBase64 } }
-      ]
-    }],
-    "safetySettings": [
-      { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
-      { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
-      { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE" },
-      { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" }
-    ],
-    "generationConfig": {
-      "temperature": 0.1,
-      "maxOutputTokens": 2048
-    }
-  };
-
-  console.log(`📡 [서버] Gemini API 호출...`);
-  console.log(`   - 모델: ${modelName}`);
-  console.log(`   - MIME: ${mimeType}`);
-  console.log(`   - 데이터 크기: ${pureBase64.length} bytes`);
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-
-  console.log(`📡 [서버] 응답 상태: ${response.status}`);
-  
-  const data = await response.json();
-  console.log("📥 [서버] Raw 응답:", JSON.stringify(data, null, 2).substring(0, 2000));
-  
-  return { response, data };
-}
-
-// 사용 가능한 모델 목록 (우선순위 순서)
-const MODELS_TO_TRY = [
-  "gemini-1.5-flash-002",
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
-  "gemini-1.5-pro-002"
-];
-
 export async function extractBusinessRegistrationFromBase64(
   base64Data: string,
   mimeType: string
@@ -136,45 +83,51 @@ export async function extractBusinessRegistrationFromBase64(
   const pureBase64 = stripBase64Header(base64Data);
   console.log(`   - 순수 Base64 길이: ${pureBase64.length}`);
   
-  try {
-    let result: any = null;
-    let lastError: string = "";
-    
-    // 여러 모델 순차 시도
-    for (const modelName of MODELS_TO_TRY) {
-      console.log(`🔄 [서버] 모델 시도: ${modelName}`);
-      result = await callGeminiAPI(apiKey, modelName, pureBase64, mimeType);
-      
-      // 성공 또는 429(할당량 초과) 시 중단
-      if (result.response.ok) {
-        console.log(`✅ [서버] ${modelName} 모델 성공!`);
-        break;
-      }
-      
-      // 429 할당량 초과 에러 처리
-      if (result.response.status === 429) {
-        console.error("⚠️ [서버] API 할당량 초과 (429)");
-        throw new Error("API 할당량이 초과되었습니다. 잠시 후 다시 시도해 주세요.");
-      }
-      
-      // 404 에러시 다음 모델 시도
-      if (result.response.status === 404) {
-        lastError = result.data?.error?.message || `${modelName} 모델을 찾을 수 없습니다.`;
-        console.log(`⚠️ [서버] ${modelName} 404 에러, 다음 모델 시도...`);
-        continue;
-      }
-      
-      // 기타 에러
-      lastError = result.data?.error?.message || JSON.stringify(result.data);
-      console.error(`❌ [서버] ${modelName} 에러:`, lastError);
-    }
-    
-    // 모든 모델 실패
-    if (!result || !result.response.ok) {
-      throw new Error(`API 호출 실패: ${lastError}`);
-    }
+  // URL 고정: v1 + gemini-1.5-flash
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  
+  console.log("Final URL:", url.replace(apiKey, "MASKED"));
+  
+  // Body 수동 구성
+  const body = {
+    "contents": [{
+      "parts": [
+        { "text": "사업자등록증에서 상호명, 대표자명, 개업일, 사업자번호, 종목, 업종, 소재지를 추출해 JSON으로 응답해줘. 반드시 다음 형식으로만 응답해: {\"company_name\":\"\",\"ceo_name\":\"\",\"founding_date\":\"\",\"business_registration_number\":\"\",\"resident_registration_number\":\"\",\"business_type\":\"\",\"business_item\":\"\",\"business_address\":\"\"}" },
+        { "inline_data": { "mime_type": mimeType, "data": pureBase64 } }
+      ]
+    }]
+  };
 
-    const data = result.data;
+  try {
+    console.log("📡 [서버] Gemini API 호출...");
+    console.log(`   - 모델: gemini-1.5-flash`);
+    console.log(`   - MIME: ${mimeType}`);
+    console.log(`   - 데이터 크기: ${pureBase64.length} bytes`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    console.log(`📡 [서버] 응답 상태: ${response.status}`);
+    
+    const data = await response.json();
+    console.log("📥 [서버] Raw 응답:", JSON.stringify(data, null, 2).substring(0, 2000));
+    
+    // 429 할당량 초과 에러 처리
+    if (response.status === 429) {
+      console.error("⚠️ [서버] API 할당량 초과 (429)");
+      throw new Error("오늘 무료 사용량이 소진되었습니다. 잠시 후 다시 시도하거나 결제 설정을 확인해 주세요.");
+    }
+    
+    // 기타 에러 처리
+    if (!response.ok) {
+      const errorMessage = data?.error?.message || JSON.stringify(data);
+      throw new Error(`API 호출 실패 (${response.status}): ${errorMessage}`);
+    }
     
     if (data.error) {
       throw new Error(`AI 응답 에러: ${data.error.message}`);
