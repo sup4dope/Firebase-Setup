@@ -2507,9 +2507,24 @@ export function CustomerDetailModal({
               </div>
             )}
 
-            {/* 집행완료 상태: 집행금액, 집행일 */}
+            {/* 집행완료 상태: 집행일, 집행금액 */}
             {statusChangeModal.targetStatus.includes("집행완료") && (
               <>
+                <div>
+                  <Label className="text-muted-foreground text-sm">집행일</Label>
+                  <Input
+                    type="date"
+                    value={statusChangeModal.executionDate || ""}
+                    onChange={(e) =>
+                      setStatusChangeModal((prev) => ({
+                        ...prev,
+                        executionDate: e.target.value,
+                      }))
+                    }
+                    className="mt-1 bg-muted border-border text-foreground"
+                    data-testid="input-status-execution-date"
+                  />
+                </div>
                 <div>
                   <Label className="text-muted-foreground text-sm">
                     최종 집행 금액 (단위: 만원)
@@ -2533,21 +2548,6 @@ export function CustomerDetailModal({
                       만원
                     </span>
                   </div>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-sm">집행일</Label>
-                  <Input
-                    type="date"
-                    value={statusChangeModal.executionDate || ""}
-                    onChange={(e) =>
-                      setStatusChangeModal((prev) => ({
-                        ...prev,
-                        executionDate: e.target.value,
-                      }))
-                    }
-                    className="mt-1 bg-muted border-border text-foreground"
-                    data-testid="input-status-execution-date"
-                  />
                 </div>
               </>
             )}
