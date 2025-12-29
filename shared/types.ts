@@ -13,6 +13,15 @@ export interface LoginHistory {
   user_agent?: string;
 }
 
+// Commission Rates for employee compensation
+export interface CommissionRates {
+  teamOverride: number; // 팀 오버라이딩율 (팀장만)
+  ad: number; // 광고 수당율
+  referral: number; // 지인소개 수당율
+  reExecution: number; // 재집행 수당율
+  outsource: number; // 외주 수당율
+}
+
 // User (Firestore: users collection)
 export interface User {
   uid: string;
@@ -34,6 +43,7 @@ export interface User {
   current_ip?: string; // 현재 접속 IP
   last_login_at?: Date; // 최근 로그인 일시
   login_history?: LoginHistory[]; // 로그인 이력 (최근 5개)
+  commissionRates?: CommissionRates; // 수당 정책 설정
   created_at?: Date;
   updated_at?: Date;
 }

@@ -522,6 +522,13 @@ export const createUser = async (userData: {
   role: 'staff' | 'team_leader' | 'super_admin';
   team_id: string | null;
   team_name: string | null;
+  commissionRates?: {
+    teamOverride: number;
+    ad: number;
+    referral: number;
+    reExecution: number;
+    outsource: number;
+  };
 }): Promise<string> => {
   const docRef = await addDoc(collection(db, 'users'), {
     ...userData,
