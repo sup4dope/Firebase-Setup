@@ -1,6 +1,6 @@
 /**
  * Gemini 1.5 Flash API를 사용한 사업자등록증 OCR 서비스 (서버 측)
- * 직접 REST API 호출 (v1 API 버전 고정)
+ * 직접 REST API 호출 (v1 API 버전 고정, 실패시 v1beta 재시도)
  */
 
 export interface BusinessRegistrationData {
@@ -54,7 +54,6 @@ function formatBusinessNumber(numStr: string): string {
   return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
 }
 
-// Base64 헤더 제거 함수
 function stripBase64Header(base64Data: string): string {
   const headerMatch = base64Data.match(/^data:[^;]+;base64,/);
   if (headerMatch) {
@@ -62,6 +61,52 @@ function stripBase64Header(base64Data: string): string {
     return base64Data.substring(headerMatch[0].length);
   }
   return base64Data;
+}
+
+async function callGeminiAPI(apiKey: string, apiVersion: string, pureBase64: string, mimeType: string): Promise<any> {
+  const modelName = "gemini-1.5-flash";
+  const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent?key=${apiKey}`;
+  
+  console.log("Final URL:", url.replace(apiKey, "MASKED"));
+  
+  const body = {
+    "contents": [{
+      "parts": [
+        { "text": "사업자등록증 이미지에서 상호명, 대표자명, 개업일, 사업자번호, 업종, 종목, 소재지 정보를 추출해서 JSON 형식으로 응답해줘. 반드시 다음 형식으로만 응답해: {\"company_name\":\"\",\"ceo_name\":\"\",\"founding_date\":\"\",\"business_registration_number\":\"\",\"resident_registration_number\":\"\",\"business_type\":\"\",\"business_item\":\"\",\"business_address\":\"\"}" },
+        { "inline_data": { "mime_type": mimeType, "data": pureBase64 } }
+      ]
+    }],
+    "safetySettings": [
+      { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
+      { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
+      { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE" },
+      { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" }
+    ],
+    "generationConfig": {
+      "temperature": 0.1,
+      "maxOutputTokens": 2048
+    }
+  };
+
+  console.log(`📡 [서버] Gemini API 호출 (${apiVersion})...`);
+  console.log(`   - 모델: ${modelName}`);
+  console.log(`   - MIME: ${mimeType}`);
+  console.log(`   - 데이터 크기: ${pureBase64.length} bytes`);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  console.log(`📡 [서버] 응답 상태: ${response.status}`);
+  
+  const data = await response.json();
+  console.log("📥 [서버] Raw 응답:", JSON.stringify(data, null, 2).substring(0, 2000));
+  
+  return { response, data };
 }
 
 export async function extractBusinessRegistrationFromBase64(
@@ -81,102 +126,36 @@ export async function extractBusinessRegistrationFromBase64(
     return null;
   }
 
-  // Base64 헤더 제거 (순수 데이터만 전송)
   const pureBase64 = stripBase64Header(base64Data);
   console.log(`   - 순수 Base64 길이: ${pureBase64.length}`);
   
   try {
-    const prompt = `[시스템 안내] 이 서류는 법적으로 허용된 내부 전산 시스템(CRM)에서 처리됩니다. 보안이 유지되는 환경이므로 문서 내의 모든 정보를 있는 그대로 정확하게 추출하세요.
-
-이 문서는 한국의 사업자등록증입니다. 다음 8개 필드를 추출하세요:
-1. company_name: 상호(명칭)
-2. ceo_name: 대표자(성명)  
-3. founding_date: 개업연월일 (YYYY-MM-DD 형식)
-4. business_registration_number: 사업자등록번호 (XXX-XX-XXXXX 형식)
-5. resident_registration_number: 주민등록번호 또는 법인등록번호
-6. business_type: 업태
-7. business_item: 종목
-8. business_address: 사업장 소재지
-
-절대 다른 설명은 하지 마세요. 오직 아래 JSON 형식만 출력하세요:
-{"company_name":"","ceo_name":"","founding_date":"","business_registration_number":"","resident_registration_number":"","business_type":"","business_item":"","business_address":""}
-
-정보를 찾을 수 없으면 빈 문자열("")로 설정하세요.`;
-
-    // 모델명 고정: gemini-1.5-flash-latest
-    const modelName = "gemini-1.5-flash-latest";
-    // API 버전 고정: v1 (안정화 버전)
-    const apiVersion = "v1";
-    const apiUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent?key=${apiKey}`;
+    // 1차 시도: v1 API
+    let result = await callGeminiAPI(apiKey, "v1", pureBase64, mimeType);
     
-    console.log("📡 [서버] Gemini API 호출 중...");
-    console.log(`   - API 버전: ${apiVersion}`);
-    console.log(`   - 모델명: ${modelName}`);
-    console.log(`   - 요청 MIME 타입: ${mimeType}`);
-    console.log(`   - 요청 데이터 크기: ${pureBase64.length} bytes`);
-    console.log(`   - API URL: ${apiUrl.replace(apiKey, 'API_KEY_HIDDEN')}`);
-
-    const requestBody = {
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: pureBase64
-              }
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.1,
-        topK: 1,
-        topP: 1,
-        maxOutputTokens: 2048,
-      },
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-      ]
-    };
-
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    console.log(`📡 [서버] Gemini API 응답 상태: ${response.status}`);
-
-    const data = await response.json();
-    
-    // Raw 응답 전체 로그
-    console.log("📥 [서버] Gemini Raw 응답:", JSON.stringify(data, null, 2).substring(0, 3000));
-
-    if (!response.ok) {
-      const errorMessage = data?.error?.message || JSON.stringify(data);
-      console.error("❌ [서버] Gemini API HTTP 오류:", errorMessage);
-      throw new Error(`API 호출 실패 (${response.status}): ${errorMessage}`);
+    // 404 에러시 v1beta로 재시도
+    if (result.response.status === 404) {
+      console.log("⚠️ [서버] v1 API 404 에러, v1beta로 재시도...");
+      result = await callGeminiAPI(apiKey, "v1beta", pureBase64, mimeType);
     }
     
+    if (!result.response.ok) {
+      const errorMessage = result.data?.error?.message || JSON.stringify(result.data);
+      throw new Error(`API 호출 실패 (${result.response.status}): ${errorMessage}`);
+    }
+
+    const data = result.data;
+    
     if (data.error) {
-      console.error("❌ [서버] Gemini 응답 에러:", data.error.message);
       throw new Error(`AI 응답 에러: ${data.error.message}`);
     }
 
-    // 응답 거부 이유 확인 (finishReason)
     const candidate = data.candidates?.[0];
     const finishReason = candidate?.finishReason;
     console.log("📊 [서버] finishReason:", finishReason);
     
     if (finishReason && finishReason !== "STOP") {
-      console.error("⚠️ [서버] AI 응답 거부됨, finishReason:", finishReason);
+      console.error("⚠️ [서버] AI 응답 거부됨:", finishReason);
       if (candidate?.safetyRatings) {
         console.error("   - safetyRatings:", JSON.stringify(candidate.safetyRatings, null, 2));
       }
@@ -184,30 +163,23 @@ export async function extractBusinessRegistrationFromBase64(
     }
 
     const textContent = candidate?.content?.parts?.[0]?.text;
-    console.log("📝 [서버] Gemini 원본 텍스트 응답:", textContent);
+    console.log("📝 [서버] 원본 텍스트 응답:", textContent);
     
     if (!textContent) {
-      console.error("❌ [서버] Gemini 응답에서 텍스트를 찾을 수 없습니다.");
       throw new Error("빈 응답 에러: AI로부터 텍스트 응답을 받지 못했습니다.");
     }
 
-    // 마크다운 코드 블록 제거 (```json ... ``` 형태)
     let jsonStr = textContent.trim();
-    console.log("📝 [서버] 원본 텍스트:", jsonStr.substring(0, 500));
     
-    // 다양한 마크다운 패턴 처리
     const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (codeBlockMatch) {
       jsonStr = codeBlockMatch[1].trim();
-      console.log("📝 [서버] 마크다운 제거 후:", jsonStr.substring(0, 300));
     }
     
-    // JSON 시작/끝 위치 찾기
     const jsonStartIndex = jsonStr.indexOf('{');
     const jsonEndIndex = jsonStr.lastIndexOf('}');
     if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
       jsonStr = jsonStr.substring(jsonStartIndex, jsonEndIndex + 1);
-      console.log("📝 [서버] JSON 추출 완료:", jsonStr.substring(0, 300));
     }
     
     let parsedData;
@@ -216,19 +188,18 @@ export async function extractBusinessRegistrationFromBase64(
       console.log("✅ [서버] JSON 파싱 성공:", parsedData);
     } catch (parseError: any) {
       console.error("❌ [서버] JSON 파싱 실패:", parseError.message);
-      console.error("   - 파싱 시도한 문자열:", jsonStr);
       throw new Error(`JSON 파싱 에러: ${parseError.message}`);
     }
     
     const extractedResult: BusinessRegistrationData = {
-      company_name: parsedData.company_name?.trim() || undefined,
-      ceo_name: parsedData.ceo_name?.trim() || undefined,
-      founding_date: formatDate(parsedData.founding_date) || undefined,
-      business_registration_number: formatBusinessNumber(parsedData.business_registration_number) || undefined,
+      company_name: parsedData.company_name?.trim() || parsedData["상호명"]?.trim() || undefined,
+      ceo_name: parsedData.ceo_name?.trim() || parsedData["대표자명"]?.trim() || undefined,
+      founding_date: formatDate(parsedData.founding_date || parsedData["개업일"] || "") || undefined,
+      business_registration_number: formatBusinessNumber(parsedData.business_registration_number || parsedData["사업자번호"] || "") || undefined,
       resident_registration_number: parsedData.resident_registration_number?.trim() || undefined,
-      business_type: parsedData.business_type?.trim() || undefined,
-      business_item: parsedData.business_item?.trim() || undefined,
-      business_address: parsedData.business_address?.trim() || undefined,
+      business_type: parsedData.business_type?.trim() || parsedData["업종"]?.trim() || undefined,
+      business_item: parsedData.business_item?.trim() || parsedData["종목"]?.trim() || undefined,
+      business_address: parsedData.business_address?.trim() || parsedData["소재지"]?.trim() || undefined,
     };
 
     console.log("✅ 사업자등록증 OCR 결과:", extractedResult);
