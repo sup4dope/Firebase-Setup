@@ -70,10 +70,16 @@ export async function extractBusinessRegistrationFromBase64(
   base64Data: string,
   mimeType: string
 ): Promise<BusinessRegistrationData | null> {
+  console.log("🔍 [서버] OCR 함수 호출됨");
+  console.log(`   - Base64 길이: ${base64Data?.length || 0}`);
+  console.log(`   - MIME 타입: ${mimeType}`);
+  
   const apiKey = process.env.GEMINI_API_KEY;
   
+  console.log(`   - API 키 존재: ${apiKey ? '✅ 있음' : '❌ 없음 (undefined)'}`);
+  
   if (!apiKey) {
-    console.error("GEMINI_API_KEY 환경변수가 설정되지 않았습니다.");
+    console.error("❌ GEMINI_API_KEY 환경변수가 설정되지 않았습니다.");
     return null;
   }
   
@@ -124,6 +130,8 @@ export async function extractBusinessRegistrationFromBase64(
       }
     };
 
+    console.log("📡 [서버] Gemini API 호출 중...");
+    
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
@@ -135,23 +143,27 @@ export async function extractBusinessRegistrationFromBase64(
       }
     );
 
+    console.log(`📡 [서버] Gemini API 응답 상태: ${response.status}`);
+
     if (!response.ok) {
       const errorData = await response.json();
-      console.error("Gemini API 오류:", errorData);
+      console.error("❌ [서버] Gemini API 오류:", JSON.stringify(errorData, null, 2));
       return null;
     }
 
     const data: GeminiResponse = await response.json();
+    console.log("📥 [서버] Gemini 응답 수신 완료");
     
     if (data.error) {
-      console.error("Gemini API 에러:", data.error.message);
+      console.error("❌ [서버] Gemini API 에러:", data.error.message);
       return null;
     }
 
     const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    console.log("📝 [서버] Gemini 텍스트 응답:", textContent?.substring(0, 500));
     
     if (!textContent) {
-      console.error("Gemini 응답에서 텍스트를 찾을 수 없습니다.");
+      console.error("❌ [서버] Gemini 응답에서 텍스트를 찾을 수 없습니다.");
       return null;
     }
 
@@ -161,6 +173,7 @@ export async function extractBusinessRegistrationFromBase64(
       jsonStr = jsonMatch[1];
     }
     
+    console.log("📝 [서버] 파싱할 JSON:", jsonStr.substring(0, 300));
     const parsedData = JSON.parse(jsonStr);
     
     const result: BusinessRegistrationData = {

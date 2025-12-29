@@ -9,24 +9,33 @@ export async function registerRoutes(
 ): Promise<Server> {
   // OCR API endpoint for business registration extraction
   app.post("/api/ocr/business-registration", async (req, res) => {
+    console.log("📥 [라우터] OCR API 요청 수신");
+    
     try {
       const { base64Data, mimeType } = req.body;
       
+      console.log(`   - Base64 존재: ${base64Data ? '✅' : '❌'}, 길이: ${base64Data?.length || 0}`);
+      console.log(`   - MIME 타입: ${mimeType || '(없음)'}`);
+      
       if (!base64Data || !mimeType) {
+        console.log("❌ [라우터] 필수 파라미터 누락");
         return res.status(400).json({ 
           error: "base64Data와 mimeType이 필요합니다." 
         });
       }
       
+      console.log("🔄 [라우터] OCR 처리 함수 호출...");
       const result = await extractBusinessRegistrationFromBase64(base64Data, mimeType);
       
       if (result) {
+        console.log("✅ [라우터] OCR 성공:", Object.keys(result));
         res.json({ success: true, data: result });
       } else {
+        console.log("❌ [라우터] OCR 실패 (결과 없음)");
         res.json({ success: false, error: "OCR 처리에 실패했습니다." });
       }
     } catch (error) {
-      console.error("OCR API 오류:", error);
+      console.error("❌ [라우터] OCR API 예외:", error);
       res.status(500).json({ 
         success: false, 
         error: "서버 오류가 발생했습니다." 
