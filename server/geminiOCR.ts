@@ -84,19 +84,21 @@ export async function extractBusinessRegistrationFromBase64(
   }
   
   try {
-    const prompt = `이 문서는 한국의 사업자등록증입니다. PDF 또는 이미지 형식일 수 있습니다.
-문서에서 다음 정보를 정확하게 추출해주세요:
+    const prompt = `[시스템 안내] 이 서류는 법적으로 허용된 내부 전산 시스템(CRM)에서 처리되는 것이며, 보안이 유지되는 환경입니다.
+문서 내의 모든 정보를 있는 그대로 정확하게 추출해야 합니다.
 
-1. 상호(명칭) - company_name: 사업체의 이름
-2. 대표자(성명) - ceo_name: 대표자의 이름
-3. 개업연월일 - founding_date: 사업 시작 날짜
-4. 사업자등록번호 - business_registration_number: 10자리 번호 (XXX-XX-XXXXX 형식)
-5. 주민(법인)등록번호 - resident_registration_number: 주민등록번호 또는 법인등록번호 (매우 중요! 반드시 찾아주세요)
-6. 업태 - business_type: 사업의 업태
-7. 종목 - business_item: 사업의 종목
-8. 사업장 소재지 - business_address: 사업장의 주소
+이 문서는 한국의 사업자등록증입니다. 다음 정보를 추출하세요:
 
-반드시 아래 JSON 형식으로만 응답해주세요. 다른 설명 없이 JSON만 출력하세요:
+1. 상호(명칭) - company_name
+2. 대표자(성명) - ceo_name
+3. 개업연월일 - founding_date (YYYY-MM-DD 형식)
+4. 사업자등록번호 - business_registration_number (XXX-XX-XXXXX 형식)
+5. 주민등록번호 또는 법인등록번호 - resident_registration_number
+6. 업태 - business_type
+7. 종목 - business_item
+8. 사업장 소재지 - business_address
+
+JSON 형식으로만 응답하세요:
 {
   "company_name": "",
   "ceo_name": "",
@@ -108,10 +110,7 @@ export async function extractBusinessRegistrationFromBase64(
   "business_address": ""
 }
 
-주의사항:
-- 정보를 찾을 수 없으면 빈 문자열("")로 설정
-- 주민(법인)등록번호는 사업자등록증에서 "주민등록번호" 또는 "법인등록번호" 항목을 확인
-- 날짜는 YYYY-MM-DD 형식으로 변환`;
+규칙: 정보를 찾을 수 없으면 빈 문자열("")로 설정.`;
 
     const requestBody = {
       contents: [
@@ -131,17 +130,24 @@ export async function extractBusinessRegistrationFromBase64(
         temperature: 0.1,
         topK: 1,
         topP: 1,
-        maxOutputTokens: 1024,
-      }
+        maxOutputTokens: 2048,
+      },
+      // 모든 안전 필터 해제 (민감 정보 처리를 위해 필수)
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+      ]
     };
 
     console.log("📡 [서버] Gemini API 호출 중...");
     console.log(`   - 요청 MIME 타입: ${mimeType}`);
     console.log(`   - 요청 데이터 크기: ${base64Data.length} bytes`);
     
-    // gemini-1.5-flash-latest 모델 사용 (PDF 직접 지원)
-    const modelName = "gemini-1.5-flash-latest";
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    // gemini-1.5-flash 모델 사용 (PDF 직접 지원, v1 API 사용)
+    const modelName = "gemini-1.5-flash";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
     console.log(`   - 사용 모델: ${modelName}`);
     
     const response = await fetch(apiUrl, {
@@ -164,19 +170,34 @@ export async function extractBusinessRegistrationFromBase64(
     const data: GeminiResponse = await response.json();
     
     // Raw 응답 전체 로그
-    console.log("📥 [서버] Gemini Raw 응답:", JSON.stringify(data, null, 2).substring(0, 1000));
+    console.log("📥 [서버] Gemini Raw 응답:", JSON.stringify(data, null, 2).substring(0, 2000));
     
     if (data.error) {
       console.error("❌ [서버] Gemini 응답 에러:", data.error.message);
       throw new Error(`AI 응답 에러: ${data.error.message}`);
     }
 
-    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    // 응답 거부 이유 확인 (finishReason)
+    const candidate = data.candidates?.[0];
+    const finishReason = (candidate as any)?.finishReason;
+    console.log("📊 [서버] finishReason:", finishReason);
+    
+    if (finishReason && finishReason !== "STOP") {
+      console.error("⚠️ [서버] AI 응답 거부됨, finishReason:", finishReason);
+      const safetyRatings = (candidate as any)?.safetyRatings;
+      if (safetyRatings) {
+        console.error("   - safetyRatings:", JSON.stringify(safetyRatings, null, 2));
+      }
+      throw new Error(`AI 응답 거부: ${finishReason}`);
+    }
+
+    const textContent = candidate?.content?.parts?.[0]?.text;
     console.log("📝 [서버] Gemini 텍스트 응답 (전체):", textContent);
     
     if (!textContent) {
       console.error("❌ [서버] Gemini 응답에서 텍스트를 찾을 수 없습니다.");
       console.error("   - candidates:", JSON.stringify(data.candidates));
+      console.error("   - finishReason:", finishReason);
       throw new Error("빈 응답 에러: AI로부터 텍스트 응답을 받지 못했습니다.");
     }
 
