@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
+import { compressImage, validateFileSize, formatFileSize } from "@/lib/imageCompressor";
+import { DocumentViewer } from "@/components/DocumentViewer";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -432,22 +434,42 @@ export function CustomerDetailModal({
     debouncedSave(updatedData);
   };
 
-  // [수정] 파일 업로드 및 즉시 저장 함수
+  // [수정] 파일 업로드 및 즉시 저장 함수 (압축 최적화 적용)
   const uploadFile = async (file: File) => {
     setIsUploading(true);
     try {
-      // 1. Storage 경로 설정 (신규 고객이면 temp 경로 사용)
+      // 0. 파일 크기 검증
+      const sizeValidation = validateFileSize(file);
+      if (!sizeValidation.valid) {
+        alert(sizeValidation.message);
+        return;
+      }
+
+      // 1. 이미지 파일인 경우 80% 품질로 압축
+      let fileToUpload = file;
+      if (file.type.startsWith('image/')) {
+        const compressionResult = await compressImage(file);
+        fileToUpload = compressionResult.file;
+        
+        if (compressionResult.wasCompressed) {
+          console.log(
+            `이미지 압축: ${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)} (${Math.round((1 - compressionResult.compressedSize / compressionResult.originalSize) * 100)}% 감소)`
+          );
+        }
+      }
+
+      // 2. Storage 경로 설정 (신규 고객이면 temp 경로 사용)
       const currentId = formData.id || `temp_${Date.now()}`;
       const storageRef = ref(
         storage,
-        `customers/${currentId}/${Date.now()}_${file.name}`,
+        `customers/${currentId}/${Date.now()}_${fileToUpload.name}`,
       );
 
-      // 2. 파일 업로드
-      await uploadBytes(storageRef, file);
+      // 3. 파일 업로드 (압축된 파일)
+      await uploadBytes(storageRef, fileToUpload);
       const downloadURL = await getDownloadURL(storageRef);
 
-      // 3. 문서 객체 생성
+      // 4. 문서 객체 생성
       const newDoc: CustomerDocument = {
         id: `doc_${Date.now()}`,
         customer_id: formData.id || "",
@@ -2060,10 +2082,10 @@ export function CustomerDetailModal({
                 </div>
               )}
 
-              {/* 뷰어 본문 영역 */}
-              <div className="flex-1 p-4 overflow-auto">
+              {/* 뷰어 본문 영역 - 최적화된 DocumentViewer 사용 */}
+              <div className="flex-1 overflow-hidden">
                 {isDragActive ? (
-                  <div className="h-full flex items-center justify-center text-blue-400">
+                  <div className="h-full flex items-center justify-center text-blue-400 p-4">
                     <div className="text-center">
                       <Upload className="w-16 h-16 mx-auto mb-4 animate-pulse" />
                       <p className="text-lg font-medium">
@@ -2072,43 +2094,15 @@ export function CustomerDetailModal({
                     </div>
                   </div>
                 ) : selectedDocument ? (
-                  <div className="h-full flex items-center justify-center">
-                    {selectedDocument.file_type.startsWith("image/") ? (
-                      <img
-                        src={selectedDocument.file_url}
-                        alt={selectedDocument.file_name}
-                        className="max-w-full max-h-full object-contain rounded"
-                      />
-                    ) : selectedDocument.file_type === "application/pdf" ||
-                      selectedDocument.file_type.includes("pdf") ? (
-                      <iframe
-                        src={`https://docs.google.com/gview?url=${encodeURIComponent(selectedDocument.file_url)}&embedded=true`}
-                        className="w-full h-full rounded border bg-white"
-                        title={selectedDocument.file_name}
-                      />
-                    ) : (
-                      <div className="text-muted-foreground text-center">
-                        <FileText className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                        <p className="mb-4">
-                          미리보기를 지원하지 않는 파일 형식입니다
-                        </p>
-                        <a
-                          href={selectedDocument.file_url}
-                          download={selectedDocument.file_name}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Button variant="outline" size="sm">
-                            <Download className="w-4 h-4 mr-2" />
-                            다운로드
-                          </Button>
-                        </a>
-                      </div>
-                    )}
-                  </div>
+                  <DocumentViewer
+                    fileUrl={selectedDocument.file_url}
+                    fileName={selectedDocument.file_name}
+                    fileType={selectedDocument.file_type}
+                    className="h-full"
+                  />
                 ) : (
                   <div
-                    className="h-full flex items-center justify-center text-muted-foreground cursor-pointer"
+                    className="h-full flex items-center justify-center text-muted-foreground cursor-pointer p-4"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <div className="text-center border-2 border-dashed border-border rounded-lg p-8">
