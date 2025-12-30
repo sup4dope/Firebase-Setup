@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid, ReferenceLine } from "recharts";
 import { 
   TrendingUp, 
   Building2, 
@@ -172,6 +172,50 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
   const dtiY1Status = getDtiStatus(dtiY1);
   const dtiAvg3YStatus = getDtiStatus(dtiAvg3Y);
 
+  const timelineData = useMemo(() => {
+    const now = new Date();
+    const months: { month: string; label: string; loans: number; guarantees: number }[] = [];
+    
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      months.push({
+        month: monthKey,
+        label: `${date.getMonth() + 1}월`,
+        loans: 0,
+        guarantees: 0
+      });
+    }
+    
+    obligations.forEach(ob => {
+      if (!ob.occurred_at) return;
+      const obDate = new Date(ob.occurred_at);
+      const monthKey = `${obDate.getFullYear()}-${String(obDate.getMonth() + 1).padStart(2, '0')}`;
+      const monthEntry = months.find(m => m.month === monthKey);
+      if (monthEntry) {
+        if (ob.type === 'loan') monthEntry.loans++;
+        else monthEntry.guarantees++;
+      }
+    });
+    
+    return months;
+  }, [obligations]);
+
+  const scatterData = useMemo(() => {
+    const data: { x: number; y: number; z: number; type: string; month: string }[] = [];
+    
+    timelineData.forEach((month, idx) => {
+      if (month.loans > 0) {
+        data.push({ x: idx, y: 1, z: month.loans * 100, type: 'loan', month: month.label });
+      }
+      if (month.guarantees > 0) {
+        data.push({ x: idx, y: 0, z: month.guarantees * 100, type: 'guarantee', month: month.label });
+      }
+    });
+    
+    return data;
+  }, [timelineData]);
+
   return (
     <div className="h-full flex flex-col gap-4 p-4 overflow-auto pt-[0px] pb-[0px] pl-[10px] pr-[10px]">
       <div className="grid grid-cols-2 gap-4">
@@ -279,6 +323,71 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                   )}
                 />
               </PieChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-purple-400" />
+            12개월 발생 추이
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0 pb-4 px-4 h-[120px]">
+          {scatterData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+              최근 12개월간 발생 내역이 없습니다
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 10, right: 10, bottom: 20, left: 10 }}>
+                <XAxis 
+                  type="category" 
+                  dataKey="x" 
+                  name="월" 
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(value) => timelineData[value]?.label || ''}
+                  axisLine={{ stroke: 'hsl(var(--border))' }}
+                  tickLine={false}
+                />
+                <YAxis 
+                  type="category" 
+                  dataKey="y" 
+                  name="유형"
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(value) => value === 1 ? '대출' : '보증'}
+                  axisLine={{ stroke: 'hsl(var(--border))' }}
+                  tickLine={false}
+                  width={35}
+                />
+                <ZAxis type="number" dataKey="z" range={[50, 300]} />
+                <Tooltip 
+                  cursor={{ strokeDasharray: '3 3' }}
+                  content={({ active, payload }) => {
+                    if (active && payload?.[0]) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-card border rounded-md px-2 py-1 text-xs shadow-md">
+                          <p className="font-medium">{data.month}</p>
+                          <p className="text-muted-foreground">
+                            {data.type === 'loan' ? '대출' : '보증'}: {data.z / 100}건
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Scatter 
+                  data={scatterData.filter(d => d.type === 'loan')} 
+                  fill="hsl(var(--chart-1))"
+                />
+                <Scatter 
+                  data={scatterData.filter(d => d.type === 'guarantee')} 
+                  fill="hsl(var(--chart-3))"
+                />
+              </ScatterChart>
             </ResponsiveContainer>
           )}
         </CardContent>
