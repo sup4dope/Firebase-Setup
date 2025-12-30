@@ -135,6 +135,11 @@ export interface Customer {
   last_memo_date?: Date; // 최근 메모 작성일 (대시보드 동기화용)
   memo_history?: CustomerMemo[]; // 메모 이력
   documents?: CustomerDocument[]; // 문서 리스트
+  
+  // 금융 분석 정보
+  financial_obligations?: FinancialObligation[]; // 대출/보증 내역
+  credit_summary?: CreditSummary; // 신용 요약
+  proposal_summary?: ProposalSummary; // 1초 제안서 요약
 }
 
 // Customer Memo
@@ -263,3 +268,56 @@ export type InsertStatusLog = Omit<StatusLog, 'id' | 'changed_at'>;
 export type InsertTodo = Omit<Todo, 'id' | 'created_at'>;
 export type InsertTodoItem = Omit<TodoItem, 'id' | 'created_at'>;
 export type InsertHoliday = Omit<Holiday, 'id'>;
+
+// ========== 금융 분석 관련 타입 ==========
+
+// 금융 의무 유형 (대출/보증)
+export type ObligationType = 'loan' | 'guarantee';
+
+// 금융 의무 (대출/보증 내역)
+export interface FinancialObligation {
+  id: string;
+  type: ObligationType; // 대출 또는 보증
+  institution: string; // 금융기관명
+  product_name: string; // 상품명
+  account_type: string; // 계정과목
+  balance: number; // 잔액 (원 단위)
+  occurred_at: string; // 발생일 (YYYY-MM-DD)
+  maturity_date?: string; // 만기일 (YYYY-MM-DD)
+  linked_obligation_id?: string; // 연결된 의무 ID (7일 이내 발생시)
+  business_registration_number?: string; // 사업자등록번호 (PDF 그룹핑용)
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+// 신용 요약 정보
+export interface CreditSummary {
+  total_loan_balance: number; // 총 대출 잔액
+  total_guarantee_balance: number; // 총 보증 잔액
+  institution_breakdown: { institution: string; amount: number }[]; // 기관별 부채
+  dti_y1?: number; // DTI (Y-1 매출 기준)
+  dti_avg_3y?: number; // DTI (3년 평균 매출 기준)
+  last_loan_date?: string; // 최근 대출일
+  calculated_at?: Date; // 계산 시점
+}
+
+// 심사 적합도 요소
+export interface EligibilityFactors {
+  credit_score?: number; // 신용점수
+  sales_bracket?: string; // 매출구간 (예: "1억~5억")
+  business_years?: number; // 업력 (년)
+  region?: string; // 지역
+  business_type?: string; // 업태
+  last_loan_date?: string; // 최근대출일자
+}
+
+// 1초 제안서 생성 결과
+export interface ProposalSummary {
+  debt_summary: string; // 부채 요약 문장
+  dti_summary: string; // DTI 요약 문장
+  eligibility_summary: string; // 적합도 요약 문장
+  generated_at: Date;
+}
+
+// Insert 타입
+export type InsertFinancialObligation = Omit<FinancialObligation, 'id' | 'created_at' | 'updated_at'>;

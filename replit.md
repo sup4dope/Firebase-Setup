@@ -17,11 +17,14 @@ client/
 ├── src/
 │   ├── components/       # 재사용 가능한 UI 컴포넌트
 │   │   ├── AppSidebar.tsx      # 메인 사이드바
+│   │   ├── CustomerDetailModal.tsx  # 고객 상세 모달 (3-탭 시스템)
 │   │   ├── CustomerForm.tsx    # 고객 등록/수정 폼
 │   │   ├── CustomerTable.tsx   # 고객 목록 테이블
+│   │   ├── FinancialAnalysisTab.tsx  # 금융 분석 탭 (대출/보증)
 │   │   ├── FunnelChart.tsx     # 영업 퍼널 차트
 │   │   ├── HolidayManagement.tsx  # 공휴일 관리
 │   │   ├── KPIWidgets.tsx      # KPI 위젯들
+│   │   ├── ReviewSummaryTab.tsx   # 심사 요약 탭 (파이차트/DTI)
 │   │   ├── StatusHistoryDialog.tsx  # 상태 변경 이력
 │   │   ├── TeamManagement.tsx  # 팀/사용자 관리
 │   │   ├── ThemeToggle.tsx     # 다크모드 토글
@@ -68,6 +71,14 @@ server/
 - 고객 연결 기능
 - 마감일 기반 우선순위 표시
 
+### 5. 금융 분석 대시보드 (신규)
+- 고객 상세 모달에 3-탭 시스템 적용
+  - **서류 보기**: 문서 업로드/뷰어, 드래그 앤 드롭 지원
+  - **금융 분석**: 대출/보증 채무 테이블, 7일 연계 감지, 인라인 편집
+  - **심사 요약**: Recharts 파이차트, DTI KPI, 적격성 요인 표시
+- 금융 채무 데이터 타입: FinancialObligation (shared/types.ts)
+- 채무 총액 자동 계산 및 기관별 분포 시각화
+
 ## 환경 변수 (Secrets)
 - `VITE_FIREBASE_API_KEY`: Firebase API 키
 - `VITE_FIREBASE_PROJECT_ID`: Firebase 프로젝트 ID
@@ -95,6 +106,13 @@ npm run dev
 - 프론트엔드: http://localhost:5000
 
 ## 최근 변경사항
+- 2024-12-30: 금융 분석 탭 시스템 추가
+  - CustomerDetailModal에 3-탭 UI 적용 (서류 보기/금융 분석/심사 요약)
+  - FinancialAnalysisTab: 대출/보증 채무 관리, 인라인 편집, 7일 연계 감지
+  - ReviewSummaryTab: Recharts 파이차트, DTI 계산, 적격성 요인 그리드
+  - 상시 접근 가능한 업로드 버튼 (탭 헤더에 배치)
+  - 금융 채무 데이터 자동 저장 (debounced)
+
 - 2024-12-11: 역할 기반 접근 제어 및 변경 이력 로그 기능 추가
   - Staff 사용자 읽기 전용 모드 (모든 입력 필드 비활성화)
   - "읽기 전용" 배지 헤더에 표시 (staff 사용자)

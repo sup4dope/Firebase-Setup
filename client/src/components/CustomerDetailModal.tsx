@@ -66,7 +66,10 @@ import {
   CustomerDocument,
   StatusCode,
   CustomerHistoryLog,
+  FinancialObligation,
 } from "@shared/types";
+import { FinancialAnalysisTab } from "@/components/FinancialAnalysisTab";
+import { ReviewSummaryTab } from "@/components/ReviewSummaryTab";
 import { format, differenceInDays, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { TodoForm } from "@/components/TodoForm";
@@ -208,6 +211,14 @@ export function CustomerDetailModal({
   // Active tab state for bottom panel
   const [activeBottomTab, setActiveBottomTab] = useState<"memo" | "history">(
     initialTab,
+  );
+  
+  // Active tab state for center panel (document viewer, financial analysis, review summary)
+  const [activeCenterTab, setActiveCenterTab] = useState<"documents" | "financial" | "summary">("documents");
+  
+  // Financial obligations state
+  const [financialObligations, setFinancialObligations] = useState<FinancialObligation[]>(
+    customer?.financial_obligations || []
   );
 
   // History logs state
@@ -1256,6 +1267,16 @@ export function CustomerDetailModal({
     debouncedSave.flush(); // 대기 중인 저장을 즉시 실행
   }, [debouncedSave]);
 
+  // Handle financial obligations change
+  const handleFinancialObligationsChange = useCallback((newObligations: FinancialObligation[]) => {
+    setFinancialObligations(newObligations);
+    setFormData(prev => {
+      const next = { ...prev, financial_obligations: newObligations };
+      debouncedSave(next);
+      return next;
+    });
+  }, [debouncedSave]);
+
   // Handle delete
   const handleDelete = async () => {
     if (!customer?.id || !onDelete) return;
@@ -2205,60 +2226,76 @@ export function CustomerDetailModal({
             </div>
           </div>
 
-          {/* Section 2: 중앙 패널 - 문서 뷰어 (40%, A4 비율) */}
+          {/* Section 2: 중앙 패널 - 탭 기반 금융 분석 대시보드 (40%) */}
           <div className="flex-1 h-full bg-muted/50 dark:bg-gray-950 flex flex-col overflow-hidden border-r">
-            {/* Document Header - 상태 변경 드롭다운 포함 */}
-            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b bg-muted/50">
-              <div className="flex items-center gap-2 flex-1 overflow-x-auto">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  multiple
-                  className="hidden"
-                />
+            {/* Center Panel Tabs */}
+            <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b bg-muted/50">
+              <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading || isReadOnly}
+                  onClick={() => setActiveCenterTab("documents")}
                   className={cn(
-                    "border-border shrink-0",
-                    isReadOnly && "opacity-50 cursor-not-allowed",
+                    "h-8 px-3 text-sm",
+                    activeCenterTab === "documents"
+                      ? "bg-blue-600/20 text-blue-400"
+                      : "text-muted-foreground",
                   )}
+                  data-testid="tab-documents"
                 >
-                  <Upload className="w-4 h-4 mr-1" />
-                  {isUploading && uploadProgress 
-                    ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})...` 
-                    : "파일 업로드"}
+                  <FileText className="w-4 h-4 mr-1.5" />
+                  서류 보기
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveCenterTab("financial")}
+                  className={cn(
+                    "h-8 px-3 text-sm",
+                    activeCenterTab === "financial"
+                      ? "bg-emerald-600/20 text-emerald-400"
+                      : "text-muted-foreground",
+                  )}
+                  data-testid="tab-financial"
+                >
+                  <Bot className="w-4 h-4 mr-1.5" />
+                  금융 분석
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveCenterTab("summary")}
+                  className={cn(
+                    "h-8 px-3 text-sm",
+                    activeCenterTab === "summary"
+                      ? "bg-purple-600/20 text-purple-400"
+                      : "text-muted-foreground",
+                  )}
+                  data-testid="tab-summary"
+                >
+                  <Search className="w-4 h-4 mr-1.5" />
+                  심사 요약
                 </Button>
 
-                {/* File Tabs */}
-                <div className="flex gap-1 overflow-x-auto">
-                  {documents.map((doc) => (
-                    <Button
-                      key={doc.id}
-                      variant={
-                        selectedDocument?.id === doc.id ? "secondary" : "ghost"
-                      }
-                      size="sm"
-                      onClick={() => setSelectedDocument(doc)}
-                      className={cn(
-                        "shrink-0 max-w-[150px]",
-                        selectedDocument?.id === doc.id
-                          ? "bg-blue-600/20 text-blue-400"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      <FileText className="w-3 h-3 mr-1" />
-                      <span className="truncate">{doc.file_name}</span>
-                    </Button>
-                  ))}
-                </div>
+                {/* Upload button - always visible */}
+                {!isReadOnly && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="border-border ml-2"
+                    data-testid="button-upload-global"
+                  >
+                    <Upload className="w-4 h-4 mr-1" />
+                    {isUploading && uploadProgress 
+                      ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})` 
+                      : "업로드"}
+                  </Button>
+                )}
               </div>
 
-              {/* 상태 변경 드롭다운 - 문서 헤더 우측에 배치 */}
+              {/* 상태 변경 드롭다운 - 헤더 우측에 배치 */}
               {!isReadOnly && formData.id && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -2281,7 +2318,6 @@ export function CustomerDetailModal({
                     className="w-48 max-h-80 overflow-y-auto bg-card"
                   >
                     {(() => {
-                      // staff 사용자는 집행완료 상태로 변경 불가 (team_leader, super_admin만 가능)
                       const canChangeToExecution = currentUser?.role === 'team_leader' || currentUser?.role === 'super_admin';
                       const filteredOptions = STATUS_OPTIONS.filter(option => {
                         if (option.value.includes('집행완료') && !canChangeToExecution) {
@@ -2336,17 +2372,14 @@ export function CustomerDetailModal({
                                       formData.id &&
                                       formData.status_code !== option.value
                                     ) {
-                                      // 계약완료: 자문료, 계약금액, 계약일이 모두 있으면 모달 스킵
                                       const hasContractInfo = 
                                         (formData.commission_rate && formData.commission_rate > 0) &&
                                         (formData.contract_amount && formData.contract_amount > 0) &&
                                         ((formData as any).contract_date);
                                       
-                                      // 신청완료: 진행기관이 설정되어 있으면 모달 스킵
                                       const hasProcessingOrg = 
                                         formData.processing_org && formData.processing_org !== "미등록";
                                       
-                                      // 집행완료: 집행금액과 집행일이 모두 있으면 모달 스킵
                                       const hasExecutionInfo = 
                                         (formData.execution_amount && formData.execution_amount > 0) &&
                                         ((formData as any).execution_date);
@@ -2373,56 +2406,35 @@ export function CustomerDetailModal({
                                       const oldStatus = formData.status_code;
                                       setFormData((prev) => ({
                                         ...prev,
-                                        status_code: option.value as StatusCode,
+                                        status_code: option.value,
                                       }));
 
-                                      try {
-                                        await updateDoc(
-                                          doc(db, "customers", formData.id!),
-                                          {
+                                      if (customer?.id) {
+                                        try {
+                                          const customerRef = doc(db, "customers", customer.id);
+                                          await updateDoc(customerRef, {
                                             status_code: option.value,
                                             updated_at: new Date(),
-                                          },
-                                        );
+                                          });
 
-                                        await addDoc(
-                                          collection(
-                                            db,
-                                            "customer_history_logs",
-                                          ),
-                                          {
-                                            customer_id: formData.id,
+                                          await addDoc(collection(db, "counseling_logs"), {
+                                            customer_id: customer.id,
                                             action_type: "status_change",
                                             description: `상태 변경: ${oldStatus} → ${option.value}`,
                                             old_value: oldStatus,
                                             new_value: option.value,
-                                            changed_by_id:
-                                              currentUser?.uid || "",
-                                            changed_by_name:
-                                              currentUser?.name || "",
+                                            changed_by_name: currentUser?.name || "관리자",
                                             changed_at: new Date(),
-                                          },
-                                        );
-
-                                        // 대시보드에 상태 변경 알림
-                                        if (onSave) {
-                                          onSave({
-                                            id: formData.id,
-                                            status_code: option.value as StatusCode,
+                                            type: "log",
                                           });
-                                        }
 
-                                        const logs =
-                                          await getCustomerHistoryLogs(
-                                            formData.id!,
-                                          );
-                                        setHistoryLogs(logs);
-                                      } catch (error) {
-                                        console.error("상태 변경 실패:", error);
-                                        setFormData((prev) => ({
-                                          ...prev,
-                                          status_code: oldStatus,
-                                        }));
+                                          onSave?.({
+                                            id: customer.id,
+                                            status_code: option.value,
+                                          });
+                                        } catch (error) {
+                                          console.error("상태 변경 실패:", error);
+                                        }
                                       }
                                     }
                                   }}
@@ -2451,129 +2463,214 @@ export function CustomerDetailModal({
               )}
             </div>
 
-            {/* Document Viewer with Drag & Drop */}
-            <div
-              {...getRootProps()}
-              className={cn(
-                "flex-1 flex flex-col overflow-hidden bg-muted/30 dark:bg-gray-950/50 transition-all",
-                isDragActive &&
-                  "border-2 border-dashed border-blue-500 bg-blue-500/10",
-              )}
-            >
-              <input {...getInputProps()} />
+            {/* Hidden file input - always mounted */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".pdf,.png,.jpg,.jpeg"
+              multiple
+              className="hidden"
+            />
 
-              {/* 선택된 파일 헤더 - 파일명 + 액션 버튼 */}
-              {selectedDocument && !isDragActive && (
-                <div className="shrink-0 px-4 py-2 border-b bg-muted/50 dark:bg-gray-900/50 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <span className="text-sm text-muted-foreground truncate">
-                      {selectedDocument.file_name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {/* 새 창에서 열기 */}
+            {/* Tab Content */}
+            <div className="flex-1 overflow-hidden">
+              {/* 서류 보기 탭 */}
+              {activeCenterTab === "documents" && (
+                <div className="h-full flex flex-col">
+                  {/* Document Sub-header */}
+                  <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-muted/30">
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        window.open(selectedDocument.file_url, "_blank")
-                      }
-                      title="새 창에서 열기"
-                      data-testid="button-open-new-window"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading || isReadOnly}
+                      className={cn(
+                        "border-border shrink-0",
+                        isReadOnly && "opacity-50 cursor-not-allowed",
+                      )}
                     >
-                      <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                      <Upload className="w-4 h-4 mr-1" />
+                      {isUploading && uploadProgress 
+                        ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})...` 
+                        : "파일 업로드"}
                     </Button>
-                    {/* 다운로드 */}
-                    <a
-                      href={selectedDocument.file_url}
-                      download={selectedDocument.file_name}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="다운로드"
-                        data-testid="button-download-file"
-                      >
-                        <Download className="w-4 h-4 text-muted-foreground" />
-                      </Button>
-                    </a>
-                    {/* 삭제 버튼 - 읽기전용이 아닐 때만 */}
-                    {!isReadOnly && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteFile(selectedDocument)}
-                        title="파일 삭제"
-                        className="text-red-400 hover:text-red-300"
-                        data-testid="button-delete-file"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+
+                    {/* File Tabs */}
+                    <div className="flex gap-1 overflow-x-auto">
+                      {documents.map((doc) => (
+                        <Button
+                          key={doc.id}
+                          variant={
+                            selectedDocument?.id === doc.id ? "secondary" : "ghost"
+                          }
+                          size="sm"
+                          onClick={() => setSelectedDocument(doc)}
+                          className={cn(
+                            "shrink-0 max-w-[150px]",
+                            selectedDocument?.id === doc.id
+                              ? "bg-blue-600/20 text-blue-400"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          <FileText className="w-3 h-3 mr-1" />
+                          <span className="truncate">{doc.file_name}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Document Viewer with Drag & Drop */}
+                  <div
+                    {...getRootProps()}
+                    className={cn(
+                      "flex-1 flex flex-col overflow-hidden bg-muted/30 dark:bg-gray-950/50 transition-all",
+                      isDragActive &&
+                        "border-2 border-dashed border-blue-500 bg-blue-500/10",
                     )}
+                  >
+                    <input {...getInputProps()} />
+
+                    {/* 선택된 파일 헤더 - 파일명 + 액션 버튼 */}
+                    {selectedDocument && !isDragActive && (
+                      <div className="shrink-0 px-4 py-2 border-b bg-muted/50 dark:bg-gray-900/50 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm text-muted-foreground truncate">
+                            {selectedDocument.file_name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {/* 새 창에서 열기 */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              window.open(selectedDocument.file_url, "_blank")
+                            }
+                            title="새 창에서 열기"
+                            data-testid="button-open-new-window"
+                          >
+                            <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                          </Button>
+                          {/* 다운로드 */}
+                          <a
+                            href={selectedDocument.file_url}
+                            download={selectedDocument.file_name}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="다운로드"
+                              data-testid="button-download-file"
+                            >
+                              <Download className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                          </a>
+                          {/* 삭제 버튼 - 읽기전용이 아닐 때만 */}
+                          {!isReadOnly && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteFile(selectedDocument)}
+                              title="파일 삭제"
+                              className="text-red-400 hover:text-red-300"
+                              data-testid="button-delete-file"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 뷰어 본문 영역 - 최적화된 DocumentViewer 사용 */}
+                    <div className="flex-1 overflow-hidden">
+                      {isDragActive ? (
+                        <div className="h-full flex items-center justify-center text-blue-400 p-4">
+                          <div className="text-center">
+                            <Upload className="w-16 h-16 mx-auto mb-4 animate-pulse" />
+                            <p className="text-lg font-medium">
+                              파일을 여기에 놓으세요
+                            </p>
+                            <p className="text-sm text-blue-400/70 mt-1">
+                              여러 파일을 동시에 업로드할 수 있습니다
+                            </p>
+                          </div>
+                        </div>
+                      ) : isUploading && uploadProgress ? (
+                        <div className="h-full flex items-center justify-center p-4">
+                          <div className="text-center w-full max-w-xs">
+                            <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-400 animate-spin" />
+                            <p className="text-blue-400 font-medium mb-2">
+                              업로드 중... ({uploadProgress.current}/{uploadProgress.total})
+                            </p>
+                            <p className="text-sm text-muted-foreground mb-3 truncate">
+                              {uploadProgress.fileName}
+                            </p>
+                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                              <div 
+                                className="bg-blue-500 h-full transition-all duration-300"
+                                style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {Math.round((uploadProgress.current / uploadProgress.total) * 100)}% 완료
+                            </p>
+                          </div>
+                        </div>
+                      ) : selectedDocument ? (
+                        <DocumentViewer
+                          fileUrl={selectedDocument.file_url}
+                          fileName={selectedDocument.file_name}
+                          fileType={selectedDocument.file_type}
+                          className="h-full"
+                        />
+                      ) : (
+                        <div
+                          className="h-full flex items-center justify-center text-muted-foreground cursor-pointer p-4"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <div className="text-center border-2 border-dashed border-border rounded-lg p-8">
+                            <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                            <p>파일을 드래그하거나 클릭하여 업로드하세요</p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              PDF, PNG, JPG 지원 (다중 파일 가능)
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* 뷰어 본문 영역 - 최적화된 DocumentViewer 사용 */}
-              <div className="flex-1 overflow-hidden">
-                {isDragActive ? (
-                  <div className="h-full flex items-center justify-center text-blue-400 p-4">
-                    <div className="text-center">
-                      <Upload className="w-16 h-16 mx-auto mb-4 animate-pulse" />
-                      <p className="text-lg font-medium">
-                        파일을 여기에 놓으세요
-                      </p>
-                      <p className="text-sm text-blue-400/70 mt-1">
-                        여러 파일을 동시에 업로드할 수 있습니다
-                      </p>
-                    </div>
-                  </div>
-                ) : isUploading && uploadProgress ? (
-                  <div className="h-full flex items-center justify-center p-4">
-                    <div className="text-center w-full max-w-xs">
-                      <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-400 animate-spin" />
-                      <p className="text-blue-400 font-medium mb-2">
-                        업로드 중... ({uploadProgress.current}/{uploadProgress.total})
-                      </p>
-                      <p className="text-sm text-muted-foreground mb-3 truncate">
-                        {uploadProgress.fileName}
-                      </p>
-                      <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="bg-blue-500 h-full transition-all duration-300"
-                          style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {Math.round((uploadProgress.current / uploadProgress.total) * 100)}% 완료
-                      </p>
-                    </div>
-                  </div>
-                ) : selectedDocument ? (
-                  <DocumentViewer
-                    fileUrl={selectedDocument.file_url}
-                    fileName={selectedDocument.file_name}
-                    fileType={selectedDocument.file_type}
-                    className="h-full"
+              {/* 금융 분석 탭 */}
+              {activeCenterTab === "financial" && (
+                <div className="h-full overflow-auto p-4">
+                  <FinancialAnalysisTab
+                    obligations={financialObligations}
+                    onObligationsChange={handleFinancialObligationsChange}
+                    isReadOnly={isReadOnly}
                   />
-                ) : (
-                  <div
-                    className="h-full flex items-center justify-center text-muted-foreground cursor-pointer p-4"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <div className="text-center border-2 border-dashed border-border rounded-lg p-8">
-                      <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                      <p>파일을 드래그하거나 클릭하여 업로드하세요</p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        PDF, PNG, JPG 지원 (다중 파일 가능)
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* 심사 요약 탭 */}
+              {activeCenterTab === "summary" && (
+                <div className="h-full overflow-auto p-4">
+                  <ReviewSummaryTab
+                    obligations={financialObligations}
+                    customer={{
+                      name: formData.name || "",
+                      business_type: formData.business_type || "",
+                      sales: formData.sales || 0,
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
