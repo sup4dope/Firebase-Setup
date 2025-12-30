@@ -314,23 +314,26 @@ export async function extractVatCertificateFromBase64(
 문서에서 각 과세기간(연도)별 매출 금액을 추출해 주세요.
 
 추출 규칙:
-1. "과세기간" 또는 "귀속연도"에서 연도(YYYY)를 추출
-2. 해당 연도의 "계", "합계", "과세표준" 금액을 추출
-3. 같은 연도에 여러 기간(1기, 2기 등)이 있다면 모두 합산
+1. "과세기간" 열에서 시작일(부터)의 연도(YYYY)를 기준으로 연도 추출
+2. 각 행의 "계" 열 금액을 해당 연도의 매출로 사용
+3. 같은 연도에 여러 행(상반기, 하반기 등)이 있으면 모두 합산
 4. 금액은 숫자만 추출 (쉼표, 원 등 제거)
+5. **중요**: 현재 연도(${currentYear})에 상반기만 있어도 반드시 포함. 1개 행이라도 있으면 해당 연도 데이터로 출력
+6. 모든 행을 빠짐없이 처리할 것
 
 반드시 아래 JSON 형식으로만 응답하세요:
 {
   "sales_by_year": [
+    {"year": 2025, "total_amount": 122222599},
     {"year": 2024, "total_amount": 288611996},
-    {"year": 2023, "total_amount": 356000000},
-    {"year": 2022, "total_amount": 420000000}
+    {"year": 2023, "total_amount": 262303012},
+    {"year": 2022, "total_amount": 231346714}
   ]
 }
 
 - year: 4자리 연도 숫자
 - total_amount: 해당 연도 전체 합계 금액 (원 단위, 숫자만)
-- 데이터가 없는 연도는 포함하지 마세요`;
+- 연도별로 1개 행만 있어도 반드시 포함`;
 
   const requestBody = {
     contents: [{
@@ -401,6 +404,13 @@ export async function extractVatCertificateFromBase64(
     }
     
     console.log("📊 [서버] 연도별 매출 합산 결과:", yearMap);
+    
+    // 현재 연도(2025) 디버그 로그
+    if (yearMap[currentYear] !== undefined) {
+      console.log(`[DEBUG] ${currentYear}년 추출 금액 합계: ${yearMap[currentYear].toLocaleString()}원 -> 최근매출 매핑 완료`);
+    } else {
+      console.log(`[DEBUG] ${currentYear}년 데이터 없음 - AI 응답에서 ${currentYear}년 누락됨`);
+    }
     
     // 현재 연도 기준으로 매핑
     const recentSales = yearMap[currentYear] ? convertToEok(yearMap[currentYear]) : undefined;
