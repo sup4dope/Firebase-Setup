@@ -173,7 +173,7 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
   const dtiAvg3YStatus = getDtiStatus(dtiAvg3Y);
 
   return (
-    <div className="h-full flex flex-col gap-4 p-4 overflow-auto">
+    <div className="h-full flex flex-col gap-4 p-4 overflow-auto pt-[0px] pb-[0px]">
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardHeader className="py-3 px-4">
@@ -227,7 +227,6 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
           </CardContent>
         </Card>
       </div>
-
       <Card className="flex-1 min-h-[250px]">
         <CardHeader className="py-3 px-4">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -284,7 +283,6 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
           )}
         </CardContent>
       </Card>
-
       <Card>
         <CardHeader className="py-3 px-4">
           <CardTitle className="text-sm font-medium">적합도 요소</CardTitle>
@@ -314,7 +312,6 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
           </div>
         </CardContent>
       </Card>
-
       <Card className="shrink-0">
         <CardContent className="py-3 px-4">
           <div className="flex items-center justify-between">
