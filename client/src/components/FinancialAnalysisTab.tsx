@@ -329,7 +329,7 @@ export function FinancialAnalysisTab({
   };
 
   return (
-    <div className="h-full flex flex-col gap-4 p-4 overflow-auto">
+    <div className="h-full flex flex-col gap-4 p-4 overflow-auto pt-[0px] pb-[0px] pl-[10px] pr-[10px]">
       {linkedPairs.size > 0 && (
         <div className="flex items-center justify-end">
           <Badge variant="outline" className="text-amber-400 border-amber-400/50">
@@ -338,12 +338,10 @@ export function FinancialAnalysisTab({
           </Badge>
         </div>
       )}
-      
       <div className="flex flex-col gap-4 flex-1 min-h-0">
         {renderTable(loans, 'loan')}
         {renderTable(guarantees, 'guarantee')}
       </div>
-
       <div className="shrink-0 p-3 bg-muted/30 rounded-lg">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">총 부채</span>
