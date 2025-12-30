@@ -198,8 +198,13 @@ export function FinancialAnalysisTab({
                       >
                         <td className="py-2 px-3">
                           <div className="flex items-center gap-1">
-                            {isLinked && (
-                              <span title="7일 이내 연결된 거래">
+                            {isLoan && isLinked && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 text-emerald-400 border-emerald-400/50">
+                                보증
+                              </Badge>
+                            )}
+                            {!isLoan && isLinked && (
+                              <span title="7일 이내 연결된 대출">
                                 <Link2 className="w-3 h-3 text-amber-400" />
                               </span>
                             )}
