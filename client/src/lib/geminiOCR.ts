@@ -212,3 +212,84 @@ export async function extractVatCertificate(
     return null;
   }
 }
+
+// ========== 사업자신용정보공여내역 OCR ==========
+
+export interface CreditReportData {
+  obligations: Array<{
+    institution: string;
+    product_name: string;
+    account_type: string;
+    balance: number;
+    occurred_at: string;
+    maturity_date?: string;
+    type: 'loan' | 'guarantee';
+  }>;
+  unit_multiplier: number;
+}
+
+export function isCreditReportFile(fileName: string): boolean {
+  const normalizedName = fileName.replace(/\s+/g, '');
+  
+  // '폐업' 문구가 포함된 파일은 OCR 대상에서 제외
+  if (normalizedName.includes('폐업')) {
+    console.log(`⚠️ 폐업 문서 제외: "${fileName}" -> OCR 건너뜀`);
+    return false;
+  }
+  
+  const matched = normalizedName.includes('신용공여내역') || 
+                  normalizedName.includes('사업자신용정보공여') ||
+                  normalizedName.includes('신용정보공여');
+  
+  console.log(`🔍 신용공여내역 파일 체크: "${fileName}" -> 매칭: ${matched}`);
+  return matched;
+}
+
+export async function extractCreditReport(
+  imageSource: File | string,
+  mimeType?: string
+): Promise<CreditReportData | null> {
+  try {
+    console.log("🚀 신용공여내역 OCR 처리 시작...");
+    
+    let base64Data: string;
+    let imageMimeType: string;
+    
+    if (imageSource instanceof File) {
+      console.log(`📁 파일 정보: ${imageSource.name}, 크기: ${imageSource.size}bytes`);
+      base64Data = await fileToBase64(imageSource);
+      imageMimeType = imageSource.type || 'application/pdf';
+    } else {
+      const result = await urlToBase64(imageSource);
+      base64Data = result.base64;
+      imageMimeType = mimeType || result.mimeType;
+    }
+    
+    console.log("📡 서버 신용공여내역 OCR API 호출 중...");
+    const response = await fetch('/api/ocr/credit-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64Data, mimeType: imageMimeType })
+    });
+
+    if (!response.ok) {
+      console.error("❌ 신용공여내역 OCR API 요청 실패:", response.status);
+      return null;
+    }
+
+    const result = await response.json();
+    console.log("📥 신용공여내역 OCR 응답:", result);
+    
+    if (result.success && result.data) {
+      console.log("✅ 신용공여내역 OCR 성공:", result.data.obligations?.length || 0, "건");
+      return result.data as CreditReportData;
+    } else {
+      console.error("❌ 신용공여내역 OCR 처리 실패:", result.error);
+      return null;
+    }
+    
+  } catch (error) {
+    console.error("❌ 신용공여내역 OCR 예외:", error);
+    return null;
+  }
+}

@@ -440,3 +440,172 @@ export async function extractVatCertificateFromBase64(
     return null;
   }
 }
+
+// ========== 사업자신용정보공여내역 OCR ==========
+
+export interface CreditReportData {
+  obligations: Array<{
+    institution: string;      // 금융기관명
+    product_name: string;     // 상품명
+    account_type: string;     // 계정과목
+    balance: number;          // 잔액 (원 단위)
+    occurred_at: string;      // 발생일 (YYYY-MM-DD)
+    maturity_date?: string;   // 만기일 (YYYY-MM-DD)
+    type: 'loan' | 'guarantee';
+  }>;
+  unit_multiplier: number;    // 단위 승수 (천원이면 1000)
+}
+
+export async function extractCreditReportFromBase64(
+  base64Data: string,
+  mimeType: string
+): Promise<CreditReportData | null> {
+  console.log("🔍 [서버] 사업자신용정보공여내역 OCR 시작");
+  console.log(`   - 원본 Base64 길이: ${base64Data?.length || 0}`);
+  console.log(`   - MIME 타입: ${mimeType}`);
+  
+  const apiKey = process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    console.error("❌ [서버] GEMINI_API_KEY 환경변수 없음");
+    return null;
+  }
+  
+  const cleanBase64 = stripBase64Header(base64Data);
+  
+  const prompt = `이 문서는 한국의 "사업자신용정보공여내역" 또는 "신용공여내역" 문서입니다.
+문서에서 모든 대출 및 보증 내역을 추출해 주세요.
+
+**매우 중요한 규칙:**
+1. 문서에 "(단위 : 천원)" 또는 "단위: 천원"이 명시되어 있으면, 모든 금액에 1000을 곱하여 원 단위로 변환해야 합니다.
+2. 각 행에서 다음 정보를 추출:
+   - 금융기관명
+   - 상품명 (대출 유형: 운전자금, 시설자금 등)
+   - 계정과목 (대출, 지급보증 등)
+   - 신용공여잔액 (금액)
+   - 발생일자 (YYYY-MM-DD 형식)
+   - 만기일자 (있는 경우)
+3. 계정과목이 "대출", "할부금융", "운전자금", "시설자금" 등이면 type은 "loan"
+4. 계정과목이 "지급보증", "보증" 등이면 type은 "guarantee"
+5. 금융기관명은 가나다순으로 정렬
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{
+  "unit_type": "천원" 또는 "원",
+  "obligations": [
+    {
+      "institution": "국민은행",
+      "product_name": "운전자금(일반)",
+      "account_type": "대출",
+      "balance": 50000000,
+      "occurred_at": "2024-03-15",
+      "maturity_date": "2025-03-15",
+      "type": "loan"
+    },
+    {
+      "institution": "기술보증기금",
+      "product_name": "신용보증",
+      "account_type": "지급보증",
+      "balance": 50000000,
+      "occurred_at": "2024-03-15",
+      "maturity_date": "2025-03-15",
+      "type": "guarantee"
+    }
+  ]
+}
+
+- balance: 원 단위 숫자 (천원 단위 문서면 1000 곱한 값)
+- occurred_at, maturity_date: YYYY-MM-DD 형식
+- 모든 행을 빠짐없이 추출할 것`;
+
+  const requestBody = {
+    contents: [{
+      parts: [
+        { text: prompt },
+        {
+          inline_data: {
+            mime_type: mimeType,
+            data: cleanBase64
+          }
+        }
+      ]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      topP: 0.8,
+      maxOutputTokens: 8192
+    }
+  };
+
+  try {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    
+    console.log("📡 [서버] Gemini API 호출 (신용공여내역)...");
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ [서버] API 오류 ${response.status}:`, errorText);
+      return null;
+    }
+    
+    const result = await response.json();
+    console.log("📥 [서버] Gemini 응답 수신");
+    
+    const textContent = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textContent) {
+      console.error("❌ [서버] 응답에 텍스트 없음");
+      return null;
+    }
+    
+    console.log("📝 [서버] 원본 응답:", textContent.substring(0, 1000));
+    
+    // JSON 추출
+    const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("❌ [서버] JSON 형식 없음");
+      return null;
+    }
+    
+    const parsedData = JSON.parse(jsonMatch[0]);
+    console.log("✅ [서버] JSON 파싱 성공");
+    
+    // 단위 처리
+    const unitType = parsedData.unit_type || '원';
+    const unitMultiplier = unitType === '천원' ? 1000 : 1;
+    
+    console.log(`   - 단위: ${unitType} (승수: ${unitMultiplier})`);
+    
+    // 금융기관명 가나다순 정렬
+    const obligations = (parsedData.obligations || [])
+      .map((ob: any) => ({
+        institution: ob.institution?.trim() || '',
+        product_name: ob.product_name?.trim() || '',
+        account_type: ob.account_type?.trim() || '',
+        balance: Math.round((Number(ob.balance) || 0) * (unitType === '천원' && ob.balance < 1000000 ? 1000 : 1)),
+        occurred_at: formatDate(ob.occurred_at || ''),
+        maturity_date: ob.maturity_date ? formatDate(ob.maturity_date) : undefined,
+        type: ob.type === 'guarantee' ? 'guarantee' : 'loan'
+      }))
+      .sort((a: any, b: any) => a.institution.localeCompare(b.institution, 'ko'));
+    
+    console.log(`✅ [서버] ${obligations.length}건 추출 완료`);
+    obligations.forEach((ob: any, idx: number) => {
+      console.log(`   ${idx + 1}. ${ob.institution} | ${ob.product_name} | ${ob.account_type} | ${ob.balance.toLocaleString()}원 | ${ob.type}`);
+    });
+    
+    return {
+      obligations,
+      unit_multiplier: unitMultiplier
+    };
+    
+  } catch (error: any) {
+    console.error("❌ [서버] 신용공여내역 OCR 실패:", error);
+    return null;
+  }
+}
