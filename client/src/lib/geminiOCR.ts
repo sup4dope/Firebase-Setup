@@ -109,6 +109,13 @@ export async function extractBusinessRegistration(
 
 export function isBusinessRegistrationFile(fileName: string): boolean {
   const normalizedName = fileName.replace(/\s+/g, '');
+  
+  // '폐업' 문구가 포함된 파일은 OCR 대상에서 제외
+  if (normalizedName.includes('폐업')) {
+    console.log(`⚠️ 폐업 문서 제외: "${fileName}" -> OCR 건너뜀`);
+    return false;
+  }
+  
   const matched = normalizedName.includes('사업자등록증');
   
   console.log(`🔍 파일명 체크: "${fileName}" -> 정규화: "${normalizedName}" -> '사업자등록증' 포함: ${matched}`);
@@ -142,6 +149,13 @@ export interface VatCertificateData {
 
 export function isVatCertificateFile(fileName: string): boolean {
   const normalizedName = fileName.replace(/\s+/g, '');
+  
+  // '폐업' 문구가 포함된 파일은 OCR 대상에서 제외
+  if (normalizedName.includes('폐업')) {
+    console.log(`⚠️ 폐업 문서 제외: "${fileName}" -> OCR 건너뜀`);
+    return false;
+  }
+  
   const matched = normalizedName.includes('부가가치세과세표준증명') || 
                   normalizedName.includes('과세표준증명') ||
                   normalizedName.includes('부가세과세표준');
