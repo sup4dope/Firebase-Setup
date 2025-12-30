@@ -149,7 +149,7 @@ export function FinancialAnalysisTab({
 
     return (
       <Card className={cn("overflow-hidden", isLoan ? "flex-[7]" : "flex-[3]")}>
-        <CardHeader className="py-3 px-4">
+        <CardHeader className="py-3 px-4 pt-[0px] pb-[0px]">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Icon className={cn("w-4 h-4", iconColor)} />
