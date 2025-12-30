@@ -16,6 +16,8 @@ import {
   UserCog,
   Lock,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Download,
   Plus,
@@ -215,6 +217,10 @@ export function CustomerDetailModal({
   
   // Active tab state for center panel (document viewer, financial analysis, review summary)
   const [activeCenterTab, setActiveCenterTab] = useState<"documents" | "financial" | "summary">("documents");
+  
+  // File carousel pagination state (max 3 files visible at a time)
+  const [fileCarouselStart, setFileCarouselStart] = useState(0);
+  const FILES_PER_PAGE = 3;
   
   // Financial obligations state
   const [financialObligations, setFinancialObligations] = useState<FinancialObligation[]>(
@@ -2604,27 +2610,63 @@ export function CustomerDetailModal({
                         : "파일 업로드"}
                     </Button>
 
-                    {/* File Tabs */}
-                    <div className="flex gap-1 overflow-x-auto">
-                      {documents.map((doc) => (
+                    {/* File Tabs with Carousel Navigation */}
+                    <div className="flex-1 flex items-center gap-1 min-w-0">
+                      {/* Left arrow - show only if there are previous files */}
+                      {fileCarouselStart > 0 && (
                         <Button
-                          key={doc.id}
-                          variant={
-                            selectedDocument?.id === doc.id ? "secondary" : "ghost"
-                          }
-                          size="sm"
-                          onClick={() => setSelectedDocument(doc)}
-                          className={cn(
-                            "shrink-0 max-w-[150px]",
-                            selectedDocument?.id === doc.id
-                              ? "bg-blue-600/20 text-blue-400"
-                              : "text-muted-foreground",
-                          )}
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setFileCarouselStart(Math.max(0, fileCarouselStart - FILES_PER_PAGE))}
+                          className="shrink-0 h-8 w-8"
+                          data-testid="button-file-carousel-prev"
                         >
-                          <FileText className="w-3 h-3 mr-1" />
-                          <span className="truncate">{doc.file_name}</span>
+                          <ChevronLeft className="w-4 h-4" />
                         </Button>
-                      ))}
+                      )}
+                      
+                      {/* Visible file tabs (max 3) */}
+                      <div className="flex gap-1 flex-1 min-w-0">
+                        {documents.slice(fileCarouselStart, fileCarouselStart + FILES_PER_PAGE).map((doc) => (
+                          <Button
+                            key={doc.id}
+                            variant={
+                              selectedDocument?.id === doc.id ? "secondary" : "ghost"
+                            }
+                            size="sm"
+                            onClick={() => setSelectedDocument(doc)}
+                            className={cn(
+                              "shrink-0 max-w-[150px]",
+                              selectedDocument?.id === doc.id
+                                ? "bg-blue-600/20 text-blue-400"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            <FileText className="w-3 h-3 mr-1" />
+                            <span className="truncate">{doc.file_name}</span>
+                          </Button>
+                        ))}
+                      </div>
+                      
+                      {/* Right arrow - show only if there are more files */}
+                      {fileCarouselStart + FILES_PER_PAGE < documents.length && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setFileCarouselStart(Math.min(documents.length - 1, fileCarouselStart + FILES_PER_PAGE))}
+                          className="shrink-0 h-8 w-8"
+                          data-testid="button-file-carousel-next"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      )}
+                      
+                      {/* File count indicator (when more than 3 files) */}
+                      {documents.length > FILES_PER_PAGE && (
+                        <span className="text-xs text-muted-foreground shrink-0 ml-1">
+                          {Math.floor(fileCarouselStart / FILES_PER_PAGE) + 1}/{Math.ceil(documents.length / FILES_PER_PAGE)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
