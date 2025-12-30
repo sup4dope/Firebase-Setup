@@ -202,14 +202,14 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
   }, [obligations]);
 
   const scatterData = useMemo(() => {
-    const data: { x: number; y: number; z: number; type: string; month: string }[] = [];
+    const data: { x: string; y: number; z: number; type: string; month: string }[] = [];
     
-    timelineData.forEach((month, idx) => {
+    timelineData.forEach((month) => {
       if (month.loans > 0) {
-        data.push({ x: idx, y: 1, z: month.loans * 100, type: 'loan', month: month.label });
+        data.push({ x: month.label, y: 1, z: month.loans * 100, type: 'loan', month: month.label });
       }
       if (month.guarantees > 0) {
-        data.push({ x: idx, y: 0, z: month.guarantees * 100, type: 'guarantee', month: month.label });
+        data.push({ x: month.label, y: 0, z: month.guarantees * 100, type: 'guarantee', month: month.label });
       }
     });
     
@@ -347,7 +347,7 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                   dataKey="x" 
                   name="월" 
                   tick={{ fontSize: 10 }}
-                  tickFormatter={(value) => timelineData[value]?.label || ''}
+                  allowDuplicatedCategory={false}
                   axisLine={{ stroke: 'hsl(var(--border))' }}
                   tickLine={false}
                 />

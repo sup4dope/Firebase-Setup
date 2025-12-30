@@ -66,7 +66,17 @@ export function FinancialAnalysisTab({
     
     loans.forEach(loan => {
       guarantees.forEach(guarantee => {
-        if (isWithin7Days(loan.occurred_at, guarantee.occurred_at)) {
+        // Match by institution AND date proximity (within 7 days)
+        const sameInstitution = loan.institution.trim() === guarantee.institution.trim();
+        const dateMatch = isWithin7Days(loan.occurred_at, guarantee.occurred_at);
+        // Also consider similar balance amounts (within 10% tolerance)
+        const balanceRatio = loan.balance > 0 && guarantee.balance > 0 
+          ? Math.min(loan.balance, guarantee.balance) / Math.max(loan.balance, guarantee.balance)
+          : 0;
+        const similarBalance = balanceRatio >= 0.9;
+        
+        // Link if: (same institution AND date match) OR (date match AND very similar balance)
+        if (dateMatch && (sameInstitution || similarBalance)) {
           const existing = pairs.get(loan.id) || [];
           existing.push(guarantee.id);
           pairs.set(loan.id, existing);

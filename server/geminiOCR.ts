@@ -473,25 +473,23 @@ export async function extractCreditReportFromBase64(
   
   const cleanBase64 = stripBase64Header(base64Data);
   
-  const prompt = `이 문서는 한국의 "사업자신용정보공여내역" 또는 "신용공여내역" 문서입니다.
-문서에서 모든 대출 및 보증 내역을 추출해 주세요.
+  const prompt = `You are analyzing a Korean "사업자신용정보공여내역" (Business Credit Information Disclosure) document.
+Extract all loan and guarantee records from this document.
 
-**매우 중요한 규칙:**
-1. 문서에 "(단위 : 천원)" 또는 "단위: 천원"이 명시되어 있으면, 모든 금액에 1000을 곱하여 원 단위로 변환해야 합니다.
-2. 각 행에서 다음 정보를 추출:
-   - 금융기관명
-   - 상품명 (대출 유형: 운전자금, 시설자금 등)
-   - 계정과목 (대출, 지급보증 등)
-   - 신용공여잔액 (금액)
-   - 발생일자 (YYYY-MM-DD 형식)
-   - 만기일자 (있는 경우)
-3. 계정과목이 "대출", "할부금융", "운전자금", "시설자금" 등이면 type은 "loan"
-4. 계정과목이 "지급보증", "보증" 등이면 type은 "guarantee"
-5. 금융기관명은 가나다순으로 정렬
+CRITICAL RULES:
+1. If the document shows "(단위 : 천원)" or "단위: 천원", all amounts are in thousands of Korean Won. You must multiply by 1000 to convert to Won.
+2. Extract these fields from each row:
+   - institution: Financial institution name (금융기관명)
+   - product_name: Product/loan type (상품명 - e.g., 운전자금, 시설자금)
+   - account_type: Account category (계정과목 - e.g., 대출, 지급보증)
+   - balance: Remaining balance in Won (신용공여잔액)
+   - occurred_at: Origination date in YYYY-MM-DD format (발생일자)
+   - maturity_date: Maturity date in YYYY-MM-DD format if available (만기일자)
+   - type: "loan" if account_type contains 대출/할부금융/운전자금/시설자금, "guarantee" if it contains 지급보증/보증
 
-반드시 아래 JSON 형식으로만 응답하세요:
+You MUST respond ONLY with valid JSON in this exact format:
 {
-  "unit_type": "천원" 또는 "원",
+  "unit_type": "천원" or "원",
   "obligations": [
     {
       "institution": "국민은행",
@@ -501,22 +499,15 @@ export async function extractCreditReportFromBase64(
       "occurred_at": "2024-03-15",
       "maturity_date": "2025-03-15",
       "type": "loan"
-    },
-    {
-      "institution": "기술보증기금",
-      "product_name": "신용보증",
-      "account_type": "지급보증",
-      "balance": 50000000,
-      "occurred_at": "2024-03-15",
-      "maturity_date": "2025-03-15",
-      "type": "guarantee"
     }
   ]
 }
 
-- balance: 원 단위 숫자 (천원 단위 문서면 1000 곱한 값)
-- occurred_at, maturity_date: YYYY-MM-DD 형식
-- 모든 행을 빠짐없이 추출할 것`;
+IMPORTANT:
+- Use English keys exactly as shown above
+- balance must be in Won (multiply by 1000 if unit_type is 천원)
+- Dates must be YYYY-MM-DD format
+- Extract ALL rows without missing any`;
 
   const requestBody = {
     contents: [{
