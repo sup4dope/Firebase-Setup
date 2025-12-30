@@ -342,14 +342,6 @@ export function FinancialAnalysisTab({
         {renderTable(loans, 'loan')}
         {renderTable(guarantees, 'guarantee')}
       </div>
-      <div className="shrink-0 p-3 bg-muted/30 rounded-lg">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">총 부채</span>
-          <span className="font-semibold text-lg">
-            {formatCurrency(totalLoanBalance + totalGuaranteeBalance)}원
-          </span>
-        </div>
       </div>
-    </div>
   );
 }
