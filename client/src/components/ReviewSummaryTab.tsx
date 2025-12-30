@@ -174,8 +174,6 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
 
   return (
     <div className="h-full flex flex-col gap-4 p-4 overflow-auto">
-      <h3 className="text-lg font-semibold shrink-0">심사 요약</h3>
-
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardHeader className="py-3 px-4">
