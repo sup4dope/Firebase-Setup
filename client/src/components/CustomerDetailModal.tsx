@@ -2276,23 +2276,6 @@ export function CustomerDetailModal({
                   <Search className="w-4 h-4 mr-1.5" />
                   심사 요약
                 </Button>
-
-                {/* Upload button - always visible */}
-                {!isReadOnly && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="border-border ml-2"
-                    data-testid="button-upload-global"
-                  >
-                    <Upload className="w-4 h-4 mr-1" />
-                    {isUploading && uploadProgress 
-                      ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})` 
-                      : "업로드"}
-                  </Button>
-                )}
               </div>
 
               {/* 상태 변경 드롭다운 - 헤더 우측에 배치 */}
