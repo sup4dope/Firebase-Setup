@@ -3,9 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, Trash2, Link2, Save, Building2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FinancialObligation, Customer } from "@shared/types";
+
+const truncateText = (text: string, maxLength: number = 4): string => {
+  if (!text) return '-';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+};
 
 interface FinancialAnalysisTabProps {
   customer: Partial<Customer>;
@@ -227,7 +234,14 @@ export function FinancialAnalysisTab({
                                 data-testid={`input-institution-${item.id}`}
                               />
                             ) : (
-                              <span className="truncate">{item.institution || '-'}</span>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-help">{truncateText(item.institution, 4)}</span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs">
+                                  <p className="text-sm">{item.institution || '-'}</p>
+                                </TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
                         </td>
@@ -241,7 +255,14 @@ export function FinancialAnalysisTab({
                               data-testid={`input-product-${item.id}`}
                             />
                           ) : (
-                            <span className="truncate">{item.product_name || '-'}</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help">{truncateText(item.product_name, 4)}</span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-sm">{item.product_name || '-'}</p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </td>
                         <td className="py-2 px-3">
