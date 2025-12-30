@@ -567,32 +567,32 @@ export function CustomerDetailModal({
       if (uploadedDocs.length > 0) {
         console.log(`✅ ${uploadedDocs.length}개 파일 업로드 완료`);
         
-        // 사업자등록증 파일이 있는지 확인하고 OCR 처리
+        // 모든 OCR 대상 파일 수집 및 순차 처리
         console.log("🔍 OCR 대상 파일 검색 시작...");
+        const ocrTasks: { file: File; type: 'business' | 'vat' }[] = [];
+        
         for (const uploadedFile of files) {
           console.log(`📄 파일 확인: "${uploadedFile.name}", 타입: "${uploadedFile.type}", 크기: ${uploadedFile.size}bytes`);
           
           const isBusinessReg = isBusinessRegistrationFile(uploadedFile.name);
+          const isVatCert = isVatCertificateFile(uploadedFile.name);
           const isImage = uploadedFile.type.startsWith('image/');
           const isPdf = uploadedFile.type === 'application/pdf' || uploadedFile.type.includes('pdf');
           const isOCRSupported = isImage || isPdf;
           
-          console.log(`   -> 사업자등록증 여부: ${isBusinessReg}, 이미지: ${isImage}, PDF: ${isPdf}, OCR지원: ${isOCRSupported}`);
+          console.log(`   -> 사업자등록증: ${isBusinessReg}, 부가세: ${isVatCert}, OCR지원: ${isOCRSupported}`);
           
           if (isBusinessReg && isOCRSupported) {
-            console.log(`📋 사업자등록증 ${isPdf ? 'PDF' : '이미지'} 파일 감지, OCR 처리 시작...`);
-            processBusinessRegistrationOCR(uploadedFile);
-            break;
+            ocrTasks.push({ file: uploadedFile, type: 'business' });
+          } else if (isVatCert && isOCRSupported) {
+            ocrTasks.push({ file: uploadedFile, type: 'vat' });
           }
-          
-          const isVatCert = isVatCertificateFile(uploadedFile.name);
-          console.log(`   -> 부가세 과세표준증명 여부: ${isVatCert}`);
-          
-          if (isVatCert && isOCRSupported) {
-            console.log(`📋 부가세 과세표준증명 ${isPdf ? 'PDF' : '이미지'} 파일 감지, OCR 처리 시작...`);
-            processVatCertificateOCR(uploadedFile);
-            break;
-          }
+        }
+        
+        // 수집된 OCR 작업 순차 실행
+        if (ocrTasks.length > 0) {
+          console.log(`📋 OCR 처리 대상: ${ocrTasks.length}개 파일`);
+          processAllOCRFiles(ocrTasks);
         }
       }
     } catch (error) {
@@ -605,7 +605,130 @@ export function CustomerDetailModal({
     }
   };
 
-  // [신규] 사업자등록증 OCR 처리 및 자동 입력
+  // [신규] 모든 OCR 파일 순차 처리 (누적 업데이트)
+  const processAllOCRFiles = async (tasks: { file: File; type: 'business' | 'vat' }[]) => {
+    setIsProcessingOCR(true);
+    const allHighlightedFields = new Set<string>();
+    
+    console.log(`🚀 OCR 순차 처리 시작: ${tasks.length}개 파일`);
+    
+    try {
+      for (const task of tasks) {
+        console.log(`\n📋 처리 중: ${task.file.name} (${task.type === 'business' ? '사업자등록증' : '부가세 과세표준증명'})`);
+        
+        if (task.type === 'business') {
+          // 사업자등록증 OCR
+          const ocrResult = await extractBusinessRegistration(task.file);
+          
+          if (ocrResult) {
+            // 누적 업데이트 (스프레드 연산자로 기존 데이터 유지)
+            setFormData(prev => {
+              const updatedData = { ...prev };
+              
+              if (ocrResult.company_name) {
+                updatedData.company_name = ocrResult.company_name;
+                allHighlightedFields.add('company_name');
+              }
+              if (ocrResult.ceo_name) {
+                updatedData.name = ocrResult.ceo_name;
+                allHighlightedFields.add('name');
+              }
+              if (ocrResult.founding_date) {
+                updatedData.founding_date = ocrResult.founding_date;
+                allHighlightedFields.add('founding_date');
+              }
+              if (ocrResult.business_registration_number) {
+                updatedData.business_registration_number = ocrResult.business_registration_number;
+                allHighlightedFields.add('business_registration_number');
+              }
+              if (ocrResult.resident_id_front) {
+                updatedData.ssn_front = ocrResult.resident_id_front;
+                allHighlightedFields.add('ssn_front');
+              }
+              if (ocrResult.resident_id_back) {
+                updatedData.ssn_back = ocrResult.resident_id_back;
+                allHighlightedFields.add('ssn_back');
+              }
+              if (ocrResult.business_type_list && ocrResult.business_type_list.length > 0) {
+                updatedData.business_type = ocrResult.business_type_list[0];
+                allHighlightedFields.add('business_type');
+                setOcrBusinessTypes(ocrResult.business_type_list);
+              }
+              if (ocrResult.business_item) {
+                updatedData.business_item = ocrResult.business_item;
+                allHighlightedFields.add('business_item');
+              }
+              if (ocrResult.business_address) {
+                updatedData.business_address = ocrResult.business_address;
+                allHighlightedFields.add('business_address');
+              }
+              if (ocrResult.business_address_detail) {
+                updatedData.business_address_detail = ocrResult.business_address_detail;
+                allHighlightedFields.add('business_address_detail');
+              }
+              
+              debouncedSave(updatedData);
+              return updatedData;
+            });
+            
+            console.log(`[성공] 사업자등록증 완료: ${task.file.name}`);
+          }
+        } else if (task.type === 'vat') {
+          // 부가세 과세표준증명 OCR
+          const ocrResult = await extractVatCertificate(task.file);
+          
+          if (ocrResult) {
+            // 누적 업데이트 (스프레드 연산자로 기존 데이터 유지)
+            setFormData(prev => {
+              const updatedData = { ...prev };
+              
+              if (ocrResult.recent_sales !== undefined) {
+                updatedData.recent_sales = ocrResult.recent_sales;
+                allHighlightedFields.add('recent_sales');
+              }
+              if (ocrResult.sales_y1 !== undefined) {
+                updatedData.sales_y1 = ocrResult.sales_y1;
+                allHighlightedFields.add('sales_y1');
+              }
+              if (ocrResult.sales_y2 !== undefined) {
+                updatedData.sales_y2 = ocrResult.sales_y2;
+                allHighlightedFields.add('sales_y2');
+              }
+              if (ocrResult.sales_y3 !== undefined) {
+                updatedData.sales_y3 = ocrResult.sales_y3;
+                allHighlightedFields.add('sales_y3');
+              }
+              
+              debouncedSave(updatedData);
+              return updatedData;
+            });
+            
+            const currentYear = new Date().getFullYear();
+            console.log(`[성공] 부가가치세 완료: ${task.file.name}`);
+            console.log(`   - 최근매출 (${currentYear}년): ${ocrResult.recent_sales ?? '없음'}억`);
+            console.log(`   - Y-1 (${currentYear - 1}년): ${ocrResult.sales_y1 ?? '없음'}억`);
+            console.log(`   - Y-2 (${currentYear - 2}년): ${ocrResult.sales_y2 ?? '없음'}억`);
+            console.log(`   - Y-3 (${currentYear - 3}년): ${ocrResult.sales_y3 ?? '없음'}억`);
+          }
+        }
+      }
+      
+      // 모든 처리 완료 후 하이라이트 적용
+      setHighlightedFields(allHighlightedFields);
+      setTimeout(() => {
+        setHighlightedFields(new Set());
+      }, 2000);
+      
+      console.log(`\n✅ 전체 OCR 처리 완료: ${tasks.length}개 파일`);
+      
+    } catch (error) {
+      console.error("❌ OCR 순차 처리 중 오류:", error);
+    } finally {
+      setIsProcessingOCR(false);
+    }
+  };
+
+  // [기존] 사업자등록증 OCR 처리 및 자동 입력 (단일 파일용 - 유지)
   const processBusinessRegistrationOCR = async (file: File) => {
     setIsProcessingOCR(true);
     
