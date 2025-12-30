@@ -594,7 +594,6 @@ export function CustomerDetailModal({
       const ocrResult = await extractBusinessRegistration(file);
       
       if (ocrResult) {
-        // 자동 입력할 필드들
         const fieldsToUpdate: Partial<typeof formData> = {};
         const newHighlightedFields = new Set<string>();
         
@@ -614,6 +613,14 @@ export function CustomerDetailModal({
           fieldsToUpdate.business_registration_number = ocrResult.business_registration_number;
           newHighlightedFields.add('business_registration_number');
         }
+        if (ocrResult.resident_id_front) {
+          fieldsToUpdate.ssn_front = ocrResult.resident_id_front;
+          newHighlightedFields.add('ssn_front');
+        }
+        if (ocrResult.resident_id_back) {
+          fieldsToUpdate.ssn_back = ocrResult.resident_id_back;
+          newHighlightedFields.add('ssn_back');
+        }
         if (ocrResult.business_type) {
           fieldsToUpdate.business_type = ocrResult.business_type;
           newHighlightedFields.add('business_type');
@@ -626,21 +633,21 @@ export function CustomerDetailModal({
           fieldsToUpdate.business_address = ocrResult.business_address;
           newHighlightedFields.add('business_address');
         }
+        if (ocrResult.business_address_detail) {
+          fieldsToUpdate.business_address_detail = ocrResult.business_address_detail;
+          newHighlightedFields.add('business_address_detail');
+        }
         
-        // 폼 데이터 업데이트
         if (Object.keys(fieldsToUpdate).length > 0) {
           const updatedData = { ...formData, ...fieldsToUpdate };
           setFormData(updatedData);
           
-          // 하이라이트 표시
           setHighlightedFields(newHighlightedFields);
           
-          // 2초 후 하이라이트 제거
           setTimeout(() => {
             setHighlightedFields(new Set());
           }, 2000);
           
-          // 자동 저장 트리거
           debouncedSave(updatedData);
           
           console.log("✅ 사업자등록증 정보 자동 입력 완료:", fieldsToUpdate);

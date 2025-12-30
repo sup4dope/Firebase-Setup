@@ -4,19 +4,19 @@
  */
 
 export interface BusinessRegistrationData {
-  company_name?: string;        // 상호명
-  ceo_name?: string;            // 대표자명
-  founding_date?: string;       // 개업연월일 (YYYY-MM-DD)
-  business_registration_number?: string;  // 사업자등록번호 (000-00-00000)
-  resident_registration_number?: string;  // 주민(법인)등록번호
-  business_type?: string;       // 업종
-  business_item?: string;       // 종목
-  business_address?: string;    // 사업장 소재지
+  company_name?: string;
+  ceo_name?: string;
+  founding_date?: string;
+  business_registration_number?: string;
+  resident_id_front?: string;
+  resident_id_back?: string;
+  business_type?: string;
+  business_type_list?: string[];
+  business_item?: string;
+  business_address?: string;
+  business_address_detail?: string;
 }
 
-/**
- * 이미지 파일을 Base64로 변환
- */
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -30,9 +30,6 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-/**
- * URL에서 이미지를 가져와 Base64로 변환
- */
 async function urlToBase64(url: string): Promise<{ base64: string; mimeType: string }> {
   const response = await fetch(url);
   const blob = await response.blob();
@@ -50,9 +47,6 @@ async function urlToBase64(url: string): Promise<{ base64: string; mimeType: str
   });
 }
 
-/**
- * 서버 OCR API를 호출하여 사업자등록증 정보 추출
- */
 export async function extractBusinessRegistration(
   imageSource: File | string,
   mimeType?: string
@@ -113,10 +107,6 @@ export async function extractBusinessRegistration(
   }
 }
 
-/**
- * 파일명에 '사업자등록증'이 정확히 포함되어 있는지 확인
- * 엄격한 매칭: 공백 제거 후 '사업자등록증' 문자열 포함 여부만 체크
- */
 export function isBusinessRegistrationFile(fileName: string): boolean {
   const normalizedName = fileName.replace(/\s+/g, '');
   const matched = normalizedName.includes('사업자등록증');
@@ -125,18 +115,12 @@ export function isBusinessRegistrationFile(fileName: string): boolean {
   return matched;
 }
 
-/**
- * 이미지 파일인지 확인
- */
 export function isImageFile(fileType: string): boolean {
   const isImage = fileType.startsWith('image/');
   console.log(`🔍 파일 타입 체크: "${fileType}" -> 이미지 여부: ${isImage}`);
   return isImage;
 }
 
-/**
- * OCR 지원 파일인지 확인 (이미지 또는 PDF)
- */
 export function isOCRSupportedFile(fileType: string): boolean {
   const isImage = fileType.startsWith('image/');
   const isPdf = fileType === 'application/pdf' || fileType.includes('pdf');
