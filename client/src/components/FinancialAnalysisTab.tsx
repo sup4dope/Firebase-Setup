@@ -330,15 +330,14 @@ export function FinancialAnalysisTab({
 
   return (
     <div className="h-full flex flex-col gap-4 p-4 overflow-auto">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">금융 분석</h3>
-        {linkedPairs.size > 0 && (
+      {linkedPairs.size > 0 && (
+        <div className="flex items-center justify-end">
           <Badge variant="outline" className="text-amber-400 border-amber-400/50">
             <Link2 className="w-3 h-3 mr-1" />
             {linkedPairs.size}개 연결된 거래
           </Badge>
-        )}
-      </div>
+        </div>
+      )}
       
       <div className="flex flex-col gap-4 flex-1 min-h-0">
         {renderTable(loans, 'loan')}
