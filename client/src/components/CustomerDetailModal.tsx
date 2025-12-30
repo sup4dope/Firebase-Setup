@@ -272,6 +272,9 @@ export function CustomerDetailModal({
   // OCR 자동 입력 하이라이트 상태
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
+  
+  // OCR 추출 업종 리스트 상태 (드롭다운 상단에 추가)
+  const [ocrBusinessTypes, setOcrBusinessTypes] = useState<string[]>([]);
 
   // Status change modal state
   const [statusChangeModal, setStatusChangeModal] = useState<{
@@ -621,8 +624,19 @@ export function CustomerDetailModal({
           fieldsToUpdate.ssn_back = ocrResult.resident_id_back;
           newHighlightedFields.add('ssn_back');
         }
-        if (ocrResult.business_type) {
-          fieldsToUpdate.business_type = ocrResult.business_type;
+        if (ocrResult.business_type_list && ocrResult.business_type_list.length > 0) {
+          const extractedTypes = ocrResult.business_type_list.filter(t => t && t.trim());
+          const uniqueExtracted = extractedTypes.filter(t => !BUSINESS_TYPES.includes(t));
+          setOcrBusinessTypes(uniqueExtracted);
+          
+          fieldsToUpdate.business_type = extractedTypes[0];
+          newHighlightedFields.add('business_type');
+        } else if (ocrResult.business_type) {
+          const extractedTypes = ocrResult.business_type.split(/[\/,]/).map(t => t.trim()).filter(Boolean);
+          const uniqueExtracted = extractedTypes.filter(t => !BUSINESS_TYPES.includes(t));
+          setOcrBusinessTypes(uniqueExtracted);
+          
+          fieldsToUpdate.business_type = extractedTypes[0] || ocrResult.business_type;
           newHighlightedFields.add('business_type');
         }
         if (ocrResult.business_item) {
@@ -1561,7 +1575,17 @@ export function CustomerDetailModal({
                 {/* Row 6: 업종 | 종목 (12분할 그리드 - 각 6칸) */}
                 <div className="grid grid-cols-12 gap-1 items-end">
                   <div className="col-span-6">
-                    <Label className="text-[10px] text-muted-foreground">업종</Label>
+                    <div className="flex items-center gap-1">
+                      <Label className="text-[10px] text-muted-foreground">업종</Label>
+                      {ocrBusinessTypes.length > 0 && highlightedFields.has('business_type') && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[8px] px-1 py-0 bg-blue-600/20 text-blue-400 leading-tight"
+                        >
+                          AI 추출
+                        </Badge>
+                      )}
+                    </div>
                     <Select
                       value={formData.business_type || "기타"}
                       onValueChange={(v) =>
@@ -1581,6 +1605,20 @@ export function CustomerDetailModal({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-muted border-border">
+                        {ocrBusinessTypes.length > 0 && (
+                          <>
+                            {ocrBusinessTypes.map((t) => (
+                              <SelectItem
+                                key={`ocr-${t}`}
+                                value={t}
+                                className="text-foreground text-xs bg-blue-600/10"
+                              >
+                                {t} (AI)
+                              </SelectItem>
+                            ))}
+                            <div className="h-px bg-border my-1" />
+                          </>
+                        )}
                         {BUSINESS_TYPES.map((t) => (
                           <SelectItem
                             key={t}
