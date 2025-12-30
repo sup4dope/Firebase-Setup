@@ -2229,7 +2229,7 @@ export function CustomerDetailModal({
           {/* Section 2: 중앙 패널 - 탭 기반 금융 분석 대시보드 (40%) */}
           <div className="flex-1 h-full bg-muted/50 dark:bg-gray-950 flex flex-col overflow-hidden border-r">
             {/* Center Panel Tabs */}
-            <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b bg-muted/50">
+            <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b bg-muted/50 pl-[6px] pr-[6px] pt-[2px] pb-[2px]">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
