@@ -129,3 +129,72 @@ export function isOCRSupportedFile(fileType: string): boolean {
   console.log(`🔍 OCR 지원 파일 체크: "${fileType}" -> 이미지: ${isImage}, PDF: ${isPdf}, 지원: ${supported}`);
   return supported;
 }
+
+// ========== 부가가치세 과세표준증명 OCR ==========
+
+export interface VatCertificateData {
+  recent_sales?: number;
+  sales_y1?: number;
+  sales_y2?: number;
+  sales_y3?: number;
+  raw_data?: { year: number; amount: number }[];
+}
+
+export function isVatCertificateFile(fileName: string): boolean {
+  const normalizedName = fileName.replace(/\s+/g, '');
+  const matched = normalizedName.includes('부가가치세과세표준증명') || 
+                  normalizedName.includes('과세표준증명') ||
+                  normalizedName.includes('부가세과세표준');
+  
+  console.log(`🔍 부가세 과세표준증명 파일 체크: "${fileName}" -> 매칭: ${matched}`);
+  return matched;
+}
+
+export async function extractVatCertificate(
+  imageSource: File | string,
+  mimeType?: string
+): Promise<VatCertificateData | null> {
+  try {
+    console.log("🚀 부가세 과세표준증명 OCR 처리 시작...");
+    
+    let base64Data: string;
+    let imageMimeType: string;
+    
+    if (imageSource instanceof File) {
+      console.log(`📁 파일 정보: ${imageSource.name}, 크기: ${imageSource.size}bytes`);
+      base64Data = await fileToBase64(imageSource);
+      imageMimeType = imageSource.type || 'application/pdf';
+    } else {
+      const result = await urlToBase64(imageSource);
+      base64Data = result.base64;
+      imageMimeType = mimeType || result.mimeType;
+    }
+    
+    console.log("📡 서버 부가세 OCR API 호출 중...");
+    const response = await fetch('/api/ocr/vat-certificate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64Data, mimeType: imageMimeType })
+    });
+
+    if (!response.ok) {
+      console.error("❌ 부가세 OCR API 요청 실패:", response.status);
+      return null;
+    }
+
+    const result = await response.json();
+    console.log("📥 부가세 OCR 응답:", result);
+    
+    if (result.success && result.data) {
+      console.log("✅ 부가세 과세표준증명 OCR 성공:", result.data);
+      return result.data as VatCertificateData;
+    } else {
+      console.error("❌ 부가세 OCR 처리 실패:", result.error);
+      return null;
+    }
+    
+  } catch (error) {
+    console.error("❌ 부가세 과세표준증명 OCR 예외:", error);
+    return null;
+  }
+}

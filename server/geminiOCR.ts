@@ -273,3 +273,160 @@ export async function extractBusinessRegistrationFromBase64(
     } as BusinessRegistrationData & { _error?: string };
   }
 }
+
+// ========== 부가가치세 과세표준증명 OCR ==========
+
+export interface VatCertificateData {
+  recent_sales?: number;  // 최근 매출 (억원)
+  sales_y1?: number;      // Y-1 매출 (억원)
+  sales_y2?: number;      // Y-2 매출 (억원)
+  sales_y3?: number;      // Y-3 매출 (억원)
+  raw_data?: { year: number; amount: number }[];  // 원본 연도별 데이터
+}
+
+function convertToEok(amount: number): number {
+  // 원화를 억원으로 변환 (소수점 둘째 자리까지)
+  return Math.round(amount / 100000000 * 100) / 100;
+}
+
+export async function extractVatCertificateFromBase64(
+  base64Data: string,
+  mimeType: string
+): Promise<VatCertificateData | null> {
+  const currentYear = new Date().getFullYear();
+  
+  console.log("🔍 [서버] 부가가치세 과세표준증명 OCR 시작");
+  console.log(`   📅 현재 기준 연도: ${currentYear}년`);
+  console.log(`   📅 Y-1: ${currentYear - 1}년, Y-2: ${currentYear - 2}년, Y-3: ${currentYear - 3}년`);
+  console.log(`   - 원본 Base64 길이: ${base64Data?.length || 0}`);
+  console.log(`   - MIME 타입: ${mimeType}`);
+  
+  const apiKey = process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    console.error("❌ [서버] GEMINI_API_KEY 환경변수 없음");
+    return null;
+  }
+  
+  const cleanBase64 = stripBase64Header(base64Data);
+  
+  const prompt = `이 문서는 한국의 "부가가치세 과세표준증명" 또는 "부가가치세과세표준증명원"입니다.
+문서에서 각 과세기간(연도)별 매출 금액을 추출해 주세요.
+
+추출 규칙:
+1. "과세기간" 또는 "귀속연도"에서 연도(YYYY)를 추출
+2. 해당 연도의 "계", "합계", "과세표준" 금액을 추출
+3. 같은 연도에 여러 기간(1기, 2기 등)이 있다면 모두 합산
+4. 금액은 숫자만 추출 (쉼표, 원 등 제거)
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{
+  "sales_by_year": [
+    {"year": 2024, "total_amount": 288611996},
+    {"year": 2023, "total_amount": 356000000},
+    {"year": 2022, "total_amount": 420000000}
+  ]
+}
+
+- year: 4자리 연도 숫자
+- total_amount: 해당 연도 전체 합계 금액 (원 단위, 숫자만)
+- 데이터가 없는 연도는 포함하지 마세요`;
+
+  const requestBody = {
+    contents: [{
+      parts: [
+        { text: prompt },
+        {
+          inline_data: {
+            mime_type: mimeType,
+            data: cleanBase64
+          }
+        }
+      ]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      topP: 0.8,
+      maxOutputTokens: 2048
+    }
+  };
+
+  try {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    
+    console.log("📡 [서버] Gemini API 호출 (부가세 과세표준증명)...");
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ [서버] API 오류 ${response.status}:`, errorText);
+      return null;
+    }
+    
+    const result = await response.json();
+    console.log("📥 [서버] Gemini 응답 수신");
+    
+    const textContent = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textContent) {
+      console.error("❌ [서버] 응답에 텍스트 없음");
+      return null;
+    }
+    
+    console.log("📝 [서버] 원본 응답:", textContent);
+    
+    // JSON 추출
+    const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("❌ [서버] JSON 형식 없음");
+      return null;
+    }
+    
+    const parsedData = JSON.parse(jsonMatch[0]);
+    console.log("✅ [서버] JSON 파싱 성공:", parsedData);
+    
+    // 연도별 매출 데이터 매핑
+    const salesByYear = parsedData.sales_by_year || [];
+    const yearMap: { [key: number]: number } = {};
+    
+    // 같은 연도 합산
+    for (const item of salesByYear) {
+      const year = Number(item.year);
+      const amount = Number(item.total_amount) || 0;
+      yearMap[year] = (yearMap[year] || 0) + amount;
+    }
+    
+    console.log("📊 [서버] 연도별 매출 합산 결과:", yearMap);
+    
+    // 현재 연도 기준으로 매핑
+    const recentSales = yearMap[currentYear] ? convertToEok(yearMap[currentYear]) : undefined;
+    const salesY1 = yearMap[currentYear - 1] ? convertToEok(yearMap[currentYear - 1]) : undefined;
+    const salesY2 = yearMap[currentYear - 2] ? convertToEok(yearMap[currentYear - 2]) : undefined;
+    const salesY3 = yearMap[currentYear - 3] ? convertToEok(yearMap[currentYear - 3]) : undefined;
+    
+    console.log(`✅ [서버] 매출 매핑 결과:`);
+    console.log(`   - 최근매출 (${currentYear}년): ${recentSales !== undefined ? recentSales + '억' : '데이터 없음'}`);
+    console.log(`   - Y-1 매출 (${currentYear - 1}년): ${salesY1 !== undefined ? salesY1 + '억' : '데이터 없음'}`);
+    console.log(`   - Y-2 매출 (${currentYear - 2}년): ${salesY2 !== undefined ? salesY2 + '억' : '데이터 없음'}`);
+    console.log(`   - Y-3 매출 (${currentYear - 3}년): ${salesY3 !== undefined ? salesY3 + '억' : '데이터 없음'}`);
+    
+    return {
+      recent_sales: recentSales,
+      sales_y1: salesY1,
+      sales_y2: salesY2,
+      sales_y3: salesY3,
+      raw_data: Object.entries(yearMap).map(([year, amount]) => ({
+        year: Number(year),
+        amount: convertToEok(amount)
+      }))
+    };
+    
+  } catch (error: any) {
+    console.error("❌ [서버] 부가세 과세표준증명 OCR 실패:", error);
+    return null;
+  }
+}

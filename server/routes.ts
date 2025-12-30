@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { extractBusinessRegistrationFromBase64 } from "./geminiOCR";
+import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64 } from "./geminiOCR";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -83,6 +83,44 @@ export async function registerRoutes(
         success: false, 
         error: errorMessage,
         stack: errorStack,
+        details: "서버에서 OCR 처리 중 예외 발생"
+      });
+    }
+  });
+
+  // OCR API endpoint for VAT certificate (부가가치세 과세표준증명)
+  app.post("/api/ocr/vat-certificate", async (req, res) => {
+    console.log("📥 [라우터] 부가세 과세표준증명 OCR 요청 수신");
+    
+    try {
+      const { base64Data, mimeType } = req.body;
+      
+      console.log(`   - Base64 존재: ${base64Data ? '✅' : '❌'}, 길이: ${base64Data?.length || 0}`);
+      console.log(`   - MIME 타입: ${mimeType || '(없음)'}`);
+      
+      if (!base64Data || !mimeType) {
+        console.log("❌ [라우터] 필수 파라미터 누락");
+        return res.status(400).json({ 
+          error: "base64Data와 mimeType이 필요합니다." 
+        });
+      }
+      
+      console.log("🔄 [라우터] 부가세 OCR 처리 함수 호출...");
+      const result = await extractVatCertificateFromBase64(base64Data, mimeType);
+      
+      if (result) {
+        console.log("✅ [라우터] 부가세 OCR 성공:", result);
+        res.json({ success: true, data: result });
+      } else {
+        console.log("❌ [라우터] 부가세 OCR 실패 (결과 없음)");
+        res.json({ success: false, error: "OCR 결과가 비어 있습니다." });
+      }
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error);
+      console.error("❌ [라우터] 부가세 OCR API 예외:", errorMessage);
+      res.status(500).json({ 
+        success: false, 
+        error: errorMessage,
         details: "서버에서 OCR 처리 중 예외 발생"
       });
     }

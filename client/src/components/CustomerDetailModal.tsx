@@ -23,7 +23,14 @@ import {
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
 import { compressImage, validateFileSize, formatFileSize } from "@/lib/imageCompressor";
-import { extractBusinessRegistration, isBusinessRegistrationFile, type BusinessRegistrationData } from "@/lib/geminiOCR";
+import { 
+  extractBusinessRegistration, 
+  isBusinessRegistrationFile, 
+  extractVatCertificate,
+  isVatCertificateFile,
+  type BusinessRegistrationData,
+  type VatCertificateData
+} from "@/lib/geminiOCR";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -575,7 +582,16 @@ export function CustomerDetailModal({
           if (isBusinessReg && isOCRSupported) {
             console.log(`📋 사업자등록증 ${isPdf ? 'PDF' : '이미지'} 파일 감지, OCR 처리 시작...`);
             processBusinessRegistrationOCR(uploadedFile);
-            break; // 첫 번째 사업자등록증만 처리
+            break;
+          }
+          
+          const isVatCert = isVatCertificateFile(uploadedFile.name);
+          console.log(`   -> 부가세 과세표준증명 여부: ${isVatCert}`);
+          
+          if (isVatCert && isOCRSupported) {
+            console.log(`📋 부가세 과세표준증명 ${isPdf ? 'PDF' : '이미지'} 파일 감지, OCR 처리 시작...`);
+            processVatCertificateOCR(uploadedFile);
+            break;
           }
         }
       }
@@ -669,6 +685,61 @@ export function CustomerDetailModal({
       }
     } catch (error) {
       console.error("사업자등록증 OCR 처리 실패:", error);
+    } finally {
+      setIsProcessingOCR(false);
+    }
+  };
+
+  // [신규] 부가가치세 과세표준증명 OCR 처리 및 자동 입력
+  const processVatCertificateOCR = async (file: File) => {
+    setIsProcessingOCR(true);
+    
+    try {
+      const ocrResult = await extractVatCertificate(file);
+      
+      if (ocrResult) {
+        const fieldsToUpdate: Partial<typeof formData> = {};
+        const newHighlightedFields = new Set<string>();
+        
+        if (ocrResult.recent_sales !== undefined) {
+          fieldsToUpdate.recent_sales = ocrResult.recent_sales;
+          newHighlightedFields.add('recent_sales');
+        }
+        if (ocrResult.sales_y1 !== undefined) {
+          fieldsToUpdate.sales_y1 = ocrResult.sales_y1;
+          newHighlightedFields.add('sales_y1');
+        }
+        if (ocrResult.sales_y2 !== undefined) {
+          fieldsToUpdate.sales_y2 = ocrResult.sales_y2;
+          newHighlightedFields.add('sales_y2');
+        }
+        if (ocrResult.sales_y3 !== undefined) {
+          fieldsToUpdate.sales_y3 = ocrResult.sales_y3;
+          newHighlightedFields.add('sales_y3');
+        }
+        
+        if (Object.keys(fieldsToUpdate).length > 0) {
+          const updatedData = { ...formData, ...fieldsToUpdate };
+          setFormData(updatedData);
+          
+          setHighlightedFields(newHighlightedFields);
+          
+          setTimeout(() => {
+            setHighlightedFields(new Set());
+          }, 2000);
+          
+          debouncedSave(updatedData);
+          
+          const currentYear = new Date().getFullYear();
+          console.log(`✅ 부가세 과세표준증명 매출 자동 입력 완료:`);
+          console.log(`   - 최근매출 (${currentYear}년): ${ocrResult.recent_sales ?? '없음'}억`);
+          console.log(`   - Y-1 매출 (${currentYear - 1}년): ${ocrResult.sales_y1 ?? '없음'}억`);
+          console.log(`   - Y-2 매출 (${currentYear - 2}년): ${ocrResult.sales_y2 ?? '없음'}억`);
+          console.log(`   - Y-3 매출 (${currentYear - 3}년): ${ocrResult.sales_y3 ?? '없음'}억`);
+        }
+      }
+    } catch (error) {
+      console.error("부가세 과세표준증명 OCR 처리 실패:", error);
     } finally {
       setIsProcessingOCR(false);
     }
@@ -1828,9 +1899,19 @@ export function CustomerDetailModal({
                 {/* Row 10: 최근 매출 | Y-1 매출 | Y-2 매출 | Y-3 매출 (4등분) */}
                 <div className="grid grid-cols-4 gap-1">
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">
-                      최근 매출
-                    </Label>
+                    <div className="flex items-center gap-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        최근 매출
+                      </Label>
+                      {highlightedFields.has('recent_sales') && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[8px] px-1 py-0 bg-blue-600/20 text-blue-400 leading-tight"
+                        >
+                          AI
+                        </Badge>
+                      )}
+                    </div>
                     <div className="relative">
                       <Input
                         type="number"
@@ -1842,10 +1923,11 @@ export function CustomerDetailModal({
                         }
                         disabled={isReadOnly}
                         className={cn(
-                          "border-border text-foreground pr-5 h-7 text-xs w-full",
+                          "border-border text-foreground pr-5 h-7 text-xs w-full transition-colors duration-300",
                           isReadOnly
                             ? "bg-muted cursor-not-allowed opacity-70"
                             : "bg-muted",
+                          highlightedFields.has('recent_sales') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                         )}
                       />
                       <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
@@ -1854,9 +1936,19 @@ export function CustomerDetailModal({
                     </div>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">
-                      Y-1 매출
-                    </Label>
+                    <div className="flex items-center gap-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        Y-1 매출
+                      </Label>
+                      {highlightedFields.has('sales_y1') && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[8px] px-1 py-0 bg-blue-600/20 text-blue-400 leading-tight"
+                        >
+                          AI
+                        </Badge>
+                      )}
+                    </div>
                     <div className="relative">
                       <Input
                         type="number"
@@ -1868,10 +1960,11 @@ export function CustomerDetailModal({
                         }
                         disabled={isReadOnly}
                         className={cn(
-                          "border-border text-foreground pr-5 h-7 text-xs w-full",
+                          "border-border text-foreground pr-5 h-7 text-xs w-full transition-colors duration-300",
                           isReadOnly
                             ? "bg-muted cursor-not-allowed opacity-70"
                             : "bg-muted",
+                          highlightedFields.has('sales_y1') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                         )}
                       />
                       <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
@@ -1880,9 +1973,19 @@ export function CustomerDetailModal({
                     </div>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">
-                      Y-2 매출
-                    </Label>
+                    <div className="flex items-center gap-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        Y-2 매출
+                      </Label>
+                      {highlightedFields.has('sales_y2') && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[8px] px-1 py-0 bg-blue-600/20 text-blue-400 leading-tight"
+                        >
+                          AI
+                        </Badge>
+                      )}
+                    </div>
                     <div className="relative">
                       <Input
                         type="number"
@@ -1894,10 +1997,11 @@ export function CustomerDetailModal({
                         }
                         disabled={isReadOnly}
                         className={cn(
-                          "border-border text-foreground pr-5 h-7 text-xs w-full",
+                          "border-border text-foreground pr-5 h-7 text-xs w-full transition-colors duration-300",
                           isReadOnly
                             ? "bg-muted cursor-not-allowed opacity-70"
                             : "bg-muted",
+                          highlightedFields.has('sales_y2') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                         )}
                       />
                       <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
@@ -1906,9 +2010,19 @@ export function CustomerDetailModal({
                     </div>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">
-                      Y-3 매출
-                    </Label>
+                    <div className="flex items-center gap-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        Y-3 매출
+                      </Label>
+                      {highlightedFields.has('sales_y3') && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[8px] px-1 py-0 bg-blue-600/20 text-blue-400 leading-tight"
+                        >
+                          AI
+                        </Badge>
+                      )}
+                    </div>
                     <div className="relative">
                       <Input
                         type="number"
@@ -1920,10 +2034,11 @@ export function CustomerDetailModal({
                         }
                         disabled={isReadOnly}
                         className={cn(
-                          "border-border text-foreground pr-5 h-7 text-xs w-full",
+                          "border-border text-foreground pr-5 h-7 text-xs w-full transition-colors duration-300",
                           isReadOnly
                             ? "bg-muted cursor-not-allowed opacity-70"
                             : "bg-muted",
+                          highlightedFields.has('sales_y3') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
                         )}
                       />
                       <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
