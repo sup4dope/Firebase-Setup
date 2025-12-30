@@ -2604,7 +2604,7 @@ export function CustomerDetailModal({
                   </div>
 
                   {/* Document Footer (File List & Upload) - Moved to bottom */}
-                  <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-t bg-muted/30">
+                  <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-t bg-muted/30 pt-[2px] pb-[2px] pl-[6px] pr-[6px]">
                     <Button
                       variant="outline"
                       size="sm"
@@ -2943,7 +2943,6 @@ export function CustomerDetailModal({
           </div>
         </div>
       </DialogContent>
-
       {/* Status Change Confirmation Modal */}
       <Dialog
         open={statusChangeModal.isOpen}
@@ -3200,7 +3199,6 @@ export function CustomerDetailModal({
           </div>
         </DialogContent>
       </Dialog>
-
       {/* TO-DO 추가 모달 */}
       {currentUser && (
         <TodoForm
