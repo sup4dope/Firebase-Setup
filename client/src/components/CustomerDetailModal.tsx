@@ -302,6 +302,9 @@ export function CustomerDetailModal({
   
   // OCR 추출 업종 리스트 상태 (드롭다운 상단에 추가)
   const [ocrBusinessTypes, setOcrBusinessTypes] = useState<string[]>([]);
+  
+  // 신용공여내역 OCR 추출 건수 (탭 배지 표시용)
+  const [ocrExtractedCount, setOcrExtractedCount] = useState<number>(0);
 
   // Status change modal state
   const [statusChangeModal, setStatusChangeModal] = useState<{
@@ -739,21 +742,51 @@ export function CustomerDetailModal({
           
           if (ocrResult && ocrResult.obligations && ocrResult.obligations.length > 0) {
             // 금융 채무 데이터를 financial_obligations에 추가
+            const newObligations: FinancialObligation[] = ocrResult.obligations.map((ob, idx) => ({
+              id: `ocr-${Date.now()}-${idx}`,
+              type: ob.type as 'loan' | 'guarantee',
+              institution: ob.institution,
+              product_name: ob.product_name,
+              account_type: ob.account_type,
+              balance: ob.balance,
+              occurred_at: ob.occurred_at,
+              maturity_date: ob.maturity_date,
+            }));
+            
+            // financialObligations 상태 업데이트 (UI 즉시 반영)
+            setFinancialObligations(prevObligations => {
+              const mergedObligations = [...prevObligations];
+              let addedCount = 0;
+              
+              newObligations.forEach(newOb => {
+                const isDuplicate = mergedObligations.some(
+                  existing => 
+                    existing.institution === newOb.institution &&
+                    existing.product_name === newOb.product_name &&
+                    existing.balance === newOb.balance &&
+                    existing.occurred_at === newOb.occurred_at
+                );
+                if (!isDuplicate) {
+                  mergedObligations.push(newOb);
+                  addedCount++;
+                }
+              });
+              
+              // 배지에 표시할 추출 건수 업데이트
+              if (addedCount > 0) {
+                setOcrExtractedCount(addedCount);
+                // 5초 후 배지 숨기기
+                setTimeout(() => setOcrExtractedCount(0), 5000);
+              }
+              
+              return mergedObligations;
+            });
+            
+            // formData도 동기화 (Firestore 저장용)
             setFormData(prev => {
               const existingObligations = prev.financial_obligations || [];
-              const newObligations = ocrResult.obligations.map((ob, idx) => ({
-                id: `ocr-${Date.now()}-${idx}`,
-                type: ob.type as 'loan' | 'guarantee',
-                institution: ob.institution,
-                product_name: ob.product_name,
-                account_type: ob.account_type,
-                balance: ob.balance,
-                occurred_at: ob.occurred_at,
-                maturity_date: ob.maturity_date,
-              }));
-              
-              // 기존 데이터와 병합 (중복 제거: 같은 기관+상품명+잔액+발생일이면 중복)
               const mergedObligations = [...existingObligations];
+              
               newObligations.forEach(newOb => {
                 const isDuplicate = mergedObligations.some(
                   existing => 
@@ -775,6 +808,9 @@ export function CustomerDetailModal({
               debouncedSave(updatedData);
               return updatedData;
             });
+            
+            // 금융 분석 탭으로 자동 전환
+            setActiveCenterTab("financial");
             
             console.log(`[성공] 신용공여내역 완료: ${task.file.name}`);
             console.log(`   - 추출 건수: ${ocrResult.obligations.length}건`);
@@ -2309,9 +2345,12 @@ export function CustomerDetailModal({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setActiveCenterTab("financial")}
+                  onClick={() => {
+                    setActiveCenterTab("financial");
+                    setOcrExtractedCount(0); // 탭 클릭 시 배지 숨기기
+                  }}
                   className={cn(
-                    "h-8 px-3 text-sm",
+                    "h-8 px-3 text-sm relative",
                     activeCenterTab === "financial"
                       ? "bg-emerald-600/20 text-emerald-400"
                       : "text-muted-foreground",
@@ -2320,6 +2359,14 @@ export function CustomerDetailModal({
                 >
                   <Bot className="w-4 h-4 mr-1.5" />
                   금융 분석
+                  {ocrExtractedCount > 0 && activeCenterTab !== "financial" && (
+                    <Badge 
+                      variant="destructive" 
+                      className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[10px] animate-pulse"
+                    >
+                      {ocrExtractedCount}건
+                    </Badge>
+                  )}
                 </Button>
                 <Button
                   variant="ghost"
@@ -2730,6 +2777,7 @@ export function CustomerDetailModal({
               {activeCenterTab === "financial" && (
                 <div className="h-full overflow-auto p-4">
                   <FinancialAnalysisTab
+                    customer={formData}
                     obligations={financialObligations}
                     onObligationsChange={handleFinancialObligationsChange}
                     isReadOnly={isReadOnly}
@@ -2745,7 +2793,10 @@ export function CustomerDetailModal({
                     customer={{
                       name: formData.name || "",
                       business_type: formData.business_type || "",
-                      sales: formData.sales || 0,
+                      recent_sales: formData.recent_sales || 0,
+                      sales_y1: formData.sales_y1 || 0,
+                      sales_y2: formData.sales_y2 || 0,
+                      sales_y3: formData.sales_y3 || 0,
                     }}
                   />
                 </div>
