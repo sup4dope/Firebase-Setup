@@ -330,15 +330,6 @@ export function FinancialAnalysisTab({
 
   return (
     <div className="h-full flex flex-col gap-4 p-4 overflow-auto pt-[0px] pb-[0px] pl-[10px] pr-[10px]">
-      <div className="flex items-center justify-end min-h-[28px]">
-        {linkedPairs.size > 0 && (
-          <Badge variant="outline" className="text-amber-400 border-amber-400/50">
-            <Link2 className="w-3 h-3 mr-1" />
-            {linkedPairs.size}개 연결된 거래
-          </Badge>
-        )}
-      </div>
-      
       <div className="flex flex-col gap-4 flex-1 min-h-0">
         {renderTable(loans, 'loan')}
         {renderTable(guarantees, 'guarantee')}
