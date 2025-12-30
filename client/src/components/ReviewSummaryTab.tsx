@@ -173,7 +173,7 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
   const dtiAvg3YStatus = getDtiStatus(dtiAvg3Y);
 
   return (
-    <div className="h-full flex flex-col gap-4 p-4 overflow-auto pt-[0px] pb-[0px]">
+    <div className="h-full flex flex-col gap-4 p-4 overflow-auto pt-[0px] pb-[0px] pl-[10px] pr-[10px]">
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardHeader className="py-3 px-4">
