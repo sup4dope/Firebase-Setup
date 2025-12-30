@@ -2478,48 +2478,6 @@ export function CustomerDetailModal({
               {/* 서류 보기 탭 */}
               {activeCenterTab === "documents" && (
                 <div className="h-full flex flex-col">
-                  {/* Document Sub-header */}
-                  <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-muted/30">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading || isReadOnly}
-                      className={cn(
-                        "border-border shrink-0",
-                        isReadOnly && "opacity-50 cursor-not-allowed",
-                      )}
-                    >
-                      <Upload className="w-4 h-4 mr-1" />
-                      {isUploading && uploadProgress 
-                        ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})...` 
-                        : "파일 업로드"}
-                    </Button>
-
-                    {/* File Tabs */}
-                    <div className="flex gap-1 overflow-x-auto">
-                      {documents.map((doc) => (
-                        <Button
-                          key={doc.id}
-                          variant={
-                            selectedDocument?.id === doc.id ? "secondary" : "ghost"
-                          }
-                          size="sm"
-                          onClick={() => setSelectedDocument(doc)}
-                          className={cn(
-                            "shrink-0 max-w-[150px]",
-                            selectedDocument?.id === doc.id
-                              ? "bg-blue-600/20 text-blue-400"
-                              : "text-muted-foreground",
-                          )}
-                        >
-                          <FileText className="w-3 h-3 mr-1" />
-                          <span className="truncate">{doc.file_name}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
                   {/* Document Viewer with Drag & Drop */}
                   <div
                     {...getRootProps()}
@@ -2642,6 +2600,48 @@ export function CustomerDetailModal({
                           </div>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Document Footer (File List & Upload) - Moved to bottom */}
+                  <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-t bg-muted/30">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading || isReadOnly}
+                      className={cn(
+                        "border-border shrink-0",
+                        isReadOnly && "opacity-50 cursor-not-allowed",
+                      )}
+                    >
+                      <Upload className="w-4 h-4 mr-1" />
+                      {isUploading && uploadProgress 
+                        ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})...` 
+                        : "파일 업로드"}
+                    </Button>
+
+                    {/* File Tabs */}
+                    <div className="flex gap-1 overflow-x-auto">
+                      {documents.map((doc) => (
+                        <Button
+                          key={doc.id}
+                          variant={
+                            selectedDocument?.id === doc.id ? "secondary" : "ghost"
+                          }
+                          size="sm"
+                          onClick={() => setSelectedDocument(doc)}
+                          className={cn(
+                            "shrink-0 max-w-[150px]",
+                            selectedDocument?.id === doc.id
+                              ? "bg-blue-600/20 text-blue-400"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          <FileText className="w-3 h-3 mr-1" />
+                          <span className="truncate">{doc.file_name}</span>
+                        </Button>
+                      ))}
                     </div>
                   </div>
                 </div>
