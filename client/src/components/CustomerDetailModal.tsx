@@ -30,8 +30,11 @@ import {
   isBusinessRegistrationFile, 
   extractVatCertificate,
   isVatCertificateFile,
+  extractCreditReport,
+  isCreditReportFile,
   type BusinessRegistrationData,
-  type VatCertificateData
+  type VatCertificateData,
+  type CreditReportData
 } from "@/lib/geminiOCR";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -586,23 +589,26 @@ export function CustomerDetailModal({
         
         // 모든 OCR 대상 파일 수집 및 순차 처리
         console.log("🔍 OCR 대상 파일 검색 시작...");
-        const ocrTasks: { file: File; type: 'business' | 'vat' }[] = [];
+        const ocrTasks: { file: File; type: 'business' | 'vat' | 'credit' }[] = [];
         
         for (const uploadedFile of files) {
           console.log(`📄 파일 확인: "${uploadedFile.name}", 타입: "${uploadedFile.type}", 크기: ${uploadedFile.size}bytes`);
           
           const isBusinessReg = isBusinessRegistrationFile(uploadedFile.name);
           const isVatCert = isVatCertificateFile(uploadedFile.name);
+          const isCreditReport = isCreditReportFile(uploadedFile.name);
           const isImage = uploadedFile.type.startsWith('image/');
           const isPdf = uploadedFile.type === 'application/pdf' || uploadedFile.type.includes('pdf');
           const isOCRSupported = isImage || isPdf;
           
-          console.log(`   -> 사업자등록증: ${isBusinessReg}, 부가세: ${isVatCert}, OCR지원: ${isOCRSupported}`);
+          console.log(`   -> 사업자등록증: ${isBusinessReg}, 부가세: ${isVatCert}, 신용공여: ${isCreditReport}, OCR지원: ${isOCRSupported}`);
           
           if (isBusinessReg && isOCRSupported) {
             ocrTasks.push({ file: uploadedFile, type: 'business' });
           } else if (isVatCert && isOCRSupported) {
             ocrTasks.push({ file: uploadedFile, type: 'vat' });
+          } else if (isCreditReport && isOCRSupported) {
+            ocrTasks.push({ file: uploadedFile, type: 'credit' });
           }
         }
         
@@ -623,7 +629,7 @@ export function CustomerDetailModal({
   };
 
   // [신규] 모든 OCR 파일 순차 처리 (누적 업데이트)
-  const processAllOCRFiles = async (tasks: { file: File; type: 'business' | 'vat' }[]) => {
+  const processAllOCRFiles = async (tasks: { file: File; type: 'business' | 'vat' | 'credit' }[]) => {
     setIsProcessingOCR(true);
     const allHighlightedFields = new Set<string>();
     
@@ -726,6 +732,54 @@ export function CustomerDetailModal({
             console.log(`   - Y-1 (${currentYear - 1}년): ${ocrResult.sales_y1 ?? '없음'}억`);
             console.log(`   - Y-2 (${currentYear - 2}년): ${ocrResult.sales_y2 ?? '없음'}억`);
             console.log(`   - Y-3 (${currentYear - 3}년): ${ocrResult.sales_y3 ?? '없음'}억`);
+          }
+        } else if (task.type === 'credit') {
+          // 신용공여내역 OCR
+          const ocrResult = await extractCreditReport(task.file);
+          
+          if (ocrResult && ocrResult.obligations && ocrResult.obligations.length > 0) {
+            // 금융 채무 데이터를 financial_obligations에 추가
+            setFormData(prev => {
+              const existingObligations = prev.financial_obligations || [];
+              const newObligations = ocrResult.obligations.map((ob, idx) => ({
+                id: `ocr-${Date.now()}-${idx}`,
+                type: ob.type as 'loan' | 'guarantee',
+                institution: ob.institution,
+                product_name: ob.product_name,
+                account_type: ob.account_type,
+                balance: ob.balance,
+                occurred_at: ob.occurred_at,
+                maturity_date: ob.maturity_date,
+              }));
+              
+              // 기존 데이터와 병합 (중복 제거: 같은 기관+상품명+잔액+발생일이면 중복)
+              const mergedObligations = [...existingObligations];
+              newObligations.forEach(newOb => {
+                const isDuplicate = mergedObligations.some(
+                  existing => 
+                    existing.institution === newOb.institution &&
+                    existing.product_name === newOb.product_name &&
+                    existing.balance === newOb.balance &&
+                    existing.occurred_at === newOb.occurred_at
+                );
+                if (!isDuplicate) {
+                  mergedObligations.push(newOb);
+                }
+              });
+              
+              const updatedData = { 
+                ...prev, 
+                financial_obligations: mergedObligations 
+              };
+              
+              debouncedSave(updatedData);
+              return updatedData;
+            });
+            
+            console.log(`[성공] 신용공여내역 완료: ${task.file.name}`);
+            console.log(`   - 추출 건수: ${ocrResult.obligations.length}건`);
+            console.log(`   - 대출: ${ocrResult.obligations.filter(o => o.type === 'loan').length}건`);
+            console.log(`   - 보증: ${ocrResult.obligations.filter(o => o.type === 'guarantee').length}건`);
           }
         }
       }
