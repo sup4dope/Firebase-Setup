@@ -33,13 +33,11 @@ export function ExecutionAgencyPage({
         <h1 className="text-3xl font-bold text-teal-900">예상 집행 기관 및 금액</h1>
         <p className="text-sm text-[#4A5568] mt-1">Execution Agencies & Funding</p>
       </div>
-
       <div className="mb-6 bg-gradient-to-br from-teal-900 to-teal-700 rounded-lg p-6 text-white shadow-lg">
         <p className="text-sm opacity-80 mb-2">총 조달 예상 금액</p>
         <p className="text-4xl font-bold mb-1">{totalExpectedFunding}</p>
         <p className="text-xs opacity-70">{fundingPeriod}</p>
       </div>
-
       <div className="flex-1 flex flex-col">
         <h3 className="text-lg font-bold text-teal-900 mb-4 flex items-center gap-2">
           <div className="w-1 h-6 bg-cyan-500 rounded-full"></div>
@@ -89,11 +87,10 @@ export function ExecutionAgencyPage({
           ))}
         </div>
       </div>
-
       <div className="mt-auto pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-[#4A5568]">
         <span>{reportDate}</span>
-        <span className="font-semibold">Page 5 of 7</span>
+        <span className="font-semibold">Page 4 of 7</span>
       </div>
     </div>
-  )
+  );
 }

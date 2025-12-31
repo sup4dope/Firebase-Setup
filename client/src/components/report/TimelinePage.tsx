@@ -11,7 +11,6 @@ export function TimelinePage({ reportDate }: TimelinePageProps) {
         <h1 className="text-3xl font-bold text-teal-900">실행 계획 및 타임라인</h1>
         <p className="text-sm text-[#4A5568] mt-1">Action Plan & Timeline</p>
       </div>
-
       <div className="mb-6 bg-gradient-to-br from-teal-900/5 to-cyan-500/5 rounded-lg p-5 border border-cyan-500/20">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-600 to-cyan-500 flex items-center justify-center">
@@ -24,7 +23,6 @@ export function TimelinePage({ reportDate }: TimelinePageProps) {
         </div>
         <p className="text-sm text-[#2D3748] leading-relaxed">진행 기관과 진행 자금의 종류에따라 달라질 수 있습니다.</p>
       </div>
-
       <div className="flex-1">
         <h3 className="text-lg font-bold text-teal-900 mb-5 flex items-center gap-2">
           <div className="w-1 h-6 bg-cyan-500 rounded-full"></div>
@@ -112,11 +110,10 @@ export function TimelinePage({ reportDate }: TimelinePageProps) {
           </div>
         </div>
       </div>
-
       <div className="mt-auto pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-[#4A5568]">
         <span>{reportDate}</span>
-        <span className="font-semibold">Page 6 of 7</span>
+        <span className="font-semibold">Page 5 of 7</span>
       </div>
     </div>
-  )
+  );
 }
