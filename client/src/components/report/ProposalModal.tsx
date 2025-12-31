@@ -225,18 +225,6 @@ export function ProposalModal({ isOpen, onClose, onGenerate, customerName }: Pro
                         </span>
                       )}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-gray-600">예상 금리</Label>
-                      <div className="text-sm py-2 px-3 bg-gray-100 dark:bg-gray-700 rounded-md text-gray-700 dark:text-gray-300">
-                        1% ~ 4.5%
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-gray-600">약정기간</Label>
-                      <div className="text-sm py-2 px-3 bg-gray-100 dark:bg-gray-700 rounded-md text-gray-700 dark:text-gray-300">
-                        1년 ~ 10년
-                      </div>
-                    </div>
                   </div>
                 </div>
               ))}
