@@ -1,0 +1,47 @@
+import { Award } from "lucide-react"
+
+export function CoverPage() {
+  return (
+    <div className="h-[297mm] bg-white p-[25mm] flex flex-col justify-between print:break-after-page">
+      {/* Header with logo */}
+      <div className="flex justify-end">
+        <div className="text-right">
+          <div className="text-[#002C5F] font-bold text-sm">{"{logo}"}</div>
+        </div>
+      </div>
+
+      {/* Main Title */}
+      <div className="flex-1 flex flex-col justify-center items-center space-y-12">
+        <div className="text-center space-y-6">
+          <h1 className="text-5xl font-serif text-[#002C5F] leading-tight">{"{businessName}"} 귀사</h1>
+          <h2 className="text-3xl text-[#002C5F]/80 leading-relaxed">
+            정책자금 조달 가능성 분석 및<br />
+            전략 보고서
+          </h2>
+        </div>
+
+        {/* Golden guarantee box */}
+        <div className="border-4 border-[#B8860B] bg-gradient-to-br from-[#B8860B]/5 to-[#B8860B]/10 p-8 rounded-sm max-w-2xl">
+          <div className="flex items-center gap-4 justify-center">
+            <Award className="w-10 h-10 text-[#B8860B]" />
+            <div className="text-center">
+              <p className="text-xl font-bold text-[#B8860B] mb-2">조달 실패시 환불 보증</p>
+              <p className="text-[#002C5F] text-base leading-relaxed">정책자금 조달 실패 시 자문료 100% 환불</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex justify-between items-end text-sm text-[#002C5F]/60">
+        <div>
+          <p>작성일: {"{reportDate}"}</p>
+          <p className="mt-1">경영지원그룹 이음</p>
+        </div>
+        <div className="text-right">
+          <p>Management Support Group Yieum</p>
+        </div>
+      </div>
+    </div>
+  )
+}

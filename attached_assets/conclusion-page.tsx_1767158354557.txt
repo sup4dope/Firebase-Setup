@@ -1,0 +1,160 @@
+import { CheckCircle2, XCircle, Clock, FileText, AlertTriangle, Calendar } from "lucide-react"
+
+export function ConclusionPage() {
+  const comparisonData = [
+    {
+      aspect: "승인율",
+      expert: "85% 이상",
+      expertIcon: <CheckCircle2 className="w-5 h-5 text-green-600" />,
+      self: "30~40%",
+      selfIcon: <XCircle className="w-5 h-5 text-red-600" />,
+    },
+    {
+      aspect: "소요 시간",
+      expert: "2~3주",
+      expertIcon: <Clock className="w-5 h-5 text-green-600" />,
+      self: "1~2개월",
+      selfIcon: <Clock className="w-5 h-5 text-yellow-600" />,
+    },
+    {
+      aspect: "서류 준비",
+      expert: "전문가 대행",
+      expertIcon: <CheckCircle2 className="w-5 h-5 text-green-600" />,
+      self: "본인 직접 준비",
+      selfIcon: <FileText className="w-5 h-5 text-yellow-600" />,
+    },
+    {
+      aspect: "심사 대응",
+      expert: "전략적 대응 지원",
+      expertIcon: <CheckCircle2 className="w-5 h-5 text-green-600" />,
+      self: "본인 대응",
+      selfIcon: <AlertTriangle className="w-5 h-5 text-yellow-600" />,
+    },
+    {
+      aspect: "리스크",
+      expert: "실패 시 100% 환불",
+      expertIcon: <CheckCircle2 className="w-5 h-5 text-green-600" />,
+      self: "6개월 재신청 금지",
+      selfIcon: <XCircle className="w-5 h-5 text-red-600" />,
+    },
+  ]
+
+  const timeline = [
+    { step: "상담", duration: "1일", description: "현황 분석 및 전략 수립" },
+    { step: "서류 패키징", duration: "1주", description: "맞춤형 서류 준비" },
+    { step: "심사", duration: "1~2주", description: "기관 심사 진행" },
+    { step: "집행", duration: "3~5일", description: "자금 실행 완료" },
+  ]
+
+  return (
+    <div className="h-[297mm] bg-white p-[25mm] flex flex-col print:break-after-page">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-12 pb-6 border-b-2 border-[#002C5F]">
+        <h1 className="text-4xl font-serif text-[#002C5F]">결론 및 제언</h1>
+        <div className="text-sm text-[#002C5F]/60">페이지 5/5</div>
+      </div>
+
+      {/* Comparison Table */}
+      <div className="mb-10">
+        <h2 className="text-xl font-bold text-[#002C5F] mb-6 flex items-center gap-3">
+          <span className="w-1 h-6 bg-[#B8860B]"></span>
+          전문가 컨설팅 vs 셀프 신청 비교
+        </h2>
+        <div className="overflow-hidden rounded-sm border-2 border-[#002C5F]/20">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-[#002C5F] text-white">
+                <th className="py-4 px-6 text-left font-bold">구분</th>
+                <th className="py-4 px-6 text-center font-bold">전문가 컨설팅</th>
+                <th className="py-4 px-6 text-center font-bold">셀프 신청</th>
+              </tr>
+            </thead>
+            <tbody>
+              {comparisonData.map((row, index) => (
+                <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-[#002C5F]/5"}>
+                  <td className="py-4 px-6 text-[#002C5F] font-medium">{row.aspect}</td>
+                  <td className="py-4 px-6">
+                    <div className="flex items-center justify-center gap-2">
+                      {row.expertIcon}
+                      <span className="text-[#002C5F] font-medium">{row.expert}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-6">
+                    <div className="flex items-center justify-center gap-2">
+                      {row.selfIcon}
+                      <span className="text-[#002C5F]/70">{row.self}</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Warning Box */}
+      <div className="mb-10 border-2 border-red-600 bg-red-50 p-6 rounded-sm">
+        <h3 className="text-red-600 font-bold text-lg mb-3 flex items-center gap-2">
+          <AlertTriangle className="w-6 h-6" />
+          셀프 신청 시 주의사항
+        </h3>
+        <p className="text-[#002C5F] leading-relaxed">
+          정책자금 심사에서 부결될 경우, <span className="font-bold text-red-600">6개월간 동일 기관 재신청이 금지</span>
+          됩니다. 이는 귀사의 자금 조달 일정에 심각한 차질을 줄 수 있습니다. 전문가와 함께 철저한 준비 후 신청하시길
+          권장합니다.
+        </p>
+      </div>
+
+      {/* Timeline */}
+      <div className="mb-10">
+        <h2 className="text-xl font-bold text-[#002C5F] mb-6 flex items-center gap-3">
+          <Calendar className="w-6 h-6 text-[#B8860B]" />
+          프로세스 타임라인
+        </h2>
+        <div className="relative">
+          <div className="absolute top-8 left-0 w-full h-0.5 bg-[#002C5F]/20"></div>
+          <div className="grid grid-cols-4 gap-4 relative">
+            {timeline.map((item, index) => (
+              <div key={index} className="text-center">
+                <div className="w-16 h-16 rounded-full bg-[#002C5F] text-white flex items-center justify-center font-bold text-xl mx-auto mb-3 relative z-10">
+                  {index + 1}
+                </div>
+                <h4 className="text-[#002C5F] font-bold mb-1">{item.step}</h4>
+                <p className="text-[#B8860B] font-bold text-sm mb-2">{item.duration}</p>
+                <p className="text-[#002C5F]/60 text-xs">{item.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Final Notice */}
+      <div className="bg-gradient-to-r from-[#002C5F] to-[#002C5F]/90 p-8 rounded-sm text-white">
+        <div className="grid grid-cols-2 gap-8">
+          <div>
+            <p className="text-sm opacity-80 mb-2">본 보고서 작성일</p>
+            <p className="text-xl font-bold">{"{reportDate}"}</p>
+          </div>
+          <div>
+            <p className="text-sm opacity-80 mb-2">분석 유효기간</p>
+            <p className="text-xl font-bold text-[#B8860B]">{"{validUntil}"}</p>
+          </div>
+        </div>
+        <div className="mt-6 pt-6 border-t border-white/20 flex justify-between items-center">
+          <div>
+            <p className="text-sm opacity-80 mb-1">담당자</p>
+            <p className="text-lg font-bold">{"{consultantName}"}</p>
+          </div>
+          <div className="text-right">
+            <div className="text-[#B8860B] font-bold text-2xl">{"{stamp}"}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-auto pt-8 text-center text-xs text-[#002C5F]/40">
+        경영지원그룹 이음 | Management Support Group Yieum
+      </div>
+    </div>
+  )
+}

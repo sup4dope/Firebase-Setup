@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { FinancialObligation, Customer, CreditSummary, EligibilityFactors } from "@shared/types";
 import { PolicyReportModal } from "./PolicyReportModal";
+import { ProposalReportModal } from "./report";
 
 interface ReviewSummaryTabProps {
   customer: Partial<Customer>;
@@ -84,6 +85,7 @@ const isWithin7Days = (date1: string, date2: string): boolean => {
 
 export function ReviewSummaryTab({ customer, obligations, creditSummary }: ReviewSummaryTabProps) {
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showReportModalV2, setShowReportModalV2] = useState(false);
   
   const loans = useMemo(() => 
     obligations.filter(o => o.type === 'loan'),
@@ -656,21 +658,31 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
 
       <Card className="shrink-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 border-blue-500/30">
         <CardContent className="py-4 px-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
               <h4 className="font-semibold text-sm mb-1">정책자금 조달 보고서</h4>
               <p className="text-xs text-muted-foreground">
                 기업 현황, 금융 분석, 맞춤 전략이 포함된 5페이지 보고서를 생성합니다
               </p>
             </div>
-            <Button
-              onClick={() => setShowReportModal(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-              data-testid="button-preview-report"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              제안서 미리보기
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowReportModal(true)}
+                variant="outline"
+                data-testid="button-preview-report"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                기본 제안서
+              </Button>
+              <Button
+                onClick={() => setShowReportModalV2(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="button-preview-report-v2"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                v2 제안서
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -678,6 +690,13 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
       <PolicyReportModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
+        customer={customer}
+        obligations={obligations}
+      />
+
+      <ProposalReportModal
+        isOpen={showReportModalV2}
+        onClose={() => setShowReportModalV2(false)}
         customer={customer}
         obligations={obligations}
       />
