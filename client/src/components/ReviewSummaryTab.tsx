@@ -34,6 +34,36 @@ const CHART_COLORS = [
   "#ec4899",
 ];
 
+const SECTOR_COLORS = {
+  first: "#3b82f6",
+  second: "#f59e0b",
+  public: "#10b981",
+};
+
+const classifyFinancialSector = (institution: string): '1금융권' | '2금융권' | '공공기관' => {
+  const name = institution.toLowerCase();
+  
+  const firstTierKeywords = [
+    '은행', '국민', '신한', '하나', '우리', '기업', 'nh농협', 'kb', 'ibk',
+    'sc제일', '씨티', 'bnk', 'dgb', 'jb', '경남', '부산', '광주', '전북', '제주'
+  ];
+  
+  const publicKeywords = [
+    '신용보증재단', '기술보증기금', '신용보증기금', '소상공인', '중소벤처기업진흥공단',
+    '서울시', '경기도', '정책', '지역신보', '지역신용보증'
+  ];
+  
+  if (publicKeywords.some(k => name.includes(k))) {
+    return '공공기관';
+  }
+  
+  if (firstTierKeywords.some(k => name.includes(k))) {
+    return '1금융권';
+  }
+  
+  return '2금융권';
+};
+
 export function ReviewSummaryTab({ customer, obligations, creditSummary }: ReviewSummaryTabProps) {
   const institutionBreakdown = useMemo(() => {
     const breakdown = new Map<string, number>();
@@ -44,9 +74,33 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
     });
     
     return Array.from(breakdown.entries())
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value]) => ({ 
+        name, 
+        value,
+        sector: classifyFinancialSector(name)
+      }))
       .sort((a, b) => b.value - a.value);
   }, [obligations]);
+
+  const sectorBreakdown = useMemo(() => {
+    const sectors = new Map<string, number>();
+    
+    institutionBreakdown.forEach(item => {
+      const current = sectors.get(item.sector) || 0;
+      sectors.set(item.sector, current + item.value);
+    });
+    
+    const order = ['1금융권', '2금융권', '공공기관'];
+    return order
+      .filter(sector => sectors.has(sector))
+      .map(sector => ({
+        name: sector,
+        value: sectors.get(sector)!,
+        fill: sector === '1금융권' ? SECTOR_COLORS.first 
+            : sector === '2금융권' ? SECTOR_COLORS.second 
+            : SECTOR_COLORS.public
+      }));
+  }, [institutionBreakdown]);
 
   const totalDebt = useMemo(() => 
     obligations.reduce((sum, ob) => sum + ob.balance, 0),
@@ -271,59 +325,110 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
           </CardContent>
         </Card>
       </div>
-      <Card className="flex-1 min-h-[250px]">
+      <Card className="flex-1 min-h-[280px]">
         <CardHeader className="py-3 px-4">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Building2 className="w-4 h-4 text-emerald-400" />
             금융기관별 부채 비중
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0 pb-4 px-4 h-[calc(100%-52px)]">
+        <CardContent className="pt-0 pb-2 px-4 h-[calc(100%-52px)]">
           {institutionBreakdown.length === 0 ? (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               등록된 금융 내역이 없습니다
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={institutionBreakdown}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={2}
-                  dataKey="value"
-                  nameKey="name"
-                  label={({ name, percent }) => 
-                    `${name} (${(percent * 100).toFixed(0)}%)`
-                  }
-                  labelLine={false}
-                >
-                  {institutionBreakdown.map((_, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={CHART_COLORS[index % CHART_COLORS.length]} 
+            <div className="flex h-full gap-2">
+              <div className="flex-1 min-w-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={institutionBreakdown}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={35}
+                      outerRadius={55}
+                      paddingAngle={1}
+                      dataKey="value"
+                      nameKey="name"
+                    >
+                      {institutionBreakdown.map((_, index) => (
+                        <Cell 
+                          key={`inner-${index}`} 
+                          fill={CHART_COLORS[index % CHART_COLORS.length]} 
+                        />
+                      ))}
+                    </Pie>
+                    <Pie
+                      data={sectorBreakdown}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={75}
+                      paddingAngle={2}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) => 
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
+                      labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
+                    >
+                      {sectorBreakdown.map((entry, index) => (
+                        <Cell 
+                          key={`outer-${index}`} 
+                          fill={entry.fill} 
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                      }}
                     />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={36}
-                  formatter={(value) => (
-                    <span className="text-xs text-foreground">{value}</span>
-                  )}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="w-[140px] shrink-0 flex flex-col justify-center gap-1 overflow-y-auto max-h-full">
+                <p className="text-[10px] text-muted-foreground font-medium mb-1">금융권 구분</p>
+                {sectorBreakdown.map((sector) => (
+                  <div key={sector.name} className="flex items-center gap-1.5">
+                    <div 
+                      className="w-2.5 h-2.5 rounded-sm shrink-0" 
+                      style={{ backgroundColor: sector.fill }}
+                    />
+                    <span className="text-[11px] truncate">{sector.name}</span>
+                    <span className="text-[10px] text-muted-foreground ml-auto">
+                      {totalDebt > 0 ? ((sector.value / totalDebt) * 100).toFixed(0) : 0}%
+                    </span>
+                  </div>
+                ))}
+                <div className="h-px bg-border my-1" />
+                <p className="text-[10px] text-muted-foreground font-medium mb-1">금융기관</p>
+                {institutionBreakdown.slice(0, 5).map((item, idx) => (
+                  <div key={item.name} className="flex items-center gap-1.5">
+                    <div 
+                      className="w-2.5 h-2.5 rounded-sm shrink-0" 
+                      style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                    />
+                    <span className="text-[10px] truncate" title={item.name}>
+                      {item.name.length > 8 ? item.name.substring(0, 8) + '..' : item.name}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground ml-auto">
+                      {totalDebt > 0 ? ((item.value / totalDebt) * 100).toFixed(0) : 0}%
+                    </span>
+                  </div>
+                ))}
+                {institutionBreakdown.length > 5 && (
+                  <span className="text-[9px] text-muted-foreground">
+                    +{institutionBreakdown.length - 5}개 기관
+                  </span>
+                )}
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
