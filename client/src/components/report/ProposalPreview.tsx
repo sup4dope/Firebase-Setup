@@ -4,7 +4,6 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Printer, X } from "lucide-react"
 import { CoverPage } from "./CoverPage"
 import { ExecutiveSummaryPage } from "./ExecutiveSummaryPage"
-import { DiagnosticsPage } from "./DiagnosticsPage"
 import { RiskAnalysisPage } from "./RiskAnalysisPage"
 import { ExecutionAgencyPage } from "./ExecutionAgencyPage"
 import { TimelinePage } from "./TimelinePage"
@@ -255,21 +254,6 @@ export function ProposalPreview({
               keyFinding2={keyFindings[1] || ""}
               keyFinding3={keyFindings[2] || ""}
               reportDate={reportDate}
-            />
-
-            <DiagnosticsPage
-              companyName={customer?.company_name || ""}
-              ceoName={customer?.name || ""}
-              businessNumber={customer?.business_registration_number || "정보 없음"}
-              openingDate={customer?.founding_date || "정보 없음"}
-              industry={customer?.business_type || customer?.industry || "정보 없음"}
-              businessAge={calculateBusinessAge()}
-              address={customer?.business_address || customer?.address || "정보 없음"}
-              sales2022={customer?.sales_y3 || 0}
-              sales2023={customer?.sales_y2 || 0}
-              sales2024={customer?.sales_y1 || 0}
-              sales2025={customer?.recent_sales}
-              growthRate={calculateGrowthRate()}
             />
 
             <RiskAnalysisPage

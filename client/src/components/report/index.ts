@@ -1,6 +1,5 @@
 export { CoverPage } from './CoverPage'
 export { ExecutiveSummaryPage } from './ExecutiveSummaryPage'
-export { DiagnosticsPage } from './DiagnosticsPage'
 export { RiskAnalysisPage } from './RiskAnalysisPage'
 export { ExecutionAgencyPage } from './ExecutionAgencyPage'
 export { TimelinePage } from './TimelinePage'
