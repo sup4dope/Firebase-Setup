@@ -477,10 +477,10 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                         className="w-2.5 h-2.5 rounded-sm shrink-0" 
                         style={{ backgroundColor: sector.fill }}
                       />
-                      <span className="text-[11px] truncate">{sector.name}</span>
-                      <span className="text-[10px] text-muted-foreground font-medium">
+                      <span className="text-[10px] text-muted-foreground font-medium w-[28px] shrink-0">
                         {filteredTotalDebt > 0 ? ((sector.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
                       </span>
+                      <span className="text-[11px] truncate">{sector.name}</span>
                     </div>
                   ))}
                 </div>
@@ -494,11 +494,11 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                         className="w-2.5 h-2.5 rounded-sm shrink-0" 
                         style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
                       />
+                      <span className="text-[9px] text-muted-foreground font-medium w-[28px] shrink-0">
+                        {filteredTotalDebt > 0 ? ((item.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
+                      </span>
                       <span className="text-[10px] truncate">
                         {item.name.length > 8 ? item.name.substring(0, 8) + '..' : item.name}
-                      </span>
-                      <span className="text-[9px] text-muted-foreground font-medium">
-                        {filteredTotalDebt > 0 ? ((item.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
                       </span>
                     </div>
                   ))}
