@@ -1970,61 +1970,22 @@ export function CustomerDetailModal({
                 {/* Row 6: 업종 | 종목 (12분할 그리드 - 각 6칸) */}
                 <div className="grid grid-cols-12 gap-1 items-end">
                   <div className="col-span-6">
-                    <div className="flex items-center gap-1">
-                      <Label className="text-[10px] text-muted-foreground">업종</Label>
-                      {ocrBusinessTypes.length > 0 && highlightedFields.has('business_type') && (
-                        <Badge
-                          variant="secondary"
-                          className="text-[8px] px-1 py-0 bg-blue-600/20 text-blue-400 leading-tight"
-                        >
-                          AI 추출
-                        </Badge>
-                      )}
-                    </div>
-                    <Select
-                      value={formData.business_type || "기타"}
-                      onValueChange={(v) =>
-                        handleFieldChange({ business_type: v })
+                    <Label className="text-[10px] text-muted-foreground">업종</Label>
+                    <Input
+                      value={formData.business_type || ""}
+                      onChange={(e) =>
+                        handleFieldChange({ business_type: e.target.value })
                       }
                       disabled={isReadOnly}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          "border-border text-foreground h-7 text-xs w-full transition-colors duration-300",
-                          isReadOnly
-                            ? "bg-muted cursor-not-allowed opacity-70"
-                            : "bg-muted",
-                          highlightedFields.has('business_type') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
-                        )}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-muted border-border">
-                        {ocrBusinessTypes.length > 0 && (
-                          <>
-                            {ocrBusinessTypes.map((t) => (
-                              <SelectItem
-                                key={`ocr-${t}`}
-                                value={t}
-                                className="text-foreground text-xs bg-blue-600/10"
-                              >
-                                {t} (AI)
-                              </SelectItem>
-                            ))}
-                            <div className="h-px bg-border my-1" />
-                          </>
-                        )}
-                        {BUSINESS_TYPES.map((t) => (
-                          <SelectItem
-                            key={t}
-                            value={t}
-                            className="text-foreground text-xs"
-                          >
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      className={cn(
+                        "border-border text-foreground h-7 text-xs w-full transition-colors duration-300",
+                        isReadOnly
+                          ? "bg-muted cursor-not-allowed opacity-70"
+                          : "bg-muted",
+                        highlightedFields.has('business_type') && "bg-yellow-200 dark:bg-yellow-900/50 border-yellow-400",
+                      )}
+                      placeholder="업종 입력"
+                    />
                   </div>
                   <div className="col-span-6">
                     <Label className="text-[10px] text-muted-foreground">종목</Label>
