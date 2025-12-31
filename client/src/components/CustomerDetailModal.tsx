@@ -425,7 +425,12 @@ export function CustomerDetailModal({
         const customerSnap = await getDoc(customerRef);
 
         if (customerSnap.exists()) {
-          const freshData = customerSnap.data() as Customer;
+          // RAW DATA 로그 출력 (필드명 확인용)
+          const rawData = customerSnap.data();
+          console.log(`[RAW DATA] 📋 Firestore 원시 데이터:`, rawData);
+          console.log(`[RAW DATA] 📋 financial_obligations 필드:`, rawData.financial_obligations);
+          
+          const freshData = rawData as Customer;
           
           // 금융 채무 데이터 로그 및 상태 업데이트
           const obligations = freshData.financial_obligations || [];
@@ -1329,8 +1334,15 @@ export function CustomerDetailModal({
           created_at: m.created_at,
         })),
         documents,
+        // 금융 채무 데이터 저장 (핵심!)
+        financial_obligations: dataToSave.financial_obligations || [],
         updated_at: new Date(),
       };
+
+      // 디버그: 저장되는 금융 채무 데이터 로그
+      if (dataToSave.financial_obligations?.length > 0) {
+        console.log(`[SAVE] 💾 금융 채무 저장: ${dataToSave.financial_obligations.length}건`);
+      }
 
       // ★핵심: 저장 전 데이터 청소 (Invalid Date, undefined 제거)
       const sanitizedData = cleanData(customerData);
