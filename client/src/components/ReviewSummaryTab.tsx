@@ -510,7 +510,7 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
             12개월 발생 추이
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0 pb-4 px-4 h-[120px]">
+        <CardContent className="p-6 px-4 h-[120px] pt-[0px] pb-[0px] pl-[16px] pr-[16px]">
           {!hasMonthlyData ? (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
               최근 12개월간 발생 내역이 없습니다
