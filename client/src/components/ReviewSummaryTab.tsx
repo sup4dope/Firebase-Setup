@@ -221,12 +221,25 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
     );
   }, [obligations]);
 
-  const businessYears = useMemo(() => {
+  const businessYearsInfo = useMemo(() => {
     if (!customer.founding_date) return null;
     const founding = new Date(customer.founding_date);
     const now = new Date();
-    return Math.floor((now.getTime() - founding.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    const diffMs = now.getTime() - founding.getTime();
+    const diffDays = diffMs / (24 * 60 * 60 * 1000);
+    const years = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000));
+    const isOver7Years = diffDays > 7 * 365.25;
+    return { years, isOver7Years };
   }, [customer.founding_date]);
+
+  const extractMajorRegion = (address?: string): string | null => {
+    if (!address) return null;
+    const parts = address.trim().split(' ');
+    if (parts.length > 0) {
+      return parts[0];
+    }
+    return null;
+  };
 
   const getSalesBracket = (sales?: number): string => {
     if (!sales) return '미확인';
@@ -277,15 +290,15 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
     },
     { 
       label: '업력', 
-      value: businessYears !== null ? `${businessYears}년` : null, 
+      value: businessYearsInfo !== null ? `${businessYearsInfo.years}년` : null, 
       icon: Calendar,
-      status: businessYears !== null 
-        ? businessYears >= 3 ? 'good' : businessYears >= 1 ? 'warning' : 'bad'
+      status: businessYearsInfo !== null 
+        ? businessYearsInfo.isOver7Years ? 'warning' : businessYearsInfo.years >= 3 ? 'good' : businessYearsInfo.years >= 1 ? 'warning' : 'bad'
         : undefined
     },
     { 
       label: '지역', 
-      value: customer.business_address?.split(' ')[0] || null, 
+      value: extractMajorRegion(customer.business_address), 
       icon: MapPin 
     },
     { 
