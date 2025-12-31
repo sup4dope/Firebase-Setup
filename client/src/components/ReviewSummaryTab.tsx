@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid, ReferenceLine } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { 
   TrendingUp, 
   Building2, 
@@ -303,9 +303,9 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
   const dtiY1Status = getDtiStatus(dtiY1);
   const dtiAvg3YStatus = getDtiStatus(dtiAvg3Y);
 
-  const timelineData = useMemo(() => {
+  const monthlyAmountData = useMemo(() => {
     const now = new Date();
-    const months: { month: string; label: string; loans: number; guarantees: number }[] = [];
+    const months: { month: string; label: string; loanAmount: number; guaranteeAmount: number }[] = [];
     
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -313,8 +313,8 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
       months.push({
         month: monthKey,
         label: `${date.getMonth() + 1}월`,
-        loans: 0,
-        guarantees: 0
+        loanAmount: 0,
+        guaranteeAmount: 0
       });
     }
     
@@ -324,28 +324,18 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
       const monthKey = `${obDate.getFullYear()}-${String(obDate.getMonth() + 1).padStart(2, '0')}`;
       const monthEntry = months.find(m => m.month === monthKey);
       if (monthEntry) {
-        if (ob.type === 'loan') monthEntry.loans++;
-        else monthEntry.guarantees++;
+        const amountInEok = (ob.balance || 0) / 100000000;
+        if (ob.type === 'loan') monthEntry.loanAmount += amountInEok;
+        else monthEntry.guaranteeAmount += amountInEok;
       }
     });
     
     return months;
   }, [obligations]);
 
-  const scatterData = useMemo(() => {
-    const data: { x: string; y: number; z: number; type: string; month: string }[] = [];
-    
-    timelineData.forEach((month) => {
-      if (month.loans > 0) {
-        data.push({ x: month.label, y: 1, z: month.loans * 100, type: 'loan', month: month.label });
-      }
-      if (month.guarantees > 0) {
-        data.push({ x: month.label, y: 0, z: month.guarantees * 100, type: 'guarantee', month: month.label });
-      }
-    });
-    
-    return data;
-  }, [timelineData]);
+  const hasMonthlyData = useMemo(() => {
+    return monthlyAmountData.some(m => m.loanAmount > 0 || m.guaranteeAmount > 0);
+  }, [monthlyAmountData]);
 
   return (
     <div className="h-full flex flex-col gap-4 p-4 overflow-auto pt-[0px] pb-[0px] pl-[10px] pr-[10px]">
@@ -521,59 +511,59 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0 pb-4 px-4 h-[120px]">
-          {scatterData.length === 0 ? (
+          {!hasMonthlyData ? (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
               최근 12개월간 발생 내역이 없습니다
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 10, right: 10, bottom: 20, left: 10 }}>
+              <BarChart data={monthlyAmountData} margin={{ top: 10, right: 10, bottom: 5, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
                 <XAxis 
-                  type="category" 
-                  dataKey="x" 
-                  name="월" 
-                  tick={{ fontSize: 10 }}
-                  allowDuplicatedCategory={false}
+                  dataKey="label" 
+                  tick={{ fontSize: 9 }}
                   axisLine={{ stroke: 'hsl(var(--border))' }}
                   tickLine={false}
                 />
                 <YAxis 
-                  type="category" 
-                  dataKey="y" 
-                  name="유형"
-                  tick={{ fontSize: 10 }}
-                  tickFormatter={(value) => value === 1 ? '대출' : '보증'}
+                  tick={{ fontSize: 9 }}
+                  tickFormatter={(value) => `${value}`}
                   axisLine={{ stroke: 'hsl(var(--border))' }}
                   tickLine={false}
-                  width={35}
+                  width={30}
+                  label={{ value: '억원', angle: -90, position: 'insideLeft', fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
                 />
-                <ZAxis type="number" dataKey="z" range={[50, 300]} />
                 <Tooltip 
-                  cursor={{ strokeDasharray: '3 3' }}
-                  content={({ active, payload }) => {
-                    if (active && payload?.[0]) {
-                      const data = payload[0].payload;
+                  cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+                  content={({ active, payload, label }) => {
+                    if (active && payload?.length) {
                       return (
                         <div className="bg-card border rounded-md px-2 py-1 text-xs shadow-md">
-                          <p className="font-medium">{data.month}</p>
-                          <p className="text-muted-foreground">
-                            {data.type === 'loan' ? '대출' : '보증'}: {data.z / 100}건
-                          </p>
+                          <p className="font-medium">{label}</p>
+                          {payload.map((entry, idx) => (
+                            <p key={idx} style={{ color: entry.color }}>
+                              {entry.name}: {(entry.value as number).toFixed(2)}억원
+                            </p>
+                          ))}
                         </div>
                       );
                     }
                     return null;
                   }}
                 />
-                <Scatter 
-                  data={scatterData.filter(d => d.type === 'loan')} 
+                <Bar 
+                  dataKey="loanAmount" 
+                  name="대출" 
                   fill="hsl(var(--chart-1))"
+                  radius={[2, 2, 0, 0]}
                 />
-                <Scatter 
-                  data={scatterData.filter(d => d.type === 'guarantee')} 
+                <Bar 
+                  dataKey="guaranteeAmount" 
+                  name="보증" 
                   fill="hsl(var(--chart-3))"
+                  radius={[2, 2, 0, 0]}
                 />
-              </ScatterChart>
+              </BarChart>
             </ResponsiveContainer>
           )}
         </CardContent>
