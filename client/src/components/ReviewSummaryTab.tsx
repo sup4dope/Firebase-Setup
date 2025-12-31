@@ -36,8 +36,15 @@ const CHART_COLORS = [
 
 const SECTOR_COLORS = {
   first: "#3b82f6",
+  firstGuaranteed: "#60a5fa",
   second: "#f59e0b",
   public: "#10b981",
+};
+
+const isGuaranteeOnlyInstitution = (institution: string): boolean => {
+  const name = institution.toLowerCase();
+  const guaranteeKeywords = ['재단', '기금'];
+  return guaranteeKeywords.some(k => name.includes(k));
 };
 
 const classifyFinancialSector = (institution: string): '1금융권' | '2금융권' | '공공기관' => {
@@ -63,14 +70,55 @@ const classifyFinancialSector = (institution: string): '1금융권' | '2금융�
   return '2금융권';
 };
 
+const isWithin7Days = (date1: string, date2: string): boolean => {
+  if (!date1 || !date2) return false;
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  const diffMs = Math.abs(d1.getTime() - d2.getTime());
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  return diffDays <= 7;
+};
+
 export function ReviewSummaryTab({ customer, obligations, creditSummary }: ReviewSummaryTabProps) {
+  const loans = useMemo(() => 
+    obligations.filter(o => o.type === 'loan'),
+    [obligations]
+  );
+
+  const guarantees = useMemo(() => 
+    obligations.filter(o => o.type === 'guarantee'),
+    [obligations]
+  );
+
+  const linkedLoanIds = useMemo(() => {
+    const linkedIds = new Set<string>();
+    
+    loans.forEach(loan => {
+      guarantees.forEach(guarantee => {
+        const dateMatch = isWithin7Days(loan.occurred_at, guarantee.occurred_at);
+        const balanceRatio = loan.balance > 0 && guarantee.balance > 0 
+          ? Math.min(loan.balance, guarantee.balance) / Math.max(loan.balance, guarantee.balance)
+          : 0;
+        const similarBalance = balanceRatio >= 0.9;
+        
+        if (dateMatch && similarBalance) {
+          linkedIds.add(loan.id);
+        }
+      });
+    });
+    
+    return linkedIds;
+  }, [loans, guarantees]);
+
   const institutionBreakdown = useMemo(() => {
     const breakdown = new Map<string, number>();
     
-    obligations.forEach(ob => {
-      const current = breakdown.get(ob.institution) || 0;
-      breakdown.set(ob.institution, current + ob.balance);
-    });
+    obligations
+      .filter(ob => !isGuaranteeOnlyInstitution(ob.institution))
+      .forEach(ob => {
+        const current = breakdown.get(ob.institution) || 0;
+        breakdown.set(ob.institution, current + ob.balance);
+      });
     
     return Array.from(breakdown.entries())
       .map(([name, value]) => ({ 
@@ -83,23 +131,46 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
 
   const sectorBreakdown = useMemo(() => {
     const sectors = new Map<string, number>();
+    let firstTierGuaranteedAmount = 0;
     
-    institutionBreakdown.forEach(item => {
-      const current = sectors.get(item.sector) || 0;
-      sectors.set(item.sector, current + item.value);
-    });
+    obligations
+      .filter(ob => !isGuaranteeOnlyInstitution(ob.institution))
+      .forEach(ob => {
+        const sector = classifyFinancialSector(ob.institution);
+        
+        if (sector === '1금융권' && ob.type === 'loan' && linkedLoanIds.has(ob.id)) {
+          firstTierGuaranteedAmount += ob.balance;
+        } else {
+          const current = sectors.get(sector) || 0;
+          sectors.set(sector, current + ob.balance);
+        }
+      });
     
-    const order = ['1금융권', '2금융권', '공공기관'];
-    return order
-      .filter(sector => sectors.has(sector))
-      .map(sector => ({
-        name: sector,
-        value: sectors.get(sector)!,
-        fill: sector === '1금융권' ? SECTOR_COLORS.first 
-            : sector === '2금융권' ? SECTOR_COLORS.second 
-            : SECTOR_COLORS.public
-      }));
-  }, [institutionBreakdown]);
+    const order = ['1금융권', '1금융권(보증)', '2금융권', '공공기관'];
+    const result = [];
+    
+    for (const sector of order) {
+      if (sector === '1금융권(보증)') {
+        if (firstTierGuaranteedAmount > 0) {
+          result.push({
+            name: '1금융권(보증)',
+            value: firstTierGuaranteedAmount,
+            fill: SECTOR_COLORS.firstGuaranteed
+          });
+        }
+      } else if (sectors.has(sector)) {
+        result.push({
+          name: sector,
+          value: sectors.get(sector)!,
+          fill: sector === '1금융권' ? SECTOR_COLORS.first 
+              : sector === '2금융권' ? SECTOR_COLORS.second 
+              : SECTOR_COLORS.public
+        });
+      }
+    }
+    
+    return result;
+  }, [obligations, linkedLoanIds]);
 
   const totalDebt = useMemo(() => 
     obligations.reduce((sum, ob) => sum + ob.balance, 0),
