@@ -114,7 +114,7 @@ export function ExecutiveSummaryPage({
 
       <div className="mt-auto pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-[#4A5568]">
         <span>{reportDate}</span>
-        <span className="font-semibold">Page 2 of 7</span>
+        <span className="font-semibold">Page 2 of 6</span>
       </div>
     </div>
   )
