@@ -415,96 +415,96 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
               등록된 금융 내역이 없습니다
             </div>
           ) : (
-            <div className="flex h-full gap-3">
-              <div className="w-[160px] shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={institutionBreakdown}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={30}
-                      outerRadius={48}
-                      paddingAngle={1}
-                      dataKey="value"
-                      nameKey="name"
-                    >
-                      {institutionBreakdown.map((_, index) => (
-                        <Cell 
-                          key={`inner-${index}`} 
-                          fill={CHART_COLORS[index % CHART_COLORS.length]} 
-                        />
-                      ))}
-                    </Pie>
-                    <Pie
-                      data={sectorBreakdown}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={52}
-                      outerRadius={65}
-                      paddingAngle={2}
-                      dataKey="value"
-                      nameKey="name"
-                    >
-                      {sectorBreakdown.map((entry, index) => (
-                        <Cell 
-                          key={`outer-${index}`} 
-                          fill={entry.fill} 
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value: number, name: string) => [formatCurrency(value), name]}
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex-1 flex flex-col gap-2 min-w-0">
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium mb-1.5">금융권 구분</p>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                    {sectorBreakdown.map((sector) => (
-                      <div key={sector.name} className="flex items-center gap-1.5">
-                        <div 
-                          className="w-2.5 h-2.5 rounded-sm shrink-0" 
-                          style={{ backgroundColor: sector.fill }}
-                        />
-                        <span className="text-[11px] truncate">{sector.name}</span>
-                        <span className="text-[10px] text-muted-foreground ml-auto font-medium">
-                          {filteredTotalDebt > 0 ? ((sector.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+            <div className="grid grid-cols-3 h-full gap-3">
+              <div className="flex flex-col">
+                <p className="text-[10px] text-muted-foreground font-medium mb-1">채무 분포</p>
+                <div className="flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={institutionBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={25}
+                        outerRadius={40}
+                        paddingAngle={1}
+                        dataKey="value"
+                        nameKey="name"
+                      >
+                        {institutionBreakdown.map((_, index) => (
+                          <Cell 
+                            key={`inner-${index}`} 
+                            fill={CHART_COLORS[index % CHART_COLORS.length]} 
+                          />
+                        ))}
+                      </Pie>
+                      <Pie
+                        data={sectorBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={44}
+                        outerRadius={55}
+                        paddingAngle={2}
+                        dataKey="value"
+                        nameKey="name"
+                      >
+                        {sectorBreakdown.map((entry, index) => (
+                          <Cell 
+                            key={`outer-${index}`} 
+                            fill={entry.fill} 
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="h-px bg-border" />
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium mb-1.5">금융기관</p>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                    {institutionBreakdown.slice(0, 6).map((item, idx) => (
-                      <div key={item.name} className="flex items-center gap-1.5" title={item.name}>
-                        <div 
-                          className="w-2.5 h-2.5 rounded-sm shrink-0" 
-                          style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
-                        />
-                        <span className="text-[10px] truncate flex-1">
-                          {item.name.length > 10 ? item.name.substring(0, 10) + '..' : item.name}
-                        </span>
-                        <span className="text-[9px] text-muted-foreground font-medium">
-                          {filteredTotalDebt > 0 ? ((item.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  {institutionBreakdown.length > 6 && (
-                    <p className="text-[9px] text-muted-foreground mt-1">
-                      +{institutionBreakdown.length - 6}개 기관
+              </div>
+              <div className="flex flex-col">
+                <p className="text-[10px] text-muted-foreground font-medium mb-1.5">금융권 구분</p>
+                <div className="flex flex-col gap-1.5">
+                  {sectorBreakdown.map((sector) => (
+                    <div key={sector.name} className="flex items-center gap-1.5">
+                      <div 
+                        className="w-2.5 h-2.5 rounded-sm shrink-0" 
+                        style={{ backgroundColor: sector.fill }}
+                      />
+                      <span className="text-[11px] truncate">{sector.name}</span>
+                      <span className="text-[10px] text-muted-foreground ml-auto font-medium">
+                        {filteredTotalDebt > 0 ? ((sector.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <p className="text-[10px] text-muted-foreground font-medium mb-1.5">금융기관</p>
+                <div className="flex flex-col gap-1">
+                  {institutionBreakdown.slice(0, 5).map((item, idx) => (
+                    <div key={item.name} className="flex items-center gap-1.5" title={item.name}>
+                      <div 
+                        className="w-2.5 h-2.5 rounded-sm shrink-0" 
+                        style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                      />
+                      <span className="text-[10px] truncate flex-1">
+                        {item.name.length > 8 ? item.name.substring(0, 8) + '..' : item.name}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground font-medium">
+                        {filteredTotalDebt > 0 ? ((item.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
+                      </span>
+                    </div>
+                  ))}
+                  {institutionBreakdown.length > 5 && (
+                    <p className="text-[9px] text-muted-foreground">
+                      +{institutionBreakdown.length - 5}개 기관
                     </p>
                   )}
                 </div>
