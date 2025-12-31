@@ -3,7 +3,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Trash2, FileText } from "lucide-react"
+
+const AGENCY_OPTIONS = [
+  "소상공인진흥공단",
+  "지역신용보증재단",
+  "미소금융재단",
+  "신용보증기금",
+  "기술보증기금",
+  "중소기업벤처진흥공단",
+  "농림수산업자 신용보증기금",
+  "국민체육진흥공단",
+  "정부 직접대출",
+  "금융권 대리대출"
+]
 
 export interface RecommendedAgency {
   name: string;
@@ -24,14 +38,29 @@ interface ProposalModalProps {
   customerName: string;
 }
 
+function formatAmountDisplay(value: string): string {
+  const num = parseInt(value.replace(/[^0-9]/g, ""), 10)
+  if (isNaN(num) || num === 0) return ""
+  
+  if (num >= 10000) {
+    const eok = Math.floor(num / 10000)
+    const man = num % 10000
+    if (man === 0) {
+      return `${eok}억원`
+    }
+    return `${eok}억 ${man.toLocaleString()}만원`
+  }
+  return `${num.toLocaleString()}만원`
+}
+
 export function ProposalModal({ isOpen, onClose, onGenerate, customerName }: ProposalModalProps) {
   const [desiredAmount, setDesiredAmount] = useState("")
   const [agencies, setAgencies] = useState<RecommendedAgency[]>([
-    { name: "", amount: "", rate: "", period: "5년" }
+    { name: "", amount: "", rate: "1% ~ 4.5%", period: "1년 ~ 10년" }
   ])
 
   const addAgency = () => {
-    setAgencies([...agencies, { name: "", amount: "", rate: "", period: "5년" }])
+    setAgencies([...agencies, { name: "", amount: "", rate: "1% ~ 4.5%", period: "1년 ~ 10년" }])
   }
 
   const removeAgency = (index: number) => {
@@ -46,21 +75,39 @@ export function ProposalModal({ isOpen, onClose, onGenerate, customerName }: Pro
     setAgencies(updated)
   }
 
+  const handleAmountChange = (index: number, value: string) => {
+    const numericValue = value.replace(/[^0-9]/g, "")
+    updateAgency(index, "amount", numericValue)
+  }
+
+  const handleDesiredAmountChange = (value: string) => {
+    const numericValue = value.replace(/[^0-9]/g, "")
+    setDesiredAmount(numericValue)
+  }
+
   const handleGenerate = () => {
     const validAgencies = agencies.filter(a => a.name.trim() && a.amount.trim())
     if (validAgencies.length === 0) {
       alert("최소 1개의 추천 기관을 입력해주세요.")
       return
     }
+    
+    const formattedAgencies = validAgencies.map(a => ({
+      ...a,
+      amount: formatAmountDisplay(a.amount),
+      rate: "1% ~ 4.5%",
+      period: "1년 ~ 10년"
+    }))
+    
     onGenerate({
-      desiredAmount: desiredAmount || "협의 후 결정",
-      agencies: validAgencies
+      desiredAmount: desiredAmount ? formatAmountDisplay(desiredAmount) : "협의 후 결정",
+      agencies: formattedAgencies
     })
   }
 
   const handleClose = () => {
     setDesiredAmount("")
-    setAgencies([{ name: "", amount: "", rate: "", period: "5년" }])
+    setAgencies([{ name: "", amount: "", rate: "1% ~ 4.5%", period: "1년 ~ 10년" }])
     onClose()
   }
 
@@ -80,16 +127,23 @@ export function ProposalModal({ isOpen, onClose, onGenerate, customerName }: Pro
         <div className="space-y-6 py-4">
           <div className="space-y-2">
             <Label htmlFor="desiredAmount" className="text-sm font-medium">
-              희망 조달 금액
+              희망 조달 금액 (만원 단위)
             </Label>
-            <Input
-              id="desiredAmount"
-              placeholder="예: 5억원"
-              value={desiredAmount}
-              onChange={(e) => setDesiredAmount(e.target.value)}
-              className="border-gray-300"
-              data-testid="input-desired-amount"
-            />
+            <div className="flex items-center gap-3">
+              <Input
+                id="desiredAmount"
+                placeholder="예: 50000 (5억원)"
+                value={desiredAmount}
+                onChange={(e) => handleDesiredAmountChange(e.target.value)}
+                className="border-gray-300"
+                data-testid="input-desired-amount"
+              />
+              {desiredAmount && (
+                <span className="text-sm text-teal-700 font-medium whitespace-nowrap min-w-[100px]">
+                  {formatAmountDisplay(desiredAmount)}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -135,43 +189,53 @@ export function ProposalModal({ isOpen, onClose, onGenerate, customerName }: Pro
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs text-gray-600">기관명</Label>
-                      <Input
-                        placeholder="예: 신용보증기금"
+                      <Select
                         value={agency.name}
-                        onChange={(e) => updateAgency(index, "name", e.target.value)}
-                        className="text-sm"
-                        data-testid={`input-agency-name-${index}`}
-                      />
+                        onValueChange={(value) => updateAgency(index, "name", value)}
+                      >
+                        <SelectTrigger 
+                          className="text-sm"
+                          data-testid={`select-agency-name-${index}`}
+                        >
+                          <SelectValue placeholder="기관 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {AGENCY_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-gray-600">예상 한도</Label>
-                      <Input
-                        placeholder="예: 2억원"
-                        value={agency.amount}
-                        onChange={(e) => updateAgency(index, "amount", e.target.value)}
-                        className="text-sm"
-                        data-testid={`input-agency-amount-${index}`}
-                      />
+                      <Label className="text-xs text-gray-600">예상 한도 (만원 단위)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="예: 20000"
+                          value={agency.amount}
+                          onChange={(e) => handleAmountChange(index, e.target.value)}
+                          className="text-sm"
+                          data-testid={`input-agency-amount-${index}`}
+                        />
+                      </div>
+                      {agency.amount && (
+                        <span className="text-xs text-teal-600 font-medium">
+                          {formatAmountDisplay(agency.amount)}
+                        </span>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-gray-600">예상 금리</Label>
-                      <Input
-                        placeholder="예: 3.5%"
-                        value={agency.rate}
-                        onChange={(e) => updateAgency(index, "rate", e.target.value)}
-                        className="text-sm"
-                        data-testid={`input-agency-rate-${index}`}
-                      />
+                      <div className="text-sm py-2 px-3 bg-gray-100 dark:bg-gray-700 rounded-md text-gray-700 dark:text-gray-300">
+                        1% ~ 4.5%
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-gray-600">약정기간</Label>
-                      <Input
-                        placeholder="예: 5년"
-                        value={agency.period}
-                        onChange={(e) => updateAgency(index, "period", e.target.value)}
-                        className="text-sm"
-                        data-testid={`input-agency-period-${index}`}
-                      />
+                      <div className="text-sm py-2 px-3 bg-gray-100 dark:bg-gray-700 rounded-md text-gray-700 dark:text-gray-300">
+                        1년 ~ 10년
+                      </div>
                     </div>
                   </div>
                 </div>
