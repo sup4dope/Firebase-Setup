@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { 
   TrendingUp, 
@@ -11,12 +10,10 @@ import {
   Briefcase, 
   CreditCard,
   AlertCircle,
-  CheckCircle2,
-  FileText
+  CheckCircle2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FinancialObligation, Customer, CreditSummary, EligibilityFactors } from "@shared/types";
-import { ReportSettingsModal, ReportContainer, type AgencyInfo } from "./report";
 
 interface ReviewSummaryTabProps {
   customer: Partial<Customer>;
@@ -83,13 +80,6 @@ const isWithin7Days = (date1: string, date2: string): boolean => {
 };
 
 export function ReviewSummaryTab({ customer, obligations, creditSummary }: ReviewSummaryTabProps) {
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showReportContainer, setShowReportContainer] = useState(false);
-  const [reportSettings, setReportSettings] = useState<{ requiredFunding: string; agencies: AgencyInfo[] }>({
-    requiredFunding: "",
-    agencies: [],
-  });
-  
   const loans = useMemo(() => 
     obligations.filter(o => o.type === 'loan'),
     [obligations]
@@ -658,46 +648,6 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
           </div>
         </CardContent>
       </Card>
-
-      <Card className="shrink-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 border-blue-500/30">
-        <CardContent className="py-4 px-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex-1 min-w-[200px]">
-              <h4 className="font-semibold text-sm mb-1">정책자금 조달 보고서</h4>
-              <p className="text-xs text-muted-foreground">
-                기업 현황, 금융 분석, 맞춤 전략이 포함된 8페이지 보고서를 생성합니다
-              </p>
-            </div>
-            <Button
-              onClick={() => setShowSettingsModal(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-              data-testid="button-create-report"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              제안서 만들기
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <ReportSettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        onGenerate={(data: { requiredFunding: string; agencies: AgencyInfo[] }) => {
-          setReportSettings(data);
-          setShowSettingsModal(false);
-          setShowReportContainer(true);
-        }}
-      />
-
-      <ReportContainer
-        isOpen={showReportContainer}
-        onClose={() => setShowReportContainer(false)}
-        customer={customer}
-        obligations={obligations}
-        requiredFunding={reportSettings.requiredFunding}
-        agencies={reportSettings.agencies}
-      />
     </div>
   );
 }
