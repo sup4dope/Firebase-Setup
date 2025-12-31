@@ -1,0 +1,225 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Updated to premium financial report color scheme */
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.18 0.02 247);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 247);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 247);
+  --primary: oklch(0.22 0.05 247);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.95 0.01 247);
+  --secondary-foreground: oklch(0.22 0.05 247);
+  --muted: oklch(0.96 0.01 247);
+  --muted-foreground: oklch(0.52 0.02 247);
+  --accent: oklch(0.45 0.08 65);
+  --accent-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.9 0.01 247);
+  --input: oklch(0.9 0.01 247);
+  --ring: oklch(0.22 0.05 247);
+  --chart-1: oklch(0.22 0.05 247);
+  --chart-2: oklch(0.4 0.08 247);
+  --chart-3: oklch(0.45 0.08 65);
+  --chart-4: oklch(0.65 0.1 247);
+  --chart-5: oklch(0.5 0.05 247);
+  --radius: 0.25rem;
+  /* Added custom financial brand colors */
+  --teal-900: oklch(0.28 0.08 210);
+  --teal-800: oklch(0.35 0.1 210);
+  --teal-700: oklch(0.42 0.12 210);
+  --teal-600: oklch(0.48 0.14 210);
+  --teal-500: oklch(0.55 0.16 210);
+  --cyan-600: oklch(0.6 0.15 220);
+  --cyan-500: oklch(0.68 0.14 220);
+  --cyan-400: oklch(0.75 0.12 220);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  /* Updated font stack for premium typography */
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Georgia", "Times New Roman", ui-serif, serif;
+  --font-mono: "Geist Mono", "Courier New", monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  /* Added custom brand color utilities */
+  --color-teal-900: var(--teal-900);
+  --color-teal-800: var(--teal-800);
+  --color-teal-700: var(--teal-700);
+  --color-teal-600: var(--teal-600);
+  --color-teal-500: var(--teal-500);
+  --color-cyan-600: var(--cyan-600);
+  --color-cyan-500: var(--cyan-500);
+  --color-cyan-400: var(--cyan-400);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  /* Added premium typography defaults */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply text-balance;
+  }
+  p {
+    @apply text-pretty;
+  }
+}
+
+@layer utilities {
+  @media print {
+    .print\:break-after-page {
+      break-after: page;
+    }
+  }
+
+  /* Added page-break utility for PDF generation */
+  .page-break {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  /* Added custom scrollbar styling for execution agency section */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.6 0.15 220) #e2e8f0;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #e2e8f0;
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: oklch(0.6 0.15 220);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.68 0.14 220);
+  }
+
+  /* Added dynamic text sizing utilities for responsive A4 content */
+  .dynamic-text-xs {
+    font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+  }
+  .dynamic-text-sm {
+    font-size: clamp(0.75rem, 1vw, 0.875rem);
+  }
+  .dynamic-text-base {
+    font-size: clamp(0.85rem, 1.1vw, 1rem);
+  }
+  .dynamic-text-lg {
+    font-size: clamp(0.95rem, 1.2vw, 1.125rem);
+  }
+  .dynamic-text-xl {
+    font-size: clamp(1.05rem, 1.3vw, 1.25rem);
+  }
+  .dynamic-text-2xl {
+    font-size: clamp(1.25rem, 1.5vw, 1.5rem);
+  }
+  .dynamic-text-3xl {
+    font-size: clamp(1.5rem, 1.8vw, 1.875rem);
+  }
+  .dynamic-text-4xl {
+    font-size: clamp(1.75rem, 2vw, 2.25rem);
+  }
+  .dynamic-text-5xl {
+    font-size: clamp(2rem, 2.5vw, 3rem);
+  }
+}
