@@ -227,9 +227,25 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
     const now = new Date();
     const diffMs = now.getTime() - founding.getTime();
     const diffDays = diffMs / (24 * 60 * 60 * 1000);
-    const years = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000));
+    
+    let years = now.getFullYear() - founding.getFullYear();
+    let months = now.getMonth() - founding.getMonth();
+    
+    if (now.getDate() < founding.getDate()) {
+      months--;
+    }
+    
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    
     const isOver7Years = diffDays > 7 * 365.25;
-    return { years, isOver7Years };
+    const displayText = years > 0 
+      ? months > 0 ? `${years}년 ${months}개월` : `${years}년`
+      : months > 0 ? `${months}개월` : '0개월';
+    
+    return { years, months, isOver7Years, displayText };
   }, [customer.founding_date]);
 
   const extractMajorRegion = (address?: string): string | null => {
@@ -290,7 +306,7 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
     },
     { 
       label: '업력', 
-      value: businessYearsInfo !== null ? `${businessYearsInfo.years}년` : null, 
+      value: businessYearsInfo !== null ? businessYearsInfo.displayText : null, 
       icon: Calendar,
       status: businessYearsInfo !== null 
         ? businessYearsInfo.isOver7Years ? 'warning' : businessYearsInfo.years >= 3 ? 'good' : businessYearsInfo.years >= 1 ? 'warning' : 'bad'
