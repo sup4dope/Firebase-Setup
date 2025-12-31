@@ -733,6 +733,10 @@ export function CustomerDetailModal({
               if (ocrResult.founding_date) {
                 updatedData.founding_date = ocrResult.founding_date;
                 allHighlightedFields.add('founding_date');
+                // Calculate 7-year status
+                const foundingDate = parseISO(ocrResult.founding_date);
+                const daysOld = differenceInDays(new Date(), foundingDate);
+                updatedData.over_7_years = daysOld > 2555;
               }
               if (ocrResult.business_registration_number) {
                 updatedData.business_registration_number = ocrResult.business_registration_number;
@@ -928,6 +932,10 @@ export function CustomerDetailModal({
         if (ocrResult.founding_date) {
           fieldsToUpdate.founding_date = ocrResult.founding_date;
           newHighlightedFields.add('founding_date');
+          // Calculate 7-year status
+          const foundingDate = parseISO(ocrResult.founding_date);
+          const daysOld = differenceInDays(new Date(), foundingDate);
+          (fieldsToUpdate as any).over_7_years = daysOld > 2555;
         }
         if (ocrResult.business_registration_number) {
           fieldsToUpdate.business_registration_number = ocrResult.business_registration_number;
