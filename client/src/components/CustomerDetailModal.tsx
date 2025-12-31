@@ -369,6 +369,8 @@ export function CustomerDetailModal({
       );
       setDocuments(customer.documents || []);
       setSelectedDocument(null); // 이전 고객의 선택된 문서 초기화
+      // 금융 채무 데이터 복원 (Firestore에서 불러온 데이터)
+      setFinancialObligations(customer.financial_obligations || []);
     } else if (isNewCustomer) {
       setFormData({
         name: "",
@@ -398,8 +400,13 @@ export function CustomerDetailModal({
       setMemos([]);
       setDocuments([]);
       setSelectedDocument(null); // 뷰어 초기화
+      // 신규 고객은 빈 금융 채무 배열로 초기화
+      setFinancialObligations([]);
     }
     setAiMessages([]);
+    // OCR 관련 상태 초기화
+    setOcrBusinessTypes([]);
+    setOcrExtractedCount(0);
   }, [customer, isNewCustomer, currentUser]);
 
   // [수정] 메모 실시간 로딩 (로그 추가)
@@ -1427,16 +1434,22 @@ export function CustomerDetailModal({
             {/* Auto-save status indicator - hide for read-only users */}
             {!isReadOnly && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                {saveStatus === "saving" && (
+                {isProcessingOCR && (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
+                    <span className="text-blue-400">OCR 분석 중...</span>
+                  </>
+                )}
+                {!isProcessingOCR && saveStatus === "saving" && (
                   <>
                     <Loader2 className="w-3 h-3 animate-spin" />
                     <span>저장 중...</span>
                   </>
                 )}
-                {saveStatus === "saved" && (
+                {!isProcessingOCR && saveStatus === "saved" && (
                   <>
                     <Check className="w-3 h-3 text-green-500" />
-                    <span className="text-green-500">모든 변경사항 저장됨</span>
+                    <span className="text-green-500">데이터가 안전하게 보관되었습니다</span>
                   </>
                 )}
               </div>
