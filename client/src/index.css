@@ -320,3 +320,110 @@
 .status-dropdown-content::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
+
+/* ========== Print Styles for Proposal Report ========== */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Hide everything except the proposal print area */
+  body > *:not(.print-visible) {
+    display: none !important;
+  }
+
+  /* Make dialogs print-friendly */
+  [role="dialog"] {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  [data-radix-dialog-overlay] {
+    display: none !important;
+  }
+
+  /* Print area styles */
+  #proposal-print-area {
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  #proposal-print-area > div {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Page break utilities */
+  .page-break {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print\\:break-after-page {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  /* Prevent page breaks inside elements */
+  .no-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Ensure backgrounds print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide non-print elements - only hide CRM chrome, not report content */
+  .print\\:hidden,
+  #proposal-print-area ~ *,
+  [role="dialog"]:not(:has(#proposal-print-area)) {
+    display: none !important;
+  }
+
+  /* Hide print button inside proposal preview during print */
+  #proposal-print-area [data-testid="button-print-proposal"],
+  #proposal-print-area [data-testid="button-close-preview"] {
+    display: none !important;
+  }
+
+  /* Show print-only elements */
+  .print\\:block {
+    display: block !important;
+  }
+
+  /* Ensure shadows are preserved */
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  /* Chart rendering */
+  .recharts-wrapper,
+  .recharts-surface {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}

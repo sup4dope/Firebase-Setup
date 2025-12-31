@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { 
   TrendingUp, 
@@ -10,7 +11,8 @@ import {
   Briefcase, 
   CreditCard,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FinancialObligation, Customer, CreditSummary, EligibilityFactors } from "@shared/types";
@@ -19,6 +21,7 @@ interface ReviewSummaryTabProps {
   customer: Partial<Customer>;
   obligations: FinancialObligation[];
   creditSummary?: CreditSummary;
+  onGenerateProposal?: () => void;
 }
 
 const CHART_COLORS = [
@@ -79,7 +82,7 @@ const isWithin7Days = (date1: string, date2: string): boolean => {
   return diffDays <= 7;
 };
 
-export function ReviewSummaryTab({ customer, obligations, creditSummary }: ReviewSummaryTabProps) {
+export function ReviewSummaryTab({ customer, obligations, creditSummary, onGenerateProposal }: ReviewSummaryTabProps) {
   const loans = useMemo(() => 
     obligations.filter(o => o.type === 'loan'),
     [obligations]
@@ -648,6 +651,32 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
           </div>
         </CardContent>
       </Card>
+
+      {onGenerateProposal && (
+        <Card className="mt-4 border-teal-500/30 bg-gradient-to-r from-teal-900/10 to-cyan-500/10">
+          <CardContent className="py-4 px-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-700 to-teal-600 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">정책자금 제안서</p>
+                  <p className="text-xs text-muted-foreground">고객에게 제공할 맞춤형 제안서를 생성합니다</p>
+                </div>
+              </div>
+              <Button
+                onClick={onGenerateProposal}
+                className="bg-teal-700 hover:bg-teal-800 text-white"
+                data-testid="button-generate-proposal"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                제안서 만들기
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

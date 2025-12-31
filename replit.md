@@ -29,7 +29,19 @@ client/
 │   │   ├── TeamManagement.tsx  # 팀/사용자 관리
 │   │   ├── ThemeToggle.tsx     # 다크모드 토글
 │   │   ├── TodoForm.tsx        # 할 일 추가 폼
-│   │   └── TodoList.tsx        # 할 일 목록
+│   │   ├── TodoList.tsx        # 할 일 목록
+│   │   └── report/             # 제안서 컴포넌트
+│   │       ├── index.ts        # 모듈 export
+│   │       ├── ProposalModal.tsx    # 제안서 입력 모달
+│   │       ├── ProposalPreview.tsx  # 제안서 미리보기/인쇄
+│   │       ├── CoverPage.tsx        # 표지
+│   │       ├── ExecutiveSummaryPage.tsx  # 요약
+│   │       ├── DiagnosticsPage.tsx  # 기업 진단
+│   │       ├── RiskAnalysisPage.tsx # 위험 분석
+│   │       ├── ExecutionAgencyPage.tsx  # 집행 기관
+│   │       ├── TimelinePage.tsx     # 진행 일정
+│   │       ├── ConclusionPage.tsx   # 결론
+│   │       └── ThankYouPage.tsx     # 감사 페이지
 │   ├── contexts/
 │   │   └── AuthContext.tsx     # Firebase 인증 상태
 │   ├── lib/
@@ -106,6 +118,21 @@ npm run dev
 - 프론트엔드: http://localhost:5000
 
 ## 최근 변경사항
+- 2024-12-31: 정책자금 제안서 시스템 추가
+  - **8페이지 전문 제안서 생성**: 고객 데이터 기반 맞춤형 제안서 자동 생성
+    - CoverPage: 표지
+    - ExecutiveSummaryPage: 요약 (신용점수, 위험 수준, 핵심 발견사항)
+    - DiagnosticsPage: 기업 진단 (기본 정보, 매출 추이, 성장률)
+    - RiskAnalysisPage: 위험 분석 (부채 구조, 신용등급, DTI)
+    - ExecutionAgencyPage: 추천 집행 기관 (금융기관 목록, 한도, 금리)
+    - TimelinePage: 진행 일정
+    - ConclusionPage: 결론 및 연락처
+    - ThankYouPage: 감사 페이지
+  - **ProposalModal**: 희망 조달 금액, 추천 기관(기관명/금액/금리/기간) 입력
+  - **ProposalPreview**: A4 최적화 미리보기, window.print() PDF 출력
+  - 심사 요약 탭 하단에 "제안서 만들기" 버튼 배치
+  - 인쇄 CSS: @media print, A4 사이즈, page-break 처리
+
 - 2024-12-30: 신용공여내역 OCR 및 금융 분석 기능 강화
   - **신용공여내역 OCR 추가**: 사업자신용정보공여내역 PDF/이미지에서 대출/보증 데이터 자동 추출
     - 단위 변환 지원 (천원 → 원)

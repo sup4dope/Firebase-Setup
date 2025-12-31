@@ -75,6 +75,7 @@ import {
 } from "@shared/types";
 import { FinancialAnalysisTab } from "@/components/FinancialAnalysisTab";
 import { ReviewSummaryTab } from "@/components/ReviewSummaryTab";
+import { ProposalModal, ProposalPreview, type ProposalFormData } from "@/components/report";
 import { format, differenceInDays, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { TodoForm } from "@/components/TodoForm";
@@ -237,6 +238,16 @@ export function CustomerDetailModal({
 
   // TO-DO form modal state
   const [todoModalOpen, setTodoModalOpen] = useState(false);
+  const [proposalModalOpen, setProposalModalOpen] = useState(false);
+  const [proposalPreviewOpen, setProposalPreviewOpen] = useState(false);
+  const [proposalAgencies, setProposalAgencies] = useState<{
+    name: string;
+    limit: string;
+    rate: string;
+    period: string;
+    monthlyPayment: string;
+  }[]>([]);
+  const [proposalDesiredAmount, setProposalDesiredAmount] = useState("");
 
   // Form state
   const [formData, setFormData] = useState<
@@ -1458,6 +1469,27 @@ export function CustomerDetailModal({
       return next;
     });
   }, [debouncedSave]);
+
+  // Handle proposal generation
+  const handleGenerateProposal = useCallback(() => {
+    setProposalModalOpen(true);
+  }, []);
+
+  const handleProposalFormSubmit = useCallback((data: ProposalFormData) => {
+    // Convert agencies to the format expected by ProposalPreview
+    const agencies = data.agencies.map(agency => ({
+      name: agency.name,
+      limit: agency.amount,
+      rate: agency.rate || "협의",
+      period: agency.period || "5년",
+      monthlyPayment: "협의 후 결정"
+    }));
+    
+    setProposalAgencies(agencies);
+    setProposalDesiredAmount(data.desiredAmount);
+    setProposalModalOpen(false);
+    setProposalPreviewOpen(true);
+  }, []);
 
   // Handle delete
   const handleDelete = async () => {
@@ -2844,16 +2876,27 @@ export function CustomerDetailModal({
                   <ReviewSummaryTab
                     obligations={financialObligations}
                     customer={{
+                      id: formData.id || "",
+                      readable_id: formData.readable_id || "",
                       name: formData.name || "",
+                      company_name: formData.company_name || "",
                       business_type: formData.business_type || "",
+                      business_item: formData.business_item || "",
+                      business_registration_number: formData.business_registration_number || "",
                       recent_sales: formData.recent_sales || 0,
                       sales_y1: formData.sales_y1 || 0,
                       sales_y2: formData.sales_y2 || 0,
                       sales_y3: formData.sales_y3 || 0,
+                      avg_revenue_3y: formData.avg_revenue_3y,
                       credit_score: formData.credit_score,
                       founding_date: formData.founding_date || "",
                       business_address: formData.business_address || "",
+                      address: formData.address || "",
+                      over_7_years: formData.over_7_years,
+                      industry: formData.industry || "",
+                      financial_obligations: financialObligations,
                     }}
+                    onGenerateProposal={handleGenerateProposal}
                   />
                 </div>
               )}
@@ -3401,6 +3444,44 @@ export function CustomerDetailModal({
           }}
         />
       )}
+
+      {/* 제안서 입력 모달 */}
+      <ProposalModal
+        isOpen={proposalModalOpen}
+        onClose={() => setProposalModalOpen(false)}
+        onGenerate={handleProposalFormSubmit}
+        customerName={formData.company_name || formData.name || ""}
+      />
+
+      {/* 제안서 미리보기 */}
+      <ProposalPreview
+        isOpen={proposalPreviewOpen}
+        onClose={() => setProposalPreviewOpen(false)}
+        customer={{
+          id: formData.id || "",
+          readable_id: formData.readable_id || "",
+          name: formData.name || "",
+          company_name: formData.company_name || "",
+          business_type: formData.business_type || "",
+          business_item: formData.business_item || "",
+          business_registration_number: formData.business_registration_number || "",
+          recent_sales: formData.recent_sales || 0,
+          sales_y1: formData.sales_y1 || 0,
+          sales_y2: formData.sales_y2 || 0,
+          sales_y3: formData.sales_y3 || 0,
+          avg_revenue_3y: formData.avg_revenue_3y,
+          credit_score: formData.credit_score,
+          founding_date: formData.founding_date || "",
+          business_address: formData.business_address || "",
+          address: formData.address || "",
+          over_7_years: formData.over_7_years,
+          industry: formData.industry || "",
+          financial_obligations: financialObligations,
+        }}
+        currentUser={currentUser}
+        agencies={proposalAgencies}
+        desiredAmount={proposalDesiredAmount}
+      />
     </Dialog>
   );
 }
