@@ -2842,6 +2842,9 @@ export function CustomerDetailModal({
                       sales_y1: formData.sales_y1 || 0,
                       sales_y2: formData.sales_y2 || 0,
                       sales_y3: formData.sales_y3 || 0,
+                      credit_score: formData.credit_score,
+                      founding_date: formData.founding_date || "",
+                      business_address: formData.business_address || "",
                     }}
                   />
                 </div>
