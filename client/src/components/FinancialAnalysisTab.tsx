@@ -148,8 +148,8 @@ export function FinancialAnalysisTab({
     const total = isLoan ? totalLoanBalance : totalGuaranteeBalance;
 
     return (
-      <Card className={cn("overflow-hidden", isLoan ? "flex-[7]" : "flex-[3]")}>
-        <CardHeader className="py-3 px-4 pt-[0px] pb-[0px]">
+      <Card className={cn("overflow-hidden flex flex-col", isLoan ? "flex-[7]" : "flex-[3]")}>
+        <CardHeader className="py-3 px-4 pt-[0px] pb-[0px] shrink-0">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Icon className={cn("w-4 h-4", iconColor)} />
@@ -176,8 +176,8 @@ export function FinancialAnalysisTab({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(50vh-120px)]">
+        <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
+          <div className="h-full overflow-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 sticky top-0">
                 <tr className="border-b">
