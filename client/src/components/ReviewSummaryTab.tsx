@@ -415,8 +415,8 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
               등록된 금융 내역이 없습니다
             </div>
           ) : (
-            <div className="grid grid-cols-3 h-full gap-3">
-              <div className="flex flex-col">
+            <div className="flex h-full gap-3">
+              <div className="flex-[2] flex flex-col min-w-0">
                 <p className="text-[10px] text-muted-foreground font-medium mb-1">채무 분포</p>
                 <div className="flex-1">
                   <ResponsiveContainer width="100%" height="100%">
@@ -425,8 +425,8 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                         data={institutionBreakdown}
                         cx="50%"
                         cy="50%"
-                        innerRadius={25}
-                        outerRadius={40}
+                        innerRadius={30}
+                        outerRadius={48}
                         paddingAngle={1}
                         dataKey="value"
                         nameKey="name"
@@ -442,8 +442,8 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                         data={sectorBreakdown}
                         cx="50%"
                         cy="50%"
-                        innerRadius={44}
-                        outerRadius={55}
+                        innerRadius={52}
+                        outerRadius={65}
                         paddingAngle={2}
                         dataKey="value"
                         nameKey="name"
@@ -468,7 +468,7 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                   </ResponsiveContainer>
                 </div>
               </div>
-              <div className="flex flex-col">
+              <div className="flex-1 flex flex-col min-w-0">
                 <p className="text-[10px] text-muted-foreground font-medium mb-1.5">금융권 구분</p>
                 <div className="flex flex-col gap-1.5">
                   {sectorBreakdown.map((sector) => (
@@ -478,14 +478,14 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                         style={{ backgroundColor: sector.fill }}
                       />
                       <span className="text-[11px] truncate">{sector.name}</span>
-                      <span className="text-[10px] text-muted-foreground ml-auto font-medium">
+                      <span className="text-[10px] text-muted-foreground font-medium">
                         {filteredTotalDebt > 0 ? ((sector.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="flex flex-col">
+              <div className="flex-1 flex flex-col min-w-0">
                 <p className="text-[10px] text-muted-foreground font-medium mb-1.5">금융기관</p>
                 <div className="flex flex-col gap-1">
                   {institutionBreakdown.slice(0, 5).map((item, idx) => (
@@ -494,7 +494,7 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                         className="w-2.5 h-2.5 rounded-sm shrink-0" 
                         style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
                       />
-                      <span className="text-[10px] truncate flex-1">
+                      <span className="text-[10px] truncate">
                         {item.name.length > 8 ? item.name.substring(0, 8) + '..' : item.name}
                       </span>
                       <span className="text-[9px] text-muted-foreground font-medium">
