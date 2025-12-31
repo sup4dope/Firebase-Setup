@@ -23,6 +23,7 @@ interface PolicyReportModalProps {
 interface FundingPlan {
   institution: string;
   amount: number;
+  purpose: string;
 }
 
 const classifyFinancialSector = (institution: string): '1금융권' | '2금융권' | '공공기관' => {
@@ -71,25 +72,31 @@ const getBusinessAge = (foundingDate?: string): string => {
   }
 };
 
-const getCreditScoreComment = (score: number): { label: string; comment: string; color: string } => {
+const getCreditScoreComment = (score: number): { label: string; comment: string; comment2: string; color: string } => {
+  const scoreRange = score >= 900 ? '900점대' : score >= 800 ? '800점대' : score >= 700 ? '700점대' : '700점 미만';
+  
   if (score >= 900) return { 
     label: '우수', 
-    comment: '매우 우수한 신용 상태입니다. 대부분의 정책자금 신청에 유리합니다.',
+    comment: `현재 신용점수 ${scoreRange}로, 1금융권 정책자금 조달에 매우 유리한 위치에 있습니다.`,
+    comment2: '신보/기보 보증부 대출 및 정책자금 최우선 지원 대상입니다. 최대 한도 신청이 가능합니다.',
     color: '#10b981'
   };
   if (score >= 800) return { 
     label: '양호', 
-    comment: '양호한 신용 상태로, 주요 정책자금 신청 자격을 충족합니다.',
+    comment: `현재 신용점수 ${scoreRange}로, 1금융권 정책자금 조달에 유리한 위치에 있습니다.`,
+    comment2: '대부분의 정책자금 신청 자격을 충족하며, 신용보증재단 및 기술보증기금 활용이 권장됩니다.',
     color: '#3b82f6'
   };
   if (score >= 700) return { 
     label: '보통', 
-    comment: '보통 수준의 신용으로, 일부 정책자금은 제한될 수 있습니다.',
+    comment: `현재 신용점수 ${scoreRange}로, 일부 정책자금 신청에 제약이 있을 수 있습니다.`,
+    comment2: '신용등급 개선을 위한 부채 관리가 선행되어야 하며, 소상공인진흥공단 위주의 접근을 권장합니다.',
     color: '#f59e0b'
   };
   return { 
     label: '관리필요', 
-    comment: '신용 관리가 필요합니다. 신용 개선 후 정책자금 신청을 권장합니다.',
+    comment: `현재 신용점수 ${scoreRange}로, 정책자금 신청 전 신용 개선이 필요합니다.`,
+    comment2: '2금융권 대환 및 연체 정리를 통해 최소 700점 이상으로 개선 후 재신청을 권장드립니다.',
     color: '#ef4444'
   };
 };
@@ -107,7 +114,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [showFundingInput, setShowFundingInput] = useState(true);
   const [fundingPlans, setFundingPlans] = useState<FundingPlan[]>([
-    { institution: '', amount: 0 }
+    { institution: '', amount: 0, purpose: '운전자금' }
   ]);
   const reportRef = useRef<HTMLDivElement>(null);
   const totalPages = 5;
@@ -116,7 +123,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
     if (isOpen) {
       setShowFundingInput(true);
       setCurrentPage(1);
-      setFundingPlans([{ institution: '', amount: 0 }]);
+      setFundingPlans([{ institution: '', amount: 0, purpose: '운전자금' }]);
     }
   }, [isOpen]);
 
@@ -167,7 +174,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
   const validFundingPlans = fundingPlans.filter(p => p.institution && p.amount > 0);
 
   const addFundingPlan = () => {
-    setFundingPlans([...fundingPlans, { institution: '', amount: 0 }]);
+    setFundingPlans([...fundingPlans, { institution: '', amount: 0, purpose: '운전자금' }]);
   };
 
   const removeFundingPlan = (index: number) => {
@@ -180,8 +187,10 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
     const updated = [...fundingPlans];
     if (field === 'amount') {
       updated[index].amount = Number(value) * 100000000;
-    } else {
+    } else if (field === 'institution') {
       updated[index].institution = value as string;
+    } else if (field === 'purpose') {
+      updated[index].purpose = value as string;
     }
     setFundingPlans(updated);
   };
@@ -238,41 +247,41 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
 
   const pageStyles: React.CSSProperties = {
     fontFamily: "'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif",
-    lineHeight: 1.6,
+    lineHeight: 1.8,
     padding: '40px',
     height: '100%',
     backgroundColor: '#ffffff',
     color: '#1e293b',
+    fontSize: '10pt',
   };
 
   const tableStyles: React.CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse',
-    fontSize: '14px',
+    fontSize: '10pt',
   };
 
   const thStyles: React.CSSProperties = {
-    padding: '12px 16px',
+    padding: '10px 14px',
     textAlign: 'left',
-    backgroundColor: '#f8fafc',
-    borderTop: '2px solid #3b82f6',
-    borderBottom: '1px solid #e2e8f0',
+    backgroundColor: 'transparent',
+    borderBottom: '1px solid #e5e7eb',
     fontWeight: 600,
-    color: '#334155',
+    color: '#374151',
   };
 
   const tdStyles: React.CSSProperties = {
-    padding: '12px 16px',
-    borderBottom: '1px solid #e2e8f0',
-    color: '#475569',
+    padding: '10px 14px',
+    borderBottom: '1px solid #f3f4f6',
+    color: '#4b5563',
   };
 
   const tdLabelStyles: React.CSSProperties = {
     ...tdStyles,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fafafa',
     fontWeight: 500,
     width: '25%',
-    color: '#334155',
+    color: '#374151',
   };
 
   const renderPage = () => {
@@ -283,7 +292,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
             <img 
               src={logoSero} 
               alt="경영지원그룹 이음" 
-              style={{ height: '100px', marginBottom: '48px', mixBlendMode: 'multiply' }} 
+              style={{ height: '100px', marginBottom: '48px', mixBlendMode: 'multiply', backgroundColor: 'white' }} 
             />
             <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#1e293b', textAlign: 'center', marginBottom: '12px' }}>
               {businessName} 귀사 맞춤형
@@ -300,12 +309,16 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
               padding: '24px 40px', 
               borderRadius: '12px', 
               textAlign: 'center',
-              boxShadow: '0 4px 20px rgba(37, 99, 235, 0.3)'
+              boxShadow: '0 4px 20px rgba(37, 99, 235, 0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}>
-              <p style={{ fontSize: '18px', fontWeight: 500, marginBottom: '8px' }}>
+              <p style={{ fontSize: '18px', fontWeight: 500, margin: 0, marginBottom: '8px' }}>
                 본 컨설팅은 계약 기간 내 조달 실패 시
               </p>
-              <p style={{ fontSize: '22px', fontWeight: 700 }}>
+              <p style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>
                 계약금 100% 환불을 보장합니다
               </p>
             </div>
@@ -317,7 +330,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
           <div style={pageStyles}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
               <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#1e293b' }}>기업 현황 진단</h2>
-              <img src={logoGaro} alt="로고" style={{ height: '60px', mixBlendMode: 'multiply' }} />
+              <img src={logoGaro} alt="로고" style={{ height: '120px', mixBlendMode: 'multiply', backgroundColor: 'white' }} />
             </div>
             <div style={{ borderBottom: '2px solid #2563eb', marginBottom: '32px' }} />
             
@@ -401,7 +414,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
           <div style={pageStyles}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
               <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#1e293b' }}>금융 부채 및 DTI 분석</h2>
-              <img src={logoGaro} alt="로고" style={{ height: '60px', mixBlendMode: 'multiply' }} />
+              <img src={logoGaro} alt="로고" style={{ height: '60px', mixBlendMode: 'multiply', backgroundColor: 'white' }} />
             </div>
             <div style={{ borderBottom: '2px solid #2563eb', marginBottom: '32px' }} />
 
@@ -426,7 +439,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
                 </div>
 
                 <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#f0fdf4', borderRadius: '8px', borderLeft: `4px solid ${creditScoreInfo.color}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <span style={{ fontWeight: 600, color: '#334155' }}>신용점수</span>
                     <span style={{ 
                       padding: '4px 12px', 
@@ -439,8 +452,11 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
                       {creditScore}점 ({creditScoreInfo.label})
                     </span>
                   </div>
-                  <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
+                  <p style={{ fontSize: '12px', color: '#475569', margin: 0, marginBottom: '8px', lineHeight: 1.6 }}>
                     {creditScoreInfo.comment}
+                  </p>
+                  <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: 1.6 }}>
+                    {creditScoreInfo.comment2}
                   </p>
                 </div>
               </div>
@@ -550,7 +566,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
           <div style={pageStyles}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
               <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#1e293b' }}>맞춤형 조달 전략</h2>
-              <img src={logoGaro} alt="로고" style={{ height: '60px', mixBlendMode: 'multiply' }} />
+              <img src={logoGaro} alt="로고" style={{ height: '60px', mixBlendMode: 'multiply', backgroundColor: 'white' }} />
             </div>
             <div style={{ borderBottom: '2px solid #2563eb', marginBottom: '32px' }} />
 
@@ -631,6 +647,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
                         <tr>
                           <th style={thStyles}>No.</th>
                           <th style={thStyles}>조달 기관</th>
+                          <th style={thStyles}>자금용도</th>
                           <th style={{ ...thStyles, textAlign: 'right' }}>예정 금액</th>
                         </tr>
                       </thead>
@@ -639,12 +656,13 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
                           <tr key={idx}>
                             <td style={tdStyles}>{idx + 1}</td>
                             <td style={tdStyles}>{plan.institution}</td>
+                            <td style={tdStyles}>{plan.purpose}</td>
                             <td style={{ ...tdStyles, textAlign: 'right', fontWeight: 500 }}>{formatCurrency(plan.amount)}</td>
                           </tr>
                         ))}
                         <tr style={{ backgroundColor: '#f0f9ff' }}>
-                          <td style={{ ...tdStyles, fontWeight: 600 }} colSpan={2}>총 기대 조달 금액</td>
-                          <td style={{ ...tdStyles, textAlign: 'right', fontWeight: 700, color: '#2563eb', fontSize: '18px' }}>
+                          <td style={{ ...tdStyles, fontWeight: 600 }} colSpan={3}>총 기대 조달 금액</td>
+                          <td style={{ ...tdStyles, textAlign: 'right', fontWeight: 700, color: '#2563eb', fontSize: '16px' }}>
                             {formatCurrency(totalFundingAmount)}
                           </td>
                         </tr>
@@ -673,7 +691,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
           <div style={pageStyles}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
               <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#1e293b' }}>결론 및 제언</h2>
-              <img src={logoGaro} alt="로고" style={{ height: '60px', mixBlendMode: 'multiply' }} />
+              <img src={logoGaro} alt="로고" style={{ height: '60px', mixBlendMode: 'multiply', backgroundColor: 'white' }} />
             </div>
             <div style={{ borderBottom: '2px solid #2563eb', marginBottom: '32px' }} />
 
@@ -747,7 +765,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
             </div>
 
             <div style={{ textAlign: 'center', marginTop: '32px' }}>
-              <img src={logoGaro} alt="경영지원그룹 이음" style={{ height: '40px', mixBlendMode: 'multiply', opacity: 0.7 }} />
+              <img src={logoGaro} alt="경영지원그룹 이음" style={{ height: '40px', mixBlendMode: 'multiply', backgroundColor: 'white', opacity: 0.7 }} />
               <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '12px' }}>
                 경영지원그룹 이음 | 정책자금 전문 컨설팅
               </p>
@@ -785,7 +803,7 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
                     data-testid={`input-funding-institution-${idx}`}
                   />
                 </div>
-                <div className="w-28">
+                <div className="w-24">
                   <Label className="text-xs text-muted-foreground">금액 (억원)</Label>
                   <Input
                     type="number"
@@ -795,6 +813,20 @@ export function PolicyReportModal({ isOpen, onClose, customer, obligations }: Po
                     onChange={(e) => updateFundingPlan(idx, 'amount', e.target.value)}
                     data-testid={`input-funding-amount-${idx}`}
                   />
+                </div>
+                <div className="w-24">
+                  <Label className="text-xs text-muted-foreground">자금용도</Label>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    value={plan.purpose}
+                    onChange={(e) => updateFundingPlan(idx, 'purpose', e.target.value)}
+                    data-testid={`select-funding-purpose-${idx}`}
+                  >
+                    <option value="운전자금">운전자금</option>
+                    <option value="시설자금">시설자금</option>
+                    <option value="창업자금">창업자금</option>
+                    <option value="기타">기타</option>
+                  </select>
                 </div>
                 {fundingPlans.length > 1 && (
                   <Button
