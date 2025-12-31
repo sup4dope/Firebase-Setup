@@ -172,6 +172,13 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
     return result;
   }, [obligations, linkedLoanIds]);
 
+  const filteredTotalDebt = useMemo(() => 
+    obligations
+      .filter(ob => !isGuaranteeOnlyInstitution(ob.institution))
+      .reduce((sum, ob) => sum + ob.balance, 0),
+    [obligations]
+  );
+
   const totalDebt = useMemo(() => 
     obligations.reduce((sum, ob) => sum + ob.balance, 0),
     [obligations]
@@ -408,16 +415,16 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
               등록된 금융 내역이 없습니다
             </div>
           ) : (
-            <div className="flex h-full gap-2">
-              <div className="flex-1 min-w-0">
+            <div className="flex h-full gap-3">
+              <div className="w-[160px] shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={institutionBreakdown}
                       cx="50%"
                       cy="50%"
-                      innerRadius={35}
-                      outerRadius={55}
+                      innerRadius={30}
+                      outerRadius={48}
                       paddingAngle={1}
                       dataKey="value"
                       nameKey="name"
@@ -433,15 +440,11 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                       data={sectorBreakdown}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={75}
+                      innerRadius={52}
+                      outerRadius={65}
                       paddingAngle={2}
                       dataKey="value"
                       nameKey="name"
-                      label={({ name, percent }) => 
-                        `${name} ${(percent * 100).toFixed(0)}%`
-                      }
-                      labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
                     >
                       {sectorBreakdown.map((entry, index) => (
                         <Cell 
@@ -462,41 +465,49 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary }: Revie
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="w-[140px] shrink-0 flex flex-col justify-center gap-1 overflow-y-auto max-h-full">
-                <p className="text-[10px] text-muted-foreground font-medium mb-1">금융권 구분</p>
-                {sectorBreakdown.map((sector) => (
-                  <div key={sector.name} className="flex items-center gap-1.5">
-                    <div 
-                      className="w-2.5 h-2.5 rounded-sm shrink-0" 
-                      style={{ backgroundColor: sector.fill }}
-                    />
-                    <span className="text-[11px] truncate">{sector.name}</span>
-                    <span className="text-[10px] text-muted-foreground ml-auto">
-                      {totalDebt > 0 ? ((sector.value / totalDebt) * 100).toFixed(0) : 0}%
-                    </span>
+              <div className="flex-1 flex flex-col gap-2 min-w-0">
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium mb-1.5">금융권 구분</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    {sectorBreakdown.map((sector) => (
+                      <div key={sector.name} className="flex items-center gap-1.5">
+                        <div 
+                          className="w-2.5 h-2.5 rounded-sm shrink-0" 
+                          style={{ backgroundColor: sector.fill }}
+                        />
+                        <span className="text-[11px] truncate">{sector.name}</span>
+                        <span className="text-[10px] text-muted-foreground ml-auto font-medium">
+                          {filteredTotalDebt > 0 ? ((sector.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-                <div className="h-px bg-border my-1" />
-                <p className="text-[10px] text-muted-foreground font-medium mb-1">금융기관</p>
-                {institutionBreakdown.slice(0, 5).map((item, idx) => (
-                  <div key={item.name} className="flex items-center gap-1.5">
-                    <div 
-                      className="w-2.5 h-2.5 rounded-sm shrink-0" 
-                      style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
-                    />
-                    <span className="text-[10px] truncate" title={item.name}>
-                      {item.name.length > 8 ? item.name.substring(0, 8) + '..' : item.name}
-                    </span>
-                    <span className="text-[9px] text-muted-foreground ml-auto">
-                      {totalDebt > 0 ? ((item.value / totalDebt) * 100).toFixed(0) : 0}%
-                    </span>
+                </div>
+                <div className="h-px bg-border" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium mb-1.5">금융기관</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    {institutionBreakdown.slice(0, 6).map((item, idx) => (
+                      <div key={item.name} className="flex items-center gap-1.5" title={item.name}>
+                        <div 
+                          className="w-2.5 h-2.5 rounded-sm shrink-0" 
+                          style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                        />
+                        <span className="text-[10px] truncate flex-1">
+                          {item.name.length > 10 ? item.name.substring(0, 10) + '..' : item.name}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground font-medium">
+                          {filteredTotalDebt > 0 ? ((item.value / filteredTotalDebt) * 100).toFixed(0) : 0}%
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-                {institutionBreakdown.length > 5 && (
-                  <span className="text-[9px] text-muted-foreground">
-                    +{institutionBreakdown.length - 5}개 기관
-                  </span>
-                )}
+                  {institutionBreakdown.length > 6 && (
+                    <p className="text-[9px] text-muted-foreground mt-1">
+                      +{institutionBreakdown.length - 6}개 기관
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
