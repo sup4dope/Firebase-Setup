@@ -87,6 +87,7 @@ import {
 } from "firebase/storage";
 import {
   doc,
+  getDoc,
   updateDoc,
   addDoc,
   collection,
@@ -408,6 +409,64 @@ export function CustomerDetailModal({
     setOcrBusinessTypes([]);
     setOcrExtractedCount(0);
   }, [customer, isNewCustomer, currentUser]);
+
+  // [핵심] Firestore에서 최신 고객 데이터 강제 재조회 (모달 열릴 때마다)
+  useEffect(() => {
+    const fetchFreshCustomerData = async () => {
+      // 신규 고객이거나 고객 ID가 없으면 건너뜀
+      if (isNewCustomer || !customer?.id || !isOpen) {
+        return;
+      }
+
+      console.log(`[DEBUG] 🔄 Firestore에서 최신 고객 데이터 조회 시작: ${customer.id}`);
+
+      try {
+        const customerRef = doc(db, "customers", customer.id);
+        const customerSnap = await getDoc(customerRef);
+
+        if (customerSnap.exists()) {
+          const freshData = customerSnap.data() as Customer;
+          
+          // 금융 채무 데이터 로그 및 상태 업데이트
+          const obligations = freshData.financial_obligations || [];
+          const loanCount = obligations.filter((o: FinancialObligation) => o.type === 'loan').length;
+          const guaranteeCount = obligations.filter((o: FinancialObligation) => o.type === 'guarantee').length;
+          
+          console.log(`[DEBUG] ✅ DB로부터 불러온 대출 내역: ${loanCount}건`);
+          console.log(`[DEBUG] ✅ DB로부터 불러온 보증 내역: ${guaranteeCount}건`);
+          console.log(`[DEBUG] ✅ 업종: ${freshData.business_type || '없음'}`);
+          console.log(`[DEBUG] ✅ 최근매출: ${freshData.recent_sales || 0}억`);
+
+          // 금융 채무 상태 업데이트 (핵심!)
+          setFinancialObligations(obligations);
+          
+          // formData 업데이트 (OCR 저장된 필드들 포함)
+          const phoneParts = freshData.phone?.split("-") || ["010", "", ""];
+          setFormData(prev => ({
+            ...prev,
+            ...freshData,
+            phone_part1: phoneParts[0] || "010",
+            phone_part2: phoneParts[1] || "",
+            phone_part3: phoneParts[2] || "",
+            financial_obligations: obligations,
+          }));
+
+          // 문서 목록 업데이트
+          if (freshData.documents) {
+            setDocuments(freshData.documents);
+          }
+
+          console.log(`[DEBUG] ✅ 전체 데이터 동기화 완료`);
+        } else {
+          console.warn(`[DEBUG] ⚠️ 고객 문서를 찾을 수 없음: ${customer.id}`);
+        }
+      } catch (error) {
+        console.error(`[DEBUG] ❌ Firestore 조회 실패:`, error);
+      }
+    };
+
+    fetchFreshCustomerData();
+  }, [isOpen, customer?.id, isNewCustomer]);
 
   // [수정] 메모 실시간 로딩 (로그 추가)
   useEffect(() => {
