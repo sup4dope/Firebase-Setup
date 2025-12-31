@@ -11,7 +11,7 @@ import type { FinancialObligation, Customer } from "@shared/types";
 const truncateText = (text: string, maxLength: number = 4): string => {
   if (!text) return '-';
   if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + '...';
+  return text.substring(0, maxLength) + '..';
 };
 
 interface FinancialAnalysisTabProps {
@@ -257,7 +257,7 @@ export function FinancialAnalysisTab({
                           ) : (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="cursor-help">{truncateText(item.product_name, 4)}</span>
+                                <span className="cursor-help">{truncateText(item.product_name, 6)}</span>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-xs">
                                 <p className="text-sm">{item.product_name || '-'}</p>
@@ -275,7 +275,14 @@ export function FinancialAnalysisTab({
                               data-testid={`input-account-${item.id}`}
                             />
                           ) : (
-                            <span className="truncate">{item.account_type || '-'}</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help">{truncateText(item.account_type, 4)}</span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-sm">{item.account_type || '-'}</p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </td>
                         <td className="py-2 px-3 text-right font-mono">
