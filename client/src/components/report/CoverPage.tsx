@@ -1,4 +1,4 @@
-import { Award } from "lucide-react";
+import { Shield } from "lucide-react";
 import logoSero from "@assets/white_logo_sero_1767150624036.png";
 
 interface CoverPageProps {
@@ -8,64 +8,61 @@ interface CoverPageProps {
 
 export function CoverPage({ businessName, reportDate }: CoverPageProps) {
   return (
-    <div 
-      className="bg-white flex flex-col justify-between"
-      style={{ 
-        width: '210mm', 
-        height: '297mm', 
-        padding: '25mm',
-        pageBreakAfter: 'always'
-      }}
-    >
-      <div className="flex justify-end">
-        <img 
-          src={logoSero} 
-          alt="경영지원그룹 이음" 
-          style={{ height: '80px', mixBlendMode: 'multiply', backgroundColor: 'white' }} 
-        />
-      </div>
+    <div className="relative h-[297mm] bg-white print:break-after-page overflow-hidden">
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-teal-800/[0.02] rounded-full -translate-y-1/2 translate-x-1/2"></div>
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-cyan-600/[0.03] rounded-full translate-y-1/2 -translate-x-1/2"></div>
 
-      <div className="flex-1 flex flex-col justify-center items-center" style={{ gap: '48px' }}>
-        <div className="text-center" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <h1 style={{ fontSize: '48px', fontFamily: 'Georgia, serif', color: '#002C5F', lineHeight: 1.2 }}>
-            {businessName} 귀사
-          </h1>
-          <h2 style={{ fontSize: '28px', color: 'rgba(0, 44, 95, 0.8)', lineHeight: 1.6 }}>
-            정책자금 조달 가능성 분석 및<br />
-            전략 보고서
-          </h2>
+      <div className="relative h-full p-[25mm] flex flex-col justify-between">
+        <div className="flex justify-between items-start">
+          <div className="space-y-1">
+            <div className="font-medium text-teal-600 tracking-widest uppercase text-base">경영지원자문 제안서 (정책자금)</div>
+            <div className="text-teal-500 text-base">{reportDate}</div>
+          </div>
+          <div className="text-right">
+            <img src={logoSero} alt="Logo" className="h-16 object-contain" />
+          </div>
         </div>
 
-        <div 
-          style={{ 
-            border: '4px solid #B8860B', 
-            background: 'linear-gradient(135deg, rgba(184, 134, 11, 0.05), rgba(184, 134, 11, 0.1))',
-            padding: '32px',
-            borderRadius: '4px',
-            maxWidth: '600px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'center' }}>
-            <Award style={{ width: '40px', height: '40px', color: '#B8860B' }} />
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '20px', fontWeight: 700, color: '#B8860B', marginBottom: '8px' }}>
-                조달 실패시 환불 보증
-              </p>
-              <p style={{ fontSize: '16px', color: '#002C5F', lineHeight: 1.6 }}>
-                정책자금 조달 실패 시 자문료 100% 환불
-              </p>
+        <div className="flex-1 flex flex-col justify-center space-y-16">
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <h1 className="text-7xl font-serif text-teal-900 leading-[1.1] tracking-tight">{businessName}</h1>
+              <div className="h-1 w-24 bg-cyan-600"></div>
+            </div>
+
+            <h2 className="text-4xl text-teal-700 leading-relaxed font-light tracking-tight">
+              정책자금 조달 가능성 분석 및<br />
+              전략 보고서
+            </h2>
+          </div>
+
+          <div className="inline-block max-w-2xl">
+            <div className="relative border border-cyan-600/30 bg-gradient-to-br from-cyan-600/[0.02] to-cyan-600/[0.08] p-10 backdrop-blur-sm">
+              <div className="absolute top-4 left-4 w-3 h-3 border-t border-l border-cyan-600"></div>
+              <div className="absolute top-4 right-4 w-3 h-3 border-t border-r border-cyan-600"></div>
+              <div className="absolute bottom-4 left-4 w-3 h-3 border-b border-l border-cyan-600"></div>
+              <div className="absolute bottom-4 right-4 w-3 h-3 border-b border-r border-cyan-600"></div>
+
+              <div className="flex items-start gap-6">
+                <Shield className="w-12 h-12 text-cyan-600 flex-shrink-0" strokeWidth={1.5} />
+                <div className="space-y-3">
+                  <p className="text-2xl font-bold text-teal-900 tracking-tight">조달 실패시 환불 보증</p>
+                  <p className="text-teal-600 text-base leading-relaxed">정책자금 조달 실패 시 자문료 100% 환불</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '14px', color: 'rgba(0, 44, 95, 0.6)' }}>
-        <div>
-          <p>작성일: {reportDate}</p>
-          <p style={{ marginTop: '4px' }}>경영지원그룹 이음</p>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <p>Management Support Group Yieum</p>
+        <div className="flex justify-between items-end text-xs text-teal-500">
+          <div className="space-y-1">
+            <p className="text-teal-700 font-medium">Management Support Group</p>
+            <p>Yieum</p>
+          </div>
+          <div className="text-right space-y-1">
+            <p className="uppercase tracking-wider">Confidential Report</p>
+            <p>Page 1 of 8</p>
+          </div>
         </div>
       </div>
     </div>

@@ -1,21 +1,12 @@
-export interface ExecutionPlan {
-  institution: string;
-  amount: string;
-  purpose?: string;
-}
-
-export interface DebtDistribution {
+export interface AgencyInfo {
   name: string;
-  value: number;
-  percentage: number;
+  limit: string;
+  rate: string;
+  period: string;
+  monthlyPayment: string;
 }
 
-export interface SalesData {
-  year: string;
-  value: number;
-}
-
-export interface ReportProps {
+export interface ReportData {
   businessName: string;
   ceoName: string;
   businessNumber: string;
@@ -23,53 +14,59 @@ export interface ReportProps {
   industry: string;
   businessAge: string;
   address: string;
-  reportDate: string;
-  validUntil: string;
-  consultantName: string;
-  
+  creditScore: number;
+  creditGrade: string;
+  creditComment: string;
+  creditScorePercentage: number;
+  requiredFunding: string;
+  riskLevel: string;
+  keyFinding1: string;
+  keyFinding2: string;
+  keyFinding3: string;
   sales2022: number;
   sales2023: number;
   sales2024: number;
   sales2025: number;
-  growthRate: number;
-  
-  totalDebt: number;
-  loanBalance: number;
-  guaranteeBalance: number;
-  
-  debtDistribution: DebtDistribution[];
-  
-  creditScore: number;
-  creditGrade: string;
-  creditComment: string;
-  
-  dti2024: number;
+  growthRate: string;
+  totalRevenue: string;
+  cagr: string;
+  cagrPeriod: string;
+  stabilityScore: string;
+  stabilityDescription: string;
+  reviewScore: string;
+  reviewDescription: string;
+  totalDebt: string;
+  loanBalance: string;
+  guaranteeBalance: string;
+  debt1stTier: string;
+  debt1stTierPct: number;
+  debt2ndTier: string;
+  debt2ndTierPct: number;
+  debtPublic: string;
+  debtPublicPct: number;
+  dti2024: string;
   dti2024Status: '안전' | '주의' | '위험';
-  dti3Year: number;
+  dti3Year: string;
   dti3YearStatus: '안전' | '주의' | '위험';
   dtiInterpretation: string;
-  
   diagnosisResult: string;
-  currentRate: number;
-  improvedRate: number;
-  rateDiff: number;
+  currentRate: string;
+  improvedRate: string;
+  rateDiff: string;
   currentInterest: string;
   improvedInterest: string;
   interestSavings: string;
-  
-  executionPlan: ExecutionPlan[];
+  executionPlan: { institution: string; amount: string }[];
   totalExpectedAmount: string;
-  
   recommendation1: string;
   recommendation2: string;
   recommendation3: string;
+  agencies: AgencyInfo[];
+  totalExpectedFunding: string;
+  fundingPeriod: string;
+  consultantName: string;
+  consultantPhone: string;
+  consultantEmail: string;
+  reportDate: string;
+  validUntil: string;
 }
-
-export const formatBillion = (value: number): string => {
-  if (value >= 100000000) {
-    return `${(value / 100000000).toFixed(1)}억원`;
-  } else if (value >= 10000) {
-    return `${(value / 10000).toFixed(0)}만원`;
-  }
-  return `${value.toLocaleString()}원`;
-};

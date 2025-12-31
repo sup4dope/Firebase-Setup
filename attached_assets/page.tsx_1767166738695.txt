@@ -1,0 +1,25 @@
+import { CoverPage } from "@/components/report/cover-page"
+import { ExecutiveSummaryPage } from "@/components/report/executive-summary-page"
+import { FinancialAnalysisPage } from "@/components/report/financial-analysis-page"
+import { RiskAnalysisPage } from "@/components/report/risk-analysis-page"
+import { ExecutionAgencyPage } from "@/components/report/execution-agency-page"
+import { TimelinePage } from "@/components/report/timeline-page"
+import { ConclusionPage } from "@/components/report/conclusion-page"
+import { ThankYouPage } from "@/components/report/thank-you-page"
+
+export default function ReportPage() {
+  return (
+    <div className="min-h-screen bg-[#E8E9EB]">
+      <div className="max-w-[210mm] mx-auto space-y-4">
+        <CoverPage />
+        <ExecutiveSummaryPage />
+        <FinancialAnalysisPage />
+        <RiskAnalysisPage />
+        <ExecutionAgencyPage />
+        <TimelinePage />
+        <ConclusionPage />
+        <ThankYouPage />
+      </div>
+    </div>
+  )
+}

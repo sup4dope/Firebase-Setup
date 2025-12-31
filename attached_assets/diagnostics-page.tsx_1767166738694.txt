@@ -1,0 +1,138 @@
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from "recharts"
+import { TrendingUp, Info } from "lucide-react"
+
+export function DiagnosticsPage() {
+  const salesData = [
+    { year: "2022년", value: "{sales2022}" },
+    { year: "2023년", value: "{sales2023}" },
+    { year: "2024년", value: "{sales2024}" },
+    { year: "2025년(최근)", value: "{sales2025}" },
+  ]
+
+  return (
+    <div className="h-[297mm] bg-white p-[25mm] flex flex-col print:break-after-page relative overflow-hidden">
+      {/* Decorative gradient backgrounds */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-navy-900/5 via-navy-700/3 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-gold-600/8 via-gold-400/4 to-transparent rounded-full blur-3xl translate-y-1/2 -translate-x-1/3"></div>
+
+      <div className="relative z-10 flex flex-col h-full">
+        <div className="flex justify-between items-start mb-12">
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-1.5 bg-gradient-to-b from-gold-600 to-gold-400 shadow-lg shadow-gold-600/30"></div>
+              <h1 className="dynamic-text-5xl font-serif text-navy-900 tracking-tight">정밀 기업 진단</h1>
+            </div>
+            <p className="text-navy-500 dynamic-text-sm ml-6 tracking-wide font-medium">
+              Comprehensive Business Diagnostics
+            </p>
+          </div>
+          <div className="text-right space-y-1 bg-navy-900/5 px-5 py-4 rounded-sm border-l-2 border-gold-600">
+            <div className="text-xs text-navy-500 uppercase tracking-widest font-semibold">Page</div>
+            <div className="dynamic-text-3xl font-bold text-navy-900">02</div>
+            <div className="text-xs text-navy-400 font-medium">/05</div>
+          </div>
+        </div>
+
+        <div className="mb-12 flex-shrink-0">
+          <div className="flex items-center gap-3 mb-6">
+            <Info className="w-5 h-5 text-gold-600" strokeWidth={2} />
+            <h2 className="dynamic-text-xl font-bold text-navy-900 tracking-tight">기본 정보</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-x-12 gap-y-4 bg-navy-900/[0.02] p-6 rounded-sm border border-navy-200/50 shadow-sm">
+            <div className="flex items-baseline justify-between border-b border-navy-200 pb-3">
+              <span className="text-navy-500 dynamic-text-sm tracking-wide font-medium">상호명</span>
+              <span className="text-navy-900 font-semibold dynamic-text-base">{"{companyName}"}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-b border-navy-200 pb-3">
+              <span className="text-navy-500 dynamic-text-sm tracking-wide font-medium">대표자</span>
+              <span className="text-navy-900 font-semibold dynamic-text-base">{"{ceoName}"}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-b border-navy-200 pb-3">
+              <span className="text-navy-500 dynamic-text-sm tracking-wide font-medium">사업자번호</span>
+              <span className="text-navy-900 font-semibold dynamic-text-base">{"{businessNumber}"}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-b border-navy-200 pb-3">
+              <span className="text-navy-500 dynamic-text-sm tracking-wide font-medium">개업일</span>
+              <span className="text-navy-900 font-semibold dynamic-text-base">{"{openingDate}"}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-b border-navy-200 pb-3">
+              <span className="text-navy-500 dynamic-text-sm tracking-wide font-medium">업종</span>
+              <span className="text-navy-900 font-semibold dynamic-text-base">{"{industry}"}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-b border-navy-200 pb-3">
+              <span className="text-navy-500 dynamic-text-sm tracking-wide font-medium">업력</span>
+              <span className="text-navy-900 font-semibold dynamic-text-base">{"{businessAge}"}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-b border-navy-200 pb-3 col-span-2">
+              <span className="text-navy-500 dynamic-text-sm tracking-wide font-medium">사업장 주소</span>
+              <span className="text-navy-900 font-semibold dynamic-text-base truncate ml-4">{"{address}"}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="dynamic-text-xl font-bold text-navy-900 tracking-tight">최근 3개년 매출 추이</h2>
+            <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-navy-900/[0.08] to-navy-900/[0.04] rounded-sm border-l-2 border-gold-600">
+              <TrendingUp className="w-4 h-4 text-gold-600" strokeWidth={2} />
+              <span className="dynamic-text-sm text-navy-700 font-semibold">Growth Analysis</span>
+            </div>
+          </div>
+
+          <div className="h-64 mb-6 border-2 border-navy-200 p-5 bg-white shadow-lg flex-shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={salesData} barSize={50}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E0E5EB" vertical={false} />
+                <XAxis
+                  dataKey="year"
+                  tick={{ fill: "oklch(0.28 0.06 247)", fontSize: 12, fontWeight: 500 }}
+                  axisLine={{ stroke: "oklch(0.28 0.06 247)", strokeWidth: 1.5 }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: "oklch(0.28 0.06 247)", fontSize: 12, fontWeight: 500 }}
+                  axisLine={{ stroke: "oklch(0.28 0.06 247)", strokeWidth: 1.5 }}
+                  tickLine={false}
+                  label={{
+                    value: "매출액 (억원)",
+                    angle: -90,
+                    position: "insideLeft",
+                    fill: "oklch(0.28 0.06 247)",
+                    style: { fontSize: 12, fontWeight: 600 },
+                  }}
+                />
+                <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                  {salesData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={index === salesData.length - 1 ? "oklch(0.45 0.08 65)" : "oklch(0.22 0.05 247)"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="relative bg-gradient-to-br from-navy-900 via-navy-800 to-navy-900 text-white py-6 px-7 overflow-hidden shadow-2xl shadow-navy-900/30 border-l-4 border-gold-600">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gold-600/10 rounded-full translate-x-1/2 -translate-y-1/2"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gold-400/5 rounded-full -translate-x-1/2 translate-y-1/2"></div>
+            <div className="relative flex items-start gap-4">
+              <div className="w-1 h-14 bg-gradient-to-b from-gold-600 to-gold-400 flex-shrink-0 shadow-lg shadow-gold-600/30"></div>
+              <div className="space-y-2">
+                <p className="text-gold-400 text-xs font-semibold tracking-widest uppercase">Growth Insight</p>
+                <p className="text-white/95 leading-relaxed dynamic-text-base">
+                  최근 3년 평균 <span className="text-gold-400 font-bold dynamic-text-2xl">{"{growthRate}"}%</span>의
+                  견고한 성장세를 유지하고 있습니다.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 text-right text-xs text-navy-400 tracking-wide font-medium">
+          Management Support Group Yieum
+        </div>
+      </div>
+    </div>
+  )
+}
