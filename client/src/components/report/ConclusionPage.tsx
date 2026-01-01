@@ -69,7 +69,7 @@ export function ConclusionPage({
         <img 
           src={logoGaro} 
           alt="경영지원그룹 이음" 
-          className="h-10 w-auto object-contain opacity-60 flex-shrink-0"
+          className="h-10 w-auto object-contain flex-shrink-0"
         />
       </div>
 

@@ -66,7 +66,7 @@ export function RiskAnalysisPage({
         <img 
           src={logoGaro} 
           alt="경영지원그룹 이음" 
-          className="h-10 w-auto object-contain opacity-60 flex-shrink-0"
+          className="h-10 w-auto object-contain flex-shrink-0"
         />
       </div>
       <div className="mb-6 flex-shrink-0">

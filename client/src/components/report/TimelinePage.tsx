@@ -16,7 +16,7 @@ export function TimelinePage({ reportDate }: TimelinePageProps) {
         <img 
           src={logoGaro} 
           alt="경영지원그룹 이음" 
-          className="h-10 w-auto object-contain opacity-60 flex-shrink-0"
+          className="h-10 w-auto object-contain flex-shrink-0"
         />
       </div>
       <div className="mb-6 bg-gradient-to-br from-teal-900/5 to-cyan-500/5 rounded-lg p-5 border border-cyan-500/20">

@@ -38,7 +38,7 @@ export function ExecutionAgencyPage({
         <img 
           src={logoGaro} 
           alt="경영지원그룹 이음" 
-          className="h-10 w-auto object-contain opacity-60 flex-shrink-0"
+          className="h-10 w-auto object-contain flex-shrink-0"
         />
       </div>
       <div className="mb-6 bg-gradient-to-br from-teal-900 to-teal-700 rounded-lg p-6 text-white shadow-lg">

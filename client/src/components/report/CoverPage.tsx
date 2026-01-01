@@ -13,23 +13,17 @@ export function CoverPage({ businessName, reportDate, logo = "경영지원그룹
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-teal-800/[0.02] rounded-full -translate-y-1/2 translate-x-1/2"></div>
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-cyan-600/[0.03] rounded-full translate-y-1/2 -translate-x-1/2"></div>
       
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <img 
-          src={logoSquare} 
-          alt="경영지원그룹 이음" 
-          className="w-48 h-48 object-contain opacity-10"
-        />
-      </div>
-
       <div className="relative h-full p-[25mm] flex flex-col justify-between">
         <div className="flex justify-between items-start">
           <div className="space-y-1">
             <div className="font-medium text-teal-600 tracking-widest uppercase text-base">경영지원자문 제안서 (정책자금)</div>
             <div className="text-teal-500 text-base">{reportDate}</div>
           </div>
-          <div className="text-right">
-            <div className="text-teal-800 font-bold text-base tracking-tight">{logo}</div>
-          </div>
+          <img 
+            src={logoSquare} 
+            alt="경영지원그룹 이음" 
+            className="w-24 h-24 object-contain"
+          />
         </div>
 
         <div className="flex-1 flex flex-col justify-center space-y-16">

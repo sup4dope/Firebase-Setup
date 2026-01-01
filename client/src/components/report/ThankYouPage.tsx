@@ -6,15 +6,13 @@ export function ThankYouPage() {
       <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-cyan-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-teal-900/10 to-transparent rounded-full translate-y-1/2 -translate-x-1/2"></div>
       
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="relative z-10 text-center max-w-2xl space-y-8">
         <img 
           src={logoSquare} 
           alt="경영지원그룹 이음" 
-          className="w-48 h-48 object-contain opacity-10"
+          className="w-28 h-28 object-contain mx-auto mb-4"
         />
-      </div>
 
-      <div className="relative z-10 text-center max-w-2xl space-y-8">
         <div className="flex items-center justify-center gap-4 mb-8">
           <div className="h-px w-24 bg-gradient-to-r from-transparent to-cyan-500"></div>
           <div className="w-3 h-3 bg-cyan-500 rounded-full"></div>
