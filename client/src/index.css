@@ -328,19 +328,33 @@
     margin: 0;
   }
 
-  body {
+  html, body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
+    background: white !important;
   }
 
-  /* Hide everything except the proposal print area */
-  body > *:not(.print-visible) {
+  /* Hide the main app content */
+  body > #root {
     display: none !important;
   }
 
-  /* Make dialogs print-friendly */
-  [role="dialog"] {
+  /* Show Radix Portal which contains the dialog */
+  body > [data-radix-portal] {
+    display: block !important;
+    position: static !important;
+    background: white !important;
+  }
+
+  /* Hide dialog overlay */
+  [data-radix-dialog-overlay] {
+    display: none !important;
+  }
+
+  /* Make dialog content print-friendly */
+  [role="dialog"],
+  [data-radix-dialog-content] {
     position: static !important;
     transform: none !important;
     width: 100% !important;
@@ -351,11 +365,8 @@
     margin: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    background: transparent !important;
-  }
-
-  [data-radix-dialog-overlay] {
-    display: none !important;
+    background: white !important;
+    overflow: visible !important;
   }
 
   /* Print area styles */
@@ -370,6 +381,11 @@
     max-width: none !important;
     padding: 0 !important;
     margin: 0 !important;
+  }
+
+  /* Hide header in print */
+  .print\\:hidden {
+    display: none !important;
   }
 
   /* Page break utilities */
@@ -395,29 +411,16 @@
     print-color-adjust: exact !important;
   }
 
-  /* Hide non-print elements - only hide CRM chrome, not report content */
-  .print\\:hidden,
-  #proposal-print-area ~ *,
-  [role="dialog"]:not(:has(#proposal-print-area)) {
-    display: none !important;
-  }
-
-  /* Hide print button inside proposal preview during print */
-  #proposal-print-area [data-testid="button-print-proposal"],
-  #proposal-print-area [data-testid="button-close-preview"] {
-    display: none !important;
-  }
-
   /* Show print-only elements */
   .print\\:block {
     display: block !important;
   }
 
-  /* Ensure shadows are preserved */
+  /* Ensure shadows are preserved for pages */
   .shadow-lg,
   .shadow-xl,
   .shadow-2xl {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    box-shadow: none !important;
   }
 
   /* Chart rendering */
@@ -425,5 +428,11 @@
   .recharts-surface {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+
+  /* Ensure each page has white background */
+  #proposal-print-area > div > div {
+    background: white !important;
+    box-shadow: none !important;
   }
 }
