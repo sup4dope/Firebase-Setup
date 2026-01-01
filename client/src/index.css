@@ -341,58 +341,40 @@
     margin: 0;
   }
 
-  /* Force white background on everything */
+  /* Force white background and hide everything by default */
   html, body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  /* Hide the main app content */
-  body > #root {
-    display: none !important;
+  /* Hide EVERYTHING first */
+  body * {
+    visibility: hidden;
   }
 
-  /* Show Radix Portal which contains the dialog */
-  body > [data-radix-portal] {
-    display: block !important;
-    position: static !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
+  /* Then show only the proposal print area and its contents */
+  #proposal-print-area,
+  #proposal-print-area * {
+    visibility: visible !important;
   }
 
-  /* Hide dialog overlay */
-  [data-radix-dialog-overlay] {
-    display: none !important;
-  }
-
-  /* Make dialog content print-friendly */
-  [role="dialog"],
-  [data-radix-dialog-content] {
-    position: static !important;
-    transform: none !important;
+  /* Position the proposal print area at the top */
+  #proposal-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     height: auto !important;
-    max-width: none !important;
-    max-height: none !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     padding: 0 !important;
     margin: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    overflow: visible !important;
-  }
-
-  /* Print area styles */
-  #proposal-print-area {
-    overflow: visible !important;
-    height: auto !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    padding: 0 !important;
   }
 
   #proposal-print-area > div {
@@ -408,11 +390,20 @@
     background-color: #ffffff !important;
     box-shadow: none !important;
     color: #000000 !important;
+    width: 210mm !important;
+  }
+
+  /* Completely hide all dialogs overlays and backgrounds */
+  [data-radix-dialog-overlay],
+  [data-radix-portal] > div:first-child {
+    display: none !important;
+    visibility: hidden !important;
   }
 
   /* Hide header in print */
   .print\\:hidden {
     display: none !important;
+    visibility: hidden !important;
   }
 
   /* Page break utilities */
@@ -433,7 +424,8 @@
   }
 
   /* Ensure backgrounds print */
-  * {
+  #proposal-print-area,
+  #proposal-print-area * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -441,6 +433,7 @@
   /* Show print-only elements */
   .print\\:block {
     display: block !important;
+    visibility: visible !important;
   }
 
   /* Remove shadows for cleaner print */
