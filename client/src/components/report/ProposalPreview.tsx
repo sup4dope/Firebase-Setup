@@ -94,6 +94,21 @@ export function ProposalPreview({
     return Math.round((totalDebt / revenueInWon) * 100)
   }
 
+  const calculate3YearDTI = (): number => {
+    const y1 = customer?.sales_y1 || 0
+    const y2 = customer?.sales_y2 || 0
+    const y3 = customer?.sales_y3 || 0
+    
+    const validYears = [y1, y2, y3].filter(s => s > 0)
+    if (validYears.length === 0) return 0
+    
+    const avgRevenue = validYears.reduce((sum, s) => sum + s, 0) / validYears.length
+    const totalDebt = getTotalDebt()
+    const avgRevenueInWon = avgRevenue * 100000000
+    
+    return Math.round((totalDebt / avgRevenueInWon) * 100)
+  }
+
   const getDTIStatus = (dti: number): string => {
     if (dti <= 30) return "안전"
     if (dti <= 50) return "주의"
@@ -290,8 +305,8 @@ export function ProposalPreview({
               creditComment={getCreditComment(customer?.credit_score || 0)}
               dti2024={calculateDTI(customer?.sales_y1)}
               dti2024Status={getDTIStatus(calculateDTI(customer?.sales_y1))}
-              dti3Year={calculateDTI(customer?.avg_revenue_3y)}
-              dti3YearStatus={getDTIStatus(calculateDTI(customer?.avg_revenue_3y))}
+              dti3Year={calculate3YearDTI()}
+              dti3YearStatus={getDTIStatus(calculate3YearDTI())}
               dtiInterpretation={getDTIInterpretation()}
               reportDate={reportDate}
             />
