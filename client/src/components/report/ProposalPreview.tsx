@@ -65,7 +65,9 @@ export function ProposalPreview({
 
   const getTotalDebt = (): number => {
     if (!customer?.financial_obligations) return 0
-    return customer.financial_obligations.reduce((sum, ob) => sum + (ob.balance || 0), 0)
+    return customer.financial_obligations
+      .filter(ob => ob.type === 'loan')
+      .reduce((sum, ob) => sum + (ob.balance || 0), 0)
   }
 
   const getLoanBalance = (): number => {

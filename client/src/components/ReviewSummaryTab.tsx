@@ -182,15 +182,12 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary, onGener
     [obligations]
   );
 
-  const totalDebt = useMemo(() => 
-    obligations.reduce((sum, ob) => sum + ob.balance, 0),
-    [obligations]
-  );
-
   const totalLoanBalance = useMemo(() => 
     obligations.filter(o => o.type === 'loan').reduce((sum, o) => sum + o.balance, 0),
     [obligations]
   );
+
+  const totalDebt = totalLoanBalance;
 
   const totalGuaranteeBalance = useMemo(() => 
     obligations.filter(o => o.type === 'guarantee').reduce((sum, o) => sum + o.balance, 0),
