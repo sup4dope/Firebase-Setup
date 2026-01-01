@@ -341,69 +341,71 @@
     margin: 0;
   }
 
-  /* Force white background and hide everything by default */
+  /* Base print settings */
   html, body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Hide EVERYTHING first */
-  body * {
-    visibility: hidden;
+  /* Hide the main app root */
+  body > #root {
+    display: none !important;
   }
 
-  /* Then show only the proposal print area and its contents */
-  #proposal-print-area,
-  #proposal-print-area * {
-    visibility: visible !important;
+  /* Hide dialog overlays */
+  [data-radix-dialog-overlay] {
+    display: none !important;
   }
 
-  /* Position the proposal print area at the top */
+  /* Keep radix portal visible but transparent */
+  body > [data-radix-portal] {
+    display: block !important;
+    position: static !important;
+    background: transparent !important;
+  }
+
+  /* Make dialog content flow naturally for pagination */
+  [role="dialog"],
+  [data-radix-dialog-content] {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  /* Proposal print area - keep in normal flow for pagination */
   #proposal-print-area {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
     width: 100% !important;
     height: auto !important;
     overflow: visible !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
     padding: 0 !important;
     margin: 0 !important;
+    background: transparent !important;
   }
 
   #proposal-print-area > div {
     max-width: none !important;
+    width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
-    background: #ffffff !important;
-  }
-
-  /* Force white background on all proposal pages */
-  #proposal-print-area > div > div {
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    box-shadow: none !important;
-    color: #000000 !important;
-    width: 210mm !important;
-  }
-
-  /* Completely hide all dialogs overlays and backgrounds */
-  [data-radix-dialog-overlay],
-  [data-radix-portal] > div:first-child {
-    display: none !important;
-    visibility: hidden !important;
+    background: transparent !important;
   }
 
   /* Hide header in print */
   .print\\:hidden {
     display: none !important;
-    visibility: hidden !important;
   }
 
   /* Page break utilities */
@@ -423,9 +425,8 @@
     break-inside: avoid;
   }
 
-  /* Ensure backgrounds print */
-  #proposal-print-area,
-  #proposal-print-area * {
+  /* Ensure backgrounds and colors print correctly */
+  * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -433,13 +434,12 @@
   /* Show print-only elements */
   .print\\:block {
     display: block !important;
-    visibility: visible !important;
   }
 
   /* Remove shadows for cleaner print */
-  .shadow-lg,
-  .shadow-xl,
-  .shadow-2xl {
+  #proposal-print-area .shadow-lg,
+  #proposal-print-area .shadow-xl,
+  #proposal-print-area .shadow-2xl {
     box-shadow: none !important;
   }
 
@@ -448,12 +448,5 @@
   .recharts-surface {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-  }
-
-  /* Override dark mode in print */
-  .dark #proposal-print-area,
-  .dark #proposal-print-area * {
-    background-color: #ffffff !important;
-    color: #000000 !important;
   }
 }
