@@ -1,4 +1,5 @@
 import { Building2, TrendingUp, AlertTriangleIcon, CircleDollarSignIcon } from "lucide-react"
+import logoGaro from "@assets/logo_garo_white-removebg-preview_1767271262627.png"
 
 interface ExecutiveSummaryPageProps {
   businessName: string;
@@ -29,9 +30,16 @@ export function ExecutiveSummaryPage({
 }: ExecutiveSummaryPageProps) {
   return (
     <div className="w-[210mm] h-[297mm] bg-white shadow-lg p-[25mm] flex flex-col page-break">
-      <div className="border-b-2 border-cyan-500 pb-4 mb-6">
-        <h1 className="text-3xl font-bold text-teal-900">기업 진단 요약</h1>
-        <p className="text-sm text-[#4A5568] mt-1">Executive Summary</p>
+      <div className="border-b-2 border-cyan-500 pb-4 mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-teal-900">기업 진단 요약</h1>
+          <p className="text-sm text-[#4A5568] mt-1">Executive Summary</p>
+        </div>
+        <img 
+          src={logoGaro} 
+          alt="경영지원그룹 이음" 
+          className="h-10 w-auto object-contain opacity-60 flex-shrink-0"
+        />
       </div>
 
       <div className="mb-8 bg-gradient-to-br from-teal-900/5 to-cyan-500/5 rounded-lg p-6 border border-cyan-500/20">

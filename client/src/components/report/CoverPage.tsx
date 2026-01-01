@@ -1,4 +1,5 @@
 import { Shield } from "lucide-react"
+import logoSquare from "@assets/logo_square_white-removebg-preview_1767271262627.png"
 
 interface CoverPageProps {
   businessName: string;
@@ -11,6 +12,14 @@ export function CoverPage({ businessName, reportDate, logo = "경영지원그룹
     <div className="relative h-[297mm] bg-white print:break-after-page overflow-hidden">
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-teal-800/[0.02] rounded-full -translate-y-1/2 translate-x-1/2"></div>
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-cyan-600/[0.03] rounded-full translate-y-1/2 -translate-x-1/2"></div>
+      
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <img 
+          src={logoSquare} 
+          alt="경영지원그룹 이음" 
+          className="w-48 h-48 object-contain opacity-10"
+        />
+      </div>
 
       <div className="relative h-full p-[25mm] flex flex-col justify-between">
         <div className="flex justify-between items-start">

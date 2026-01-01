@@ -1,4 +1,5 @@
 import { CheckCircle2, XCircle, Clock, FileText, AlertTriangle, Shield, Mail, Phone, User } from "lucide-react"
+import logoGaro from "@assets/logo_garo_white-removebg-preview_1767271262627.png"
 
 interface ConclusionPageProps {
   reportDate: string;
@@ -65,6 +66,11 @@ export function ConclusionPage({
           </div>
           <p className="text-teal-600 text-sm ml-5 tracking-wide">Conclusion & Recommendation</p>
         </div>
+        <img 
+          src={logoGaro} 
+          alt="경영지원그룹 이음" 
+          className="h-10 w-auto object-contain opacity-60 flex-shrink-0"
+        />
       </div>
 
       <div className="mb-6 flex-shrink-0">

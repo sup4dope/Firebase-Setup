@@ -1,5 +1,6 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts"
 import { AlertTriangle, CheckCircle, Shield } from "lucide-react"
+import logoGaro from "@assets/logo_garo_white-removebg-preview_1767271262627.png"
 
 interface DebtDistribution {
   name: string;
@@ -57,9 +58,16 @@ export function RiskAnalysisPage({
 
   return (
     <div className="w-[210mm] h-[297mm] bg-white shadow-lg p-[25mm] flex flex-col page-break">
-      <div className="border-b-2 border-cyan-500 pb-4 mb-6">
-        <h1 className="text-3xl font-bold text-teal-900">리스크 분석</h1>
-        <p className="text-sm text-[#4A5568] mt-1">Risk Analysis</p>
+      <div className="border-b-2 border-cyan-500 pb-4 mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-teal-900">리스크 분석</h1>
+          <p className="text-sm text-[#4A5568] mt-1">Risk Analysis</p>
+        </div>
+        <img 
+          src={logoGaro} 
+          alt="경영지원그룹 이음" 
+          className="h-10 w-auto object-contain opacity-60 flex-shrink-0"
+        />
       </div>
       <div className="mb-6 flex-shrink-0">
         <h2 className="text-base font-bold text-teal-900 mb-3 flex items-center gap-2">
