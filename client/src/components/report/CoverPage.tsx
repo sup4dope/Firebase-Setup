@@ -9,7 +9,7 @@ interface CoverPageProps {
 
 export function CoverPage({ businessName, reportDate, logo = "경영지원그룹 이음" }: CoverPageProps) {
   return (
-    <div className="relative h-[297mm] bg-white print:break-after-page overflow-hidden">
+    <div className="relative h-[297mm] !bg-white !text-black print:break-after-page overflow-hidden">
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-teal-800/[0.02] rounded-full -translate-y-1/2 translate-x-1/2"></div>
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-cyan-600/[0.03] rounded-full translate-y-1/2 -translate-x-1/2"></div>
       

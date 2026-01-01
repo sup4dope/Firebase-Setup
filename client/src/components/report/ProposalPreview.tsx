@@ -273,10 +273,10 @@ export function ProposalPreview({
 
         <div
           ref={printRef}
-          className="overflow-y-auto h-full bg-[#E8E9EB] print:bg-white print:overflow-visible"
+          className="overflow-y-auto h-full bg-[#E8E9EB] print:!bg-white print:overflow-visible force-light-mode"
           id="proposal-print-area"
         >
-          <div className="max-w-[210mm] mx-auto space-y-4 print:space-y-0 py-4 print:py-0">
+          <div className="max-w-[210mm] mx-auto space-y-4 print:space-y-0 py-4 print:py-0 force-light-mode">
             <CoverPage
               businessName={customer?.company_name || ""}
               reportDate={reportDate}

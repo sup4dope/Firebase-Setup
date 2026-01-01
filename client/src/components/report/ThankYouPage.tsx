@@ -2,7 +2,7 @@ import logoSquare from "@assets/logo_square_white-removebg-preview_1767271262627
 
 export function ThankYouPage() {
   return (
-    <div className="w-[210mm] h-[297mm] bg-white shadow-lg p-[25mm] flex flex-col items-center justify-center page-break relative overflow-hidden">
+    <div className="w-[210mm] h-[297mm] !bg-white !text-black shadow-lg p-[25mm] flex flex-col items-center justify-center page-break relative overflow-hidden">
       <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-cyan-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-teal-900/10 to-transparent rounded-full translate-y-1/2 -translate-x-1/2"></div>
       

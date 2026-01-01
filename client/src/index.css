@@ -321,6 +321,19 @@
   background: #6b7280;
 }
 
+/* ========== Force Light Mode for Proposal Pages ========== */
+.force-light-mode {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Reset dark mode variables for proposal pages */
+.force-light-mode,
+.force-light-mode * {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+}
+
 /* ========== Print Styles for Proposal Report ========== */
 @media print {
   @page {
@@ -328,11 +341,13 @@
     margin: 0;
   }
 
+  /* Force white background on everything */
   html, body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
-    background: white !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
   }
 
   /* Hide the main app content */
@@ -344,7 +359,8 @@
   body > [data-radix-portal] {
     display: block !important;
     position: static !important;
-    background: white !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
   }
 
   /* Hide dialog overlay */
@@ -365,7 +381,8 @@
     margin: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    background: white !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     overflow: visible !important;
   }
 
@@ -373,7 +390,8 @@
   #proposal-print-area {
     overflow: visible !important;
     height: auto !important;
-    background: white !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     padding: 0 !important;
   }
 
@@ -381,6 +399,15 @@
     max-width: none !important;
     padding: 0 !important;
     margin: 0 !important;
+    background: #ffffff !important;
+  }
+
+  /* Force white background on all proposal pages */
+  #proposal-print-area > div > div {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+    color: #000000 !important;
   }
 
   /* Hide header in print */
@@ -416,7 +443,7 @@
     display: block !important;
   }
 
-  /* Ensure shadows are preserved for pages */
+  /* Remove shadows for cleaner print */
   .shadow-lg,
   .shadow-xl,
   .shadow-2xl {
@@ -430,9 +457,10 @@
     break-inside: avoid !important;
   }
 
-  /* Ensure each page has white background */
-  #proposal-print-area > div > div {
-    background: white !important;
-    box-shadow: none !important;
+  /* Override dark mode in print */
+  .dark #proposal-print-area,
+  .dark #proposal-print-area * {
+    background-color: #ffffff !important;
+    color: #000000 !important;
   }
 }

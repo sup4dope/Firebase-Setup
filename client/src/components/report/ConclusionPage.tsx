@@ -57,7 +57,7 @@ export function ConclusionPage({
   ]
 
   return (
-    <div className="h-[297mm] bg-white p-[25mm] flex flex-col print:break-after-page">
+    <div className="h-[297mm] !bg-white !text-black p-[25mm] flex flex-col print:break-after-page">
       <div className="flex justify-between items-start mb-10 flex-shrink-0">
         <div className="space-y-3">
           <div className="flex items-center gap-4">

@@ -29,7 +29,7 @@ export function ExecutionAgencyPage({
   reportDate
 }: ExecutionAgencyPageProps) {
   return (
-    <div className="w-[210mm] h-[297mm] bg-white shadow-lg p-[25mm] flex flex-col page-break">
+    <div className="w-[210mm] h-[297mm] !bg-white !text-black shadow-lg p-[25mm] flex flex-col page-break">
       <div className="border-b-2 border-cyan-500 pb-4 mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-teal-900">예상 집행 기관 및 금액</h1>
