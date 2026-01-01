@@ -246,7 +246,10 @@ export function ProposalPreview({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] h-[95vh] p-0 overflow-hidden">
+      <DialogContent 
+        id="proposal-print-dialog"
+        className="max-w-[95vw] h-[95vh] p-0 overflow-hidden print:!bg-white"
+      >
         <div className="sticky top-0 z-50 bg-white dark:bg-gray-900 border-b px-4 py-3 flex items-center justify-between print:hidden">
           <h2 className="text-lg font-semibold text-teal-900 dark:text-white">
             제안서 미리보기 - {customer?.company_name || ""}

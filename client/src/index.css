@@ -348,28 +348,34 @@
     color-adjust: exact !important;
     margin: 0 !important;
     padding: 0 !important;
+    background: #ffffff !important;
   }
 
-  /* Hide the main app root */
-  body > #root {
+  /* STEP 1: Hide EVERYTHING at body level */
+  body > * {
     display: none !important;
   }
 
-  /* Hide dialog overlays */
+  /* STEP 2: Show only the portal that contains proposal dialog */
+  body > [data-radix-portal]:has(#proposal-print-dialog) {
+    display: block !important;
+    position: static !important;
+    background: #ffffff !important;
+  }
+
+  /* Hide all dialog overlays */
   [data-radix-dialog-overlay] {
     display: none !important;
   }
 
-  /* Keep radix portal visible but transparent */
-  body > [data-radix-portal] {
-    display: block !important;
-    position: static !important;
-    background: transparent !important;
+  /* Hide any dialog that is NOT the proposal dialog */
+  [data-radix-dialog-content]:not(#proposal-print-dialog) {
+    display: none !important;
   }
 
-  /* Make dialog content flow naturally for pagination */
-  [role="dialog"],
-  [data-radix-dialog-content] {
+  /* Style the proposal dialog for printing */
+  #proposal-print-dialog {
+    display: block !important;
     position: static !important;
     transform: none !important;
     width: 100% !important;
@@ -380,7 +386,7 @@
     margin: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    background: transparent !important;
+    background: #ffffff !important;
     overflow: visible !important;
   }
 
@@ -392,7 +398,7 @@
     overflow: visible !important;
     padding: 0 !important;
     margin: 0 !important;
-    background: transparent !important;
+    background: #ffffff !important;
   }
 
   #proposal-print-area > div {
@@ -400,7 +406,13 @@
     width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
-    background: transparent !important;
+    background: #ffffff !important;
+  }
+
+  /* Each proposal page should have white background */
+  #proposal-print-area > div > div {
+    background: #ffffff !important;
+    box-shadow: none !important;
   }
 
   /* Hide header in print */
