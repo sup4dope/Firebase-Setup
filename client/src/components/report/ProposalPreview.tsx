@@ -148,11 +148,34 @@ export function ProposalPreview({
   }
 
   const calculateTotalFunding = (): string => {
-    const total = agencies.reduce((sum, agency) => {
-      const amount = parseFloat(agency.limit.replace(/[^0-9.]/g, ''))
-      return sum + (isNaN(amount) ? 0 : amount)
+    const totalManWon = agencies.reduce((sum, agency) => {
+      const limitStr = agency.limit || ""
+      
+      const eokMatch = limitStr.match(/(\d+(?:,\d+)?)\s*억/)
+      const manMatch = limitStr.match(/(\d+(?:,\d+)?)\s*만원/)
+      
+      let amountInManWon = 0
+      
+      if (eokMatch) {
+        const eokValue = parseFloat(eokMatch[1].replace(/,/g, ""))
+        amountInManWon += eokValue * 10000
+      }
+      
+      if (manMatch) {
+        const manValue = parseFloat(manMatch[1].replace(/,/g, ""))
+        amountInManWon += manValue
+      }
+      
+      return sum + amountInManWon
     }, 0)
-    return `${total}억원`
+
+    if (totalManWon >= 10000) {
+      const eok = Math.floor(totalManWon / 10000)
+      const man = Math.round(totalManWon % 10000)
+      if (man === 0) return `${eok}억원`
+      return `${eok}억 ${man.toLocaleString()}만원`
+    }
+    return `${totalManWon.toLocaleString()}만원`
   }
 
   const getKeyFindings = (): string[] => {
