@@ -454,6 +454,8 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary, onGener
                           <Cell 
                             key={`inner-${index}`} 
                             fill={CHART_COLORS[index % CHART_COLORS.length]} 
+                            stroke="currentColor"
+                            className="text-card"
                           />
                         ))}
                       </Pie>
@@ -471,6 +473,8 @@ export function ReviewSummaryTab({ customer, obligations, creditSummary, onGener
                           <Cell 
                             key={`outer-${index}`} 
                             fill={entry.fill} 
+                            stroke="currentColor"
+                            className="text-card"
                           />
                         ))}
                       </Pie>
