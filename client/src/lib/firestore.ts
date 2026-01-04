@@ -921,7 +921,7 @@ const toDateString = (dateValue: Timestamp | Date | string | undefined): string 
   return null;
 };
 
-// 고객 데이터에서 정산 항목 자동 생성 (계약/집행 상태인 고객 대상)
+// 고객 데이터에서 정산 항목 자동 생성 및 업데이트 (계약/집행 상태인 고객 대상)
 export const syncCustomerSettlements = async (month: string, users: User[]): Promise<void> => {
   try {
     // 1. 모든 고객 가져오기
@@ -937,15 +937,12 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       } as Customer;
     });
 
-    // 2. 기존 정산 항목 가져오기 (중복 방지)
+    // 2. 기존 정산 항목 가져오기
     const existingSettlements = await getSettlementItems(month);
-    const existingCustomerIds = new Set(existingSettlements.map(s => s.customer_id));
+    const existingSettlementMap = new Map(existingSettlements.map(s => [s.customer_id, s]));
 
     // 3. 정산 대상 상태이고, 해당 월에 등록된 고객 필터링
     const targetCustomers = customers.filter(customer => {
-      // 이미 정산에 존재하면 건너뛰기
-      if (existingCustomerIds.has(customer.id)) return false;
-      
       // 정산 대상 상태인지 확인 (명시적 목록 또는 '계약'/'집행' 포함)
       const status = customer.status_code || '';
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
@@ -960,47 +957,95 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       return settlementMonth === month;
     });
 
-    // 4. 정산 항목 생성
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    // 4. 정산 항목 생성 또는 업데이트
     for (const customer of targetCustomers) {
       const manager = users.find(u => u.uid === customer.manager_id);
       const entrySource = (customer.entry_source || '기타') as EntrySourceType;
       const commissionRate = getCommissionRate(manager?.commissionRates, entrySource);
       const contractAmount = customer.deposit_amount || customer.contract_amount || 0;
       const executionAmount = customer.execution_amount || 0;
-      const feeRate = customer.contract_fee_rate || 3;
+      // 자문료율: contract_fee_rate 우선, 없으면 commission_rate (레거시), 기본값 3%
+      const feeRate = customer.contract_fee_rate || customer.commission_rate || 3;
       
       const calc = calculateSettlement(contractAmount, executionAmount, feeRate, commissionRate);
       
       // 정산일자: 계약도달일 우선, 없으면 등록일
       const contractDate = customer.contract_completion_date || customer.entry_date || '';
       
-      const settlementData: InsertSettlementItem = {
-        customer_id: customer.id,
-        customer_name: customer.company_name || customer.name,
-        manager_id: customer.manager_id,
-        manager_name: customer.manager_name || manager?.name || '',
-        team_id: customer.team_id,
-        team_name: customer.team_name || '',
-        entry_source: entrySource,
-        contract_amount: contractAmount,
-        execution_amount: executionAmount,
-        fee_rate: feeRate,
-        total_revenue: calc.totalRevenue,
-        commission_rate: commissionRate,
-        gross_commission: calc.grossCommission,
-        tax_amount: calc.taxAmount,
-        net_commission: calc.netCommission,
-        settlement_month: month,
-        contract_date: contractDate,
-        status: '정상',
-        is_clawback: false,
-      };
+      const existingSettlement = existingSettlementMap.get(customer.id);
       
-      await createSettlementItem(settlementData);
+      // 해당 고객의 활성(정상) 정산 항목 찾기
+      const activeSettlement = existingSettlement && 
+        existingSettlement.status === '정상' && 
+        !existingSettlement.is_clawback ? existingSettlement : null;
+      
+      if (activeSettlement) {
+        // 기존 활성 정산 항목이 있으면 업데이트
+        // 변경사항이 있는지 확인
+        const hasChanges = 
+          activeSettlement.contract_amount !== contractAmount ||
+          activeSettlement.execution_amount !== executionAmount ||
+          activeSettlement.fee_rate !== feeRate ||
+          activeSettlement.commission_rate !== commissionRate ||
+          activeSettlement.customer_name !== (customer.company_name || customer.name) ||
+          activeSettlement.manager_id !== customer.manager_id;
+        
+        if (hasChanges) {
+          await updateSettlementItem(activeSettlement.id, {
+            customer_name: customer.company_name || customer.name,
+            manager_id: customer.manager_id,
+            manager_name: customer.manager_name || manager?.name || '',
+            team_id: customer.team_id,
+            team_name: customer.team_name || '',
+            entry_source: entrySource,
+            contract_amount: contractAmount,
+            execution_amount: executionAmount,
+            fee_rate: feeRate,
+            total_revenue: calc.totalRevenue,
+            commission_rate: commissionRate,
+            gross_commission: calc.grossCommission,
+            tax_amount: calc.taxAmount,
+            net_commission: calc.netCommission,
+            contract_date: contractDate,
+          });
+          updatedCount++;
+        }
+      } else if (!existingSettlement) {
+        // 정산 항목이 전혀 없는 경우에만 신규 생성
+        // (취소/환수 항목이 있는 경우 중복 생성 방지)
+        // 신규 정산 항목 생성
+        const settlementData: InsertSettlementItem = {
+          customer_id: customer.id,
+          customer_name: customer.company_name || customer.name,
+          manager_id: customer.manager_id,
+          manager_name: customer.manager_name || manager?.name || '',
+          team_id: customer.team_id,
+          team_name: customer.team_name || '',
+          entry_source: entrySource,
+          contract_amount: contractAmount,
+          execution_amount: executionAmount,
+          fee_rate: feeRate,
+          total_revenue: calc.totalRevenue,
+          commission_rate: commissionRate,
+          gross_commission: calc.grossCommission,
+          tax_amount: calc.taxAmount,
+          net_commission: calc.netCommission,
+          settlement_month: month,
+          contract_date: contractDate,
+          status: '정상',
+          is_clawback: false,
+        };
+        
+        await createSettlementItem(settlementData);
+        createdCount++;
+      }
     }
     
-    if (targetCustomers.length > 0) {
-      console.log(`[Settlement Sync] ${targetCustomers.length}건의 정산 항목이 생성되었습니다.`);
+    if (createdCount > 0 || updatedCount > 0) {
+      console.log(`[Settlement Sync] 생성: ${createdCount}건, 업데이트: ${updatedCount}건`);
     }
   } catch (error) {
     console.error('Error syncing customer settlements:', error);
