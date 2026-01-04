@@ -144,7 +144,16 @@ export default function Settlements() {
   }, [items, users, selectedMonth, isSuperAdmin]);
 
   const totals = useMemo(() => {
-    return summaries.reduce(
+    // Calculate item-level totals for contract/execution amounts
+    const normalItems = items.filter(item => item.status === '정상' && !item.is_clawback);
+    const clawbackItems = items.filter(item => item.is_clawback);
+    
+    const contractAmount = normalItems.reduce((sum, item) => sum + item.contract_amount, 0);
+    const executionCount = normalItems.filter(item => item.execution_amount > 0).length;
+    const executionAmount = normalItems.reduce((sum, item) => sum + item.execution_amount, 0);
+    const clawbackContractAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(item.contract_amount), 0);
+    
+    const summaryTotals = summaries.reduce(
       (acc, s) => ({
         contracts: acc.contracts + s.total_contracts,
         revenue: acc.revenue + s.total_revenue,
@@ -166,15 +175,23 @@ export default function Settlements() {
         finalPayment: 0,
       }
     );
-  }, [summaries]);
+    
+    return {
+      ...summaryTotals,
+      contractAmount,
+      executionCount,
+      executionAmount,
+      clawbackContractAmount,
+    };
+  }, [summaries, items]);
 
   // Show loading skeleton while auth is still resolving
   if (authLoading) {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map(i => (
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
@@ -315,8 +332,8 @@ export default function Settlements() {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map(i => (
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
@@ -370,7 +387,7 @@ export default function Settlements() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card
           className="cursor-pointer hover-elevate"
           onClick={() => handleShowDetail('전체 계약 건', (item) => item.status === '정상')}
@@ -385,7 +402,29 @@ export default function Settlements() {
           <CardContent>
             <div className="text-2xl font-bold">{totals.contracts}건</div>
             <p className="text-xs text-muted-foreground mt-1">
-              총 수익: {totals.revenue.toLocaleString()}만원
+              총 계약금액: {totals.contractAmount.toLocaleString()}만원
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="cursor-pointer hover-elevate"
+          onClick={() => handleShowDetail('집행 완료 건', (item) => item.status === '정상' && item.execution_amount > 0)}
+          data-testid="card-execution"
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              집행 건수
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totals.executionCount}건</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              총 집행금액: {totals.executionAmount.toLocaleString()}만원
+            </p>
+            <p className="text-xs text-muted-foreground">
+              총 수익금액: {totals.revenue.toLocaleString()}만원
             </p>
           </CardContent>
         </Card>
@@ -405,9 +444,6 @@ export default function Settlements() {
             <div className="text-2xl font-bold text-green-600">
               {totals.grossCommission.toLocaleString()}만원
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              세금(3.3%): {totals.tax.toLocaleString()}만원
-            </p>
           </CardContent>
         </Card>
 
@@ -427,7 +463,7 @@ export default function Settlements() {
               -{totals.clawbackAmount.toLocaleString()}만원
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              환수 건수: {totals.clawbackCount}건
+              환수 건수: {totals.clawbackCount}건 / 환수 계약금액: {totals.clawbackContractAmount.toLocaleString()}만원
             </p>
           </CardContent>
         </Card>
@@ -448,7 +484,7 @@ export default function Settlements() {
               {totals.finalPayment.toLocaleString()}만원
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              세후 - 환수
+              공제세액: {totals.tax.toLocaleString()}만원
             </p>
           </CardContent>
         </Card>
