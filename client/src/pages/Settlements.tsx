@@ -396,7 +396,6 @@ export default function Settlements() {
           </Button>
         </div>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card
           className="cursor-pointer hover-elevate"
@@ -502,7 +501,6 @@ export default function Settlements() {
           </CardContent>
         </Card>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>직원별 정산 현황</CardTitle>
@@ -517,7 +515,7 @@ export default function Settlements() {
                   <TableHead className="text-right">계약 건수</TableHead>
                   <TableHead className="text-right">집행건수</TableHead>
                   <TableHead className="text-right">집행금액</TableHead>
-                  <TableHead className="text-right">총 수익금액</TableHead>
+                  <TableHead className="text-right">총 자문금액</TableHead>
                   <TableHead className="text-right">환수</TableHead>
                   <TableHead className="text-right">최종지급액(세후)</TableHead>
                 </TableRow>
@@ -564,7 +562,6 @@ export default function Settlements() {
           </ScrollArea>
         </CardContent>
       </Card>
-
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
         <DialogContent className="max-w-5xl max-h-[80vh]">
           <DialogHeader>
@@ -642,7 +639,6 @@ export default function Settlements() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
