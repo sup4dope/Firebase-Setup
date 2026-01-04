@@ -899,35 +899,65 @@ export const getCounselingLogs = async (): Promise<CounselingLog[]> => {
 
 // ========== 정산 관리 ==========
 
+// 정산 대상 상태 목록 (이 상태를 가진 고객은 정산에 포함)
+const SETTLEMENT_TARGET_STATUSES = [
+  '계약', '계약완료', '계약완료(선불)', '계약완료(후불)',
+  '집행', '집행완료', '집행대기', '집행중',
+];
+
+// 날짜를 YYYY-MM-DD 문자열로 변환하는 헬퍼 함수
+const toDateString = (dateValue: Timestamp | Date | string | undefined): string | null => {
+  if (!dateValue) return null;
+  
+  if (dateValue instanceof Timestamp) {
+    return dateValue.toDate().toISOString().slice(0, 10);
+  }
+  if (dateValue instanceof Date) {
+    return dateValue.toISOString().slice(0, 10);
+  }
+  if (typeof dateValue === 'string' && dateValue.length >= 10) {
+    return dateValue.slice(0, 10);
+  }
+  return null;
+};
+
 // 고객 데이터에서 정산 항목 자동 생성 (계약/집행 상태인 고객 대상)
 export const syncCustomerSettlements = async (month: string, users: User[]): Promise<void> => {
   try {
-    // 1. 해당 월에 계약 도달일(contract_completion_date)이 있는 고객 가져오기
+    // 1. 모든 고객 가져오기
     const customersSnapshot = await getDocs(collection(db, 'customers'));
-    const customers = customersSnapshot.docs.map(docSnap => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-    })) as Customer[];
+    const customers = customersSnapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        // 날짜 필드 정규화 (toDateString 헬퍼 사용)
+        entry_date: toDateString(data.entry_date) || undefined,
+        contract_completion_date: toDateString(data.contract_completion_date) || undefined,
+      } as Customer;
+    });
 
     // 2. 기존 정산 항목 가져오기 (중복 방지)
     const existingSettlements = await getSettlementItems(month);
     const existingCustomerIds = new Set(existingSettlements.map(s => s.customer_id));
 
-    // 3. 계약 또는 집행 상태이고, 계약도달일이 해당 월에 해당하는 고객 필터링
+    // 3. 정산 대상 상태이고, 해당 월에 등록된 고객 필터링
     const targetCustomers = customers.filter(customer => {
       // 이미 정산에 존재하면 건너뛰기
       if (existingCustomerIds.has(customer.id)) return false;
       
-      // 계약 또는 집행 상태인지 확인
-      const isContractStatus = customer.status_code === '계약' || customer.status_code === '집행';
-      if (!isContractStatus) return false;
+      // 정산 대상 상태인지 확인 (명시적 목록 또는 '계약'/'집행' 포함)
+      const status = customer.status_code || '';
+      const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
+        status.includes('계약') || status.includes('집행');
+      if (!isTargetStatus) return false;
       
-      // 계약도달일이 해당 월인지 확인
-      const contractDate = customer.contract_completion_date;
-      if (!contractDate) return false;
+      // 정산월 결정: 계약도달일 > 등록일 순서로 확인
+      const dateForSettlement = customer.contract_completion_date || customer.entry_date;
+      if (!dateForSettlement) return false;
       
-      const contractMonth = contractDate.slice(0, 7); // YYYY-MM 형식
-      return contractMonth === month;
+      const settlementMonth = dateForSettlement.slice(0, 7); // YYYY-MM 형식
+      return settlementMonth === month;
     });
 
     // 4. 정산 항목 생성
@@ -940,6 +970,9 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       const feeRate = customer.contract_fee_rate || 3;
       
       const calc = calculateSettlement(contractAmount, executionAmount, feeRate, commissionRate);
+      
+      // 정산일자: 계약도달일 우선, 없으면 등록일
+      const contractDate = customer.contract_completion_date || customer.entry_date || '';
       
       const settlementData: InsertSettlementItem = {
         customer_id: customer.id,
@@ -958,7 +991,7 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
         tax_amount: calc.taxAmount,
         net_commission: calc.netCommission,
         settlement_month: month,
-        contract_date: customer.contract_completion_date || '',
+        contract_date: contractDate,
         status: '정상',
         is_clawback: false,
       };
@@ -966,7 +999,9 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       await createSettlementItem(settlementData);
     }
     
-    console.log(`[Settlement Sync] ${targetCustomers.length}건의 정산 항목이 생성되었습니다.`);
+    if (targetCustomers.length > 0) {
+      console.log(`[Settlement Sync] ${targetCustomers.length}건의 정산 항목이 생성되었습니다.`);
+    }
   } catch (error) {
     console.error('Error syncing customer settlements:', error);
   }
