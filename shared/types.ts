@@ -321,3 +321,69 @@ export interface ProposalSummary {
 
 // Insert 타입
 export type InsertFinancialObligation = Omit<FinancialObligation, 'id' | 'created_at' | 'updated_at'>;
+
+// ========== 정산 관리 관련 타입 ==========
+
+// 정산 항목 상태
+export type SettlementStatus = '정상' | '취소' | '환수';
+
+// 유입경로 (수당률 결정에 사용)
+export type EntrySourceType = '광고' | '고객소개' | '승인복제' | '외주' | '기타';
+
+// 정산 항목 (개별 계약/집행 건)
+export interface SettlementItem {
+  id: string;
+  customer_id: string; // 고객 ID
+  customer_name: string; // 업체명
+  manager_id: string; // 담당 직원 ID
+  manager_name: string; // 담당 직원명
+  team_id: string; // 팀 ID
+  team_name?: string; // 팀명
+  
+  // 계약 정보
+  entry_source: EntrySourceType; // 유입경로
+  contract_amount: number; // 계약금 (만원)
+  execution_amount: number; // 집행금액 (만원)
+  fee_rate: number; // 자문료율 (%)
+  
+  // 수당 계산 결과
+  total_revenue: number; // 총수익 = 계약금 + (집행금액 * 자문료율%)
+  commission_rate: number; // 적용된 수당률 (%)
+  gross_commission: number; // 세전수당 (만원)
+  tax_amount: number; // 원천세 (3.3%)
+  net_commission: number; // 세후실지급액 (만원)
+  
+  // 정산 정보
+  settlement_month: string; // 정산월 (YYYY-MM)
+  contract_date: string; // 계약일 (YYYY-MM-DD)
+  status: SettlementStatus; // 정상/취소/환수
+  is_clawback: boolean; // 환수 항목 여부
+  original_item_id?: string; // 환수 시 원본 정산 항목 ID
+  
+  created_at: Date;
+  updated_at?: Date;
+}
+
+// 월별 정산 요약 (직원별)
+export interface MonthlySettlementSummary {
+  manager_id: string;
+  manager_name: string;
+  settlement_month: string; // YYYY-MM
+  
+  // 집계
+  total_contracts: number; // 총 계약 건수
+  total_revenue: number; // 총 수익 (만원)
+  total_gross_commission: number; // 총 세전수당 (만원)
+  total_tax: number; // 총 원천세 (만원)
+  total_net_commission: number; // 총 세후실지급액 (만원)
+  
+  // 환수
+  clawback_count: number; // 환수 건수
+  clawback_amount: number; // 환수 금액 (만원)
+  
+  // 최종
+  final_payment: number; // 최종 지급액 (세후 - 환수)
+}
+
+// Insert 타입
+export type InsertSettlementItem = Omit<SettlementItem, 'id' | 'created_at' | 'updated_at'>;
