@@ -33,6 +33,11 @@ import type {
   TodoItem,
   InsertTodoItem,
   CounselingLog,
+  SettlementItem,
+  InsertSettlementItem,
+  MonthlySettlementSummary,
+  EntrySourceType,
+  CommissionRates,
 } from '@shared/types';
 // STATUS_LABELS removed - using Korean status names directly
 
@@ -890,4 +895,166 @@ export const getCounselingLogs = async (): Promise<CounselingLog[]> => {
       created_at: data.created_at ? toDate(data.created_at) : new Date(),
     } as CounselingLog;
   });
+};
+
+// ========== 정산 관리 ==========
+
+// 정산 항목 조회 (월별)
+export const getSettlementItems = async (month?: string): Promise<SettlementItem[]> => {
+  let q;
+  if (month) {
+    q = query(
+      collection(db, 'settlements'),
+      where('settlement_month', '==', month),
+      orderBy('created_at', 'desc')
+    );
+  } else {
+    q = query(collection(db, 'settlements'), orderBy('created_at', 'desc'));
+  }
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      ...data,
+      created_at: data.created_at ? toDate(data.created_at) : new Date(),
+      updated_at: data.updated_at ? toDate(data.updated_at) : undefined,
+    } as SettlementItem;
+  });
+};
+
+// 정산 항목 생성
+export const createSettlementItem = async (data: InsertSettlementItem): Promise<SettlementItem> => {
+  const docRef = await addDoc(collection(db, 'settlements'), {
+    ...data,
+    created_at: Timestamp.now(),
+  });
+  return {
+    id: docRef.id,
+    ...data,
+    created_at: new Date(),
+  };
+};
+
+// 정산 항목 수정
+export const updateSettlementItem = async (id: string, data: Partial<SettlementItem>): Promise<void> => {
+  const updateData = { ...data, updated_at: Timestamp.now() };
+  delete (updateData as any).id;
+  delete (updateData as any).created_at;
+  await updateDoc(doc(db, 'settlements', id), updateData);
+};
+
+// 정산 항목 삭제
+export const deleteSettlementItem = async (id: string): Promise<void> => {
+  await deleteDoc(doc(db, 'settlements', id));
+};
+
+// 수당률 조회 (유입경로별)
+export const getCommissionRate = (rates: CommissionRates | undefined, entrySource: EntrySourceType): number => {
+  if (!rates) return 0;
+  switch (entrySource) {
+    case '광고':
+      return rates.ad || 0;
+    case '고객소개':
+      return rates.referral || 0;
+    case '승인복제':
+      return rates.reExecution || 0;
+    case '외주':
+      return rates.outsource || 0;
+    default:
+      return 0;
+  }
+};
+
+// 정산 계산
+export const calculateSettlement = (
+  contractAmount: number,
+  executionAmount: number,
+  feeRate: number,
+  commissionRate: number
+): { totalRevenue: number; grossCommission: number; taxAmount: number; netCommission: number } => {
+  const totalRevenue = contractAmount + (executionAmount * feeRate / 100);
+  const grossCommission = totalRevenue * commissionRate / 100;
+  const taxAmount = grossCommission * 0.033;
+  const netCommission = grossCommission * 0.967;
+  return {
+    totalRevenue: Math.round(totalRevenue * 100) / 100,
+    grossCommission: Math.round(grossCommission * 100) / 100,
+    taxAmount: Math.round(taxAmount * 100) / 100,
+    netCommission: Math.round(netCommission * 100) / 100,
+  };
+};
+
+// 월별 정산 요약 계산
+export const calculateMonthlySettlementSummary = (
+  items: SettlementItem[],
+  managerId: string,
+  managerName: string,
+  month: string
+): MonthlySettlementSummary => {
+  const managerItems = items.filter(item => item.manager_id === managerId && item.settlement_month === month);
+  
+  const normalItems = managerItems.filter(item => item.status === '정상');
+  const clawbackItems = managerItems.filter(item => item.is_clawback);
+  
+  const totalContracts = normalItems.length;
+  const totalRevenue = normalItems.reduce((sum, item) => sum + item.total_revenue, 0);
+  const totalGrossCommission = normalItems.reduce((sum, item) => sum + item.gross_commission, 0);
+  const totalTax = normalItems.reduce((sum, item) => sum + item.tax_amount, 0);
+  const totalNetCommission = normalItems.reduce((sum, item) => sum + item.net_commission, 0);
+  
+  const clawbackCount = clawbackItems.length;
+  const clawbackAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(item.net_commission), 0);
+  
+  const finalPayment = totalNetCommission - clawbackAmount;
+  
+  return {
+    manager_id: managerId,
+    manager_name: managerName,
+    settlement_month: month,
+    total_contracts: totalContracts,
+    total_revenue: Math.round(totalRevenue * 100) / 100,
+    total_gross_commission: Math.round(totalGrossCommission * 100) / 100,
+    total_tax: Math.round(totalTax * 100) / 100,
+    total_net_commission: Math.round(totalNetCommission * 100) / 100,
+    clawback_count: clawbackCount,
+    clawback_amount: Math.round(clawbackAmount * 100) / 100,
+    final_payment: Math.round(finalPayment * 100) / 100,
+  };
+};
+
+// 취소 처리 및 환수 생성
+export const cancelSettlementWithClawback = async (
+  item: SettlementItem,
+  currentMonth: string
+): Promise<SettlementItem | null> => {
+  await updateSettlementItem(item.id, { status: '취소' });
+  
+  if (item.settlement_month < currentMonth) {
+    const clawbackData: InsertSettlementItem = {
+      customer_id: item.customer_id,
+      customer_name: item.customer_name,
+      manager_id: item.manager_id,
+      manager_name: item.manager_name,
+      team_id: item.team_id,
+      team_name: item.team_name,
+      entry_source: item.entry_source,
+      contract_amount: 0,
+      execution_amount: 0,
+      fee_rate: 0,
+      total_revenue: -item.total_revenue,
+      commission_rate: item.commission_rate,
+      gross_commission: -item.gross_commission,
+      tax_amount: -item.tax_amount,
+      net_commission: -item.net_commission,
+      settlement_month: currentMonth,
+      contract_date: item.contract_date,
+      status: '환수',
+      is_clawback: true,
+      original_item_id: item.id,
+    };
+    return await createSettlementItem(clawbackData);
+  }
+  
+  return null;
 };

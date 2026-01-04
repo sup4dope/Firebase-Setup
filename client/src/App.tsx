@@ -17,6 +17,7 @@ import Teams from '@/pages/Teams';
 import Holidays from '@/pages/Holidays';
 import Settings from '@/pages/Settings';
 import Stats from '@/pages/Stats';
+import Settlements from '@/pages/Settlements';
 import NotFound from '@/pages/not-found';
 import {
   getTodos,
@@ -194,6 +195,7 @@ function AuthenticatedApp() {
               <Route path="/holidays" component={Holidays} />
               <Route path="/settings" component={Settings} />
               <Route path="/stats" component={Stats} />
+              <Route path="/settlements" component={Settlements} />
               <Route component={NotFound} />
             </Switch>
           </main>

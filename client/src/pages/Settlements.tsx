@@ -1,0 +1,707 @@
+import { useState, useEffect, useMemo } from 'react';
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Calculator,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  X,
+} from 'lucide-react';
+import {
+  getSettlementItems,
+  getUsers,
+  getCustomers,
+  calculateMonthlySettlementSummary,
+  cancelSettlementWithClawback,
+  createSettlementItem,
+  calculateSettlement,
+  getCommissionRate,
+} from '@/lib/firestore';
+import type {
+  SettlementItem,
+  MonthlySettlementSummary,
+  User,
+  Customer,
+  EntrySourceType,
+  InsertSettlementItem,
+} from '@shared/types';
+
+const ENTRY_SOURCES: EntrySourceType[] = ['광고', '고객소개', '승인복제', '외주', '기타'];
+
+export default function Settlements() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<SettlementItem[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailModalTitle, setDetailModalTitle] = useState('');
+  const [detailModalItems, setDetailModalItems] = useState<SettlementItem[]>([]);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+
+  const [newItem, setNewItem] = useState({
+    customer_id: '',
+    entry_source: '광고' as EntrySourceType,
+    contract_amount: 0,
+    execution_amount: 0,
+    fee_rate: 3,
+    contract_date: format(new Date(), 'yyyy-MM-dd'),
+  });
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [fetchedItems, fetchedUsers, fetchedCustomers] = await Promise.all([
+        getSettlementItems(selectedMonth),
+        getUsers(),
+        getCustomers(),
+      ]);
+      setItems(fetchedItems);
+      setUsers(fetchedUsers);
+      setCustomers(fetchedCustomers);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast({
+        title: '오류',
+        description: '데이터를 불러오는 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [selectedMonth]);
+
+  const summaries = useMemo(() => {
+    const managerIds = Array.from(new Set(items.map(item => item.manager_id)));
+    return managerIds.map(managerId => {
+      const manager = users.find(u => u.uid === managerId);
+      return calculateMonthlySettlementSummary(
+        items,
+        managerId,
+        manager?.name || '알 수 없음',
+        selectedMonth
+      );
+    });
+  }, [items, users, selectedMonth]);
+
+  const totals = useMemo(() => {
+    return summaries.reduce(
+      (acc, s) => ({
+        contracts: acc.contracts + s.total_contracts,
+        revenue: acc.revenue + s.total_revenue,
+        grossCommission: acc.grossCommission + s.total_gross_commission,
+        tax: acc.tax + s.total_tax,
+        netCommission: acc.netCommission + s.total_net_commission,
+        clawbackCount: acc.clawbackCount + s.clawback_count,
+        clawbackAmount: acc.clawbackAmount + s.clawback_amount,
+        finalPayment: acc.finalPayment + s.final_payment,
+      }),
+      {
+        contracts: 0,
+        revenue: 0,
+        grossCommission: 0,
+        tax: 0,
+        netCommission: 0,
+        clawbackCount: 0,
+        clawbackAmount: 0,
+        finalPayment: 0,
+      }
+    );
+  }, [summaries]);
+
+  const handleMonthChange = (direction: 'prev' | 'next') => {
+    const current = parseISO(`${selectedMonth}-01`);
+    const newDate = direction === 'prev'
+      ? new Date(current.getFullYear(), current.getMonth() - 1, 1)
+      : new Date(current.getFullYear(), current.getMonth() + 1, 1);
+    setSelectedMonth(format(newDate, 'yyyy-MM'));
+  };
+
+  const handleCancelItem = async (item: SettlementItem) => {
+    if (item.status !== '정상') {
+      toast({
+        title: '알림',
+        description: '이미 취소되었거나 환수된 항목입니다.',
+      });
+      return;
+    }
+
+    try {
+      const clawback = await cancelSettlementWithClawback(item, selectedMonth);
+      if (clawback) {
+        toast({
+          title: '환수 처리 완료',
+          description: `과거 정산 건이 취소되어 이번 달에 ${Math.abs(clawback.net_commission).toLocaleString()}만원 환수 항목이 생성되었습니다.`,
+        });
+      } else {
+        toast({
+          title: '취소 완료',
+          description: '당월 정산 건이 취소되었습니다.',
+        });
+      }
+      fetchData();
+    } catch (error) {
+      console.error('Error canceling item:', error);
+      toast({
+        title: '오류',
+        description: '취소 처리 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleShowDetail = (title: string, filterFn: (item: SettlementItem) => boolean) => {
+    setDetailModalTitle(title);
+    setDetailModalItems(items.filter(filterFn));
+    setDetailModalOpen(true);
+  };
+
+  const handleAddSettlement = async () => {
+    if (!newItem.customer_id) {
+      toast({
+        title: '알림',
+        description: '고객을 선택해주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const customer = customers.find(c => c.id === newItem.customer_id);
+    if (!customer) return;
+
+    const manager = users.find(u => u.uid === customer.manager_id);
+    const commissionRate = getCommissionRate(manager?.commissionRates, newItem.entry_source);
+    const calc = calculateSettlement(
+      newItem.contract_amount,
+      newItem.execution_amount,
+      newItem.fee_rate,
+      commissionRate
+    );
+
+    const settlementData: InsertSettlementItem = {
+      customer_id: customer.id,
+      customer_name: customer.company_name || customer.name,
+      manager_id: customer.manager_id,
+      manager_name: customer.manager_name || manager?.name || '',
+      team_id: customer.team_id,
+      team_name: customer.team_name,
+      entry_source: newItem.entry_source,
+      contract_amount: newItem.contract_amount,
+      execution_amount: newItem.execution_amount,
+      fee_rate: newItem.fee_rate,
+      total_revenue: calc.totalRevenue,
+      commission_rate: commissionRate,
+      gross_commission: calc.grossCommission,
+      tax_amount: calc.taxAmount,
+      net_commission: calc.netCommission,
+      settlement_month: selectedMonth,
+      contract_date: newItem.contract_date,
+      status: '정상',
+      is_clawback: false,
+    };
+
+    try {
+      await createSettlementItem(settlementData);
+      toast({
+        title: '성공',
+        description: '정산 항목이 추가되었습니다.',
+      });
+      setAddModalOpen(false);
+      setNewItem({
+        customer_id: '',
+        entry_source: '광고',
+        contract_amount: 0,
+        execution_amount: 0,
+        fee_rate: 3,
+        contract_date: format(new Date(), 'yyyy-MM-dd'),
+      });
+      fetchData();
+    } catch (error) {
+      console.error('Error adding settlement:', error);
+      toast({
+        title: '오류',
+        description: '정산 항목 추가 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => handleMonthChange('prev')}
+            data-testid="button-prev-month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-2xl font-bold" data-testid="text-selected-month">
+            {format(parseISO(`${selectedMonth}-01`), 'yyyy년 M월', { locale: ko })} 정산
+          </h1>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => handleMonthChange('next')}
+            data-testid="button-next-month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchData}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            새로고침
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setAddModalOpen(true)}
+            data-testid="button-add-settlement"
+          >
+            <Calculator className="h-4 w-4 mr-2" />
+            정산 추가
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card
+          className="cursor-pointer hover-elevate"
+          onClick={() => handleShowDetail('전체 계약 건', (item) => item.status === '정상')}
+          data-testid="card-total-contracts"
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              계약 건수
+            </CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totals.contracts}건</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              총 수익: {totals.revenue.toLocaleString()}만원
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="cursor-pointer hover-elevate"
+          onClick={() => handleShowDetail('세전 수당', (item) => item.status === '정상')}
+          data-testid="card-gross-commission"
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              세전수당 합계
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {totals.grossCommission.toLocaleString()}만원
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              세금(3.3%): {totals.tax.toLocaleString()}만원
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="cursor-pointer hover-elevate"
+          onClick={() => handleShowDetail('환수 항목', (item) => item.is_clawback)}
+          data-testid="card-clawback"
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              환수 금액
+            </CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              -{totals.clawbackAmount.toLocaleString()}만원
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              환수 건수: {totals.clawbackCount}건
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="cursor-pointer hover-elevate"
+          onClick={() => handleShowDetail('최종 지급', () => true)}
+          data-testid="card-final-payment"
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              최종 지급액
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {totals.finalPayment.toLocaleString()}만원
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              세후 - 환수
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>직원별 정산 현황</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[400px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>직원명</TableHead>
+                  <TableHead className="text-right">계약 건수</TableHead>
+                  <TableHead className="text-right">총 수익</TableHead>
+                  <TableHead className="text-right">세전수당</TableHead>
+                  <TableHead className="text-right">세금</TableHead>
+                  <TableHead className="text-right">세후지급</TableHead>
+                  <TableHead className="text-right">환수</TableHead>
+                  <TableHead className="text-right">최종지급</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summaries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      해당 월에 정산 데이터가 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  summaries.map((summary) => (
+                    <TableRow
+                      key={summary.manager_id}
+                      className="cursor-pointer"
+                      onDoubleClick={() => handleShowDetail(
+                        `${summary.manager_name} 정산 내역`,
+                        (item) => item.manager_id === summary.manager_id
+                      )}
+                      data-testid={`row-manager-${summary.manager_id}`}
+                    >
+                      <TableCell className="font-medium">{summary.manager_name}</TableCell>
+                      <TableCell className="text-right">{summary.total_contracts}건</TableCell>
+                      <TableCell className="text-right">{summary.total_revenue.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{summary.total_gross_commission.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {summary.total_tax.toLocaleString()}만원
+                      </TableCell>
+                      <TableCell className="text-right">{summary.total_net_commission.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right text-red-600">
+                        {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}만원` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-blue-600">
+                        {summary.final_payment.toLocaleString()}만원
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>상세 정산 내역</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[400px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>업체명</TableHead>
+                  <TableHead>담당자</TableHead>
+                  <TableHead>유입경로</TableHead>
+                  <TableHead className="text-right">계약금</TableHead>
+                  <TableHead className="text-right">집행금액</TableHead>
+                  <TableHead className="text-right">수당률</TableHead>
+                  <TableHead className="text-right">세전수당</TableHead>
+                  <TableHead className="text-right">실지급액</TableHead>
+                  <TableHead>상태</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                      해당 월에 정산 데이터가 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  items.map((item) => (
+                    <TableRow key={item.id} data-testid={`row-settlement-${item.id}`}>
+                      <TableCell className="font-medium">{item.customer_name}</TableCell>
+                      <TableCell>{item.manager_name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{item.entry_source}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{item.contract_amount.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{item.execution_amount.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{item.commission_rate}%</TableCell>
+                      <TableCell className="text-right">
+                        {item.is_clawback ? (
+                          <span className="text-red-600">{item.gross_commission.toLocaleString()}만원</span>
+                        ) : (
+                          `${item.gross_commission.toLocaleString()}만원`
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {item.is_clawback ? (
+                          <span className="text-red-600">{item.net_commission.toLocaleString()}만원</span>
+                        ) : (
+                          `${item.net_commission.toLocaleString()}만원`
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            item.status === '정상' ? 'default' :
+                            item.status === '취소' ? 'secondary' : 'destructive'
+                          }
+                        >
+                          {item.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {item.status === '정상' && !item.is_clawback && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleCancelItem(item)}
+                            data-testid={`button-cancel-${item.id}`}
+                          >
+                            <X className="h-4 w-4 text-red-500" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{detailModalTitle}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>업체명</TableHead>
+                  <TableHead>담당자</TableHead>
+                  <TableHead>유입경로</TableHead>
+                  <TableHead className="text-right">총수익</TableHead>
+                  <TableHead className="text-right">수당률</TableHead>
+                  <TableHead className="text-right">세전수당</TableHead>
+                  <TableHead className="text-right">실지급액</TableHead>
+                  <TableHead>상태</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detailModalItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.customer_name}</TableCell>
+                    <TableCell>{item.manager_name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{item.entry_source}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{item.total_revenue.toLocaleString()}만원</TableCell>
+                    <TableCell className="text-right">{item.commission_rate}%</TableCell>
+                    <TableCell className="text-right">
+                      <span className={item.is_clawback ? 'text-red-600' : ''}>
+                        {item.gross_commission.toLocaleString()}만원
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className={item.is_clawback ? 'text-red-600' : ''}>
+                        {item.net_commission.toLocaleString()}만원
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          item.status === '정상' ? 'default' :
+                          item.status === '취소' ? 'secondary' : 'destructive'
+                        }
+                      >
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>정산 항목 추가</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>고객 선택</Label>
+              <Select
+                value={newItem.customer_id}
+                onValueChange={(value) => setNewItem({ ...newItem, customer_id: value })}
+              >
+                <SelectTrigger data-testid="select-customer">
+                  <SelectValue placeholder="고객을 선택하세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.company_name || customer.name} ({customer.manager_name})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>유입경로</Label>
+              <Select
+                value={newItem.entry_source}
+                onValueChange={(value) => setNewItem({ ...newItem, entry_source: value as EntrySourceType })}
+              >
+                <SelectTrigger data-testid="select-entry-source">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENTRY_SOURCES.map((source) => (
+                    <SelectItem key={source} value={source}>
+                      {source}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>계약금 (만원)</Label>
+                <Input
+                  type="number"
+                  value={newItem.contract_amount}
+                  onChange={(e) => setNewItem({ ...newItem, contract_amount: Number(e.target.value) })}
+                  data-testid="input-contract-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>집행금액 (만원)</Label>
+                <Input
+                  type="number"
+                  value={newItem.execution_amount}
+                  onChange={(e) => setNewItem({ ...newItem, execution_amount: Number(e.target.value) })}
+                  data-testid="input-execution-amount"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>자문료율 (%)</Label>
+                <Input
+                  type="number"
+                  value={newItem.fee_rate}
+                  onChange={(e) => setNewItem({ ...newItem, fee_rate: Number(e.target.value) })}
+                  data-testid="input-fee-rate"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>계약일</Label>
+                <Input
+                  type="date"
+                  value={newItem.contract_date}
+                  onChange={(e) => setNewItem({ ...newItem, contract_date: e.target.value })}
+                  data-testid="input-contract-date"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setAddModalOpen(false)}>
+                취소
+              </Button>
+              <Button onClick={handleAddSettlement} data-testid="button-submit-settlement">
+                추가
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
