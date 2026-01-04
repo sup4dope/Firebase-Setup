@@ -1131,7 +1131,7 @@ export const calculateSettlement = (
   feeRate: number,
   commissionRate: number
 ): { totalRevenue: number; grossCommission: number; taxAmount: number; netCommission: number } => {
-  const totalRevenue = (executionAmount * feeRate / 100);
+  const totalRevenue = contractAmount + (executionAmount * feeRate / 100);
   const grossCommission = totalRevenue * commissionRate / 100;
   const taxAmount = grossCommission * 0.033;
   const netCommission = grossCommission * 0.967;

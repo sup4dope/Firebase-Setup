@@ -547,12 +547,7 @@ export default function Settlements() {
                       <TableCell className="text-right">{summary.total_contracts}건</TableCell>
                       <TableCell className="text-right">{summary.execution_count}건</TableCell>
                       <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm font-medium">{summary.total_revenue.toLocaleString()}만원</span>
-                          <span className="text-[10px] text-muted-foreground">(집행금액 × 자문료율)</span>
-                        </div>
-                      </TableCell>
+                      <TableCell className="text-right">{summary.total_revenue.toLocaleString()}만원</TableCell>
                       <TableCell className="text-right text-red-600">
                         {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}만원` : '-'}
                       </TableCell>
