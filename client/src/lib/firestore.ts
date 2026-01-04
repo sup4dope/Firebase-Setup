@@ -899,6 +899,79 @@ export const getCounselingLogs = async (): Promise<CounselingLog[]> => {
 
 // ========== 정산 관리 ==========
 
+// 고객 데이터에서 정산 항목 자동 생성 (계약/집행 상태인 고객 대상)
+export const syncCustomerSettlements = async (month: string, users: User[]): Promise<void> => {
+  try {
+    // 1. 해당 월에 계약 도달일(contract_completion_date)이 있는 고객 가져오기
+    const customersSnapshot = await getDocs(collection(db, 'customers'));
+    const customers = customersSnapshot.docs.map(docSnap => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    })) as Customer[];
+
+    // 2. 기존 정산 항목 가져오기 (중복 방지)
+    const existingSettlements = await getSettlementItems(month);
+    const existingCustomerIds = new Set(existingSettlements.map(s => s.customer_id));
+
+    // 3. 계약 또는 집행 상태이고, 계약도달일이 해당 월에 해당하는 고객 필터링
+    const targetCustomers = customers.filter(customer => {
+      // 이미 정산에 존재하면 건너뛰기
+      if (existingCustomerIds.has(customer.id)) return false;
+      
+      // 계약 또는 집행 상태인지 확인
+      const isContractStatus = customer.status_code === '계약' || customer.status_code === '집행';
+      if (!isContractStatus) return false;
+      
+      // 계약도달일이 해당 월인지 확인
+      const contractDate = customer.contract_completion_date;
+      if (!contractDate) return false;
+      
+      const contractMonth = contractDate.slice(0, 7); // YYYY-MM 형식
+      return contractMonth === month;
+    });
+
+    // 4. 정산 항목 생성
+    for (const customer of targetCustomers) {
+      const manager = users.find(u => u.uid === customer.manager_id);
+      const entrySource = (customer.entry_source || '기타') as EntrySourceType;
+      const commissionRate = getCommissionRate(manager?.commissionRates, entrySource);
+      const contractAmount = customer.deposit_amount || customer.contract_amount || 0;
+      const executionAmount = customer.execution_amount || 0;
+      const feeRate = customer.contract_fee_rate || 3;
+      
+      const calc = calculateSettlement(contractAmount, executionAmount, feeRate, commissionRate);
+      
+      const settlementData: InsertSettlementItem = {
+        customer_id: customer.id,
+        customer_name: customer.company_name || customer.name,
+        manager_id: customer.manager_id,
+        manager_name: customer.manager_name || manager?.name || '',
+        team_id: customer.team_id,
+        team_name: customer.team_name || '',
+        entry_source: entrySource,
+        contract_amount: contractAmount,
+        execution_amount: executionAmount,
+        fee_rate: feeRate,
+        total_revenue: calc.totalRevenue,
+        commission_rate: commissionRate,
+        gross_commission: calc.grossCommission,
+        tax_amount: calc.taxAmount,
+        net_commission: calc.netCommission,
+        settlement_month: month,
+        contract_date: customer.contract_completion_date || '',
+        status: '정상',
+        is_clawback: false,
+      };
+      
+      await createSettlementItem(settlementData);
+    }
+    
+    console.log(`[Settlement Sync] ${targetCustomers.length}건의 정산 항목이 생성되었습니다.`);
+  } catch (error) {
+    console.error('Error syncing customer settlements:', error);
+  }
+};
+
 // 정산 항목 조회 (월별)
 export const getSettlementItems = async (month?: string): Promise<SettlementItem[]> => {
   try {

@@ -53,6 +53,7 @@ import {
   createSettlementItem,
   calculateSettlement,
   getCommissionRate,
+  syncCustomerSettlements,
 } from '@/lib/firestore';
 import type {
   SettlementItem,
@@ -103,13 +104,19 @@ export default function Settlements() {
     if (!isSuperAdmin || authLoading) return;
     setDataLoading(true);
     try {
-      const [fetchedItems, fetchedUsers, fetchedCustomers] = await Promise.all([
+      // 먼저 사용자 목록 가져오기 (동기화에 필요)
+      const fetchedUsers = await getUsers();
+      setUsers(fetchedUsers);
+      
+      // 고객 데이터에서 계약/집행 상태인 항목 자동 동기화
+      await syncCustomerSettlements(selectedMonth, fetchedUsers);
+      
+      // 동기화 후 정산 항목 및 고객 목록 가져오기
+      const [fetchedItems, fetchedCustomers] = await Promise.all([
         getSettlementItems(selectedMonth),
-        getUsers(),
         getCustomers(),
       ]);
       setItems(fetchedItems);
-      setUsers(fetchedUsers);
       setCustomers(fetchedCustomers);
     } catch (error) {
       console.error('Error fetching data:', error);
