@@ -523,14 +523,18 @@ export default function Settlements() {
                   summaries.map((summary) => (
                     <TableRow
                       key={summary.manager_id}
-                      className="cursor-pointer"
-                      onDoubleClick={() => handleShowDetail(
-                        `${summary.manager_name} 정산 내역`,
-                        (item) => item.manager_id === summary.manager_id
-                      )}
                       data-testid={`row-manager-${summary.manager_id}`}
                     >
-                      <TableCell className="font-medium">{summary.manager_name}</TableCell>
+                      <TableCell 
+                        className="font-medium cursor-pointer hover:underline"
+                        onDoubleClick={() => handleShowDetail(
+                          `${summary.manager_name} 정산 내역`,
+                          (item) => item.manager_id === summary.manager_id && item.settlement_month === selectedMonth
+                        )}
+                        data-testid={`cell-manager-name-${summary.manager_id}`}
+                      >
+                        {summary.manager_name}
+                      </TableCell>
                       <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}만원</TableCell>
                       <TableCell className="text-right">{summary.total_contracts}건</TableCell>
                       <TableCell className="text-right">{summary.execution_count}건</TableCell>
@@ -551,17 +555,16 @@ export default function Settlements() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>상세 정산 내역</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[400px]">
+      <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+        <DialogContent className="max-w-5xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{detailModalTitle}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh]">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>업체명</TableHead>
-                  <TableHead>담당자</TableHead>
                   <TableHead>유입경로</TableHead>
                   <TableHead className="text-right">계약금</TableHead>
                   <TableHead className="text-right">집행금액</TableHead>
@@ -573,17 +576,16 @@ export default function Settlements() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.length === 0 ? (
+                {detailModalItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                      해당 월에 정산 데이터가 없습니다.
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                      정산 데이터가 없습니다.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  items.map((item) => (
-                    <TableRow key={item.id} data-testid={`row-settlement-${item.id}`}>
+                  detailModalItems.map((item) => (
+                    <TableRow key={item.id} data-testid={`modal-row-settlement-${item.id}`}>
                       <TableCell className="font-medium">{item.customer_name}</TableCell>
-                      <TableCell>{item.manager_name}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{item.entry_source}</Badge>
                       </TableCell>
@@ -591,18 +593,14 @@ export default function Settlements() {
                       <TableCell className="text-right">{item.execution_amount.toLocaleString()}만원</TableCell>
                       <TableCell className="text-right">{item.commission_rate}%</TableCell>
                       <TableCell className="text-right">
-                        {item.is_clawback ? (
-                          <span className="text-red-600">{item.gross_commission.toLocaleString()}만원</span>
-                        ) : (
-                          `${item.gross_commission.toLocaleString()}만원`
-                        )}
+                        <span className={item.is_clawback ? 'text-red-600' : ''}>
+                          {item.gross_commission.toLocaleString()}만원
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        {item.is_clawback ? (
-                          <span className="text-red-600">{item.net_commission.toLocaleString()}만원</span>
-                        ) : (
-                          `${item.net_commission.toLocaleString()}만원`
-                        )}
+                        <span className={item.is_clawback ? 'text-red-600' : ''}>
+                          {item.net_commission.toLocaleString()}만원
+                        </span>
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -620,7 +618,7 @@ export default function Settlements() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleCancelItem(item)}
-                            data-testid={`button-cancel-${item.id}`}
+                            data-testid={`modal-button-cancel-${item.id}`}
                           >
                             <X className="h-4 w-4 text-red-500" />
                           </Button>
@@ -629,63 +627,6 @@ export default function Settlements() {
                     </TableRow>
                   ))
                 )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>{detailModalTitle}</DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="h-[60vh]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>업체명</TableHead>
-                  <TableHead>담당자</TableHead>
-                  <TableHead>유입경로</TableHead>
-                  <TableHead className="text-right">총수익</TableHead>
-                  <TableHead className="text-right">수당률</TableHead>
-                  <TableHead className="text-right">세전수당</TableHead>
-                  <TableHead className="text-right">실지급액</TableHead>
-                  <TableHead>상태</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {detailModalItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.customer_name}</TableCell>
-                    <TableCell>{item.manager_name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{item.entry_source}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{item.total_revenue.toLocaleString()}만원</TableCell>
-                    <TableCell className="text-right">{item.commission_rate}%</TableCell>
-                    <TableCell className="text-right">
-                      <span className={item.is_clawback ? 'text-red-600' : ''}>
-                        {item.gross_commission.toLocaleString()}만원
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className={item.is_clawback ? 'text-red-600' : ''}>
-                        {item.net_commission.toLocaleString()}만원
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          item.status === '정상' ? 'default' :
-                          item.status === '취소' ? 'secondary' : 'destructive'
-                        }
-                      >
-                        {item.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
               </TableBody>
             </Table>
           </ScrollArea>
