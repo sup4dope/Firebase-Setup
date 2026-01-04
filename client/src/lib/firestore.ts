@@ -1160,6 +1160,10 @@ export const calculateMonthlySettlementSummary = (
   const executionCount = normalItems.filter(item => item.execution_amount > 0).length;
   const totalExecutionAmount = normalItems.reduce((sum, item) => sum + item.execution_amount, 0);
   const totalRevenue = normalItems.reduce((sum, item) => sum + item.total_revenue, 0);
+  // 총 자문금액 = 집행금액 × 자문료율% × 수당률%
+  const totalExecutionFee = normalItems.reduce((sum, item) => {
+    return sum + (item.execution_amount * (item.fee_rate / 100) * (item.commission_rate / 100));
+  }, 0);
   const totalGrossCommission = normalItems.reduce((sum, item) => sum + item.gross_commission, 0);
   const totalTax = normalItems.reduce((sum, item) => sum + item.tax_amount, 0);
   const totalNetCommission = normalItems.reduce((sum, item) => sum + item.net_commission, 0);
@@ -1178,6 +1182,7 @@ export const calculateMonthlySettlementSummary = (
     execution_count: executionCount,
     total_execution_amount: Math.round(totalExecutionAmount * 100) / 100,
     total_revenue: Math.round(totalRevenue * 100) / 100,
+    total_execution_fee: Math.round(totalExecutionFee * 100) / 100,
     total_gross_commission: Math.round(totalGrossCommission * 100) / 100,
     total_tax: Math.round(totalTax * 100) / 100,
     total_net_commission: Math.round(totalNetCommission * 100) / 100,

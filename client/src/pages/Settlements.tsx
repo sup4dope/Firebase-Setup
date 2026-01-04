@@ -163,7 +163,7 @@ export default function Settlements() {
     const summaryTotals = summaries.reduce(
       (acc, s) => ({
         contracts: acc.contracts + s.total_contracts,
-        revenue: acc.revenue + s.total_revenue,
+        executionFee: acc.executionFee + s.total_execution_fee,
         grossCommission: acc.grossCommission + s.total_gross_commission,
         tax: acc.tax + s.total_tax,
         netCommission: acc.netCommission + s.total_net_commission,
@@ -173,7 +173,7 @@ export default function Settlements() {
       }),
       {
         contracts: 0,
-        revenue: 0,
+        executionFee: 0,
         grossCommission: 0,
         tax: 0,
         netCommission: 0,
@@ -433,7 +433,7 @@ export default function Settlements() {
               총 집행금액: {totals.executionAmount.toLocaleString()}만원
             </p>
             <p className="text-xs text-muted-foreground">
-              총 수익금액: {totals.revenue.toLocaleString()}만원
+              총 자문금액: {(totals.executionFee || 0).toLocaleString()}만원
             </p>
           </CardContent>
         </Card>
@@ -547,7 +547,7 @@ export default function Settlements() {
                       <TableCell className="text-right">{summary.total_contracts}건</TableCell>
                       <TableCell className="text-right">{summary.execution_count}건</TableCell>
                       <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right">{summary.total_revenue.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}만원</TableCell>
                       <TableCell className="text-right text-red-600">
                         {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}만원` : '-'}
                       </TableCell>
