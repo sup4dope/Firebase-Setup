@@ -430,8 +430,7 @@ export default function Settlements() {
         </Card>
 
         <Card
-          className="cursor-pointer hover-elevate"
-          onClick={() => handleShowDetail('세전 수당', (item) => item.status === '정상')}
+          className="no-default-hover-elevate"
           data-testid="card-gross-commission"
         >
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
@@ -469,8 +468,7 @@ export default function Settlements() {
         </Card>
 
         <Card
-          className="cursor-pointer hover-elevate"
-          onClick={() => handleShowDetail('최종 지급', () => true)}
+          className="no-default-hover-elevate"
           data-testid="card-final-payment"
         >
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
