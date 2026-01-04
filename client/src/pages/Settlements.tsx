@@ -280,6 +280,9 @@ export default function Settlements() {
       commissionRate
     );
 
+    // 계약일 기준으로 정산월 자동 설정
+    const contractDateMonth = newItem.contract_date.slice(0, 7); // YYYY-MM 형식 추출
+
     const settlementData: InsertSettlementItem = {
       customer_id: customer.id,
       customer_name: customer.company_name || customer.name,
@@ -296,7 +299,7 @@ export default function Settlements() {
       gross_commission: calc.grossCommission,
       tax_amount: calc.taxAmount,
       net_commission: calc.netCommission,
-      settlement_month: selectedMonth,
+      settlement_month: contractDateMonth,
       contract_date: newItem.contract_date,
       status: '정상',
       is_clawback: false,
