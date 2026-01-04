@@ -516,6 +516,7 @@ export default function Settlements() {
                   <TableHead className="text-right">집행건수</TableHead>
                   <TableHead className="text-right">집행금액</TableHead>
                   <TableHead className="text-right">총 자문금액</TableHead>
+                  <TableHead className="text-right">총 수익금액</TableHead>
                   <TableHead className="text-right">환수</TableHead>
                   <TableHead className="text-right">최종지급액(세후)</TableHead>
                 </TableRow>
@@ -523,7 +524,7 @@ export default function Settlements() {
               <TableBody>
                 {summaries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       해당 월에 정산 데이터가 없습니다.
                     </TableCell>
                   </TableRow>
@@ -548,6 +549,7 @@ export default function Settlements() {
                       <TableCell className="text-right">{summary.execution_count}건</TableCell>
                       <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}만원</TableCell>
                       <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right font-medium">{(summary.total_contract_amount + (summary.total_execution_fee || 0)).toLocaleString()}만원</TableCell>
                       <TableCell className="text-right text-red-600">
                         {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}만원` : '-'}
                       </TableCell>
