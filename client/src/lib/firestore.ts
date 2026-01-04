@@ -901,26 +901,31 @@ export const getCounselingLogs = async (): Promise<CounselingLog[]> => {
 
 // 정산 항목 조회 (월별)
 export const getSettlementItems = async (month?: string): Promise<SettlementItem[]> => {
-  let q;
-  if (month) {
-    q = query(
-      collection(db, 'settlements'),
-      where('settlement_month', '==', month),
-      orderBy('created_at', 'desc')
-    );
-  } else {
-    q = query(collection(db, 'settlements'), orderBy('created_at', 'desc'));
+  try {
+    let q;
+    if (month) {
+      q = query(
+        collection(db, 'settlements'),
+        where('settlement_month', '==', month)
+      );
+    } else {
+      q = query(collection(db, 'settlements'));
+    }
+    const snapshot = await getDocs(q);
+    const items = snapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        created_at: data.created_at ? toDate(data.created_at) : new Date(),
+        updated_at: data.updated_at ? toDate(data.updated_at) : undefined,
+      } as SettlementItem;
+    });
+    return items.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+  } catch (error) {
+    console.error('Error fetching settlement items:', error);
+    return [];
   }
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(docSnap => {
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      ...data,
-      created_at: data.created_at ? toDate(data.created_at) : new Date(),
-      updated_at: data.updated_at ? toDate(data.updated_at) : undefined,
-    } as SettlementItem;
-  });
 };
 
 // 정산 항목 생성

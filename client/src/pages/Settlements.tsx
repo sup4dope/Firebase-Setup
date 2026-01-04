@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { useLocation } from 'wouter';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +42,7 @@ import {
   ChevronRight,
   RefreshCw,
   X,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   getSettlementItems,
@@ -63,8 +66,10 @@ import type {
 const ENTRY_SOURCES: EntrySourceType[] = ['광고', '고객소개', '승인복제', '외주', '기타'];
 
 export default function Settlements() {
+  const { isSuperAdmin, loading: authLoading } = useAuth();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [items, setItems] = useState<SettlementItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -83,8 +88,20 @@ export default function Settlements() {
     contract_date: format(new Date(), 'yyyy-MM-dd'),
   });
 
+  useEffect(() => {
+    if (!authLoading && !isSuperAdmin) {
+      toast({
+        title: '접근 권한 없음',
+        description: '이 페이지는 관리자만 접근할 수 있습니다.',
+        variant: 'destructive',
+      });
+      setLocation('/');
+    }
+  }, [isSuperAdmin, authLoading, setLocation, toast]);
+
   const fetchData = async () => {
-    setLoading(true);
+    if (!isSuperAdmin || authLoading) return;
+    setDataLoading(true);
     try {
       const [fetchedItems, fetchedUsers, fetchedCustomers] = await Promise.all([
         getSettlementItems(selectedMonth),
@@ -102,15 +119,18 @@ export default function Settlements() {
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, [selectedMonth]);
+    if (isSuperAdmin && !authLoading) {
+      fetchData();
+    }
+  }, [selectedMonth, isSuperAdmin, authLoading]);
 
   const summaries = useMemo(() => {
+    if (!isSuperAdmin) return [];
     const managerIds = Array.from(new Set(items.map(item => item.manager_id)));
     return managerIds.map(managerId => {
       const manager = users.find(u => u.uid === managerId);
@@ -121,7 +141,7 @@ export default function Settlements() {
         selectedMonth
       );
     });
-  }, [items, users, selectedMonth]);
+  }, [items, users, selectedMonth, isSuperAdmin]);
 
   const totals = useMemo(() => {
     return summaries.reduce(
@@ -147,6 +167,32 @@ export default function Settlements() {
       }
     );
   }, [summaries]);
+
+  // Show loading skeleton while auth is still resolving
+  if (authLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  // Only check authorization after auth loading is complete
+  if (!isSuperAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+        <h1 className="text-2xl font-bold mb-2">접근 권한 없음</h1>
+        <p className="text-muted-foreground">이 페이지는 관리자만 접근할 수 있습니다.</p>
+      </div>
+    );
+  }
 
   const handleMonthChange = (direction: 'prev' | 'next') => {
     const current = parseISO(`${selectedMonth}-01`);
@@ -265,7 +311,7 @@ export default function Settlements() {
     }
   };
 
-  if (loading) {
+  if (dataLoading) {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-10 w-64" />
