@@ -461,9 +461,14 @@ export default function Settlements() {
             <div className="text-2xl font-bold text-red-600">
               -{totals.clawbackAmount.toLocaleString()}만원
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              환수 건수: {totals.clawbackCount}건 / 환수 계약금액: {totals.clawbackContractAmount.toLocaleString()}만원
-            </p>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">
+                환수 건수: {totals.clawbackCount}건
+              </p>
+              <p className="text-xs text-muted-foreground">
+                환수 계약금액: {totals.clawbackContractAmount.toLocaleString()}만원
+              </p>
+            </div>
           </CardContent>
         </Card>
 
