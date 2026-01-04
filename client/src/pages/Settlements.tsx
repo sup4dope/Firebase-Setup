@@ -503,13 +503,13 @@ export default function Settlements() {
               <TableHeader>
                 <TableRow>
                   <TableHead>직원명</TableHead>
+                  <TableHead className="text-right">총 계약금</TableHead>
                   <TableHead className="text-right">계약 건수</TableHead>
-                  <TableHead className="text-right">총 수익</TableHead>
-                  <TableHead className="text-right">세전수당</TableHead>
-                  <TableHead className="text-right">세금</TableHead>
-                  <TableHead className="text-right">세후지급</TableHead>
+                  <TableHead className="text-right">집행건수</TableHead>
+                  <TableHead className="text-right">집행금액</TableHead>
+                  <TableHead className="text-right">총 수익금액</TableHead>
                   <TableHead className="text-right">환수</TableHead>
-                  <TableHead className="text-right">최종지급</TableHead>
+                  <TableHead className="text-right">최종지급액(세후)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -531,13 +531,11 @@ export default function Settlements() {
                       data-testid={`row-manager-${summary.manager_id}`}
                     >
                       <TableCell className="font-medium">{summary.manager_name}</TableCell>
+                      <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}만원</TableCell>
                       <TableCell className="text-right">{summary.total_contracts}건</TableCell>
+                      <TableCell className="text-right">{summary.execution_count}건</TableCell>
+                      <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}만원</TableCell>
                       <TableCell className="text-right">{summary.total_revenue.toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right">{summary.total_gross_commission.toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {summary.total_tax.toLocaleString()}만원
-                      </TableCell>
-                      <TableCell className="text-right">{summary.total_net_commission.toLocaleString()}만원</TableCell>
                       <TableCell className="text-right text-red-600">
                         {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}만원` : '-'}
                       </TableCell>

@@ -1003,6 +1003,9 @@ export const calculateMonthlySettlementSummary = (
   const clawbackItems = managerItems.filter(item => item.is_clawback);
   
   const totalContracts = normalItems.length;
+  const totalContractAmount = normalItems.reduce((sum, item) => sum + item.contract_amount, 0);
+  const executionCount = normalItems.filter(item => item.execution_amount > 0).length;
+  const totalExecutionAmount = normalItems.reduce((sum, item) => sum + item.execution_amount, 0);
   const totalRevenue = normalItems.reduce((sum, item) => sum + item.total_revenue, 0);
   const totalGrossCommission = normalItems.reduce((sum, item) => sum + item.gross_commission, 0);
   const totalTax = normalItems.reduce((sum, item) => sum + item.tax_amount, 0);
@@ -1018,6 +1021,9 @@ export const calculateMonthlySettlementSummary = (
     manager_name: managerName,
     settlement_month: month,
     total_contracts: totalContracts,
+    total_contract_amount: Math.round(totalContractAmount * 100) / 100,
+    execution_count: executionCount,
+    total_execution_amount: Math.round(totalExecutionAmount * 100) / 100,
     total_revenue: Math.round(totalRevenue * 100) / 100,
     total_gross_commission: Math.round(totalGrossCommission * 100) / 100,
     total_tax: Math.round(totalTax * 100) / 100,

@@ -372,6 +372,9 @@ export interface MonthlySettlementSummary {
   
   // 집계
   total_contracts: number; // 총 계약 건수
+  total_contract_amount: number; // 총 계약금액 (만원)
+  execution_count: number; // 집행 건수
+  total_execution_amount: number; // 총 집행금액 (만원)
   total_revenue: number; // 총 수익 (만원)
   total_gross_commission: number; // 총 세전수당 (만원)
   total_tax: number; // 총 원천세 (만원)
