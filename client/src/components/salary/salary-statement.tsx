@@ -1,5 +1,6 @@
 import { User, Calendar, FileText, Percent, DollarSign } from "lucide-react"
 import companyLogoImg from "@assets/logo_garo_white-removebg-preview_1767617360074.png"
+import signatureImg from "@assets/yieum_signature_1767618936284.png"
 
 interface SalaryItem {
   category: string
@@ -61,15 +62,20 @@ export function SalaryStatement({
             <p className="text-xs text-teal-600 tracking-wide">Salary Statement (Freelance)</p>
           </div>
           <div className="flex items-start gap-6">
-            <div className="text-right bg-teal-900 rounded-md px-3 py-2">
-              <img src={companyLogoImg} alt="Company Logo" className="h-10 object-contain" />
+            <div className="text-right">
+              <img src={companyLogoImg} alt="Company Logo" className="h-12 object-contain" />
             </div>
-            <div className="text-center border-l-2 border-teal-200 pl-6">
+            <div className="text-center border-l-2 border-teal-200 pl-6 relative">
               <div className="text-[10px] text-[#4A5568] mb-1">{approverPosition}</div>
               <div className="text-base font-bold text-teal-900 border-b-2 border-teal-900 pb-1 px-2">
                 {approverName}
               </div>
               <div className="text-[9px] text-[#4A5568] mt-0.5">(인)</div>
+              <img 
+                src={signatureImg} 
+                alt="Signature" 
+                className="absolute -right-2 top-1/2 -translate-y-1/2 h-14 w-14 object-contain opacity-80" 
+              />
             </div>
           </div>
         </div>
