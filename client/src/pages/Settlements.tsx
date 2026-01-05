@@ -425,43 +425,7 @@ export default function Settlements() {
   };
 
   const handlePrintSalaryStatement = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast({
-        title: '팝업 차단',
-        description: '팝업이 차단되었습니다. 팝업을 허용해 주세요.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    const salaryElement = document.getElementById('salary-statement-container');
-    if (!salaryElement) return;
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>급여명세서 - ${salaryData?.employeeName}</title>
-          <link rel="stylesheet" href="/src/index.css">
-          <style>
-            @media print {
-              body { margin: 0; padding: 0; }
-              @page { size: A4; margin: 0; }
-            }
-            body { font-family: 'Inter', sans-serif; }
-          </style>
-        </head>
-        <body>
-          ${salaryElement.innerHTML}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
+    window.print();
   };
 
   if (dataLoading) {
@@ -942,7 +906,7 @@ export default function Settlements() {
               data-testid="button-print-salary"
             >
               <FileDown className="h-4 w-4 mr-2" />
-              인쇄 / PDF 저장
+              PDF 저장
             </Button>
           </DialogHeader>
           <div id="salary-statement-container" className="bg-[#E8E9EB] p-4 rounded-lg">
