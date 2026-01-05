@@ -565,19 +565,23 @@ export default function Settlements() {
         </CardContent>
       </Card>
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-5xl max-h-[80vh]">
+        <DialogContent className="max-w-[95vw] max-h-[85vh]">
           <DialogHeader>
             <DialogTitle>{detailModalTitle}</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="h-[60vh]">
+          <ScrollArea className="h-[70vh]">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>업체명</TableHead>
+                  <TableHead>수당일자</TableHead>
                   <TableHead>유입경로</TableHead>
+                  <TableHead>고유번호</TableHead>
+                  <TableHead>고객명</TableHead>
+                  <TableHead>수당구분</TableHead>
                   <TableHead className="text-right">계약금</TableHead>
+                  <TableHead className="text-right">자문료율</TableHead>
                   <TableHead className="text-right">집행금액</TableHead>
-                  <TableHead className="text-right">수당률</TableHead>
+                  <TableHead className="text-right">자문료액</TableHead>
                   <TableHead className="text-right">세전수당</TableHead>
                   <TableHead className="text-right">실지급액</TableHead>
                   <TableHead>상태</TableHead>
@@ -587,54 +591,68 @@ export default function Settlements() {
               <TableBody>
                 {detailModalItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                       정산 데이터가 없습니다.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  detailModalItems.map((item) => (
-                    <TableRow key={item.id} data-testid={`modal-row-settlement-${item.id}`}>
-                      <TableCell className="font-medium">{item.customer_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{item.entry_source}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{item.contract_amount.toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right">{item.execution_amount.toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right">{item.commission_rate}%</TableCell>
-                      <TableCell className="text-right">
-                        <span className={item.is_clawback ? 'text-red-600' : ''}>
-                          {item.gross_commission.toLocaleString()}만원
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={item.is_clawback ? 'text-red-600' : ''}>
-                          {item.net_commission.toLocaleString()}만원
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            item.status === '정상' ? 'default' :
-                            item.status === '취소' ? 'secondary' : 'destructive'
-                          }
-                        >
-                          {item.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {item.status === '정상' && !item.is_clawback && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleCancelItem(item)}
-                            data-testid={`modal-button-cancel-${item.id}`}
+                  detailModalItems.map((item) => {
+                    const customer = customers.find(c => c.id === item.customer_id);
+                    const advisoryFee = Math.round(item.execution_amount * (item.fee_rate || 0) / 100 * 100) / 100;
+                    const commissionType = item.execution_amount > 0 ? '자문료' : '계약금';
+                    
+                    return (
+                      <TableRow key={item.id} data-testid={`modal-row-settlement-${item.id}`}>
+                        <TableCell>{item.contract_date}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{item.entry_source}</Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
+                        <TableCell className="font-medium">{item.customer_name}</TableCell>
+                        <TableCell>
+                          <Badge variant={commissionType === '계약금' ? 'default' : 'secondary'}>
+                            {commissionType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{item.contract_amount.toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right">{item.fee_rate}%</TableCell>
+                        <TableCell className="text-right">{item.execution_amount.toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right">{advisoryFee.toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right">
+                          <span className={item.is_clawback ? 'text-red-600' : ''}>
+                            {item.gross_commission.toLocaleString()}만원
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className={item.is_clawback ? 'text-red-600' : ''}>
+                            {item.net_commission.toLocaleString()}만원
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              item.status === '정상' ? 'default' :
+                              item.status === '취소' ? 'secondary' : 'destructive'
+                            }
                           >
-                            <X className="h-4 w-4 text-red-500" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                            {item.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {item.status === '정상' && !item.is_clawback && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleCancelItem(item)}
+                              data-testid={`modal-button-cancel-${item.id}`}
+                            >
+                              <X className="h-4 w-4 text-red-500" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
