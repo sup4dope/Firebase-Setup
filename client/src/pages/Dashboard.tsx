@@ -26,6 +26,7 @@ import {
   deleteCustomer,
   updateCustomerStatus,
   updateCustomerInfo,
+  syncSingleCustomerSettlement,
 } from '@/lib/firestore';
 import { Plus, Search, RefreshCw, CalendarIcon } from 'lucide-react';
 import { DataExport } from '@/components/DataExport';
@@ -594,6 +595,11 @@ export default function Dashboard() {
             ? { ...c, ...data }
             : c
         )
+      );
+
+      // 정산 데이터 실시간 동기화
+      syncSingleCustomerSettlement(customerId, users).catch(err => 
+        console.error('Settlement sync error:', err)
       );
 
       toast({
