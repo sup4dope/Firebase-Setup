@@ -596,62 +596,126 @@ export default function Settlements() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  detailModalItems.map((item) => {
+                  detailModalItems.flatMap((item) => {
                     const customer = customers.find(c => c.id === item.customer_id);
+                    const customerName = customer?.name || item.customer_name;
                     const advisoryFee = Math.round(item.execution_amount * (item.fee_rate || 0) / 100 * 100) / 100;
-                    const commissionType = item.execution_amount > 0 ? '자문료' : '계약금';
                     
-                    return (
-                      <TableRow key={item.id} data-testid={`modal-row-settlement-${item.id}`}>
-                        <TableCell>{item.contract_date}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{item.entry_source}</Badge>
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
-                        <TableCell className="font-medium">{item.customer_name}</TableCell>
-                        <TableCell>
-                          <Badge variant={commissionType === '계약금' ? 'default' : 'secondary'}>
-                            {commissionType}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">{item.contract_amount.toLocaleString()}만원</TableCell>
-                        <TableCell className="text-right">{item.fee_rate}%</TableCell>
-                        <TableCell className="text-right">{item.execution_amount.toLocaleString()}만원</TableCell>
-                        <TableCell className="text-right">{advisoryFee.toLocaleString()}만원</TableCell>
-                        <TableCell className="text-right">
-                          <span className={item.is_clawback ? 'text-red-600' : ''}>
-                            {item.gross_commission.toLocaleString()}만원
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={item.is_clawback ? 'text-red-600' : ''}>
-                            {item.net_commission.toLocaleString()}만원
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              item.status === '정상' ? 'default' :
-                              item.status === '취소' ? 'secondary' : 'destructive'
-                            }
-                          >
-                            {item.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {item.status === '정상' && !item.is_clawback && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleCancelItem(item)}
-                              data-testid={`modal-button-cancel-${item.id}`}
+                    // Calculate separate commissions for 계약금 and 자문료
+                    const contractCommission = item.contract_amount * (item.commission_rate / 100);
+                    const advisoryCommission = advisoryFee * (item.commission_rate / 100);
+                    const contractNet = Math.round(contractCommission * 0.967 * 100) / 100;
+                    const advisoryNet = Math.round(advisoryCommission * 0.967 * 100) / 100;
+                    
+                    const rows: JSX.Element[] = [];
+                    
+                    // 계약금 행 (contract_amount > 0인 경우)
+                    if (item.contract_amount > 0) {
+                      rows.push(
+                        <TableRow key={`${item.id}-contract`} data-testid={`modal-row-settlement-${item.id}-contract`}>
+                          <TableCell>{item.contract_date}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{item.entry_source}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
+                          <TableCell className="font-medium">{customerName}</TableCell>
+                          <TableCell>
+                            <Badge variant="default">계약금</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{item.contract_amount.toLocaleString()}만원</TableCell>
+                          <TableCell className="text-right text-muted-foreground">-</TableCell>
+                          <TableCell className="text-right text-muted-foreground">-</TableCell>
+                          <TableCell className="text-right text-muted-foreground">-</TableCell>
+                          <TableCell className="text-right">
+                            <span className={item.is_clawback ? 'text-red-600' : ''}>
+                              {contractCommission.toLocaleString()}만원
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className={item.is_clawback ? 'text-red-600' : ''}>
+                              {contractNet.toLocaleString()}만원
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                item.status === '정상' ? 'default' :
+                                item.status === '취소' ? 'secondary' : 'destructive'
+                              }
                             >
-                              <X className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
+                              {item.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {item.status === '정상' && !item.is_clawback && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleCancelItem(item)}
+                                data-testid={`modal-button-cancel-${item.id}`}
+                              >
+                                <X className="h-4 w-4 text-red-500" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    
+                    // 자문료 행 (execution_amount > 0인 경우)
+                    if (item.execution_amount > 0) {
+                      rows.push(
+                        <TableRow key={`${item.id}-advisory`} data-testid={`modal-row-settlement-${item.id}-advisory`}>
+                          <TableCell>{item.contract_date}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{item.entry_source}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
+                          <TableCell className="font-medium">{customerName}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">자문료</Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">-</TableCell>
+                          <TableCell className="text-right">{item.fee_rate}%</TableCell>
+                          <TableCell className="text-right">{item.execution_amount.toLocaleString()}만원</TableCell>
+                          <TableCell className="text-right">{advisoryFee.toLocaleString()}만원</TableCell>
+                          <TableCell className="text-right">
+                            <span className={item.is_clawback ? 'text-red-600' : ''}>
+                              {advisoryCommission.toLocaleString()}만원
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className={item.is_clawback ? 'text-red-600' : ''}>
+                              {advisoryNet.toLocaleString()}만원
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                item.status === '정상' ? 'default' :
+                                item.status === '취소' ? 'secondary' : 'destructive'
+                              }
+                            >
+                              {item.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {item.status === '정상' && !item.is_clawback && rows.length === 0 && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleCancelItem(item)}
+                                data-testid={`modal-button-cancel-${item.id}`}
+                              >
+                                <X className="h-4 w-4 text-red-500" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    
+                    return rows;
                   })
                 )}
               </TableBody>
