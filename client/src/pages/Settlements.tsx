@@ -44,7 +44,9 @@ import {
   RefreshCw,
   ShieldAlert,
   FileDown,
+  FileText,
 } from 'lucide-react';
+import { SalaryStatement, type SalaryItem } from '@/components/salary/salary-statement';
 import {
   getSettlementItems,
   getUsers,
@@ -79,6 +81,15 @@ export default function Settlements() {
   const [detailModalTitle, setDetailModalTitle] = useState('');
   const [detailModalItems, setDetailModalItems] = useState<SettlementItem[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [salaryModalOpen, setSalaryModalOpen] = useState(false);
+  const [salaryData, setSalaryData] = useState<{
+    employeeName: string;
+    employeeId: string;
+    salaryMonth: string;
+    contractPayment: number;
+    consultingFee: number;
+    additionalPayments: SalaryItem[];
+  } | null>(null);
 
   const [newItem, setNewItem] = useState({
     customer_id: '',
@@ -382,6 +393,77 @@ export default function Settlements() {
     }
   };
 
+  const handleShowSalaryStatement = (summary: MonthlySettlementSummary) => {
+    const managerItems = items.filter(
+      item => item.manager_id === summary.manager_id && 
+              item.settlement_month === selectedMonth &&
+              !item.is_clawback
+    );
+    
+    let totalContractPayment = 0;
+    let totalConsultingFee = 0;
+    
+    managerItems.forEach(item => {
+      totalContractPayment += item.contract_amount * (item.commission_rate / 100);
+      const advisoryFee = item.execution_amount * (item.fee_rate || 0) / 100;
+      totalConsultingFee += advisoryFee * (item.commission_rate / 100);
+    });
+    
+    const [year, month] = selectedMonth.split('-');
+    const salaryMonthStr = `${year}년 ${parseInt(month)}월`;
+    const today = new Date();
+    
+    setSalaryData({
+      employeeName: summary.manager_name,
+      employeeId: summary.manager_id.slice(-8).toUpperCase(),
+      salaryMonth: salaryMonthStr,
+      contractPayment: Math.round(totalContractPayment * 10000),
+      consultingFee: Math.round(totalConsultingFee * 10000),
+      additionalPayments: [],
+    });
+    setSalaryModalOpen(true);
+  };
+
+  const handlePrintSalaryStatement = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: '팝업 차단',
+        description: '팝업이 차단되었습니다. 팝업을 허용해 주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    const salaryElement = document.getElementById('salary-statement-container');
+    if (!salaryElement) return;
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>급여명세서 - ${salaryData?.employeeName}</title>
+          <link rel="stylesheet" href="/src/index.css">
+          <style>
+            @media print {
+              body { margin: 0; padding: 0; }
+              @page { size: A4; margin: 0; }
+            }
+            body { font-family: 'Inter', sans-serif; }
+          </style>
+        </head>
+        <body>
+          ${salaryElement.innerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
+
   if (dataLoading) {
     return (
       <div className="p-6 space-y-6">
@@ -563,12 +645,13 @@ export default function Settlements() {
                   <TableHead className="text-right">총 수익금액</TableHead>
                   <TableHead className="text-right">환수</TableHead>
                   <TableHead className="text-right">최종지급액(세후)</TableHead>
+                  <TableHead className="text-center">급여명세서</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {summaries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                       해당 월에 정산 데이터가 없습니다.
                     </TableCell>
                   </TableRow>
@@ -599,6 +682,17 @@ export default function Settlements() {
                       </TableCell>
                       <TableCell className="text-right font-bold text-blue-600">
                         {summary.final_payment.toLocaleString()}만원
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleShowSalaryStatement(summary)}
+                          data-testid={`button-salary-${summary.manager_id}`}
+                        >
+                          <FileText className="h-4 w-4 mr-1" />
+                          명세서
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -834,6 +928,43 @@ export default function Settlements() {
                 추가
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={salaryModalOpen} onOpenChange={setSalaryModalOpen}>
+        <DialogContent className="max-w-[240mm] max-h-[90vh] overflow-auto">
+          <DialogHeader className="flex flex-row items-center justify-between gap-4">
+            <DialogTitle>급여명세서 - {salaryData?.employeeName}</DialogTitle>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handlePrintSalaryStatement}
+              data-testid="button-print-salary"
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              인쇄 / PDF 저장
+            </Button>
+          </DialogHeader>
+          <div id="salary-statement-container" className="bg-[#E8E9EB] p-4 rounded-lg">
+            {salaryData && (
+              <SalaryStatement
+                companyName="경영지원그룹 이음"
+                issueDate={format(new Date(), 'yyyy년 MM월 dd일')}
+                paymentDate={format(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5), 'yyyy년 MM월 dd일')}
+                employeeName={salaryData.employeeName}
+                employeeId={salaryData.employeeId}
+                department="컨설팅부"
+                position="프리랜서"
+                salaryMonth={salaryData.salaryMonth}
+                contractPayment={salaryData.contractPayment}
+                consultingFee={salaryData.consultingFee}
+                additionalPayments={salaryData.additionalPayments}
+                incomeTaxRate={3.0}
+                localTaxRate={0.3}
+                approverName="대표"
+                approverPosition="대표이사"
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>
