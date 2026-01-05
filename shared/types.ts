@@ -356,7 +356,8 @@ export interface SettlementItem {
   
   // 정산 정보
   settlement_month: string; // 정산월 (YYYY-MM)
-  contract_date: string; // 계약일 (YYYY-MM-DD)
+  contract_date: string; // 계약일 (YYYY-MM-DD) - 계약금 수당일자
+  execution_date?: string; // 집행일 (YYYY-MM-DD) - 자문료 수당일자
   status: SettlementStatus; // 정상/취소/환수
   is_clawback: boolean; // 환수 항목 여부
   original_item_id?: string; // 환수 시 원본 정산 항목 ID

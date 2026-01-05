@@ -607,7 +607,7 @@ export default function Settlements() {
                     if (item.execution_amount > 0) {
                       rows.push(
                         <TableRow key={`${item.id}-advisory`} data-testid={`modal-row-settlement-${item.id}-advisory`}>
-                          <TableCell>{item.contract_date}</TableCell>
+                          <TableCell>{item.execution_date || item.contract_date}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{item.entry_source}</Badge>
                           </TableCell>
