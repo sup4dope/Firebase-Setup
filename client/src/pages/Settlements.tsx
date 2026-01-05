@@ -41,7 +41,6 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
-  X,
   ShieldAlert,
 } from 'lucide-react';
 import {
@@ -49,7 +48,6 @@ import {
   getUsers,
   getCustomers,
   calculateMonthlySettlementSummary,
-  cancelSettlementWithClawback,
   createSettlementItem,
   calculateSettlement,
   getCommissionRate,
@@ -224,39 +222,6 @@ export default function Settlements() {
       ? new Date(current.getFullYear(), current.getMonth() - 1, 1)
       : new Date(current.getFullYear(), current.getMonth() + 1, 1);
     setSelectedMonth(format(newDate, 'yyyy-MM'));
-  };
-
-  const handleCancelItem = async (item: SettlementItem) => {
-    if (item.status !== '정상') {
-      toast({
-        title: '알림',
-        description: '이미 취소되었거나 환수된 항목입니다.',
-      });
-      return;
-    }
-
-    try {
-      const clawback = await cancelSettlementWithClawback(item, selectedMonth);
-      if (clawback) {
-        toast({
-          title: '환수 처리 완료',
-          description: `과거 정산 건이 취소되어 이번 달에 ${Math.abs(clawback.net_commission).toLocaleString()}만원 환수 항목이 생성되었습니다.`,
-        });
-      } else {
-        toast({
-          title: '취소 완료',
-          description: '당월 정산 건이 취소되었습니다.',
-        });
-      }
-      fetchData();
-    } catch (error) {
-      console.error('Error canceling item:', error);
-      toast({
-        title: '오류',
-        description: '취소 처리 중 오류가 발생했습니다.',
-        variant: 'destructive',
-      });
-    }
   };
 
   const handleShowDetail = (title: string, filterFn: (item: SettlementItem) => boolean) => {
@@ -584,14 +549,12 @@ export default function Settlements() {
                   <TableHead className="text-right">자문료액</TableHead>
                   <TableHead className="text-right">세전수당</TableHead>
                   <TableHead className="text-right">실지급액</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {detailModalItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                       정산 데이터가 없습니다.
                     </TableCell>
                   </TableRow>
@@ -636,28 +599,6 @@ export default function Settlements() {
                               {contractNet.toLocaleString()}만원
                             </span>
                           </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                item.status === '정상' ? 'default' :
-                                item.status === '취소' ? 'secondary' : 'destructive'
-                              }
-                            >
-                              {item.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {item.status === '정상' && !item.is_clawback && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleCancelItem(item)}
-                                data-testid={`modal-button-cancel-${item.id}`}
-                              >
-                                <X className="h-4 w-4 text-red-500" />
-                              </Button>
-                            )}
-                          </TableCell>
                         </TableRow>
                       );
                     }
@@ -688,28 +629,6 @@ export default function Settlements() {
                             <span className={item.is_clawback ? 'text-red-600' : ''}>
                               {advisoryNet.toLocaleString()}만원
                             </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                item.status === '정상' ? 'default' :
-                                item.status === '취소' ? 'secondary' : 'destructive'
-                              }
-                            >
-                              {item.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {item.status === '정상' && !item.is_clawback && rows.length === 0 && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleCancelItem(item)}
-                                data-testid={`modal-button-cancel-${item.id}`}
-                              >
-                                <X className="h-4 w-4 text-red-500" />
-                              </Button>
-                            )}
                           </TableCell>
                         </TableRow>
                       );

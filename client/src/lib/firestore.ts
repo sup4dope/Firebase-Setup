@@ -1047,6 +1047,42 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
     if (createdCount > 0 || updatedCount > 0) {
       console.log(`[Settlement Sync] 생성: ${createdCount}건, 업데이트: ${updatedCount}건`);
     }
+    
+    // 5. 고아 정산 항목 삭제 (고객 DB에 존재하지 않는 정산 항목)
+    const customerIdSet = new Set(customers.map(c => c.id));
+    let deletedCount = 0;
+    
+    for (const settlement of existingSettlements) {
+      // 고객이 존재하지 않거나 정산 대상 상태가 아닌 경우
+      const customer = customers.find(c => c.id === settlement.customer_id);
+      if (!customer) {
+        // 고객이 완전히 삭제된 경우 정산 항목도 삭제
+        await deleteDoc(doc(db, 'settlements', settlement.id));
+        deletedCount++;
+        continue;
+      }
+      
+      // 고객 데이터와 정산 데이터 동기화 확인 (정산 항목이 있지만 고객이 더 이상 정산 대상이 아닌 경우)
+      const status = customer.status_code || '';
+      const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
+        status.includes('계약') || status.includes('집행');
+      
+      // 정산월 확인
+      const dateForSettlement = customer.contract_completion_date || customer.entry_date;
+      const settlementMonth = dateForSettlement ? dateForSettlement.slice(0, 7) : '';
+      
+      // 정산 대상 상태가 아니거나 정산월이 다른 경우에는 활성 정산만 삭제 (환수/취소 항목은 유지)
+      if (settlement.status === '정상' && !settlement.is_clawback) {
+        if (!isTargetStatus || settlementMonth !== month) {
+          await deleteDoc(doc(db, 'settlements', settlement.id));
+          deletedCount++;
+        }
+      }
+    }
+    
+    if (deletedCount > 0) {
+      console.log(`[Settlement Cleanup] 삭제: ${deletedCount}건`);
+    }
   } catch (error) {
     console.error('Error syncing customer settlements:', error);
   }
