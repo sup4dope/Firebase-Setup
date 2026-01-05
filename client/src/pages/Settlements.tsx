@@ -896,8 +896,8 @@ export default function Settlements() {
         </DialogContent>
       </Dialog>
       <Dialog open={salaryModalOpen} onOpenChange={setSalaryModalOpen}>
-        <DialogContent className="max-w-[240mm] max-h-[90vh] overflow-auto">
-          <DialogHeader className="flex flex-row items-center justify-between gap-4">
+        <DialogContent id="salary-print-dialog" className="max-w-[240mm] max-h-[90vh] overflow-auto">
+          <DialogHeader className="flex flex-row items-center justify-between gap-4 print:hidden">
             <DialogTitle>급여명세서 - {salaryData?.employeeName}</DialogTitle>
             <Button
               variant="default"
@@ -909,7 +909,7 @@ export default function Settlements() {
               PDF 저장
             </Button>
           </DialogHeader>
-          <div id="salary-statement-container" className="bg-[#E8E9EB] p-4 rounded-lg">
+          <div id="salary-print-area" className="bg-[#E8E9EB] p-4 rounded-lg print:bg-white print:p-0">
             {salaryData && (
               <SalaryStatement
                 companyName="경영지원그룹 이음"

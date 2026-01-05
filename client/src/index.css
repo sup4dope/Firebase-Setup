@@ -356,8 +356,9 @@
     display: none !important;
   }
 
-  /* STEP 2: Show only the portal that contains proposal dialog */
-  body > [data-radix-portal]:has(#proposal-print-dialog) {
+  /* STEP 2: Show only the portal that contains proposal or salary dialog */
+  body > [data-radix-portal]:has(#proposal-print-dialog),
+  body > [data-radix-portal]:has(#salary-print-dialog) {
     display: block !important;
     position: static !important;
     background: #ffffff !important;
@@ -368,13 +369,14 @@
     display: none !important;
   }
 
-  /* Hide any dialog that is NOT the proposal dialog */
-  [data-radix-dialog-content]:not(#proposal-print-dialog) {
+  /* Hide any dialog that is NOT the proposal or salary dialog */
+  [data-radix-dialog-content]:not(#proposal-print-dialog):not(#salary-print-dialog) {
     display: none !important;
   }
 
   /* Style the proposal dialog for printing */
-  #proposal-print-dialog {
+  #proposal-print-dialog,
+  #salary-print-dialog {
     display: block !important;
     position: static !important;
     transform: none !important;
@@ -390,8 +392,9 @@
     overflow: visible !important;
   }
 
-  /* Proposal print area - keep in normal flow for pagination */
-  #proposal-print-area {
+  /* Proposal/Salary print area - keep in normal flow for pagination */
+  #proposal-print-area,
+  #salary-print-area {
     position: static !important;
     width: 100% !important;
     height: auto !important;
@@ -401,7 +404,8 @@
     background: #ffffff !important;
   }
 
-  #proposal-print-area > div {
+  #proposal-print-area > div,
+  #salary-print-area > div {
     max-width: none !important;
     width: 100% !important;
     padding: 0 !important;
@@ -409,8 +413,9 @@
     background: #ffffff !important;
   }
 
-  /* Each proposal page should have white background */
-  #proposal-print-area > div > div {
+  /* Each proposal/salary page should have white background */
+  #proposal-print-area > div > div,
+  #salary-print-area > div > div {
     background: #ffffff !important;
     box-shadow: none !important;
   }
