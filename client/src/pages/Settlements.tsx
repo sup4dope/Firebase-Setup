@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useLocation } from 'wouter';
+import * as XLSX from 'xlsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +43,7 @@ import {
   ChevronRight,
   RefreshCw,
   ShieldAlert,
+  FileDown,
 } from 'lucide-react';
 import {
   getSettlementItems,
@@ -228,6 +230,83 @@ export default function Settlements() {
     setDetailModalTitle(title);
     setDetailModalItems(items.filter(filterFn));
     setDetailModalOpen(true);
+  };
+
+  const handleExportToExcel = () => {
+    if (detailModalItems.length === 0) return;
+
+    type ExcelRow = {
+      수당일자: string;
+      유입경로: string;
+      고유번호: string;
+      고객명: string;
+      수당구분: string;
+      '계약금(만원)': number | string;
+      '자문료율(%)': number | string;
+      '집행금액(만원)': number | string;
+      '자문료액(만원)': number | string;
+      '세전수당(만원)': number;
+      '실지급액(만원)': number;
+    };
+    const excelData: ExcelRow[] = [];
+
+    detailModalItems.forEach((item) => {
+      const customer = customers.find(c => c.id === item.customer_id);
+      const customerName = customer?.name || item.customer_name;
+      const advisoryFee = Math.round(item.execution_amount * (item.fee_rate || 0) / 100 * 100) / 100;
+      const contractCommission = item.contract_amount * (item.commission_rate / 100);
+      const advisoryCommission = advisoryFee * (item.commission_rate / 100);
+      const contractNet = Math.round(contractCommission * 0.967 * 100) / 100;
+      const advisoryNet = Math.round(advisoryCommission * 0.967 * 100) / 100;
+
+      if (item.contract_amount > 0) {
+        excelData.push({
+          수당일자: item.contract_date || '',
+          유입경로: item.entry_source,
+          고유번호: customer?.readable_id || '-',
+          고객명: customerName,
+          수당구분: '계약금',
+          '계약금(만원)': item.contract_amount,
+          '자문료율(%)': '-',
+          '집행금액(만원)': '-',
+          '자문료액(만원)': '-',
+          '세전수당(만원)': contractCommission,
+          '실지급액(만원)': contractNet,
+        });
+      }
+
+      if (item.execution_amount > 0) {
+        const advisoryDate = item.execution_date || item.contract_date || '';
+        excelData.push({
+          수당일자: advisoryDate,
+          유입경로: item.entry_source,
+          고유번호: customer?.readable_id || '-',
+          고객명: customerName,
+          수당구분: '자문료',
+          '계약금(만원)': '-',
+          '자문료율(%)': item.fee_rate || 0,
+          '집행금액(만원)': item.execution_amount,
+          '자문료액(만원)': advisoryFee,
+          '세전수당(만원)': advisoryCommission,
+          '실지급액(만원)': advisoryNet,
+        });
+      }
+    });
+
+    // Sort by date descending
+    excelData.sort((a, b) => b.수당일자.localeCompare(a.수당일자));
+
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '정산내역');
+
+    const fileName = `${detailModalTitle.replace(/\s/g, '_')}_${selectedMonth}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast({
+      title: '엑셀 다운로드 완료',
+      description: `${fileName} 파일이 다운로드되었습니다.`,
+    });
   };
 
   const handleAddSettlement = async () => {
@@ -531,8 +610,18 @@ export default function Settlements() {
       </Card>
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
         <DialogContent className="max-w-[95vw] max-h-[85vh]">
-          <DialogHeader>
+          <DialogHeader className="flex flex-row items-center justify-between gap-4">
             <DialogTitle>{detailModalTitle}</DialogTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportToExcel}
+              disabled={detailModalItems.length === 0}
+              data-testid="button-export-excel"
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              엑셀 다운로드
+            </Button>
           </DialogHeader>
           <ScrollArea className="h-[70vh]">
             <Table>
