@@ -207,9 +207,8 @@ export function SalaryStatement({
         </div>
       </div>
 
-      <div className="mb-4 flex items-center justify-center gap-8 py-4">
+      <div className="mb-4 flex items-center justify-center gap-10 py-4">
         <img src={companyLogoImg} alt="Company Logo" className="h-14 object-contain" />
-        <span className="text-sm font-semibold text-teal-900">{approverPosition}</span>
         <img 
           src={signatureImg} 
           alt="Signature" 
