@@ -61,23 +61,6 @@ export function SalaryStatement({
             <h1 className="text-3xl font-bold text-teal-900 mb-1 tracking-tight">급여명세서</h1>
             <p className="text-xs text-teal-600 tracking-wide">Salary Statement (Freelance)</p>
           </div>
-          <div className="flex items-start gap-6">
-            <div className="text-right">
-              <img src={companyLogoImg} alt="Company Logo" className="h-12 object-contain" />
-            </div>
-            <div className="text-center border-l-2 border-teal-200 pl-6 relative">
-              <div className="text-[10px] text-[#4A5568] mb-1">{approverPosition}</div>
-              <div className="text-base font-bold text-teal-900 border-b-2 border-teal-900 pb-1 px-2">
-                {approverName}
-              </div>
-              <div className="text-[9px] text-[#4A5568] mt-0.5">(인)</div>
-              <img 
-                src={signatureImg} 
-                alt="Signature" 
-                className="absolute -right-2 top-1/2 -translate-y-1/2 h-14 w-14 object-contain opacity-80" 
-              />
-            </div>
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-3">
@@ -220,6 +203,21 @@ export function SalaryStatement({
           <div>
             <p className="text-[10px] text-slate-500 mb-0.5">실 지급액</p>
             <p className="text-xl font-bold text-cyan-600">{formatCurrency(netPayment)}원</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-4 flex items-center justify-end gap-8 py-4">
+        <img src={companyLogoImg} alt="Company Logo" className="h-10 object-contain" />
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-teal-900">{approverPosition}</span>
+          <div className="relative inline-flex flex-col items-center">
+            <img 
+              src={signatureImg} 
+              alt="Signature" 
+              className="h-12 w-12 object-contain" 
+            />
+            <span className="text-xs text-[#4A5568] -mt-2">(인)</span>
           </div>
         </div>
       </div>
