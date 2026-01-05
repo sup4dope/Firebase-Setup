@@ -69,7 +69,7 @@ import type {
 const ENTRY_SOURCES: EntrySourceType[] = ['광고', '고객소개', '승인복제', '외주', '기타'];
 
 export default function Settlements() {
-  const { isSuperAdmin, loading: authLoading } = useAuth();
+  const { user, isSuperAdmin, isTeamLeader, isStaff, loading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [dataLoading, setDataLoading] = useState(true);
@@ -101,33 +101,38 @@ export default function Settlements() {
   });
 
   useEffect(() => {
-    if (!authLoading && !isSuperAdmin) {
-      toast({
-        title: '접근 권한 없음',
-        description: '이 페이지는 관리자만 접근할 수 있습니다.',
-        variant: 'destructive',
-      });
-      setLocation('/');
+    if (!authLoading && !user) {
+      setLocation('/login');
     }
-  }, [isSuperAdmin, authLoading, setLocation, toast]);
+  }, [user, authLoading, setLocation]);
 
   const fetchData = async () => {
-    if (!isSuperAdmin || authLoading) return;
+    if (!user || authLoading) return;
     setDataLoading(true);
     try {
-      // 먼저 사용자 목록 가져오기 (동기화에 필요)
       const fetchedUsers = await getUsers();
       setUsers(fetchedUsers);
       
-      // 고객 데이터에서 계약/집행 상태인 항목 자동 동기화
-      await syncCustomerSettlements(selectedMonth, fetchedUsers);
+      if (isSuperAdmin) {
+        await syncCustomerSettlements(selectedMonth, fetchedUsers);
+      }
       
-      // 동기화 후 정산 항목 및 고객 목록 가져오기
       const [fetchedItems, fetchedCustomers] = await Promise.all([
         getSettlementItems(selectedMonth),
         getCustomers(),
       ]);
-      setItems(fetchedItems);
+      
+      let filteredItems = fetchedItems;
+      if (isStaff) {
+        filteredItems = fetchedItems.filter(item => item.manager_id === user.uid);
+      } else if (isTeamLeader) {
+        const teamMemberIds = fetchedUsers
+          .filter(u => u.team_id === user.team_id)
+          .map(u => u.uid);
+        filteredItems = fetchedItems.filter(item => teamMemberIds.includes(item.manager_id));
+      }
+      
+      setItems(filteredItems);
       setCustomers(fetchedCustomers);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -142,13 +147,13 @@ export default function Settlements() {
   };
 
   useEffect(() => {
-    if (isSuperAdmin && !authLoading) {
+    if (user && !authLoading) {
       fetchData();
     }
-  }, [selectedMonth, isSuperAdmin, authLoading]);
+  }, [selectedMonth, user, authLoading]);
 
   const summaries = useMemo(() => {
-    if (!isSuperAdmin) return [];
+    if (!user) return [];
     const managerIds = Array.from(new Set(items.map(item => item.manager_id)));
     return managerIds.map(managerId => {
       const manager = users.find(u => u.uid === managerId);
@@ -159,7 +164,7 @@ export default function Settlements() {
         selectedMonth
       );
     });
-  }, [items, users, selectedMonth, isSuperAdmin]);
+  }, [items, users, selectedMonth, user]);
 
   const totals = useMemo(() => {
     // Calculate item-level totals for contract/execution amounts
@@ -214,17 +219,6 @@ export default function Settlements() {
           ))}
         </div>
         <Skeleton className="h-96" />
-      </div>
-    );
-  }
-
-  // Only check authorization after auth loading is complete
-  if (!isSuperAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
-        <h1 className="text-2xl font-bold mb-2">접근 권한 없음</h1>
-        <p className="text-muted-foreground">이 페이지는 관리자만 접근할 수 있습니다.</p>
       </div>
     );
   }
@@ -476,14 +470,16 @@ export default function Settlements() {
             <RefreshCw className="h-4 w-4 mr-2" />
             새로고침
           </Button>
-          <Button
-            size="sm"
-            onClick={() => setAddModalOpen(true)}
-            data-testid="button-add-settlement"
-          >
-            <Calculator className="h-4 w-4 mr-2" />
-            정산 추가
-          </Button>
+          {isSuperAdmin && (
+            <Button
+              size="sm"
+              onClick={() => setAddModalOpen(true)}
+              data-testid="button-add-settlement"
+            >
+              <Calculator className="h-4 w-4 mr-2" />
+              정산 추가
+            </Button>
+          )}
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -670,16 +666,18 @@ export default function Settlements() {
         <DialogContent className="max-w-[95vw] max-h-[85vh]">
           <DialogHeader className="flex flex-row items-center justify-between gap-4">
             <DialogTitle>{detailModalTitle}</DialogTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportToExcel}
-              disabled={detailModalItems.length === 0}
-              data-testid="button-export-excel"
-            >
-              <FileDown className="h-4 w-4 mr-2" />
-              엑셀 다운로드
-            </Button>
+            {isSuperAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportToExcel}
+                disabled={detailModalItems.length === 0}
+                data-testid="button-export-excel"
+              >
+                <FileDown className="h-4 w-4 mr-2" />
+                엑셀 다운로드
+              </Button>
+            )}
           </DialogHeader>
           <ScrollArea className="h-[70vh]">
             <Table>
@@ -899,15 +897,17 @@ export default function Settlements() {
         <DialogContent id="salary-print-dialog" className="max-w-[240mm] max-h-[90vh] overflow-auto">
           <DialogHeader className="flex flex-row items-center justify-between gap-4 print:hidden">
             <DialogTitle>급여명세서 - {salaryData?.employeeName}</DialogTitle>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handlePrintSalaryStatement}
-              data-testid="button-print-salary"
-            >
-              <FileDown className="h-4 w-4 mr-2" />
-              PDF 저장
-            </Button>
+            {isSuperAdmin && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handlePrintSalaryStatement}
+                data-testid="button-print-salary"
+              >
+                <FileDown className="h-4 w-4 mr-2" />
+                PDF 저장
+              </Button>
+            )}
           </DialogHeader>
           <div id="salary-print-area" className="bg-[#E8E9EB] p-4 rounded-lg print:bg-white print:p-0">
             {salaryData && (
