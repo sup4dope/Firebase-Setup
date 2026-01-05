@@ -984,16 +984,20 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       
       if (activeSettlement) {
         // 기존 활성 정산 항목이 있으면 업데이트
-        // 변경사항이 있는지 확인
+        // 변경사항이 있는지 확인 (contract_date 포함)
         const hasChanges = 
           activeSettlement.contract_amount !== contractAmount ||
           activeSettlement.execution_amount !== executionAmount ||
           activeSettlement.fee_rate !== feeRate ||
           activeSettlement.commission_rate !== commissionRate ||
           activeSettlement.customer_name !== (customer.company_name || customer.name) ||
-          activeSettlement.manager_id !== customer.manager_id;
+          activeSettlement.manager_id !== customer.manager_id ||
+          activeSettlement.contract_date !== contractDate;
         
         if (hasChanges) {
+          // settlement_month도 contract_date 기준으로 갱신
+          const updatedSettlementMonth = contractDate ? contractDate.slice(0, 7) : month;
+          
           await updateSettlementItem(activeSettlement.id, {
             customer_name: customer.company_name || customer.name,
             manager_id: customer.manager_id,
@@ -1010,8 +1014,10 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
             tax_amount: calc.taxAmount,
             net_commission: calc.netCommission,
             contract_date: contractDate,
+            settlement_month: updatedSettlementMonth,
           });
           updatedCount++;
+          console.log(`[Settlement Sync] 업데이트: ${customer.company_name || customer.name}, contract_date: ${contractDate}`);
         }
       } else if (!existingSettlement) {
         // 정산 항목이 전혀 없는 경우에만 신규 생성
