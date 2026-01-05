@@ -63,7 +63,6 @@ export function SalaryStatement({
           <div className="flex items-start gap-6">
             <div className="text-right">
               <img src={companyLogoImg} alt="Company Logo" className="h-12 object-contain" />
-              <div className="text-[10px] text-teal-600 mt-1">{companyName}</div>
             </div>
             <div className="text-center border-l-2 border-teal-200 pl-6">
               <div className="text-[10px] text-[#4A5568] mb-1">{approverPosition}</div>
