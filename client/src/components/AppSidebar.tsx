@@ -142,7 +142,7 @@ export function AppSidebar({
     { href: '/', label: '고객관리', icon: Users, description: '고객 목록 및 퍼널' },
     { href: '/stats', label: '통계', icon: BarChart3, description: 'KPI 및 리포트' },
     { href: '/settings', label: '정보관리', icon: Settings, description: '팀/공휴일 설정' },
-    ...(userRole === 'super_admin' ? [{ href: '/settlements', label: '정산관리', icon: Calculator, description: '수당 정산 및 환수' }] : []),
+    { href: '/settlements', label: '정산관리', icon: Calculator, description: '수당 정산 및 환수' },
   ];
 
   const getCustomerInfo = (customerId?: string) => {
