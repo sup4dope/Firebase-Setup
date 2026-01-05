@@ -559,83 +559,96 @@ export default function Settlements() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  detailModalItems.flatMap((item) => {
-                    const customer = customers.find(c => c.id === item.customer_id);
-                    const customerName = customer?.name || item.customer_name;
-                    const advisoryFee = Math.round(item.execution_amount * (item.fee_rate || 0) / 100 * 100) / 100;
+                  (() => {
+                    // 모든 행을 먼저 생성하고 날짜순으로 정렬
+                    type RowData = { date: string; element: JSX.Element };
+                    const allRows: RowData[] = [];
                     
-                    // Calculate separate commissions for 계약금 and 자문료
-                    const contractCommission = item.contract_amount * (item.commission_rate / 100);
-                    const advisoryCommission = advisoryFee * (item.commission_rate / 100);
-                    const contractNet = Math.round(contractCommission * 0.967 * 100) / 100;
-                    const advisoryNet = Math.round(advisoryCommission * 0.967 * 100) / 100;
+                    detailModalItems.forEach((item) => {
+                      const customer = customers.find(c => c.id === item.customer_id);
+                      const customerName = customer?.name || item.customer_name;
+                      const advisoryFee = Math.round(item.execution_amount * (item.fee_rate || 0) / 100 * 100) / 100;
+                      
+                      const contractCommission = item.contract_amount * (item.commission_rate / 100);
+                      const advisoryCommission = advisoryFee * (item.commission_rate / 100);
+                      const contractNet = Math.round(contractCommission * 0.967 * 100) / 100;
+                      const advisoryNet = Math.round(advisoryCommission * 0.967 * 100) / 100;
+                      
+                      // 계약금 행
+                      if (item.contract_amount > 0) {
+                        allRows.push({
+                          date: item.contract_date || '',
+                          element: (
+                            <TableRow key={`${item.id}-contract`} data-testid={`modal-row-settlement-${item.id}-contract`}>
+                              <TableCell>{item.contract_date}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{item.entry_source}</Badge>
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
+                              <TableCell className="font-medium">{customerName}</TableCell>
+                              <TableCell>
+                                <Badge variant="default">계약금</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">{item.contract_amount.toLocaleString()}만원</TableCell>
+                              <TableCell className="text-right text-muted-foreground">-</TableCell>
+                              <TableCell className="text-right text-muted-foreground">-</TableCell>
+                              <TableCell className="text-right text-muted-foreground">-</TableCell>
+                              <TableCell className="text-right">
+                                <span className={item.is_clawback ? 'text-red-600' : ''}>
+                                  {contractCommission.toLocaleString()}만원
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={item.is_clawback ? 'text-red-600' : ''}>
+                                  {contractNet.toLocaleString()}만원
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        });
+                      }
+                      
+                      // 자문료 행
+                      if (item.execution_amount > 0) {
+                        const advisoryDate = item.execution_date || item.contract_date || '';
+                        allRows.push({
+                          date: advisoryDate,
+                          element: (
+                            <TableRow key={`${item.id}-advisory`} data-testid={`modal-row-settlement-${item.id}-advisory`}>
+                              <TableCell>{advisoryDate}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{item.entry_source}</Badge>
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
+                              <TableCell className="font-medium">{customerName}</TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">자문료</Badge>
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">-</TableCell>
+                              <TableCell className="text-right">{item.fee_rate}%</TableCell>
+                              <TableCell className="text-right">{item.execution_amount.toLocaleString()}만원</TableCell>
+                              <TableCell className="text-right">{advisoryFee.toLocaleString()}만원</TableCell>
+                              <TableCell className="text-right">
+                                <span className={item.is_clawback ? 'text-red-600' : ''}>
+                                  {advisoryCommission.toLocaleString()}만원
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={item.is_clawback ? 'text-red-600' : ''}>
+                                  {advisoryNet.toLocaleString()}만원
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        });
+                      }
+                    });
                     
-                    const rows: JSX.Element[] = [];
-                    
-                    // 계약금 행 (contract_amount > 0인 경우)
-                    if (item.contract_amount > 0) {
-                      rows.push(
-                        <TableRow key={`${item.id}-contract`} data-testid={`modal-row-settlement-${item.id}-contract`}>
-                          <TableCell>{item.contract_date}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{item.entry_source}</Badge>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
-                          <TableCell className="font-medium">{customerName}</TableCell>
-                          <TableCell>
-                            <Badge variant="default">계약금</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{item.contract_amount.toLocaleString()}만원</TableCell>
-                          <TableCell className="text-right text-muted-foreground">-</TableCell>
-                          <TableCell className="text-right text-muted-foreground">-</TableCell>
-                          <TableCell className="text-right text-muted-foreground">-</TableCell>
-                          <TableCell className="text-right">
-                            <span className={item.is_clawback ? 'text-red-600' : ''}>
-                              {contractCommission.toLocaleString()}만원
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={item.is_clawback ? 'text-red-600' : ''}>
-                              {contractNet.toLocaleString()}만원
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    }
-                    
-                    // 자문료 행 (execution_amount > 0인 경우)
-                    if (item.execution_amount > 0) {
-                      rows.push(
-                        <TableRow key={`${item.id}-advisory`} data-testid={`modal-row-settlement-${item.id}-advisory`}>
-                          <TableCell>{item.execution_date || item.contract_date}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{item.entry_source}</Badge>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
-                          <TableCell className="font-medium">{customerName}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">자문료</Badge>
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">-</TableCell>
-                          <TableCell className="text-right">{item.fee_rate}%</TableCell>
-                          <TableCell className="text-right">{item.execution_amount.toLocaleString()}만원</TableCell>
-                          <TableCell className="text-right">{advisoryFee.toLocaleString()}만원</TableCell>
-                          <TableCell className="text-right">
-                            <span className={item.is_clawback ? 'text-red-600' : ''}>
-                              {advisoryCommission.toLocaleString()}만원
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={item.is_clawback ? 'text-red-600' : ''}>
-                              {advisoryNet.toLocaleString()}만원
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    }
-                    
-                    return rows;
-                  })
+                    // 수당일자 기준 내림차순 정렬 (최신순)
+                    return allRows
+                      .sort((a, b) => b.date.localeCompare(a.date))
+                      .map(row => row.element);
+                  })()
                 )}
               </TableBody>
             </Table>
