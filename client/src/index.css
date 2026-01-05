@@ -392,9 +392,8 @@
     overflow: visible !important;
   }
 
-  /* Proposal/Salary print area - keep in normal flow for pagination */
-  #proposal-print-area,
-  #salary-print-area {
+  /* Proposal print area - keep in normal flow for pagination */
+  #proposal-print-area {
     position: static !important;
     width: 100% !important;
     height: auto !important;
@@ -404,8 +403,7 @@
     background: #ffffff !important;
   }
 
-  #proposal-print-area > div,
-  #salary-print-area > div {
+  #proposal-print-area > div {
     max-width: none !important;
     width: 100% !important;
     padding: 0 !important;
@@ -413,11 +411,43 @@
     background: #ffffff !important;
   }
 
-  /* Each proposal/salary page should have white background */
-  #proposal-print-area > div > div,
-  #salary-print-area > div > div {
+  /* Each proposal page should have white background */
+  #proposal-print-area > div > div {
     background: #ffffff !important;
     box-shadow: none !important;
+  }
+
+  /* Salary print area - preserve actual styling */
+  #salary-print-area {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  /* Salary statement - preserve all colors and backgrounds */
+  #salary-statement {
+    background: #ffffff !important;
+    width: 210mm !important;
+    min-height: 297mm !important;
+    padding: 12mm !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+  }
+
+  #salary-statement * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Ensure SVG icons print correctly */
+  #salary-statement svg {
+    display: inline-block !important;
+    visibility: visible !important;
   }
 
   /* Hide header in print */
