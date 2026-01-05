@@ -207,19 +207,14 @@ export function SalaryStatement({
         </div>
       </div>
 
-      <div className="mb-4 flex items-center justify-end gap-8 py-4">
-        <img src={companyLogoImg} alt="Company Logo" className="h-10 object-contain" />
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-teal-900">{approverPosition}</span>
-          <div className="relative inline-flex flex-col items-center">
-            <img 
-              src={signatureImg} 
-              alt="Signature" 
-              className="h-12 w-12 object-contain" 
-            />
-            <span className="text-xs text-[#4A5568] -mt-2">(인)</span>
-          </div>
-        </div>
+      <div className="mb-4 flex items-center justify-center gap-8 py-4">
+        <img src={companyLogoImg} alt="Company Logo" className="h-14 object-contain" />
+        <span className="text-sm font-semibold text-teal-900">{approverPosition}</span>
+        <img 
+          src={signatureImg} 
+          alt="Signature" 
+          className="h-14 w-14 object-contain" 
+        />
       </div>
 
       <div className="relative overflow-hidden mt-auto">
