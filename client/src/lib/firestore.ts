@@ -949,8 +949,8 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
         status.includes('계약') || status.includes('집행');
       if (!isTargetStatus) return false;
       
-      // 정산월 결정: 계약도달일 > 등록일 순서로 확인
-      const dateForSettlement = customer.contract_completion_date || customer.entry_date;
+      // 정산월 결정: 집행일자 > 계약도달일 > 등록일 순서로 확인
+      const dateForSettlement = customer.execution_date || customer.contract_completion_date || customer.entry_date;
       if (!dateForSettlement) return false;
       
       const settlementMonth = dateForSettlement.slice(0, 7); // YYYY-MM 형식
@@ -972,8 +972,8 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       
       const calc = calculateSettlement(contractAmount, executionAmount, feeRate, commissionRate);
       
-      // 정산일자: 계약도달일 우선, 없으면 등록일
-      const contractDate = customer.contract_completion_date || customer.entry_date || '';
+      // 정산일자: 집행일자 > 계약도달일 > 등록일 순서
+      const contractDate = customer.execution_date || customer.contract_completion_date || customer.entry_date || '';
       
       const existingSettlement = existingSettlementMap.get(customer.id);
       
@@ -1073,8 +1073,8 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
         status.includes('계약') || status.includes('집행');
       
-      // 정산월 확인
-      const dateForSettlement = customer.contract_completion_date || customer.entry_date;
+      // 정산월 확인 (집행일자 > 계약도달일 > 등록일)
+      const dateForSettlement = customer.execution_date || customer.contract_completion_date || customer.entry_date;
       const settlementMonth = dateForSettlement ? dateForSettlement.slice(0, 7) : '';
       
       // 정산 대상 상태가 아니거나 정산월이 다른 경우에는 활성 정산만 삭제 (환수/취소 항목은 유지)

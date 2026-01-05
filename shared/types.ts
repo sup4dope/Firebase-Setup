@@ -91,6 +91,7 @@ export interface Customer {
   deposit_amount?: number; // 계약금액/선수금 (만원 단위)
   contract_fee_rate?: number; // 자문료율 (%)
   execution_amount?: number; // 최종 집행 금액 (만원 단위)
+  execution_date?: string; // 집행일자 YYYY-MM-DD
   processing_org?: string; // 신청/진행기관
   contract_completion_date?: string; // 최초 계약 도달일
   notes?: string;
