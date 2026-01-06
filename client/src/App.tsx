@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppSidebar } from '@/components/AppSidebar';
 import { TodoForm } from '@/components/TodoForm';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { LandingPageListener } from '@/components/LandingPageListener';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import Login from '@/pages/Login';
@@ -214,6 +215,9 @@ function AuthenticatedApp() {
           setTodoRefreshTrigger(prev => prev + 1);
         }}
       />
+
+      {/* Landing Page Consultation Listener */}
+      <LandingPageListener enabled={true} />
     </SidebarProvider>
   );
 }

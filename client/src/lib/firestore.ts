@@ -1405,6 +1405,31 @@ export const cancelSettlementWithClawback = async (
 
 // ========== 상담 신청 (Consultations) ==========
 
+// Firestore 데이터를 Consultation 타입으로 변환 (신규/레거시 둘 다 지원)
+const mapFirestoreToConsultation = (docId: string, data: Record<string, unknown>): Consultation => {
+  const createdAt = (data.createdAt as { toDate?: () => Date })?.toDate?.() 
+    || (data.createdAt ? new Date(data.createdAt as string) : new Date());
+  
+  return {
+    id: docId,
+    name: (data.name as string) || (data.customername as string) || (data.customerName as string) || '',
+    phone: (data.phone as string) || '',
+    businessName: (data.businessName as string) || '',
+    businessNumber: (data.businessNumber as string) || '',
+    businessAge: (data.businessAge as string) || (data.businessStartDate as string) || '',
+    revenue: (data.revenue as string) || '',
+    region: (data.region as string) || '',
+    creditScore: String(data.creditScore || ''),
+    taxStatus: (data.taxStatus as string) || (data.taxDelinquency as string) || '',
+    services: (data.services as string[]) || [],
+    source: (data.source as string) || 'unknown',
+    createdAt,
+    email: (data.email as string) || '',
+    linked_customer_id: (data.linked_customer_id as string) || undefined,
+    processed: (data.processed as boolean) || false,
+  };
+};
+
 // 모든 상담 신청 데이터 가져오기
 export const getConsultations = async (): Promise<Consultation[]> => {
   try {
@@ -1412,26 +1437,9 @@ export const getConsultations = async (): Promise<Consultation[]> => {
     const q = query(consultationsRef, orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        customername: data.customername || data.customerName || '',
-        creditScore: data.creditScore || 0,
-        businessName: data.businessName || '',
-        businessNumber: data.businessNumber || '',
-        region: data.region || '',
-        businessStartDate: data.businessStartDate || '',
-        revenue: data.revenue || '',
-        taxDelinquency: data.taxDelinquency || '',
-        services: data.services || [],
-        estimatedLimit: data.estimatedLimit || 0,
-        createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt) || new Date(),
-        phone: data.phone || '',
-        email: data.email || '',
-        linked_customer_id: data.linked_customer_id || null,
-      } as Consultation;
-    });
+    return snapshot.docs.map(docSnap => 
+      mapFirestoreToConsultation(docSnap.id, docSnap.data() as Record<string, unknown>)
+    );
   } catch (error) {
     console.error('Error fetching consultations:', error);
     return [];
@@ -1446,24 +1454,7 @@ export const getConsultationById = async (id: string): Promise<Consultation | nu
     
     if (!docSnap.exists()) return null;
     
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      customername: data.customername || data.customerName || '',
-      creditScore: data.creditScore || 0,
-      businessName: data.businessName || '',
-      businessNumber: data.businessNumber || '',
-      region: data.region || '',
-      businessStartDate: data.businessStartDate || '',
-      revenue: data.revenue || '',
-      taxDelinquency: data.taxDelinquency || '',
-      services: data.services || [],
-      estimatedLimit: data.estimatedLimit || 0,
-      createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt) || new Date(),
-      phone: data.phone || '',
-      email: data.email || '',
-      linked_customer_id: data.linked_customer_id || null,
-    } as Consultation;
+    return mapFirestoreToConsultation(docSnap.id, docSnap.data() as Record<string, unknown>);
   } catch (error) {
     console.error('Error fetching consultation by ID:', error);
     return null;
@@ -1480,24 +1471,7 @@ export const getConsultationByCustomerId = async (customerId: string): Promise<C
     if (snapshot.empty) return null;
     
     const docSnap = snapshot.docs[0];
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      customername: data.customername || data.customerName || '',
-      creditScore: data.creditScore || 0,
-      businessName: data.businessName || '',
-      businessNumber: data.businessNumber || '',
-      region: data.region || '',
-      businessStartDate: data.businessStartDate || '',
-      revenue: data.revenue || '',
-      taxDelinquency: data.taxDelinquency || '',
-      services: data.services || [],
-      estimatedLimit: data.estimatedLimit || 0,
-      createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt) || new Date(),
-      phone: data.phone || '',
-      email: data.email || '',
-      linked_customer_id: data.linked_customer_id || null,
-    } as Consultation;
+    return mapFirestoreToConsultation(docSnap.id, docSnap.data() as Record<string, unknown>);
   } catch (error) {
     console.error('Error fetching consultation by customer ID:', error);
     return null;
@@ -1517,6 +1491,39 @@ export const linkConsultationToCustomer = async (consultationId: string, custome
   }
 };
 
+// 상담 데이터 처리 완료 표시
+export const markConsultationProcessed = async (consultationId: string): Promise<void> => {
+  try {
+    const consultationRef = doc(db, 'consultations', consultationId);
+    await updateDoc(consultationRef, {
+      processed: true,
+    });
+  } catch (error) {
+    console.error('Error marking consultation as processed:', error);
+    throw error;
+  }
+};
+
+// 전화번호로 기존 고객 조회
+export const getCustomerByPhone = async (phone: string): Promise<Customer | null> => {
+  try {
+    const customersRef = collection(db, 'customers');
+    const q = query(customersRef, where('phone', '==', phone), limit(1));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) return null;
+    
+    const docSnap = snapshot.docs[0];
+    return {
+      id: docSnap.id,
+      ...docSnap.data(),
+    } as Customer;
+  } catch (error) {
+    console.error('Error fetching customer by phone:', error);
+    return null;
+  }
+};
+
 // 상담 데이터에서 메모 요약 생성
 export const generateConsultationMemoSummary = (consultation: Consultation): string => {
   const formatDate = (date: Date | string): string => {
@@ -1531,11 +1538,6 @@ export const generateConsultationMemoSummary = (consultation: Consultation): str
     });
   };
 
-  const formatEstimatedLimit = (limit: number | undefined): string => {
-    if (!limit || limit === 0) return '-';
-    return `${limit.toLocaleString()}만원`;
-  };
-
   const formatServices = (services: string[] | undefined): string => {
     if (!services || services.length === 0) return '-';
     return services.join(', ');
@@ -1543,14 +1545,13 @@ export const generateConsultationMemoSummary = (consultation: Consultation): str
 
   return `[상담 신청 요약]
 - 신청 일시: ${formatDate(consultation.createdAt)}
-- 대표자명: ${consultation.customername || '-'}
+- 대표자명: ${consultation.name || '-'}
 - 신용점수: ${consultation.creditScore || '-'}
 - 업체명: ${consultation.businessName || '-'}
 - 사업자등록번호: ${consultation.businessNumber || '-'}
 - 지역: ${consultation.region || '-'}
-- 개업일: ${consultation.businessStartDate || '-'}
+- 개업일: ${consultation.businessAge || '-'}
 - 매출: ${consultation.revenue || '-'}
-- 세금체납: ${consultation.taxDelinquency || '-'}
-- 예상 한도: ${formatEstimatedLimit(consultation.estimatedLimit)}
+- 세금체납: ${consultation.taxStatus || '-'}
 - 신청 서비스: ${formatServices(consultation.services)}`;
 };

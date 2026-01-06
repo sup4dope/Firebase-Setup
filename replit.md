@@ -128,6 +128,7 @@ server/
 - `holidays`: 공휴일 목록
 - `meta`: 메타데이터 (사용자 수 등)
 - `settlements`: 정산 데이터 (SettlementItem)
+- `consultations`: 랜딩페이지 상담 신청 데이터
 
 ## 개발 서버 실행
 ```bash
@@ -136,6 +137,14 @@ npm run dev
 - 프론트엔드: http://localhost:5000
 
 ## 최근 변경사항
+- 2026-01-06: 랜딩페이지 상담 신청 자동 연동
+  - **LandingPageListener**: consultations 컬렉션 실시간 감지
+  - **자동 고객 생성**: 신규 상담 신청 시 customers 컬렉션에 자동 등록
+  - **중복 방지 (Upsert)**: 전화번호 기준 기존 고객 존재 시 메모만 추가
+  - **데이터 매핑**: 랜딩페이지 필드 → CRM 필드 자동 변환
+  - **메모 자동 생성**: 상담 신청 요약 메모 counseling_logs에 저장
+  - **Consultation 타입 업데이트**: 신규/레거시 데이터 형식 모두 지원
+
 - 2026-01-04: 정산 관리 시스템 추가
   - **정산관리 페이지**: super_admin 전용 사이드바 메뉴 추가
   - **수당 계산**: 총수익, 세전수당, 원천세(3.3%), 세후실지급액 자동 계산
@@ -193,3 +202,10 @@ npm run dev
 ## Firestore 인덱스 (필수)
 Firebase Console에서 다음 복합 인덱스를 생성해야 합니다:
 - customer_history_logs: customer_id (ASC) + changed_at (DESC)
+- consultations: processed (ASC) - 단일 필드 인덱스 (랜딩페이지 리스너용)
+
+## 랜딩페이지 연동 주의사항
+- **기존 데이터 마이그레이션**: LandingPageListener 활성화 전, 기존 consultations 문서에 `processed: true` 필드를 추가해야 합니다.
+- **새 문서 요구사항**: 랜딩페이지에서 생성하는 새 consultation 문서에 반드시 `processed: false` 필드를 포함해야 합니다.
+- **처리 범위**: 최근 200개 문서만 감시하며, `processed: false`인 문서만 처리합니다.
+- **실패 시 재시도**: 처리 실패 시 리스너 재시작 또는 페이지 새로고침으로 재시도됩니다.

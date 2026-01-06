@@ -1,0 +1,58 @@
+# Firestore 실시간 연동 요청: Landing Page(v0) to CRM(Replit) [최종 수정]
+
+우리 Firestore의 `consultations` 컬렉션(랜딩페이지 유입)을 감지하여 `customers` 컬렉션(CRM)에 고객을 자동 생성하는 로직을 `LandingPageListener.tsx` (또는 적절한 리스너 파일)에 구현해 줘.
+
+## 1. 소스 데이터 구조 (consultations)
+랜딩페이지에서 들어오는 실제 데이터 필드는 다음과 같이 변경되었어:
+- name: "한지성" (고객명)
+- phone: "010-0000-0000"
+- businessName: "경영지원그룹 이음"
+- businessNumber: "264-59-00830"
+- businessAge: "1년 이상 ~ 7년 미만"
+- revenue: "3천만원 미만"
+- region: "서울"
+- creditScore: "350~600점" (문자열)
+- taxStatus: "체납 및 연체가 없어요"
+- services: ["정책자금 (융자)", "기업인증", "법인설립"] (배열)
+- source: "landing-page"
+- createdAt: timestamp
+
+## 2. 데이터 매핑 규칙 (Mapping Rules)
+
+### A. 직접 매핑 (Direct Mapping)
+`consultations` -> `customers` (타입 변환 필수)
+
+- `customers.name` <- `consultations.name`
+- `customers.phone` <- `consultations.phone`
+- `customers.business_registration_number` <- `consultations.businessNumber`
+- `customers.company_name` <- `consultations.businessName`
+- `customers.entry_source` <- "광고" (`source`가 'landing-page'일 경우)
+- `customers.status_code` <- "상담대기"
+- `customers.entry_date` <- 오늘 날짜 (YYYY-MM-DD)
+- `customers.created_at` <- serverTimestamp()
+- `customers.updated_at` <- serverTimestamp()
+
+### B. 기본값 처리 (Default Values)
+CRM 필수 필드 타입 오류 방지:
+- `credit_score`: 0 (입력값이 "350~600점" 같은 문자열이므로 숫자 필드엔 0 저장)
+- `sales_y1`, `sales_y2`, `recent_sales`: 0
+- `manager_name`: "미지정"
+- `team_name`: "미지정"
+- `is_business_owned`, `is_home_owned`: false
+
+### C. 메모 필드 자동 생성 (Summary Note)
+매핑되지 않는 나머지 정보는 `customers.notes` (또는 `latest_memo`) 필드에 텍스트로 요약해서 저장해 줘.
+
+**[메모 저장 양식]**
+[랜딩페이지 상담 신청]
+- 신청일시: {createdAt (YYYY-MM-DD HH:mm 포맷팅)}
+- 업체명: {businessName} ({businessNumber})
+- 지역/업력: {region} / {businessAge}
+- 매출규모: {revenue}
+- 신용점수: {creditScore} (문자열 그대로 기재)
+- 세금상태: {taxStatus}
+- 신청서비스: {services} (배열 내 항목들을 쉼표로 연결하여 한 줄로 표시)
+
+## 3. 핵심 로직 요구사항
+1. **중복 방지 (Upsert Logic)**: `phone` 번호로 `customers` 컬렉션을 조회해서 이미 존재하는 고객이면, 새 문서를 만들지 말고 **기존 고객 문서의 `latest_memo` 필드에 위 요약 내용을 '이어쓰기(append)' 및 `updated_at` 갱신**만 수행해 줘.
+2. **Readable ID 생성**: 신규 고객 생성 시에만 `readable_id` (예: 260106-001)를 생성하는 함수를 실행해 줘. (당일 마지막 번호 +1)
