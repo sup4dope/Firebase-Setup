@@ -80,6 +80,10 @@ import { format, differenceInDays, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { TodoForm } from "@/components/TodoForm";
 import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
+import { 
+  getConsultationByCustomerId, 
+  generateConsultationMemoSummary 
+} from "@/lib/firestore";
 import {
   ref,
   uploadBytes,
@@ -302,6 +306,7 @@ export function CustomerDetailModal({
   const [memos, setMemos] = useState<MemoItem[]>([]);
   const [newMemo, setNewMemo] = useState("");
   const memoScrollRef = useRef<HTMLDivElement>(null);
+  const [memosLoaded, setMemosLoaded] = useState(false); // 메모 로딩 완료 플래그
 
   // AI Chat state
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([]);
@@ -419,6 +424,8 @@ export function CustomerDetailModal({
     // OCR 관련 상태 초기화
     setOcrBusinessTypes([]);
     setOcrExtractedCount(0);
+    // 메모 로딩 플래그 초기화
+    setMemosLoaded(false);
   }, [customer, isNewCustomer, currentUser]);
 
   // [핵심] Firestore에서 최신 고객 데이터 강제 재조회 (모달 열릴 때마다)
@@ -512,14 +519,91 @@ export function CustomerDetailModal({
           created_at: doc.data().created_at?.toDate?.() || new Date(),
         })) as MemoItem[];
         setMemos(logs);
+        setMemosLoaded(true); // 메모 로딩 완료
       },
       (error) => {
         console.error("🔥 메모 로딩 실패:", error);
+        setMemosLoaded(true); // 에러가 나도 로딩 완료로 표시
       },
     );
 
     return () => unsubscribe();
   }, [formData.id]);
+
+  // 상담 신청 데이터로부터 자동 메모 생성 (메모가 비어있을 때만)
+  // 자동 생성 완료 여부를 추적하는 ref
+  const autoMemoGeneratedRef = useRef<Set<string>>(new Set());
+  
+  useEffect(() => {
+    const autoGenerateConsultationMemo = async () => {
+      const customerId = formData.id;
+      
+      // 고객 ID가 없거나, 신규 고객이거나, 모달이 닫혀있으면 건너뜀
+      if (!customerId || isNewCustomer || !isOpen) {
+        return;
+      }
+
+      // 메모 로딩이 완료될 때까지 대기
+      if (!memosLoaded) {
+        console.log(`⏳ 메모 로딩 중, 자동 생성 대기...`);
+        return;
+      }
+
+      // 이미 이 고객에 대해 자동 생성을 시도했으면 건너뜀
+      if (autoMemoGeneratedRef.current.has(customerId)) {
+        console.log(`📋 이미 자동 메모 생성 시도함 (Customer ID: ${customerId})`);
+        return;
+      }
+
+      // 현재 메모 상태 확인 - 메모가 이미 있으면 건너뜀
+      if (memos.length > 0) {
+        console.log(`📋 이미 메모가 있음 (${memos.length}개), 자동 생성 건너뜀`);
+        autoMemoGeneratedRef.current.add(customerId);
+        return;
+      }
+
+      console.log(`🔍 상담 신청 데이터 조회 시작 (Customer ID: ${customerId})`);
+
+      try {
+        // 연결된 상담 신청 데이터 조회
+        const consultation = await getConsultationByCustomerId(customerId);
+        
+        if (!consultation) {
+          console.log(`📋 연결된 상담 신청 데이터 없음`);
+          autoMemoGeneratedRef.current.add(customerId);
+          return;
+        }
+
+        console.log(`✅ 상담 신청 데이터 발견:`, consultation);
+
+        // 메모 요약 생성
+        const memoSummary = generateConsultationMemoSummary(consultation);
+        console.log(`📝 자동 생성된 메모 요약:\n${memoSummary}`);
+
+        // 자동 생성 완료로 표시
+        autoMemoGeneratedRef.current.add(customerId);
+
+        // Firestore counseling_logs에 저장
+        const now = new Date();
+        await addDoc(collection(db, "counseling_logs"), {
+          customer_id: customerId,
+          content: memoSummary,
+          author_name: "시스템",
+          author_id: "system",
+          created_at: now,
+          type: "auto_consultation_summary",
+        });
+
+        console.log(`✅ 상담 신청 요약 메모 자동 저장 완료`);
+      } catch (error) {
+        console.error("🔥 상담 신청 메모 자동 생성 실패:", error);
+        // 에러가 나도 재시도 방지를 위해 표시
+        autoMemoGeneratedRef.current.add(customerId);
+      }
+    };
+
+    autoGenerateConsultationMemo();
+  }, [formData.id, isOpen, isNewCustomer, memos.length, memosLoaded]);
 
   // Update tab when initialTab changes
   useEffect(() => {

@@ -1533,9 +1533,6 @@ export const generateConsultationMemoSummary = (consultation: Consultation): str
 
   const formatEstimatedLimit = (limit: number | undefined): string => {
     if (!limit || limit === 0) return '-';
-    if (limit >= 10000) {
-      return `${(limit / 10000).toFixed(1)}억원`;
-    }
     return `${limit.toLocaleString()}만원`;
   };
 
