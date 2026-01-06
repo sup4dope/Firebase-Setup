@@ -393,3 +393,22 @@ export interface MonthlySettlementSummary {
 
 // Insert 타입
 export type InsertSettlementItem = Omit<SettlementItem, 'id' | 'created_at' | 'updated_at'>;
+
+// Consultation (Firestore: consultations collection) - 상담 신청 데이터
+export interface Consultation {
+  id: string;
+  customername: string; // 대표자명
+  creditScore: number; // 신용점수
+  businessName: string; // 업체명
+  businessNumber: string; // 사업자등록번호
+  region: string; // 지역
+  businessStartDate: string; // 개업일
+  revenue: string; // 매출
+  taxDelinquency: string; // 세금체납
+  services: string[]; // 신청 서비스 배열
+  estimatedLimit?: number; // 예상 한도 (만원)
+  createdAt: Date; // 신청 일시
+  phone?: string; // 연락처
+  email?: string; // 이메일
+  linked_customer_id?: string; // 연동된 CRM 고객 ID
+}

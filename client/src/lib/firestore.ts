@@ -38,6 +38,7 @@ import type {
   MonthlySettlementSummary,
   EntrySourceType,
   CommissionRates,
+  Consultation,
 } from '@shared/types';
 // STATUS_LABELS removed - using Korean status names directly
 
@@ -1400,4 +1401,159 @@ export const cancelSettlementWithClawback = async (
   }
   
   return null;
+};
+
+// ========== 상담 신청 (Consultations) ==========
+
+// 모든 상담 신청 데이터 가져오기
+export const getConsultations = async (): Promise<Consultation[]> => {
+  try {
+    const consultationsRef = collection(db, 'consultations');
+    const q = query(consultationsRef, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        customername: data.customername || data.customerName || '',
+        creditScore: data.creditScore || 0,
+        businessName: data.businessName || '',
+        businessNumber: data.businessNumber || '',
+        region: data.region || '',
+        businessStartDate: data.businessStartDate || '',
+        revenue: data.revenue || '',
+        taxDelinquency: data.taxDelinquency || '',
+        services: data.services || [],
+        estimatedLimit: data.estimatedLimit || 0,
+        createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt) || new Date(),
+        phone: data.phone || '',
+        email: data.email || '',
+        linked_customer_id: data.linked_customer_id || null,
+      } as Consultation;
+    });
+  } catch (error) {
+    console.error('Error fetching consultations:', error);
+    return [];
+  }
+};
+
+// 특정 상담 신청 데이터 가져오기
+export const getConsultationById = async (id: string): Promise<Consultation | null> => {
+  try {
+    const docRef = doc(db, 'consultations', id);
+    const docSnap = await getDoc(docRef);
+    
+    if (!docSnap.exists()) return null;
+    
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      customername: data.customername || data.customerName || '',
+      creditScore: data.creditScore || 0,
+      businessName: data.businessName || '',
+      businessNumber: data.businessNumber || '',
+      region: data.region || '',
+      businessStartDate: data.businessStartDate || '',
+      revenue: data.revenue || '',
+      taxDelinquency: data.taxDelinquency || '',
+      services: data.services || [],
+      estimatedLimit: data.estimatedLimit || 0,
+      createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt) || new Date(),
+      phone: data.phone || '',
+      email: data.email || '',
+      linked_customer_id: data.linked_customer_id || null,
+    } as Consultation;
+  } catch (error) {
+    console.error('Error fetching consultation by ID:', error);
+    return null;
+  }
+};
+
+// 고객 ID로 연결된 상담 신청 데이터 가져오기
+export const getConsultationByCustomerId = async (customerId: string): Promise<Consultation | null> => {
+  try {
+    const consultationsRef = collection(db, 'consultations');
+    const q = query(consultationsRef, where('linked_customer_id', '==', customerId), limit(1));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) return null;
+    
+    const docSnap = snapshot.docs[0];
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      customername: data.customername || data.customerName || '',
+      creditScore: data.creditScore || 0,
+      businessName: data.businessName || '',
+      businessNumber: data.businessNumber || '',
+      region: data.region || '',
+      businessStartDate: data.businessStartDate || '',
+      revenue: data.revenue || '',
+      taxDelinquency: data.taxDelinquency || '',
+      services: data.services || [],
+      estimatedLimit: data.estimatedLimit || 0,
+      createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt) || new Date(),
+      phone: data.phone || '',
+      email: data.email || '',
+      linked_customer_id: data.linked_customer_id || null,
+    } as Consultation;
+  } catch (error) {
+    console.error('Error fetching consultation by customer ID:', error);
+    return null;
+  }
+};
+
+// 상담 데이터를 고객과 연결
+export const linkConsultationToCustomer = async (consultationId: string, customerId: string): Promise<void> => {
+  try {
+    const consultationRef = doc(db, 'consultations', consultationId);
+    await updateDoc(consultationRef, {
+      linked_customer_id: customerId,
+    });
+  } catch (error) {
+    console.error('Error linking consultation to customer:', error);
+    throw error;
+  }
+};
+
+// 상담 데이터에서 메모 요약 생성
+export const generateConsultationMemoSummary = (consultation: Consultation): string => {
+  const formatDate = (date: Date | string): string => {
+    if (!date) return '-';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const formatEstimatedLimit = (limit: number | undefined): string => {
+    if (!limit || limit === 0) return '-';
+    if (limit >= 10000) {
+      return `${(limit / 10000).toFixed(1)}억원`;
+    }
+    return `${limit.toLocaleString()}만원`;
+  };
+
+  const formatServices = (services: string[] | undefined): string => {
+    if (!services || services.length === 0) return '-';
+    return services.join(', ');
+  };
+
+  return `[상담 신청 요약]
+- 신청 일시: ${formatDate(consultation.createdAt)}
+- 대표자명: ${consultation.customername || '-'}
+- 신용점수: ${consultation.creditScore || '-'}
+- 업체명: ${consultation.businessName || '-'}
+- 사업자등록번호: ${consultation.businessNumber || '-'}
+- 지역: ${consultation.region || '-'}
+- 개업일: ${consultation.businessStartDate || '-'}
+- 매출: ${consultation.revenue || '-'}
+- 세금체납: ${consultation.taxDelinquency || '-'}
+- 예상 한도: ${formatEstimatedLimit(consultation.estimatedLimit)}
+- 신청 서비스: ${formatServices(consultation.services)}`;
 };
