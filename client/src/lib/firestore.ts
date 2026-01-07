@@ -1634,16 +1634,34 @@ export const processConsultationToCustomer = async (
     
     const memoSummary = generateConsultationMemoSummary(consultation);
     
+    const now = new Date();
+    const memoEntry = {
+      content: memoSummary,
+      author_id: 'system',
+      author_name: '시스템',
+      created_at: now,
+    };
+
     if (existingCustomer) {
       // 기존 고객: 메모만 추가
       console.log(`📝 기존 고객 발견 (${existingCustomer.name}): 메모 추가`);
       
+      // counseling_logs에 저장
       await addDoc(collection(db, 'counseling_logs'), {
         customer_id: existingCustomer.id,
         content: memoSummary,
         author_name: '시스템',
-        created_at: new Date(),
+        author_id: 'system',
+        created_at: now,
         type: 'system',
+      });
+      
+      // 고객 문서의 memo_history 필드도 업데이트 (모달 재오픈 시 즉시 표시되도록)
+      const existingMemoHistory = existingCustomer.memo_history || [];
+      await updateDoc(doc(db, 'customers', existingCustomer.id), {
+        memo_history: [...existingMemoHistory, memoEntry],
+        recent_memo: memoSummary,
+        updated_at: Timestamp.now(),
       });
       
       // 상담 처리 완료 및 연결
@@ -1655,7 +1673,7 @@ export const processConsultationToCustomer = async (
       // 신규 고객 생성
       console.log(`✨ 신규 고객 생성: ${name || companyName}`);
       
-      const customerData: InsertCustomer & { manager_name?: string; team_name?: string } = {
+      const customerData: InsertCustomer & { manager_name?: string; team_name?: string; memo_history?: any[] } = {
         name: name,
         company_name: companyName,
         phone: phone,
@@ -1665,6 +1683,7 @@ export const processConsultationToCustomer = async (
         entry_date: new Date().toISOString().split('T')[0],
         status_code: '상담대기' as StatusCode,
         recent_memo: memoSummary,
+        memo_history: [memoEntry], // 메모 이력에도 저장
         manager_id: '',
         manager_name: '미배정',
         team_id: '',
@@ -1680,7 +1699,8 @@ export const processConsultationToCustomer = async (
         customer_id: newCustomer.id,
         content: memoSummary,
         author_name: '시스템',
-        created_at: new Date(),
+        author_id: 'system',
+        created_at: now,
         type: 'system',
       });
       

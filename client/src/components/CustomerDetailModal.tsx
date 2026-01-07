@@ -585,6 +585,13 @@ export function CustomerDetailModal({
 
         // Firestore counseling_logs에 저장
         const now = new Date();
+        const memoEntry = {
+          content: memoSummary,
+          author_id: "system",
+          author_name: "시스템",
+          created_at: now,
+        };
+
         await addDoc(collection(db, "counseling_logs"), {
           customer_id: customerId,
           content: memoSummary,
@@ -593,6 +600,17 @@ export function CustomerDetailModal({
           created_at: now,
           type: "auto_consultation_summary",
         });
+
+        // 고객 문서의 memo_history 필드도 업데이트 (모달 재오픈 시 즉시 표시되도록)
+        const customerRef = doc(db, "customers", customerId);
+        const customerSnap = await getDoc(customerRef);
+        if (customerSnap.exists()) {
+          const existingMemoHistory = customerSnap.data().memo_history || [];
+          await updateDoc(customerRef, {
+            memo_history: [...existingMemoHistory, memoEntry],
+            recent_memo: memoSummary,
+          });
+        }
 
         console.log(`✅ 상담 신청 요약 메모 자동 저장 완료`);
       } catch (error) {
