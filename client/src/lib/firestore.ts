@@ -1659,7 +1659,8 @@ export const processConsultationToCustomer = async (
         name: name,
         company_name: companyName,
         phone: phone,
-        credit_score: parseInt(consultation.creditScore || '0', 10) || 0,
+        business_registration_number: consultation.businessNumber || '',
+        credit_score: 0, // 신용점수는 구간(350~600점)으로 들어오므로 매핑하지 않음
         entry_source: '광고' as EntrySourceType,
         entry_date: new Date().toISOString().split('T')[0],
         status_code: '상담대기' as StatusCode,
