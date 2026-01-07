@@ -1524,6 +1524,28 @@ export const getCustomerByPhone = async (phone: string): Promise<Customer | null
   }
 };
 
+// 사업자등록번호로 기존 고객 조회
+export const getCustomerByBusinessNumber = async (businessNumber: string): Promise<Customer | null> => {
+  try {
+    if (!businessNumber || businessNumber.trim() === '') return null;
+    
+    const customersRef = collection(db, 'customers');
+    const q = query(customersRef, where('business_registration_number', '==', businessNumber), limit(1));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) return null;
+    
+    const docSnap = snapshot.docs[0];
+    return {
+      id: docSnap.id,
+      ...docSnap.data(),
+    } as Customer;
+  } catch (error) {
+    console.error('Error fetching customer by business number:', error);
+    return null;
+  }
+};
+
 // 상담 데이터에서 메모 요약 생성
 export const generateConsultationMemoSummary = (consultation: Consultation): string => {
   const formatDate = (date: Date | string): string => {
@@ -1620,16 +1642,17 @@ export const processConsultationToCustomer = async (
     const phone = consultation.phone || '';
     const name = consultation.name || '';
     const companyName = consultation.businessName || '';
+    const businessNumber = consultation.businessNumber || '';
     
-    if (!phone && !name) {
+    if (!phone && !name && !businessNumber) {
       console.log(`⏭️ 상담 ${consultationId}: 필수 정보 없음, 건너뜀`);
       return null;
     }
     
-    // 전화번호로 기존 고객 확인
+    // 사업자등록번호로 기존 고객 확인 (각 상담은 개별 고객으로 생성하되, 사업자번호가 동일하면 기존 고객에 메모 추가)
     let existingCustomer: Customer | null = null;
-    if (phone) {
-      existingCustomer = await getCustomerByPhone(phone);
+    if (businessNumber) {
+      existingCustomer = await getCustomerByBusinessNumber(businessNumber);
     }
     
     const memoSummary = generateConsultationMemoSummary(consultation);
@@ -1732,11 +1755,12 @@ export const importAllPendingConsultations = async (): Promise<{
   
   for (const { id, data } of pending) {
     try {
-      const phone = data.phone || '';
+      const businessNumber = data.businessNumber || '';
       let wasExisting = false;
       
-      if (phone) {
-        const existing = await getCustomerByPhone(phone);
+      // 사업자등록번호로 기존 고객 확인
+      if (businessNumber) {
+        const existing = await getCustomerByBusinessNumber(businessNumber);
         wasExisting = !!existing;
       }
       
