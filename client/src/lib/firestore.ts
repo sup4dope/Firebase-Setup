@@ -1555,3 +1555,183 @@ export const generateConsultationMemoSummary = (consultation: Consultation): str
 - 세금체납: ${consultation.taxStatus || '-'}
 - 신청 서비스: ${formatServices(consultation.services)}`;
 };
+
+// 미처리 상담 신청 개수 조회
+export const getPendingConsultationsCount = async (): Promise<number> => {
+  try {
+    const consultationsRef = collection(db, 'consultations');
+    const snapshot = await getDocs(consultationsRef);
+    
+    let count = 0;
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      // processed가 명시적으로 false이거나, processed가 없고 linked_customer_id도 없는 경우
+      const isUnprocessed = data.processed === false || 
+        (data.processed === undefined && !data.linked_customer_id);
+      if (isUnprocessed) {
+        count++;
+      }
+    });
+    
+    return count;
+  } catch (error) {
+    console.error('Error counting pending consultations:', error);
+    return 0;
+  }
+};
+
+// 미처리 상담 신청 목록 조회
+export const getPendingConsultations = async (): Promise<{ id: string; data: Consultation }[]> => {
+  try {
+    const consultationsRef = collection(db, 'consultations');
+    const q = query(consultationsRef, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    const pending: { id: string; data: Consultation }[] = [];
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      // processed가 명시적으로 false이거나, processed가 없고 linked_customer_id도 없는 경우
+      const isUnprocessed = data.processed === false || 
+        (data.processed === undefined && !data.linked_customer_id);
+      if (isUnprocessed) {
+        pending.push({
+          id: docSnap.id,
+          data: {
+            ...data,
+            createdAt: data.createdAt?.toDate?.() || new Date(),
+          } as Consultation,
+        });
+      }
+    });
+    
+    return pending;
+  } catch (error) {
+    console.error('Error fetching pending consultations:', error);
+    return [];
+  }
+};
+
+// 상담 데이터를 고객으로 일괄 변환 (수동 유입)
+export const processConsultationToCustomer = async (
+  consultationId: string,
+  consultation: Consultation
+): Promise<Customer | null> => {
+  try {
+    const phone = consultation.phone || '';
+    const name = consultation.name || '';
+    const companyName = consultation.businessName || '';
+    
+    if (!phone && !name) {
+      console.log(`⏭️ 상담 ${consultationId}: 필수 정보 없음, 건너뜀`);
+      return null;
+    }
+    
+    // 전화번호로 기존 고객 확인
+    let existingCustomer: Customer | null = null;
+    if (phone) {
+      existingCustomer = await getCustomerByPhone(phone);
+    }
+    
+    const memoSummary = generateConsultationMemoSummary(consultation);
+    
+    if (existingCustomer) {
+      // 기존 고객: 메모만 추가
+      console.log(`📝 기존 고객 발견 (${existingCustomer.name}): 메모 추가`);
+      
+      await addDoc(collection(db, 'counseling_logs'), {
+        customer_id: existingCustomer.id,
+        content: memoSummary,
+        author_name: '시스템',
+        created_at: new Date(),
+        type: 'system',
+      });
+      
+      // 상담 처리 완료 및 연결
+      await markConsultationProcessed(consultationId);
+      await linkConsultationToCustomer(consultationId, existingCustomer.id);
+      
+      return existingCustomer;
+    } else {
+      // 신규 고객 생성
+      console.log(`✨ 신규 고객 생성: ${name || companyName}`);
+      
+      const customerData: InsertCustomer & { manager_name?: string; team_name?: string } = {
+        name: name,
+        company_name: companyName,
+        phone: phone,
+        credit_score: parseInt(consultation.creditScore || '0', 10) || 0,
+        entry_source: '광고' as EntrySourceType,
+        entry_date: new Date().toISOString().split('T')[0],
+        status_code: '상담대기' as StatusCode,
+        recent_memo: memoSummary,
+        manager_id: '',
+        manager_name: '미배정',
+        team_id: '',
+        team_name: '미배정',
+        approved_amount: 0,
+        commission_rate: 0,
+      };
+      
+      const newCustomer = await createCustomer(customerData);
+      
+      // 상담 로그 추가
+      await addDoc(collection(db, 'counseling_logs'), {
+        customer_id: newCustomer.id,
+        content: memoSummary,
+        author_name: '시스템',
+        created_at: new Date(),
+        type: 'system',
+      });
+      
+      // 상담 처리 완료 및 연결
+      await markConsultationProcessed(consultationId);
+      await linkConsultationToCustomer(consultationId, newCustomer.id);
+      
+      return newCustomer;
+    }
+  } catch (error) {
+    console.error(`❌ 상담 처리 실패 (${consultationId}):`, error);
+    throw error;
+  }
+};
+
+// 모든 미처리 상담을 일괄 처리
+export const importAllPendingConsultations = async (): Promise<{
+  success: number;
+  failed: number;
+  newCustomers: number;
+  existingCustomers: number;
+}> => {
+  const pending = await getPendingConsultations();
+  
+  let success = 0;
+  let failed = 0;
+  let newCustomers = 0;
+  let existingCustomers = 0;
+  
+  for (const { id, data } of pending) {
+    try {
+      const phone = data.phone || '';
+      let wasExisting = false;
+      
+      if (phone) {
+        const existing = await getCustomerByPhone(phone);
+        wasExisting = !!existing;
+      }
+      
+      await processConsultationToCustomer(id, data);
+      success++;
+      
+      if (wasExisting) {
+        existingCustomers++;
+      } else {
+        newCustomers++;
+      }
+    } catch (error) {
+      console.error(`Failed to process consultation ${id}:`, error);
+      failed++;
+    }
+  }
+  
+  return { success, failed, newCustomers, existingCustomers };
+};

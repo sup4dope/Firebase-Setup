@@ -216,8 +216,8 @@ function AuthenticatedApp() {
         }}
       />
 
-      {/* Landing Page Consultation Listener */}
-      <LandingPageListener enabled={true} />
+      {/* Landing Page Consultation Listener - 비활성화 (수동 유입으로 전환) */}
+      {/* <LandingPageListener enabled={true} /> */}
     </SidebarProvider>
   );
 }

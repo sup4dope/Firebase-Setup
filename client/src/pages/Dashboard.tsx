@@ -27,8 +27,10 @@ import {
   updateCustomerStatus,
   updateCustomerInfo,
   syncSingleCustomerSettlement,
+  getPendingConsultationsCount,
+  importAllPendingConsultations,
 } from '@/lib/firestore';
-import { Plus, Search, RefreshCw, CalendarIcon } from 'lucide-react';
+import { Plus, Search, RefreshCw, CalendarIcon, Download } from 'lucide-react';
 import { DataExport } from '@/components/DataExport';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -65,6 +67,10 @@ export default function Dashboard() {
   });
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [selectedStaff, setSelectedStaff] = useState<string>('all');
+  
+  // 미처리 상담 유입 관련 상태 (super_admin 전용)
+  const [pendingConsultationsCount, setPendingConsultationsCount] = useState(0);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Form states
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
@@ -155,6 +161,51 @@ export default function Dashboard() {
   useEffect(() => {
     fetchData();
   }, [user]);
+
+  // super_admin: 미처리 상담 개수 조회
+  useEffect(() => {
+    const fetchPendingCount = async () => {
+      if (!isSuperAdmin) return;
+      try {
+        const count = await getPendingConsultationsCount();
+        setPendingConsultationsCount(count);
+      } catch (error) {
+        console.error('Error fetching pending consultations count:', error);
+      }
+    };
+    
+    fetchPendingCount();
+  }, [isSuperAdmin]);
+
+  // 미처리 상담 일괄 유입 처리
+  const handleImportConsultations = async () => {
+    if (!window.confirm(`미처리 상담 ${pendingConsultationsCount}건을 고객으로 유입하시겠습니까?`)) {
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const result = await importAllPendingConsultations();
+      
+      toast({
+        title: 'DB 유입 완료',
+        description: `총 ${result.success}건 처리 (신규: ${result.newCustomers}건, 기존 고객 메모 추가: ${result.existingCustomers}건${result.failed > 0 ? `, 실패: ${result.failed}건` : ''})`,
+      });
+
+      // 카운트 새로고침 및 고객 목록 새로고침
+      setPendingConsultationsCount(0);
+      await fetchData();
+    } catch (error) {
+      console.error('Error importing consultations:', error);
+      toast({
+        title: '오류',
+        description: '상담 유입 처리 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   // Calculate KPI
   const kpi = useMemo(() => {
@@ -870,6 +921,19 @@ export default function Dashboard() {
                 teams={teams}
                 isSuperAdmin={isSuperAdmin}
               />
+            )}
+
+            {/* DB 유입 버튼 (super_admin 전용) */}
+            {isSuperAdmin && pendingConsultationsCount > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleImportConsultations}
+                disabled={isImporting}
+                data-testid="button-import-consultations"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isImporting ? '유입 중...' : `${pendingConsultationsCount}건 DB유입`}
+              </Button>
             )}
             
             <Button onClick={handleNewCustomerModal} data-testid="button-add-customer">

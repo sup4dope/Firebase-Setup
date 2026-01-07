@@ -204,8 +204,9 @@ Firebase Console에서 다음 복합 인덱스를 생성해야 합니다:
 - customer_history_logs: customer_id (ASC) + changed_at (DESC)
 - consultations: processed (ASC) - 단일 필드 인덱스 (랜딩페이지 리스너용)
 
-## 랜딩페이지 연동 주의사항
-- **기존 데이터 마이그레이션**: LandingPageListener 활성화 전, 기존 consultations 문서에 `processed: true` 필드를 추가해야 합니다.
-- **새 문서 요구사항**: 랜딩페이지에서 생성하는 새 consultation 문서에 반드시 `processed: false` 필드를 포함해야 합니다.
-- **처리 범위**: 최근 200개 문서만 감시하며, `processed: false`인 문서만 처리합니다.
-- **실패 시 재시도**: 처리 실패 시 리스너 재시작 또는 페이지 새로고침으로 재시도됩니다.
+## 랜딩페이지 연동 (수동 유입 방식)
+- **자동 유입 비활성화**: LandingPageListener는 비활성화되어 있음 (수동 유입으로 전환)
+- **수동 유입 버튼**: super_admin 사용자는 대시보드에서 "N건 DB유입" 버튼으로 일괄 처리 가능
+- **미처리 판정 기준**: `processed === false` 또는 (`processed` 없고 `linked_customer_id` 없음)
+- **처리 로직**: 전화번호로 기존 고객 확인 → 기존 고객이면 메모만 추가, 신규면 고객 생성
+- **처리 완료 시**: `processed: true` 설정 및 `linked_customer_id`로 고객 연결
