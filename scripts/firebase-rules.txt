@@ -1,0 +1,166 @@
+/**
+ * Firebase Firestore Security Rules (Custom Claims 버전)
+ * 
+ * 중요: 이 규칙은 Firebase Custom Claims를 사용합니다.
+ * 적용 전에 반드시 /migration 페이지에서 Custom Claims 동기화를 실행하세요!
+ * 
+ * 적용 방법:
+ * 1. FIREBASE_SERVICE_ACCOUNT 환경 변수 설정 (서비스 계정 JSON)
+ * 2. /migration 페이지에서 "Custom Claims 동기화 실행" 버튼 클릭
+ * 3. Firebase Console (https://console.firebase.google.com) 접속
+ * 4. 프로젝트 선택 → Firestore Database → Rules 탭
+ * 5. 아래 코드를 복사하여 붙여넣기
+ * 6. "Publish" 버튼 클릭
+ * 7. 모든 사용자가 로그아웃 후 다시 로그인 (새 토큰 발급 필요)
+ */
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========================================
+    // Helper Functions (Custom Claims 사용)
+    // ========================================
+    
+    // 로그인 여부 확인
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Custom Claims에서 역할 가져오기 (get() 호출 없이!)
+    // 이 방식은 컬렉션 전체 쿼리에서도 정상 작동합니다.
+    function getRole() {
+      return request.auth.token.role;
+    }
+    
+    // super_admin 확인
+    function isSuperAdmin() {
+      return isAuthenticated() && getRole() == 'super_admin';
+    }
+    
+    // team_leader 이상 확인
+    function isTeamLeaderOrAbove() {
+      return isAuthenticated() && (getRole() == 'super_admin' || getRole() == 'team_leader');
+    }
+    
+    // 본인 문서 확인
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // ========================================
+    // 1. 상담 신청 (외부 고객용)
+    // ========================================
+    match /consultations/{docId} {
+      allow create: if true;  // 외부 고객도 입력 가능
+      allow read, update, delete: if isSuperAdmin();  // super_admin만 조회/수정/삭제
+    }
+    
+    // ========================================
+    // 2. 사용자 정보
+    // ========================================
+    match /users/{userId} {
+      allow read: if isAuthenticated();  // 로그인한 사용자 모두 조회 가능
+      allow create, delete: if isSuperAdmin();  // super_admin만 생성/삭제
+      allow update: if isSuperAdmin() || isOwner(userId);  // 본인 또는 super_admin만 수정
+    }
+    
+    // ========================================
+    // 3. 팀 정보
+    // ========================================
+    match /teams/{teamId} {
+      allow read: if isAuthenticated();  // 로그인한 사용자 모두 조회 가능
+      allow write: if isSuperAdmin();  // super_admin만 수정
+    }
+    
+    // ========================================
+    // 4. 고객 정보
+    // ========================================
+    match /customers/{customerId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isSuperAdmin();
+    }
+    
+    // ========================================
+    // 5. 정산 데이터 (super_admin 전용)
+    // ========================================
+    match /settlements/{settlementId} {
+      allow read, write: if isSuperAdmin();
+    }
+    
+    // ========================================
+    // 6. 회사 비용 (super_admin 전용)
+    // ========================================
+    match /company_expenses/{expenseId} {
+      allow read, write: if isSuperAdmin();
+    }
+    
+    // expenses 컬렉션 (실제 사용 중인 비용 데이터)
+    match /expenses/{expenseId} {
+      allow read, write: if isSuperAdmin();
+    }
+    
+    // ========================================
+    // 7. 공휴일
+    // ========================================
+    match /holidays/{holidayId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+    
+    // ========================================
+    // 8. 할 일 목록
+    // ========================================
+    match /todos/{todoId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /todo_list/{todoId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // ========================================
+    // 9. 메타데이터
+    // ========================================
+    match /meta/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+    
+    // ========================================
+    // 10. 상태 로그
+    // ========================================
+    match /status_logs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // ========================================
+    // 11. 고객 히스토리 로그
+    // ========================================
+    match /customer_history_logs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // ========================================
+    // 12. 상담 메모
+    // ========================================
+    match /counseling_logs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // ========================================
+    // 13. 계약 이력
+    // ========================================
+    match /contract_history/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ========================================
+    // 14. 영수증/첨부파일
+    // ========================================
+    match /receipts/{receiptId} {
+      allow read, write: if isSuperAdmin();
+    }
+  }
+}
