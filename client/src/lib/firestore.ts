@@ -43,6 +43,10 @@ import type {
   Expense,
   InsertExpense,
   ExpenseCategory,
+  LeaveRequest,
+  InsertLeaveRequest,
+  LeaveStatus,
+  LeaveSummary,
 } from '@shared/types';
 // STATUS_LABELS removed - using Korean status names directly
 
@@ -2206,14 +2210,183 @@ export const getCumulativeTaxReserve = async (upToMonth: string): Promise<number
     
     if (settlementMonth && settlementMonth <= upToMonth) {
       if (data.is_clawback) {
-        // 환수 항목: 차감
         cumulativeRevenue -= Math.abs(data.total_revenue || 0);
       } else {
-        // 원본 정산 항목: status와 관계없이 모두 집계 (Point-in-time 정확성)
         cumulativeRevenue += data.total_revenue || 0;
       }
     }
   });
   
   return Math.round(cumulativeRevenue * 0.15);
+};
+
+// ========================================
+// 연차 관리 (Leave Requests)
+// ========================================
+
+export const getLeaveRequests = async (): Promise<LeaveRequest[]> => {
+  const q = query(collection(db, 'leave_requests'), orderBy('created_at', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => ({
+    id: docSnap.id,
+    ...docSnap.data(),
+    created_at: toDate(docSnap.data().created_at),
+    updated_at: docSnap.data().updated_at ? toDate(docSnap.data().updated_at) : undefined,
+    leader_approved_at: docSnap.data().leader_approved_at ? toDate(docSnap.data().leader_approved_at) : undefined,
+    admin_approved_at: docSnap.data().admin_approved_at ? toDate(docSnap.data().admin_approved_at) : undefined,
+    rejected_at: docSnap.data().rejected_at ? toDate(docSnap.data().rejected_at) : undefined,
+  })) as LeaveRequest[];
+};
+
+export const getLeaveRequestsByUser = async (userId: string): Promise<LeaveRequest[]> => {
+  const q = query(
+    collection(db, 'leave_requests'),
+    where('user_id', '==', userId),
+    orderBy('created_at', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => ({
+    id: docSnap.id,
+    ...docSnap.data(),
+    created_at: toDate(docSnap.data().created_at),
+    updated_at: docSnap.data().updated_at ? toDate(docSnap.data().updated_at) : undefined,
+  })) as LeaveRequest[];
+};
+
+export const getLeaveRequestsByTeam = async (teamId: string): Promise<LeaveRequest[]> => {
+  const q = query(
+    collection(db, 'leave_requests'),
+    where('team_id', '==', teamId),
+    orderBy('created_at', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => ({
+    id: docSnap.id,
+    ...docSnap.data(),
+    created_at: toDate(docSnap.data().created_at),
+    updated_at: docSnap.data().updated_at ? toDate(docSnap.data().updated_at) : undefined,
+  })) as LeaveRequest[];
+};
+
+export const getLeaveRequestsByStatus = async (status: LeaveStatus): Promise<LeaveRequest[]> => {
+  const q = query(
+    collection(db, 'leave_requests'),
+    where('status', '==', status),
+    orderBy('created_at', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => ({
+    id: docSnap.id,
+    ...docSnap.data(),
+    created_at: toDate(docSnap.data().created_at),
+    updated_at: docSnap.data().updated_at ? toDate(docSnap.data().updated_at) : undefined,
+  })) as LeaveRequest[];
+};
+
+export const createLeaveRequest = async (data: InsertLeaveRequest): Promise<string> => {
+  const docRef = await addDoc(collection(db, 'leave_requests'), {
+    ...data,
+    created_at: Timestamp.now(),
+    updated_at: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const approveLeaveByLeader = async (
+  requestId: string,
+  approverId: string,
+  approverName: string
+): Promise<void> => {
+  await updateDoc(doc(db, 'leave_requests', requestId), {
+    status: 'pending_admin',
+    leader_approved_by: approverId,
+    leader_approved_name: approverName,
+    leader_approved_at: Timestamp.now(),
+    updated_at: Timestamp.now(),
+  });
+};
+
+export const approveLeaveByAdmin = async (
+  requestId: string,
+  approverId: string,
+  approverName: string,
+  userId: string,
+  leaveDays: number
+): Promise<void> => {
+  const batch = writeBatch(db);
+  
+  batch.update(doc(db, 'leave_requests', requestId), {
+    status: 'approved',
+    admin_approved_by: approverId,
+    admin_approved_name: approverName,
+    admin_approved_at: Timestamp.now(),
+    updated_at: Timestamp.now(),
+  });
+  
+  const userDocRef = doc(db, 'users', userId);
+  const userDoc = await getDoc(userDocRef);
+  if (userDoc.exists()) {
+    const userData = userDoc.data();
+    const currentUsed = userData.usedLeave || 0;
+    batch.update(userDocRef, {
+      usedLeave: currentUsed + leaveDays,
+      updated_at: Timestamp.now(),
+    });
+  }
+  
+  await batch.commit();
+};
+
+export const rejectLeaveRequest = async (
+  requestId: string,
+  rejecterId: string,
+  rejecterName: string,
+  reason: string
+): Promise<void> => {
+  await updateDoc(doc(db, 'leave_requests', requestId), {
+    status: 'rejected',
+    rejected_by: rejecterId,
+    rejected_name: rejecterName,
+    rejected_at: Timestamp.now(),
+    rejected_reason: reason,
+    updated_at: Timestamp.now(),
+  });
+};
+
+export const deleteLeaveRequest = async (requestId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'leave_requests', requestId));
+};
+
+export const getLeaveSummary = async (userId: string): Promise<LeaveSummary> => {
+  const userDoc = await getDoc(doc(db, 'users', userId));
+  
+  let totalLeave = 15;
+  let usedLeave = 0;
+  
+  if (userDoc.exists()) {
+    const userData = userDoc.data();
+    totalLeave = userData.totalLeave ?? 15;
+    usedLeave = userData.usedLeave ?? 0;
+  }
+  
+  const pendingQuery = query(
+    collection(db, 'leave_requests'),
+    where('user_id', '==', userId),
+    where('status', 'in', ['pending_leader', 'pending_admin'])
+  );
+  const pendingSnapshot = await getDocs(pendingQuery);
+  
+  return {
+    totalLeave,
+    usedLeave,
+    remainingLeave: totalLeave - usedLeave,
+    pendingCount: pendingSnapshot.size,
+  };
+};
+
+export const updateUserLeaveQuota = async (userId: string, totalLeave: number): Promise<void> => {
+  await updateDoc(doc(db, 'users', userId), {
+    totalLeave,
+    updated_at: Timestamp.now(),
+  });
 };
