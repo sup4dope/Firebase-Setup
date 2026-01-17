@@ -9,25 +9,25 @@ import {
   isAfter,
   format,
 } from 'date-fns';
-import type { Holiday, Customer, StatusLog, KPIData } from '@shared/types';
+import type { Customer, StatusLog, KPIData } from '@shared/types';
 
-// Check if a date is a holiday
-const isHoliday = (date: Date, holidays: Holiday[]): boolean => {
+// Check if a date is a holiday using Map<string, string> format (from public API)
+const isHolidayFromMap = (date: Date, holidayMap: Map<string, string>): boolean => {
   const dateStr = format(date, 'yyyy-MM-dd');
-  return holidays.some(h => h.date === dateStr);
+  return holidayMap.has(dateStr);
 };
 
 // Get business days in a month (excluding weekends and holidays)
-export const getBusinessDaysInMonth = (date: Date, holidays: Holiday[]): number => {
+export const getBusinessDaysInMonth = (date: Date, holidayMap: Map<string, string>): number => {
   const start = startOfMonth(date);
   const end = endOfMonth(date);
   const days = eachDayOfInterval({ start, end });
   
-  return days.filter(day => !isWeekend(day) && !isHoliday(day, holidays)).length;
+  return days.filter(day => !isWeekend(day) && !isHolidayFromMap(day, holidayMap)).length;
 };
 
 // Get elapsed business days in current month
-export const getElapsedBusinessDays = (date: Date, holidays: Holiday[]): number => {
+export const getElapsedBusinessDays = (date: Date, holidayMap: Map<string, string>): number => {
   const start = startOfMonth(date);
   const today = new Date();
   
@@ -38,14 +38,14 @@ export const getElapsedBusinessDays = (date: Date, holidays: Holiday[]): number 
   const end = isSameMonth(date, today) ? today : endOfMonth(date);
   const days = eachDayOfInterval({ start, end });
   
-  return days.filter(day => !isWeekend(day) && !isHoliday(day, holidays)).length;
+  return days.filter(day => !isWeekend(day) && !isHolidayFromMap(day, holidayMap)).length;
 };
 
 // Calculate KPI data
 export const calculateKPI = (
   customers: Customer[],
   statusLogs: StatusLog[],
-  holidays: Holiday[],
+  holidayMap: Map<string, string>,
   date: Date = new Date()
 ): KPIData => {
   const monthStart = startOfMonth(date);
@@ -91,8 +91,8 @@ export const calculateKPI = (
     .reduce((sum, c) => sum + (c.execution_amount || 0), 0);
   
   // Business days calculation
-  const totalBusinessDays = getBusinessDaysInMonth(date, holidays);
-  const businessDaysElapsed = getElapsedBusinessDays(date, holidays);
+  const totalBusinessDays = getBusinessDaysInMonth(date, holidayMap);
+  const businessDaysElapsed = getElapsedBusinessDays(date, holidayMap);
   
   // 예상 매출: (당월 총 집행금액 / 경과영업일) × 전체영업일
   const ratio = businessDaysElapsed > 0 ? totalBusinessDays / businessDaysElapsed : 1;

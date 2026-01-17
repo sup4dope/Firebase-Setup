@@ -13,13 +13,13 @@ import { CustomerInfoEditModal } from '@/components/CustomerInfoEditModal';
 import { CustomerInfoHistoryModal } from '@/components/CustomerInfoHistoryModal';
 import { useToast } from '@/hooks/use-toast';
 import { calculateKPI } from '@/lib/kpi';
+import { fetchYearlyHolidays } from '@/lib/publicHolidays';
 import {
   getCustomers,
   getCustomersByManager,
   getCustomersByTeam,
   getUsers,
   getTeams,
-  getHolidays,
   getStatusLogs,
   createCustomer,
   updateCustomer,
@@ -45,7 +45,7 @@ import { FUNNEL_GROUPS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Customer, User, Team, Holiday, StatusLog, StatusCode, InsertCustomer } from '@shared/types';
+import type { Customer, User, Team, StatusLog, StatusCode, InsertCustomer } from '@shared/types';
 
 const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
@@ -56,7 +56,7 @@ export default function Dashboard() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map());
   const [statusLogs, setStatusLogs] = useState<StatusLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -128,16 +128,17 @@ export default function Dashboard() {
 
     setLoading(true);
     try {
-      const [fetchedUsers, fetchedTeams, fetchedHolidays, fetchedLogs] = await Promise.all([
+      const currentYear = new Date().getFullYear();
+      const [fetchedUsers, fetchedTeams, fetchedHolidayMap, fetchedLogs] = await Promise.all([
         getUsers(),
         getTeams(),
-        getHolidays(),
+        fetchYearlyHolidays(currentYear),
         getStatusLogs(),
       ]);
 
       setUsers(fetchedUsers);
       setTeams(fetchedTeams);
-      setHolidays(fetchedHolidays);
+      setHolidayMap(fetchedHolidayMap);
       setStatusLogs(fetchedLogs);
 
       // Fetch customers based on role
@@ -213,8 +214,8 @@ export default function Dashboard() {
 
   // Calculate KPI
   const kpi = useMemo(() => {
-    return calculateKPI(customers, statusLogs, holidays);
-  }, [customers, statusLogs, holidays]);
+    return calculateKPI(customers, statusLogs, holidayMap);
+  }, [customers, statusLogs, holidayMap]);
 
   // 유효한 팀 목록 (id가 존재하는 팀만)
   const validTeams = useMemo(() => {
