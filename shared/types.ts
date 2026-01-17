@@ -44,6 +44,8 @@ export interface User {
   last_login_at?: Date; // 최근 로그인 일시
   login_history?: LoginHistory[]; // 로그인 이력 (최근 5개)
   commissionRates?: CommissionRates; // 수당 정책 설정
+  totalLeave?: number; // 총 연차 (기본 15일)
+  usedLeave?: number;  // 사용한 연차
   created_at?: Date;
   updated_at?: Date;
 }
@@ -505,4 +507,67 @@ export interface LegacyConsultation {
   phone?: string; // 연락처
   email?: string; // 이메일
   linked_customer_id?: string; // 연동된 CRM 고객 ID
+}
+
+// ========================================
+// 연차 관리 시스템 타입 정의
+// ========================================
+
+// 연차 신청 유형
+export type LeaveType = 'full' | 'am' | 'pm'; // 전일(1.0), 오전반차(0.5), 오후반차(0.5)
+
+// 연차 신청 상태 (2단계 승인)
+export type LeaveStatus = 
+  | 'pending_leader'  // 팀장 승인 대기
+  | 'pending_admin'   // 총관리자 승인 대기
+  | 'approved'        // 최종 승인
+  | 'rejected';       // 반려
+
+// 연차 신청 (Firestore: leave_requests collection)
+export interface LeaveRequest {
+  id: string;
+  user_id: string;           // 신청자 UID
+  user_name: string;         // 신청자 이름
+  team_id: string | null;    // 팀 ID
+  team_name: string | null;  // 팀 이름
+  leave_date: string;        // 연차 사용일 YYYY-MM-DD
+  leave_type: LeaveType;     // 전일/오전반차/오후반차
+  leave_days: number;        // 차감 일수 (1.0 또는 0.5)
+  reason: string;            // 사유
+  status: LeaveStatus;       // 현재 상태
+  
+  // 승인/반려 정보
+  leader_approved_by?: string;    // 팀장 승인자 UID
+  leader_approved_name?: string;  // 팀장 승인자 이름
+  leader_approved_at?: Date;      // 팀장 승인 일시
+  admin_approved_by?: string;     // 총관리자 승인자 UID
+  admin_approved_name?: string;   // 총관리자 승인자 이름
+  admin_approved_at?: Date;       // 총관리자 승인 일시
+  rejected_by?: string;           // 반려자 UID
+  rejected_name?: string;         // 반려자 이름
+  rejected_at?: Date;             // 반려 일시
+  rejected_reason?: string;       // 반려 사유
+  
+  created_at: Date;
+  updated_at?: Date;
+}
+
+// 연차 신청 Insert 타입
+export type InsertLeaveRequest = Omit<LeaveRequest, 'id' | 'created_at' | 'updated_at'>;
+
+// 공휴일 API 응답 타입 (공공데이터포털)
+export interface PublicHolidayItem {
+  dateKind: string;     // 종류: 01=국경일, 02=공휴일, 03=대체공휴일 등
+  dateName: string;     // 공휴일 명칭
+  isHoliday: string;    // Y/N
+  locdate: number;      // 날짜 YYYYMMDD
+  seq: number;          // 순번
+}
+
+// 연차 요약 정보
+export interface LeaveSummary {
+  totalLeave: number;   // 총 연차
+  usedLeave: number;    // 사용 연차
+  remainingLeave: number; // 잔여 연차
+  pendingCount: number;   // 승인 대기 건수
 }
