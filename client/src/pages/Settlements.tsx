@@ -289,8 +289,9 @@ export default function Settlements() {
     
     // 계약금 수당: 계약금 * 수당율 적용
     const contractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * item.commission_rate / 100), 0);
-    // 평균 계약금액 계산용: 수당율 적용된 개별 계약금의 평균 (총 계약금액 / 계약 건수)
-    const avgContractAmount = originalItems.length > 0 ? contractAmount / originalItems.length : 0;
+    // 평균 계약금액: 수당율 적용 없이 원본 계약금의 평균 (고객 단위 계약금 평균)
+    const rawContractAmount = originalItems.reduce((sum, item) => sum + item.contract_amount, 0);
+    const avgContractAmount = originalItems.length > 0 ? rawContractAmount / originalItems.length : 0;
     const executedItems = originalItems.filter(item => item.execution_amount > 0);
     const executionCount = executedItems.length;
     const executionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
