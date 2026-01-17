@@ -654,25 +654,6 @@ export default function CompanySettlement() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Receipt className="w-4 h-4" />
-                  비용 합계
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {formatAmount(revenueData.employeeCommission + expenseSummary.total)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  직원 수수료: {formatAmount(revenueData.employeeCommission)} / 운영비: {formatAmount(expenseSummary.total)}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-4">
