@@ -183,6 +183,12 @@ service cloud.firestore {
           && request.resource.data.status == 'rejected';
       }
       
+      // 헬퍼: 승인 취소 검증 (super_admin만 가능)
+      function isValidCancellation() {
+        return resource.data.status == 'approved' 
+          && request.resource.data.status == 'cancelled';
+      }
+      
       // 읽기: 인증된 사용자
       allow read: if isAuthenticated();
       
@@ -194,11 +200,13 @@ service cloud.firestore {
       // 수정: 2단계 승인 워크플로우
       // - pending_leader → pending_admin: 팀장 또는 관리자
       // - pending_admin → approved: 관리자만
+      // - approved → cancelled: 관리자만 (연차 복원)
       // - 반려: 팀장 또는 관리자
       allow update: if isTeamLeaderOrAbove() && (
         isValidLeaderApproval() || 
         isValidRejection() || 
-        (isSuperAdmin() && isValidAdminApproval())
+        (isSuperAdmin() && isValidAdminApproval()) ||
+        (isSuperAdmin() && isValidCancellation())
       );
       
       // 삭제: 본인 (대기 상태에서만) 또는 관리자

@@ -521,7 +521,8 @@ export type LeaveStatus =
   | 'pending_leader'  // 팀장 승인 대기
   | 'pending_admin'   // 총관리자 승인 대기
   | 'approved'        // 최종 승인
-  | 'rejected';       // 반려
+  | 'rejected'        // 반려
+  | 'cancelled';      // 승인 취소 (총관리자만)
 
 // 연차 신청 (Firestore: leave_requests collection)
 export interface LeaveRequest {
@@ -547,6 +548,9 @@ export interface LeaveRequest {
   rejected_name?: string;         // 반려자 이름
   rejected_at?: Date;             // 반려 일시
   rejected_reason?: string;       // 반려 사유
+  cancelled_by?: string;          // 취소자 UID (총관리자)
+  cancelled_by_name?: string;     // 취소자 이름
+  cancelled_at?: Date;            // 취소 일시
   
   created_at: Date;
   updated_at?: Date;

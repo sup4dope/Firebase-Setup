@@ -62,6 +62,7 @@ import {
   rejectLeaveRequest,
   deleteLeaveRequest,
   getLeaveSummary,
+  cancelApprovedLeave,
 } from '@/lib/firestore';
 import { fetchYearlyHolidays, isWeekend } from '@/lib/publicHolidays';
 import type { LeaveRequest, LeaveType, LeaveStatus, LeaveSummary, InsertLeaveRequest } from '@shared/types';
@@ -84,6 +85,7 @@ const STATUS_LABELS: Record<LeaveStatus, string> = {
   pending_admin: '총관리자 승인 대기',
   approved: '승인완료',
   rejected: '반려',
+  cancelled: '승인취소',
 };
 
 const STATUS_COLORS: Record<LeaveStatus, string> = {
@@ -91,6 +93,7 @@ const STATUS_COLORS: Record<LeaveStatus, string> = {
   pending_admin: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
   approved: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   rejected: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+  cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
 };
 
 export default function AnnualLeave() {
@@ -359,6 +362,36 @@ export default function AnnualLeave() {
       toast({
         title: '오류',
         description: '취소 처리 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCancelApprovedLeave = async (request: LeaveRequest) => {
+    if (!user || !isSuperAdmin) return;
+    
+    if (!confirm(`${request.user_name}님의 ${request.leave_date} 연차 승인을 취소하시겠습니까?\n차감된 ${request.leave_days}일이 복원됩니다.`)) {
+      return;
+    }
+
+    try {
+      await cancelApprovedLeave(
+        request.id,
+        user.uid,
+        user.name,
+        request.user_id,
+        request.leave_days
+      );
+      toast({
+        title: '승인 취소 완료',
+        description: `${request.user_name}님의 연차 ${request.leave_days}일이 복원되었습니다.`,
+      });
+      await fetchData();
+    } catch (error) {
+      console.error('Error canceling approved leave:', error);
+      toast({
+        title: '오류',
+        description: '승인 취소 처리 중 오류가 발생했습니다.',
         variant: 'destructive',
       });
     }
@@ -784,6 +817,7 @@ export default function AnnualLeave() {
                           <TableHead>상태</TableHead>
                           <TableHead>1차 승인</TableHead>
                           <TableHead>최종 승인</TableHead>
+                          <TableHead>작업</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -821,6 +855,28 @@ export default function AnnualLeave() {
                                 <div className="text-sm text-red-500">
                                   {req.rejected_name} (반려)
                                 </div>
+                              )}
+                              {req.cancelled_by_name && (
+                                <div className="text-sm text-gray-500">
+                                  {req.cancelled_by_name} (취소)
+                                  <div className="text-xs text-muted-foreground">
+                                    {req.cancelled_at && format(req.cancelled_at, 'MM/dd HH:mm')}
+                                  </div>
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {req.status === 'approved' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCancelApprovedLeave(req)}
+                                  className="text-orange-600"
+                                  data-testid={`button-cancel-approved-${req.id}`}
+                                >
+                                  <X className="h-4 w-4 mr-1" />
+                                  승인취소
+                                </Button>
                               )}
                             </TableCell>
                           </TableRow>
