@@ -577,6 +577,8 @@ export const createUser = async (userData: {
   role: 'staff' | 'team_leader' | 'super_admin';
   team_id: string | null;
   team_name: string | null;
+  totalLeave?: number;
+  usedLeave?: number;
   commissionRates?: {
     teamOverride: number;
     ad: number;

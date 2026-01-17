@@ -96,6 +96,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     hire_date: new Date().toISOString().split('T')[0],
     role: 'staff' as UserRole,
     team_id: '' as string,
+    totalLeave: 15,
     commissionRates: {
       teamOverride: 0,
       ad: 0,
@@ -120,6 +121,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     hire_date: '',
     role: 'staff' as UserRole,
     team_id: '' as string,
+    totalLeave: 15,
     commissionRates: {
       teamOverride: 0,
       ad: 0,
@@ -188,6 +190,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         role: newEmployee.role,
         team_id: newEmployee.team_id || null,
         team_name: team?.team_name || team?.name || null,
+        totalLeave: newEmployee.totalLeave,
+        usedLeave: 0,
         commissionRates: newEmployee.commissionRates,
       });
 
@@ -204,6 +208,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         hire_date: new Date().toISOString().split('T')[0],
         role: 'staff',
         team_id: '',
+        totalLeave: 15,
         commissionRates: {
           teamOverride: 0,
           ad: 0,
@@ -286,6 +291,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       hire_date: user.hire_date || '',
       role: user.role,
       team_id: user.team_id || '',
+      totalLeave: user.totalLeave ?? 15,
       commissionRates: {
         teamOverride: userCommissionRates.teamOverride || 0,
         ad: userCommissionRates.ad || 0,
@@ -316,6 +322,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         role: editEmployee.role,
         team_id: editEmployee.team_id || null,
         team_name: team?.team_name || team?.name || null,
+        totalLeave: editEmployee.totalLeave,
         commissionRates: editEmployee.commissionRates,
       });
 
@@ -693,6 +700,24 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                 </div>
               </div>
 
+              <div>
+                <Label className="text-muted-foreground text-sm">연간 연차 개수</Label>
+                <div className="relative mt-1">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="30"
+                    step="0.5"
+                    value={newEmployee.totalLeave}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, totalLeave: parseFloat(e.target.value) || 0 })}
+                    placeholder="15"
+                    className="bg-muted border-border text-foreground pr-8"
+                    data-testid="input-employee-total-leave"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">일</span>
+                </div>
+              </div>
+
               {/* 수당 정책 설정 섹션 */}
               <div className="border border-border rounded-md p-3 space-y-3">
                 <Label className="text-foreground text-sm font-medium">수당 정책 설정</Label>
@@ -1033,6 +1058,24 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                       </SelectContent>
                     </Select>
                   )}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-muted-foreground text-sm">연간 연차 개수</Label>
+                <div className="relative mt-1">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="30"
+                    step="0.5"
+                    value={editEmployee.totalLeave}
+                    onChange={(e) => setEditEmployee({ ...editEmployee, totalLeave: parseFloat(e.target.value) || 0 })}
+                    placeholder="15"
+                    className="bg-muted border-border text-foreground pr-8"
+                    data-testid="input-edit-employee-total-leave"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">일</span>
                 </div>
               </div>
 
