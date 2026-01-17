@@ -47,11 +47,13 @@ Firebase Console에서 settlements 컬렉션에 대해 다음 보안 규칙을 �
 
 ```javascript
 match /settlements/{settlementId} {
-  // 읽기: super_admin/team_leader는 전체 조회 가능
-  // staff는 manager_id == 자신의 uid인 문서만 조회 가능
+  // 읽기: 역할별 접근 제어
+  // - super_admin: 모든 정산 데이터 조회 가능
+  // - team_leader: 본인 팀(team_id)의 정산 데이터만 조회 가능
+  // - staff: 본인(manager_id)의 정산 데이터만 조회 가능
   allow read: if request.auth != null && (
     request.auth.token.role == 'super_admin' ||
-    request.auth.token.role == 'team_leader' ||
+    (request.auth.token.role == 'team_leader' && resource.data.team_id == request.auth.token.team_id) ||
     (request.auth.token.role == 'staff' && resource.data.manager_id == request.auth.uid)
   );
   // 쓰기: super_admin만 가능
@@ -68,4 +70,5 @@ match /settlements/{settlementId} {
 ## Firestore 인덱스 (필수)
 Firebase Console에서 다음 복합 인덱스를 생성해야 합니다:
 - **settlements**: `settlement_month` (ASC) + `manager_id` (ASC) - staff 사용자 정산 조회용
+- **settlements**: `settlement_month` (ASC) + `team_id` (ASC) - team_leader 사용자 정산 조회용
 - **customer_history_logs**: `customer_id` (ASC) + `changed_at` (DESC)

@@ -47,15 +47,16 @@ export default function Migration() {
       
       addClaimsLog('info', `총 ${snapshot.size}개의 사용자 발견`);
 
-      const usersToSync: Array<{ uid: string; role: string }> = [];
+      const usersToSync: Array<{ uid: string; role: string; team_id?: string | null }> = [];
 
       for (const docSnap of snapshot.docs) {
         const data = docSnap.data();
         const uid = data.uid || docSnap.id;
         const role = data.role || 'staff';
+        const team_id = data.team_id || null;
 
-        usersToSync.push({ uid, role });
-        addClaimsLog('info', `[${data.email || uid}] role: ${role}`);
+        usersToSync.push({ uid, role, team_id });
+        addClaimsLog('info', `[${data.email || uid}] role: ${role}, team_id: ${team_id || 'N/A'}`);
       }
 
       addClaimsLog('info', '서버에 동기화 요청 중...');

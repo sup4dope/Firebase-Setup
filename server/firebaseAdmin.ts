@@ -31,28 +31,33 @@ export function getAdminApp(): admin.app.App {
   }
 }
 
-export async function setUserCustomClaims(uid: string, role: string): Promise<void> {
+export async function setUserCustomClaims(uid: string, role: string, teamId?: string | null): Promise<void> {
   const app = getAdminApp();
   const auth = app.auth();
   
-  await auth.setCustomUserClaims(uid, { role });
-  console.log(`✅ Custom claim 설정 완료: ${uid} -> role: ${role}`);
+  const claims: { role: string; team_id?: string } = { role };
+  if (teamId) {
+    claims.team_id = teamId;
+  }
+  
+  await auth.setCustomUserClaims(uid, claims);
+  console.log(`✅ Custom claim 설정 완료: ${uid} -> role: ${role}, team_id: ${teamId || 'N/A'}`);
 }
 
-export async function getUserCustomClaims(uid: string): Promise<{ role?: string } | null> {
+export async function getUserCustomClaims(uid: string): Promise<{ role?: string; team_id?: string } | null> {
   const app = getAdminApp();
   const auth = app.auth();
   
   try {
     const user = await auth.getUser(uid);
-    return user.customClaims as { role?: string } || null;
+    return user.customClaims as { role?: string; team_id?: string } || null;
   } catch (error) {
     console.error('사용자 조회 실패:', error);
     return null;
   }
 }
 
-export async function syncAllUserClaims(users: Array<{ uid: string; role: string }>): Promise<{
+export async function syncAllUserClaims(users: Array<{ uid: string; role: string; team_id?: string | null }>): Promise<{
   success: number;
   failed: number;
   errors: string[];
@@ -65,7 +70,7 @@ export async function syncAllUserClaims(users: Array<{ uid: string; role: string
 
   for (const user of users) {
     try {
-      await setUserCustomClaims(user.uid, user.role);
+      await setUserCustomClaims(user.uid, user.role, user.team_id);
       results.success++;
     } catch (error: any) {
       results.failed++;

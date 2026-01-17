@@ -172,7 +172,7 @@ export async function registerRoutes(
     console.log("📥 [Admin] Custom Claims 설정 요청");
     
     try {
-      const { uid, role } = req.body;
+      const { uid, role, team_id } = req.body;
       
       if (!uid || !role) {
         return res.status(400).json({ 
@@ -181,11 +181,11 @@ export async function registerRoutes(
         });
       }
       
-      await setUserCustomClaims(uid, role);
+      await setUserCustomClaims(uid, role, team_id);
       
       res.json({ 
         success: true, 
-        message: `Custom claim 설정 완료: ${uid} -> ${role}` 
+        message: `Custom claim 설정 완료: ${uid} -> role: ${role}, team_id: ${team_id || 'N/A'}` 
       });
     } catch (error: any) {
       console.error("❌ Custom Claims 설정 실패:", error.message);

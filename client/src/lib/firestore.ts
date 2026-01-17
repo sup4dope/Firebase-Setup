@@ -1283,8 +1283,8 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
   }
 };
 
-// 정산 항목 조회 (월별, 선택적으로 담당자별 필터링)
-export const getSettlementItems = async (month?: string, managerId?: string): Promise<SettlementItem[]> => {
+// 정산 항목 조회 (월별, 선택적으로 담당자별/팀별 필터링)
+export const getSettlementItems = async (month?: string, managerId?: string, teamId?: string): Promise<SettlementItem[]> => {
   try {
     const constraints: QueryConstraint[] = [];
     
@@ -1292,12 +1292,17 @@ export const getSettlementItems = async (month?: string, managerId?: string): Pr
       constraints.push(where('settlement_month', '==', month));
     }
     
-    // 담당자 ID가 제공되면 해당 담당자의 정산만 조회 (권한 기반 필터링)
+    // 담당자 ID가 제공되면 해당 담당자의 정산만 조회 (staff 권한용)
     if (managerId) {
       constraints.push(where('manager_id', '==', managerId));
     }
     
-    console.log(`[Settlement Query] month: ${month}, managerId: ${managerId}`);
+    // 팀 ID가 제공되면 해당 팀의 정산만 조회 (team_leader 권한용)
+    if (teamId) {
+      constraints.push(where('team_id', '==', teamId));
+    }
+    
+    console.log(`[Settlement Query] month: ${month}, managerId: ${managerId}, teamId: ${teamId}`);
     
     const q = constraints.length > 0 
       ? query(collection(db, 'settlements'), ...constraints)

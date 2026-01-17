@@ -180,23 +180,17 @@ export default function Settlements() {
       const months = getMonthsForPeriod(selectedMonth);
       const isSummary = isPeriodSummary(selectedMonth);
       
-      // 권한에 따라 managerId 필터 결정 (Firebase 보안 규칙 대응)
-      // staff: 본인 것만 조회 가능
-      // team_leader/super_admin: 전체 조회 가능 (팀장은 클라이언트에서 추가 필터링)
+      // 권한에 따라 필터 결정 (Firebase 보안 규칙 대응)
+      // staff: manager_id 필터 (본인 것만)
+      // team_leader: team_id 필터 (팀원 것만)
+      // super_admin: 필터 없음 (전체)
       const managerId = isStaff ? user.uid : undefined;
+      const teamId = isTeamLeader && user.team_id ? user.team_id : undefined;
       
       if (isSummary) {
-        const allItemsPromises = months.map(m => getSettlementItems(m, managerId));
+        const allItemsPromises = months.map(m => getSettlementItems(m, managerId, teamId));
         const allItemsArrays = await Promise.all(allItemsPromises);
-        let allItems = allItemsArrays.flat();
-        
-        // 팀장은 팀원 것만 볼 수 있도록 추가 필터링
-        if (isTeamLeader) {
-          const teamMemberIds = fetchedUsers
-            .filter(u => u.team_id === user.team_id)
-            .map(u => u.uid);
-          allItems = allItems.filter(item => teamMemberIds.includes(item.manager_id));
-        }
+        const allItems = allItemsArrays.flat();
         
         const fetchedCustomers = await getCustomers();
         setItems(allItems);
@@ -207,20 +201,11 @@ export default function Settlements() {
         }
         
         const [fetchedItems, fetchedCustomers] = await Promise.all([
-          getSettlementItems(selectedMonth, managerId),
+          getSettlementItems(selectedMonth, managerId, teamId),
           getCustomers(),
         ]);
         
-        let filteredItems = fetchedItems;
-        // 팀장은 팀원 것만 볼 수 있도록 추가 필터링
-        if (isTeamLeader) {
-          const teamMemberIds = fetchedUsers
-            .filter(u => u.team_id === user.team_id)
-            .map(u => u.uid);
-          filteredItems = fetchedItems.filter(item => teamMemberIds.includes(item.manager_id));
-        }
-        
-        setItems(filteredItems);
+        setItems(fetchedItems);
         setCustomers(fetchedCustomers);
       }
     } catch (error) {

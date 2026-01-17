@@ -83,10 +83,21 @@ service cloud.firestore {
     }
     
     // ========================================
-    // 5. 정산 데이터 (super_admin 전용)
+    // 5. 정산 데이터 (역할별 접근 제어)
     // ========================================
     match /settlements/{settlementId} {
-      allow read, write: if isSuperAdmin();
+      // 읽기 권한:
+      // - super_admin: 모든 정산 데이터 조회 가능
+      // - team_leader: 본인 팀(team_id)의 정산 데이터만 조회 가능
+      // - staff: 본인(manager_id)의 정산 데이터만 조회 가능
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (getRole() == 'team_leader' && resource.data.team_id == request.auth.token.team_id) ||
+        (getRole() == 'staff' && resource.data.manager_id == request.auth.uid)
+      );
+      
+      // 쓰기 권한: super_admin만 가능
+      allow write: if isSuperAdmin();
     }
     
     // ========================================
