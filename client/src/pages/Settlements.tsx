@@ -86,6 +86,7 @@ import {
   RefreshCw,
   FileDown,
   FileText,
+  BarChart3,
 } from 'lucide-react';
 import { SalaryStatement, type SalaryItem } from '@/components/salary/salary-statement';
 import {
@@ -757,6 +758,138 @@ export default function Settlements() {
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* 직원별 상세 통계 */}
+      {summaries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              직원별 상세 통계
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {summaries.map((summary) => {
+                const managerItems = items.filter(item => item.manager_id === summary.manager_id && !item.is_clawback);
+                const avgContractPerEmployee = summary.total_contracts > 0 
+                  ? managerItems.reduce((sum, item) => sum + item.contract_amount, 0) / summary.total_contracts 
+                  : 0;
+                const avgFeeRatePerEmployee = summary.execution_count > 0
+                  ? managerItems.filter(item => item.execution_amount > 0).reduce((sum, item) => sum + (item.fee_rate || 0), 0) / summary.execution_count
+                  : 0;
+                const executionRate = summary.total_contracts > 0 
+                  ? Math.round((summary.execution_count / summary.total_contracts) * 100) 
+                  : 0;
+                const avgExecutionAmount = summary.execution_count > 0
+                  ? Math.round(summary.total_execution_amount / summary.execution_count)
+                  : 0;
+
+                return (
+                  <Card 
+                    key={summary.manager_id} 
+                    className="hover-elevate cursor-pointer"
+                    onClick={() => {
+                      const periodMonths = getMonthsForPeriod(selectedMonth);
+                      handleShowDetail(
+                        `${summary.manager_name} 정산 내역`,
+                        (item) => item.manager_id === summary.manager_id && periodMonths.includes(item.settlement_month)
+                      );
+                    }}
+                    data-testid={`card-employee-stats-${summary.manager_id}`}
+                  >
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base font-semibold flex items-center justify-between">
+                        <span>{summary.manager_name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          최종 {summary.final_payment.toLocaleString()}만원
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* 계약 관련 */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            계약
+                          </span>
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                            {summary.total_contract_amount.toLocaleString()}만원
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>건수: {summary.total_contracts}건</span>
+                          <span>평균: {Math.round(avgContractPerEmployee).toLocaleString()}만원</span>
+                        </div>
+                      </div>
+
+                      {/* 집행/자문 관련 */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            자문
+                          </span>
+                          <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">
+                            {(summary.total_execution_fee || 0).toLocaleString()}만원
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>집행: {summary.execution_count}건 ({executionRate}%)</span>
+                          <span>자문료율: {avgFeeRatePerEmployee.toFixed(1)}%</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>총 집행금액: {summary.total_execution_amount.toLocaleString()}만원</span>
+                          <span>평균: {avgExecutionAmount.toLocaleString()}만원</span>
+                        </div>
+                      </div>
+
+                      {/* 수당 관련 */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground flex items-center gap-1">
+                            <DollarSign className="w-3 h-3" />
+                            수당
+                          </span>
+                          <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                            {summary.total_gross_commission.toLocaleString()}만원
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>공제세액: {summary.total_tax.toLocaleString()}만원</span>
+                          <span className="text-purple-600 dark:text-purple-400 font-medium">
+                            세후: {summary.total_net_commission.toLocaleString()}만원
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 환수 관련 */}
+                      {summary.clawback_count > 0 && (
+                        <div className="space-y-1 pt-1 border-t">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground flex items-center gap-1">
+                              <TrendingDown className="w-3 h-3" />
+                              환수
+                            </span>
+                            <span className="text-sm font-medium text-red-600">
+                              -{summary.clawback_amount.toLocaleString()}만원
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>환수 건수: {summary.clawback_count}건</span>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
         <DialogContent className="max-w-[95vw] max-h-[85vh]">
           <DialogHeader className="flex flex-row items-center justify-between gap-4">
