@@ -22,6 +22,7 @@ import Settings from '@/pages/Settings';
 import Stats from '@/pages/Stats';
 import Settlements from '@/pages/Settlements';
 import CompanySettlement from '@/pages/CompanySettlement';
+import AnnualLeave from '@/pages/AnnualLeave';
 import Migration from '@/pages/Migration';
 import NotFound from '@/pages/not-found';
 import {
@@ -213,6 +214,7 @@ function AuthenticatedApp() {
               <Route path="/stats" component={Stats} />
               <Route path="/settlements" component={Settlements} />
               <Route path="/company-settlement" component={CompanySettlement} />
+              <Route path="/annual-leave" component={AnnualLeave} />
               <Route path="/migrate" component={Migration} />
               <Route component={NotFound} />
             </Switch>

@@ -162,5 +162,15 @@ service cloud.firestore {
     match /receipts/{receiptId} {
       allow read, write: if isSuperAdmin();
     }
+    
+    // ========================================
+    // 15. 연차 신청 (2단계 승인)
+    // ========================================
+    match /leave_requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isTeamLeaderOrAbove();
+      allow delete: if isAuthenticated();
+    }
   }
 }
