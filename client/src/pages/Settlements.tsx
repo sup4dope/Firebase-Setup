@@ -604,13 +604,13 @@ export default function Settlements() {
           <CardContent>
             <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{(totals.executionFee || 0).toLocaleString()}만원</div>
             <p className="text-xs text-muted-foreground mt-1">
+              평균 자문료율: {totals.executionAmount > 0 ? ((totals.executionFee || 0) / totals.executionAmount * 100).toFixed(1) : 0}%
+            </p>
+            <p className="text-xs text-muted-foreground">
               총 집행금액: {totals.executionAmount.toLocaleString()}만원
             </p>
             <p className="text-xs text-muted-foreground">
               집행 건수: {totals.executionCount}건
-            </p>
-            <p className="text-xs text-muted-foreground">
-              평균 자문료율: {totals.executionAmount > 0 ? ((totals.executionFee || 0) / totals.executionAmount * 100).toFixed(1) : 0}%
             </p>
           </CardContent>
         </Card>
