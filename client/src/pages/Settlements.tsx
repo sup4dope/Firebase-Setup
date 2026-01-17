@@ -116,6 +116,7 @@ export default function Settlements() {
   const [detailModalTitle, setDetailModalTitle] = useState('');
   const [detailModalItems, setDetailModalItems] = useState<SettlementItem[]>([]);
   const [salaryModalOpen, setSalaryModalOpen] = useState(false);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [salaryData, setSalaryData] = useState<{
     employeeName: string;
     employeeId: string;
@@ -662,7 +663,8 @@ export default function Settlements() {
         </Card>
 
         <Card
-          className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20"
+          className={`bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20 ${isSuperAdmin ? 'cursor-pointer hover-elevate' : ''}`}
+          onClick={() => isSuperAdmin && setSummaryModalOpen(true)}
           data-testid="card-final-payment"
         >
           <CardHeader className="pb-2">
@@ -994,6 +996,91 @@ export default function Settlements() {
                 );
               })}
             </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={summaryModalOpen} onOpenChange={setSummaryModalOpen}>
+        <DialogContent className="max-w-[90vw] max-h-[85vh]" data-testid="dialog-all-employees-summary">
+          <DialogHeader>
+            <DialogTitle>{getPeriodLabel(selectedMonth)} 전체 직원 정산 현황</DialogTitle>
+            <DialogDescription>모든 직원의 정산 요약 정보입니다.</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[65vh]">
+            <Table data-testid="table-all-employees-summary">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>직원명</TableHead>
+                  <TableHead className="text-right">계약 건수</TableHead>
+                  <TableHead className="text-right">총 계약금</TableHead>
+                  <TableHead className="text-right">집행건수</TableHead>
+                  <TableHead className="text-right">집행금액</TableHead>
+                  <TableHead className="text-right">총 자문금액</TableHead>
+                  <TableHead className="text-right">세전수당</TableHead>
+                  <TableHead className="text-right">공제세액</TableHead>
+                  <TableHead className="text-right">환수</TableHead>
+                  <TableHead className="text-right font-bold">최종지급액(세후)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summaries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                      해당 월에 정산 데이터가 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <>
+                    {summaries.map((summary) => (
+                      <TableRow
+                        key={summary.manager_id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          const periodMonths = getMonthsForPeriod(selectedMonth);
+                          handleShowDetail(
+                            `${summary.manager_name} 정산 내역`,
+                            (item) => item.manager_id === summary.manager_id && periodMonths.includes(item.settlement_month)
+                          );
+                          setSummaryModalOpen(false);
+                        }}
+                        data-testid={`summary-row-manager-${summary.manager_id}`}
+                      >
+                        <TableCell className="font-medium">{summary.manager_name}</TableCell>
+                        <TableCell className="text-right">{summary.total_contracts}건</TableCell>
+                        <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right">{summary.execution_count}건</TableCell>
+                        <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right">{summary.total_gross_commission.toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right">{summary.total_tax.toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right text-red-600">
+                          {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}만원` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-purple-600">
+                          {summary.final_payment.toLocaleString()}만원
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/30 font-semibold border-t-2">
+                      <TableCell>합계</TableCell>
+                      <TableCell className="text-right">{totals.contracts}건</TableCell>
+                      <TableCell className="text-right">{totals.contractAmount.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{totals.executionCount}건</TableCell>
+                      <TableCell className="text-right">{totals.executionAmount.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{(totals.executionFee || 0).toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{totals.grossCommission.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{totals.tax.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right text-red-600">
+                        {totals.clawbackCount > 0 ? `-${totals.clawbackAmount.toLocaleString()}만원` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-purple-600">
+                        {totals.finalPayment.toLocaleString()}만원
+                      </TableCell>
+                    </TableRow>
+                  </>
+                )}
+              </TableBody>
+            </Table>
           </ScrollArea>
         </DialogContent>
       </Dialog>

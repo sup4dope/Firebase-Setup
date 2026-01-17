@@ -1,240 +1,71 @@
 # 정책자금 컨설팅 CRM 시스템
 
-## 프로젝트 개요
-Firebase 기반의 정책자금 컨설팅 CRM 시스템입니다. 고객 관리, 영업 퍼널 추적, KPI 분석, 팀 관리 기능을 제공합니다.
+## Overview
+이 프로젝트는 Firebase를 기반으로 하는 정책자금 컨설팅 CRM 시스템입니다. 고객 관리, 영업 퍼널 추적, KPI 분석, 팀 관리 및 정산/연차 관리 기능을 통합하여 컨설팅 비즈니스의 효율성을 극대화합니다. 핵심 목표는 복잡한 고객 및 영업 데이터를 효율적으로 관리하고, 직관적인 UI를 통해 비즈니스 의사 결정을 지원하며, 컨설턴트와 관리자 모두에게 최적화된 업무 환경을 제공하는 것입니다. 이를 통해 고객 서비스 품질을 향상시키고, 영업 성과를 증대하며, 전반적인 운영 비용을 절감하는 것을 목표로 합니다.
 
-## 기술 스택
-- **Frontend**: React + TypeScript + Vite
-- **Backend**: Express.js (개발 서버)
-- **Database**: Firebase Firestore
-- **Authentication**: Firebase Auth (Google Sign-in)
-- **Styling**: Tailwind CSS + shadcn/ui
-- **Fonts**: Inter (UI), JetBrains Mono (코드)
+## User Preferences
+없음
 
-## 프로젝트 구조
-```
-client/
-├── src/
-│   ├── components/       # 재사용 가능한 UI 컴포넌트
-│   │   ├── AppSidebar.tsx      # 메인 사이드바
-│   │   ├── CustomerDetailModal.tsx  # 고객 상세 모달 (3-탭 시스템)
-│   │   ├── CustomerForm.tsx    # 고객 등록/수정 폼
-│   │   ├── CustomerTable.tsx   # 고객 목록 테이블
-│   │   ├── FinancialAnalysisTab.tsx  # 금융 분석 탭 (대출/보증)
-│   │   ├── FunnelChart.tsx     # 영업 퍼널 차트
-│   │   ├── HolidayManagement.tsx  # 공휴일 관리
-│   │   ├── KPIWidgets.tsx      # KPI 위젯들
-│   │   ├── ReviewSummaryTab.tsx   # 심사 요약 탭 (파이차트/DTI)
-│   │   ├── StatusHistoryDialog.tsx  # 상태 변경 이력
-│   │   ├── TeamManagement.tsx  # 팀/사용자 관리
-│   │   ├── ThemeToggle.tsx     # 다크모드 토글
-│   │   ├── TodoForm.tsx        # 할 일 추가 폼
-│   │   ├── TodoList.tsx        # 할 일 목록
-│   │   └── report/             # 제안서 컴포넌트
-│   │       ├── index.ts        # 모듈 export
-│   │       ├── ProposalModal.tsx    # 제안서 입력 모달
-│   │       ├── ProposalPreview.tsx  # 제안서 미리보기/인쇄
-│   │       ├── CoverPage.tsx        # 표지
-│   │       ├── ExecutiveSummaryPage.tsx  # 요약
-│   │       ├── DiagnosticsPage.tsx  # 기업 진단
-│   │       ├── RiskAnalysisPage.tsx # 위험 분석
-│   │       ├── ExecutionAgencyPage.tsx  # 집행 기관
-│   │       ├── TimelinePage.tsx     # 진행 일정
-│   │       ├── ConclusionPage.tsx   # 결론
-│   │       └── ThankYouPage.tsx     # 감사 페이지
-│   ├── contexts/
-│   │   └── AuthContext.tsx     # Firebase 인증 상태
-│   ├── lib/
-│   │   ├── firebase.ts         # Firebase 설정
-│   │   ├── firestore.ts        # Firestore CRUD 함수
-│   │   └── kpi.ts              # KPI 계산 유틸리티
-│   ├── pages/
-│   │   ├── Dashboard.tsx       # 메인 대시보드
-│   │   ├── Holidays.tsx        # 공휴일 관리 페이지
-│   │   ├── Login.tsx           # 로그인 페이지
-│   │   ├── Settings.tsx        # 설정 페이지
-│   │   └── Teams.tsx           # 팀 관리 페이지
-│   └── App.tsx                 # 앱 진입점
-shared/
-└── types.ts                    # 공유 타입 정의
-server/
-└── ...                         # Express 서버
+## System Architecture
+**UI/UX 디자인 및 기술 스택:**
+- **Frontend**: React, TypeScript, Vite를 사용한 현대적인 SPA.
+- **Styling**: Tailwind CSS와 shadcn/ui를 활용하여 일관되고 반응형인 디자인을 구현합니다.
+- **Fonts**: UI에는 Inter, 코드에는 JetBrains Mono를 사용하여 가독성을 높였습니다.
+- **주요 UI 컴포넌트**: 재사용 가능한 UI 컴포넌트(AppSidebar, CustomerDetailModal, CustomerTable 등)를 모듈화하여 개발 효율성을 높였습니다.
+- **다크 모드**: ThemeToggle 컴포넌트를 통해 다크 모드를 지원합니다.
+- **제안서 시스템**: 8페이지 전문 제안서 생성 기능을 제공하며, PDF 출력에 최적화된 레이아웃을 구현했습니다.
+
+**기술 구현 및 기능 사양:**
+- **인증 및 권한 관리 (RBAC)**: Firebase Auth를 통한 Google Sign-in을 사용하며, `staff`, `team_leader`, `super_admin` 세 가지 역할을 기반으로 한 접근 제어를 구현합니다. 각 역할에 따라 데이터 조회, 수정 및 기능 접근 권한이 세분화됩니다.
+- **고객 관리**: 고유 ID 체계를 사용하며, 상담부터 집행까지 6단계의 영업 퍼널을 통해 고객 상태를 추적하고 이력 관리를 수행합니다.
+- **KPI 시스템**: 영업일을 기준으로 예상 계약 건수 및 예상 매출액을 계산하여 성과 분석을 지원합니다.
+- **TO-DO 관리**: 팀원에게 할 일을 할당하고 고객과 연결하며, 마감일을 기준으로 우선순위를 표시합니다.
+- **금융 분석 대시보드**: 고객 상세 모달 내 3-탭 시스템(서류 보기, 금융 분석, 심사 요약)을 통해 고객의 금융 상태를 종합적으로 분석합니다. 대출/보증 채무 관리, 7일 연계 감지, DTI(Debt-to-Income) 계산 및 적격성 요인 분석 기능을 포함합니다. OCR 기술을 활용하여 신용공여내역 자동 추출 및 분석을 지원합니다.
+- **정산 관리 시스템**: `super_admin` 전용 기능으로, 총수익, 직원 수당, 세후 실지급액 등을 자동 계산하고, 취소 및 환수 로직을 포함한 상세 정산 내역을 관리합니다.
+- **연차 관리 시스템**: 2단계 승인 워크플로우(팀장 승인 → 총관리자 최종 승인)를 따르며, 전일/반차 유형을 지원합니다. 한국천문연구원 공휴일 API와 연동하여 정확한 잔여 연차를 계산하고, 달력 인터페이스를 통해 연차 신청 및 관리를 용이하게 합니다. `super_admin`은 승인된 연차를 취소할 수 있습니다.
+- **랜딩페이지 연동**: 랜딩페이지를 통한 상담 신청 데이터를 자동으로 CRM에 연동하여 고객 생성을 자동화하고 중복을 방지합니다. 현재는 수동 유입 방식으로 전환되어, `super_admin`이 미처리 상담을 일괄 처리할 수 있습니다.
+
+**데이터 모델 및 저장소:**
+- **데이터베이스**: Firebase Firestore를 메인 데이터베이스로 사용합니다.
+- **컬렉션**: `users`, `teams`, `customers`, `status_logs`, `todos`, `holidays`, `meta`, `settlements`, `consultations`, `leave_requests` 등 명확하게 분리된 컬렉션을 통해 데이터를 저장하고 관리합니다.
+- **공유 타입**: `shared/types.ts`에서 시스템 전반에 걸쳐 사용되는 데이터 타입을 정의하여 일관성을 유지합니다.
+- **보안 규칙**: Firebase Security Rules를 통해 데이터 접근 권한을 세밀하게 제어하여 데이터 보안을 강화합니다.
+
+## External Dependencies
+- **Firebase**:
+    - **Firestore**: 메인 데이터베이스 및 실시간 데이터 동기화
+    - **Authentication**: 사용자 인증 (Google Sign-in)
+- **Vite**: 프론트엔드 개발 서버 및 번들러
+- **Express.js**: (개발 서버용) 백엔드 로직 처리
+- **Tailwind CSS**: 유틸리티 우선 CSS 프레임워크
+- **shadcn/ui**: React UI 컴포넌트 라이브러리
+- **Recharts**: 금융 분석 대시보드 내 차트 시각화 (파이차트, 스캐터 차트 등)
+- **한국천문연구원 공휴일 API**: 연차 관리 시스템에서 한국 공휴일 정보 연동
+
+## Firebase Security Rules (필수)
+Firebase Console에서 settlements 컬렉션에 대해 다음 보안 규칙을 설정해야 합니다:
+
+```javascript
+match /settlements/{settlementId} {
+  // 읽기: super_admin/team_leader는 전체 조회 가능
+  // staff는 manager_id == 자신의 uid인 문서만 조회 가능
+  allow read: if request.auth != null && (
+    request.auth.token.role == 'super_admin' ||
+    request.auth.token.role == 'team_leader' ||
+    (request.auth.token.role == 'staff' && resource.data.manager_id == request.auth.uid)
+  );
+  // 쓰기: super_admin만 가능
+  allow write: if request.auth != null && request.auth.token.role == 'super_admin';
+}
 ```
 
-## 주요 기능
-
-### 1. 권한 기반 접근 제어 (RBAC)
-- **staff**: 본인 담당 고객만 조회/수정, 개인 TO-DO 관리
-- **team_leader**: 팀 전체 데이터 조회, 팀원 TO-DO 할당
-- **super_admin**: 모든 데이터 관리, 팀/공휴일 설정, 수수료율 열람
-
-### 2. 고객 관리
-- 고유 ID: YYMMDD-XXX 형식 (예: 241209-001)
-- 6단계 영업 퍼널: 상담 → 서류 → 심사 → 계약 → 집행 (+ 드롭아웃)
-- 상태 변경 이력 추적
-
-### 3. KPI 시스템
-- 영업일 기준 계산 (주말/공휴일 제외)
-- 예상 계약 건수: (현재 계약 / 경과 영업일) × 월 전체 영업일
-- 예상 매출액: (현재 매출 / 경과 영업일) × 월 전체 영업일
-
-### 4. TO-DO 관리
-- 팀장/관리자가 팀원에게 할 일 할당
-- 고객 연결 기능
-- 마감일 기반 우선순위 표시
-
-### 5. 금융 분석 대시보드
-- 고객 상세 모달에 3-탭 시스템 적용
-  - **서류 보기**: 문서 업로드/뷰어, 드래그 앤 드롭 지원
-  - **금융 분석**: 대출/보증 채무 테이블, 7일 연계 감지, 인라인 편집
-  - **심사 요약**: Recharts 파이차트, DTI KPI, 적격성 요인 표시
-- 금융 채무 데이터 타입: FinancialObligation (shared/types.ts)
-- 채무 총액 자동 계산 및 기관별 분포 시각화
-
-### 6. 정산 관리 시스템 (super_admin 전용)
-- **접근 권한**: super_admin 사용자만 사이드바에서 '정산관리' 메뉴 접근 가능
-- **수당 계산 로직**:
-  - 총수익 = 계약금 + (집행금액 × 자문료율%)
-  - 직원수당 = 총수익 × 직원별 수당률% (유입경로별 차등)
-  - 세후실지급액 = 세전수당 × 0.967 (3.3% 원천세 공제)
-- **유입경로별 수당률**: 광고, 고객소개, 승인복제, 외주 (staff.commissionRates 참조)
-- **취소 및 환수 로직**:
-  - 당월 취소: 정산 합계에서 제외
-  - 과거월 취소: 현재 월에 마이너스(-) 환수 항목 자동 생성
-- **UI 구성**:
-  - Dashboard: 이번 달 정산 요약 (계약 건수, 세전수당, 환수, 최종지급액)
-  - Table: 직원별/상세 정산 내역 (업체, 직원, 유입경로, 수당률, 세전/세후, 상태)
-  - Modal: 카드 또는 행 더블클릭 시 상세 리스트 열람
-- **데이터 타입**: SettlementItem, MonthlySettlementSummary (shared/types.ts)
-- **Firestore 컬렉션**: settlements
-
-### 7. 연차 관리 시스템 (2단계 승인)
-- **2단계 승인 워크플로우**:
-  - 1단계: 팀장(team_leader) 승인
-  - 2단계: 총관리자(super_admin) 최종 승인
-- **연차 유형**: 전일(1.0일), 오전 반차(0.5일), 오후 반차(0.5일)
-- **공휴일 연동**: 한국천문연구원 공휴일 API 연동 (fallback 데이터 포함)
-- **달력 인터페이스**: 월별 달력에서 직접 날짜 클릭하여 신청
-- **자동 잔여일 계산**: 총연차, 사용연차, 잔여연차 자동 계산
-- **승인 취소 기능**: super_admin만 승인완료된 연차 취소 가능, 잔여일 자동 복원
-- **데이터 타입**: LeaveRequest, InsertLeaveRequest, LeaveSummary (shared/types.ts)
-- **Firestore 컬렉션**: leave_requests
-- **UI 탭**:
-  - 내 신청 내역: 본인 연차 신청 목록
-  - 승인 대기: 팀장/관리자용 승인 대기 목록
-  - 전체 내역: super_admin용 전체 연차 내역 (승인 취소 버튼 포함)
-
-## 환경 변수 (Secrets)
-- `VITE_FIREBASE_API_KEY`: Firebase API 키
-- `VITE_FIREBASE_PROJECT_ID`: Firebase 프로젝트 ID
-- `VITE_FIREBASE_APP_ID`: Firebase 앱 ID
-
-## Firebase 설정 (필수)
-1. Firebase Console에서 프로젝트 생성
-2. Authentication > Google 로그인 활성화
-3. Firestore Database 생성
-4. 보안 규칙 설정 필요
-
-## Firestore 컬렉션
-- `users`: 사용자 정보 (commissionRates 필드에 유입경로별 수당률 포함)
-- `teams`: 팀 정보
-- `customers`: 고객 데이터
-- `status_logs`: 상태 변경 로그
-- `todos`: 할 일 목록
-- `holidays`: 공휴일 목록
-- `meta`: 메타데이터 (사용자 수 등)
-- `settlements`: 정산 데이터 (SettlementItem)
-- `consultations`: 랜딩페이지 상담 신청 데이터
-- `leave_requests`: 연차 신청 데이터 (LeaveRequest)
-
-## 개발 서버 실행
-```bash
-npm run dev
-```
-- 프론트엔드: http://localhost:5000
-
-## 최근 변경사항
-- 2026-01-17: 연차 관리 시스템 추가 및 영업일 로직 통일
-  - **2단계 승인 워크플로우**: 팀장 1차 승인 → 총관리자 최종 승인
-  - **달력 UI**: 월별 달력에서 날짜 클릭 → 신청, 공휴일/주말 비활성화
-  - **한국 공휴일 API**: 한국천문연구원 API 연동 + fallback 데이터 (2025-2026)
-  - **자동 잔여일 계산**: 최종 승인 시 usedLeave 필드 자동 증가
-  - **역할별 탭**: 내 신청/승인 대기/전체 내역 (super_admin 전용)
-  - **사이드바 메뉴**: "연차관리" 메뉴 모든 사용자에게 표시
-  - **승인 취소 기능**: super_admin 전용, 승인된 연차 취소 시 잔여일 자동 복원
-  - **Firebase Rules**: leave_requests 컬렉션 규칙 추가 (취소 상태 전환 포함)
-  - **영업일 로직 통일**: KPI 계산에 공공 API 공휴일 데이터 사용 (kpi.ts 업데이트)
-
-- 2026-01-06: 랜딩페이지 상담 신청 자동 연동
-  - **LandingPageListener**: consultations 컬렉션 실시간 감지
-  - **자동 고객 생성**: 신규 상담 신청 시 customers 컬렉션에 자동 등록
-  - **중복 방지 (Upsert)**: 전화번호 기준 기존 고객 존재 시 메모만 추가
-  - **데이터 매핑**: 랜딩페이지 필드 → CRM 필드 자동 변환
-  - **메모 자동 생성**: 상담 신청 요약 메모 counseling_logs에 저장
-  - **Consultation 타입 업데이트**: 신규/레거시 데이터 형식 모두 지원
-
-- 2026-01-04: 정산 관리 시스템 추가
-  - **정산관리 페이지**: super_admin 전용 사이드바 메뉴 추가
-  - **수당 계산**: 총수익, 세전수당, 원천세(3.3%), 세후실지급액 자동 계산
-  - **환수 로직**: 과거 정산월 취소 시 현재 월에 마이너스 환수 항목 생성
-  - **직원별 요약**: 월별 정산 현황 테이블 (계약 건수, 수익, 수당, 환수, 최종지급)
-  - **상세 내역**: 개별 정산 항목 테이블 (취소 버튼 포함)
-  - **모달 상세 보기**: 카드/행 더블클릭 시 해당 항목 리스트 표시
-
-- 2024-12-31: 정책자금 제안서 시스템 추가
-  - **8페이지 전문 제안서 생성**: 고객 데이터 기반 맞춤형 제안서 자동 생성
-    - CoverPage: 표지
-    - ExecutiveSummaryPage: 요약 (신용점수, 위험 수준, 핵심 발견사항)
-    - DiagnosticsPage: 기업 진단 (기본 정보, 매출 추이, 성장률)
-    - RiskAnalysisPage: 위험 분석 (부채 구조, 신용등급, DTI)
-    - ExecutionAgencyPage: 추천 집행 기관 (금융기관 목록, 한도, 금리)
-    - TimelinePage: 진행 일정
-    - ConclusionPage: 결론 및 연락처
-    - ThankYouPage: 감사 페이지
-  - **ProposalModal**: 희망 조달 금액, 추천 기관(기관명/금액/금리/기간) 입력
-  - **ProposalPreview**: A4 최적화 미리보기, window.print() PDF 출력
-  - 심사 요약 탭 하단에 "제안서 만들기" 버튼 배치
-  - 인쇄 CSS: @media print, A4 사이즈, page-break 처리
-
-- 2024-12-30: 신용공여내역 OCR 및 금융 분석 기능 강화
-  - **신용공여내역 OCR 추가**: 사업자신용정보공여내역 PDF/이미지에서 대출/보증 데이터 자동 추출
-    - 단위 변환 지원 (천원 → 원)
-    - 금융기관명 가나다순 정렬
-    - 중복 데이터 자동 병합
-  - **보증 연계 표시**: 대출과 보증이 7일 이내 + 동일 기관(또는 유사 금액)일 때 '보증' 배지 표시
-  - **12개월 발생 추이 차트**: ReviewSummaryTab에 scatter chart로 월별 대출/보증 발생 추이 시각화
-  - CustomerDetailModal에 3-탭 UI 적용 (서류 보기/금융 분석/심사 요약)
-  - FinancialAnalysisTab: 대출/보증 채무 관리, 인라인 편집, 7일 연계 감지
-  - ReviewSummaryTab: Recharts 파이차트, DTI 계산, 적격성 요인 그리드
-  - 상시 접근 가능한 업로드 버튼 (탭 헤더에 배치)
-  - 금융 채무 데이터 자동 저장 (debounced)
-
-- 2024-12-11: 역할 기반 접근 제어 및 변경 이력 로그 기능 추가
-  - Staff 사용자 읽기 전용 모드 (모든 입력 필드 비활성화)
-  - "읽기 전용" 배지 헤더에 표시 (staff 사용자)
-  - 삭제 버튼 및 저장 상태 표시 숨김 (staff 사용자)
-  - 상태 변경 시 자동 이력 로그 생성 (customer_history_logs)
-  - 담당자 변경 시 자동 이력 로그 생성
-  - "변경 이력" 탭 추가 (타임라인 UI)
-  - initialTab prop으로 변경 이력 탭 직접 열기 지원
-
-- 2024-12-09: 초기 프로젝트 설정 및 모든 컴포넌트 구현
-  - Firebase 인증 (Google Sign-in)
-  - 고객 관리 (CRUD + 상태 변경)
-  - 퍼널 차트 및 KPI 위젯
-  - TO-DO 관리
-  - 팀/사용자 관리
-  - 공휴일 관리
-  - 다크모드 지원
+**중요 (Staff 정산 조회 문제)**:
+1. Staff 사용자가 정산 데이터를 조회하려면 위 규칙이 반드시 적용되어야 합니다.
+2. Staff 쿼리는 반드시 `manager_id == user.uid` 필터를 포함해야 합니다 (코드에서 이미 적용됨).
+3. Firestore 복합 인덱스 (settlement_month + manager_id)가 생성되어 있어야 합니다.
+4. 규칙/인덱스 적용 후에도 오류 발생 시, super_admin이 해당 월 정산 페이지에서 "새로고침" 버튼을 클릭하여 정산 데이터를 동기화해야 합니다.
 
 ## Firestore 인덱스 (필수)
 Firebase Console에서 다음 복합 인덱스를 생성해야 합니다:
-- customer_history_logs: customer_id (ASC) + changed_at (DESC)
-- consultations: processed (ASC) - 단일 필드 인덱스 (랜딩페이지 리스너용)
-
-## 랜딩페이지 연동 (수동 유입 방식)
-- **자동 유입 비활성화**: LandingPageListener는 비활성화되어 있음 (수동 유입으로 전환)
-- **수동 유입 버튼**: super_admin 사용자는 대시보드에서 "N건 DB유입" 버튼으로 일괄 처리 가능
-- **미처리 판정 기준**: `processed === false` 또는 (`processed` 없고 `linked_customer_id` 없음)
-- **처리 로직**: 전화번호로 기존 고객 확인 → 기존 고객이면 메모만 추가, 신규면 고객 생성
-- **처리 완료 시**: `processed: true` 설정 및 `linked_customer_id`로 고객 연결
+- **settlements**: `settlement_month` (ASC) + `manager_id` (ASC) - staff 사용자 정산 조회용
+- **customer_history_logs**: `customer_id` (ASC) + `changed_at` (DESC)

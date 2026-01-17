@@ -1012,6 +1012,11 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
     let createdCount = 0;
     let updatedCount = 0;
 
+    console.log(`[Settlement Sync] 정산 대상 고객 수: ${targetCustomers.length}`);
+    targetCustomers.forEach(c => {
+      console.log(`[Settlement Sync] 대상 고객: ${c.company_name || c.name}, manager_id: ${c.manager_id}, status: ${c.status_code}`);
+    });
+
     // 4. 정산 항목 생성 또는 업데이트
     for (const customer of targetCustomers) {
       const manager = users.find(u => u.uid === customer.manager_id);
@@ -1292,11 +1297,15 @@ export const getSettlementItems = async (month?: string, managerId?: string): Pr
       constraints.push(where('manager_id', '==', managerId));
     }
     
+    console.log(`[Settlement Query] month: ${month}, managerId: ${managerId}`);
+    
     const q = constraints.length > 0 
       ? query(collection(db, 'settlements'), ...constraints)
       : query(collection(db, 'settlements'));
     
     const snapshot = await getDocs(q);
+    console.log(`[Settlement Query] Found ${snapshot.docs.length} settlements`);
+    
     const items = snapshot.docs.map(docSnap => {
       const data = docSnap.data();
       return {
@@ -1309,6 +1318,7 @@ export const getSettlementItems = async (month?: string, managerId?: string): Pr
     return items.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
   } catch (error) {
     console.error('Error fetching settlement items:', error);
+    console.error('[Settlement Query] Query failed - check Firebase Security Rules. Staff users need rules allowing read where resource.data.manager_id == request.auth.uid');
     return [];
   }
 };
