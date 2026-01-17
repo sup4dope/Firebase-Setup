@@ -143,8 +143,8 @@ export function AppSidebar({
   const mainMenuItems = [
     { href: '/', label: '고객관리', icon: Users, description: '고객 목록 및 퍼널', adminOnly: false },
     { href: '/stats', label: '통계', icon: BarChart3, description: 'KPI 및 리포트', adminOnly: false },
-    { href: '/settlements', label: '정산관리', icon: Calculator, description: '수당 정산 및 환수', adminOnly: false },
     { href: '/annual-leave', label: '연차관리', icon: CalendarDays, description: '연차 신청 및 승인', adminOnly: false },
+    { href: '/settlements', label: '정산관리', icon: Calculator, description: '수당 정산 및 환수', adminOnly: false },
     { href: '/company-settlement', label: '회사정산', icon: Landmark, description: '매출/비용 통합', adminOnly: true },
   ];
 
