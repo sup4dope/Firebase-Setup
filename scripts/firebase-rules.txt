@@ -167,10 +167,44 @@ service cloud.firestore {
     // 15. 연차 신청 (2단계 승인)
     // ========================================
     match /leave_requests/{requestId} {
+      // 헬퍼: 상태 전환 검증
+      function isValidLeaderApproval() {
+        return resource.data.status == 'pending_leader' 
+          && request.resource.data.status == 'pending_admin';
+      }
+      
+      function isValidAdminApproval() {
+        return resource.data.status == 'pending_admin' 
+          && request.resource.data.status == 'approved';
+      }
+      
+      function isValidRejection() {
+        return (resource.data.status == 'pending_leader' || resource.data.status == 'pending_admin')
+          && request.resource.data.status == 'rejected';
+      }
+      
+      // 읽기: 인증된 사용자
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isTeamLeaderOrAbove();
-      allow delete: if isAuthenticated();
+      
+      // 생성: 인증된 사용자 (본인 신청만)
+      allow create: if isAuthenticated() 
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.status == 'pending_leader';
+      
+      // 수정: 2단계 승인 워크플로우
+      // - pending_leader → pending_admin: 팀장 또는 관리자
+      // - pending_admin → approved: 관리자만
+      // - 반려: 팀장 또는 관리자
+      allow update: if isTeamLeaderOrAbove() && (
+        isValidLeaderApproval() || 
+        isValidRejection() || 
+        (isSuperAdmin() && isValidAdminApproval())
+      );
+      
+      // 삭제: 본인 (대기 상태에서만) 또는 관리자
+      allow delete: if (isAuthenticated() && resource.data.user_id == request.auth.uid 
+        && (resource.data.status == 'pending_leader' || resource.data.status == 'pending_admin'))
+        || isSuperAdmin();
     }
   }
 }

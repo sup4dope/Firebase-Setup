@@ -3,6 +3,46 @@ import type { PublicHolidayItem } from '@shared/types';
 const API_KEY = '9e1b6634ab6635f5859fbeef1cffd07ae7f6d12d35d7fb4c4eb3d146e4e8c5ff';
 const BASE_URL = 'https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService';
 
+const FALLBACK_HOLIDAYS_2025: Map<string, string> = new Map([
+  ['2025-01-01', '신정'],
+  ['2025-01-28', '설날연휴'],
+  ['2025-01-29', '설날'],
+  ['2025-01-30', '설날연휴'],
+  ['2025-03-01', '삼일절'],
+  ['2025-05-05', '어린이날'],
+  ['2025-05-06', '부처님오신날'],
+  ['2025-06-06', '현충일'],
+  ['2025-08-15', '광복절'],
+  ['2025-10-03', '개천절'],
+  ['2025-10-05', '추석연휴'],
+  ['2025-10-06', '추석'],
+  ['2025-10-07', '추석연휴'],
+  ['2025-10-08', '대체공휴일'],
+  ['2025-10-09', '한글날'],
+  ['2025-12-25', '크리스마스'],
+]);
+
+const FALLBACK_HOLIDAYS_2026: Map<string, string> = new Map([
+  ['2026-01-01', '신정'],
+  ['2026-02-16', '설날연휴'],
+  ['2026-02-17', '설날'],
+  ['2026-02-18', '설날연휴'],
+  ['2026-03-01', '삼일절'],
+  ['2026-03-02', '대체공휴일'],
+  ['2026-05-05', '어린이날'],
+  ['2026-05-24', '부처님오신날'],
+  ['2026-06-06', '현충일'],
+  ['2026-08-15', '광복절'],
+  ['2026-08-17', '대체공휴일'],
+  ['2026-09-24', '추석연휴'],
+  ['2026-09-25', '추석'],
+  ['2026-09-26', '추석연휴'],
+  ['2026-10-03', '개천절'],
+  ['2026-10-05', '대체공휴일'],
+  ['2026-10-09', '한글날'],
+  ['2026-12-25', '크리스마스'],
+]);
+
 interface HolidayApiResponse {
   response: {
     header: {
@@ -56,19 +96,35 @@ export const fetchPublicHolidays = async (year: number, month: number): Promise<
   }
 };
 
+const getFallbackHolidays = (year: number): Map<string, string> => {
+  if (year === 2025) return FALLBACK_HOLIDAYS_2025;
+  if (year === 2026) return FALLBACK_HOLIDAYS_2026;
+  return new Map();
+};
+
 export const fetchYearlyHolidays = async (year: number): Promise<Map<string, string>> => {
-  const holidayMap = new Map<string, string>();
+  const fallbackHolidays = getFallbackHolidays(year);
   
-  const promises = Array.from({ length: 12 }, (_, i) => fetchPublicHolidays(year, i + 1));
-  const results = await Promise.all(promises);
+  try {
+    const promises = Array.from({ length: 12 }, (_, i) => fetchPublicHolidays(year, i + 1));
+    const results = await Promise.all(promises);
+    
+    const allHolidays = results.flat();
+    
+    if (allHolidays.length > 0) {
+      const holidayMap = new Map<string, string>();
+      allHolidays.forEach(holiday => {
+        const dateStr = holiday.locdate.toString();
+        const formatted = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
+        holidayMap.set(formatted, holiday.dateName);
+      });
+      return holidayMap;
+    }
+  } catch (error) {
+    console.warn('API fetch failed, using fallback holidays');
+  }
   
-  results.flat().forEach(holiday => {
-    const dateStr = holiday.locdate.toString();
-    const formatted = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
-    holidayMap.set(formatted, holiday.dateName);
-  });
-  
-  return holidayMap;
+  return fallbackHolidays;
 };
 
 export const isHoliday = (date: string, holidayMap: Map<string, string>): boolean => {

@@ -108,6 +108,21 @@ server/
 - **데이터 타입**: SettlementItem, MonthlySettlementSummary (shared/types.ts)
 - **Firestore 컬렉션**: settlements
 
+### 7. 연차 관리 시스템 (2단계 승인)
+- **2단계 승인 워크플로우**:
+  - 1단계: 팀장(team_leader) 승인
+  - 2단계: 총관리자(super_admin) 최종 승인
+- **연차 유형**: 전일(1.0일), 오전 반차(0.5일), 오후 반차(0.5일)
+- **공휴일 연동**: 한국천문연구원 공휴일 API 연동 (fallback 데이터 포함)
+- **달력 인터페이스**: 월별 달력에서 직접 날짜 클릭하여 신청
+- **자동 잔여일 계산**: 총연차, 사용연차, 잔여연차 자동 계산
+- **데이터 타입**: LeaveRequest, InsertLeaveRequest, LeaveSummary (shared/types.ts)
+- **Firestore 컬렉션**: leave_requests
+- **UI 탭**:
+  - 내 신청 내역: 본인 연차 신청 목록
+  - 승인 대기: 팀장/관리자용 승인 대기 목록
+  - 전체 내역: super_admin용 전체 연차 내역
+
 ## 환경 변수 (Secrets)
 - `VITE_FIREBASE_API_KEY`: Firebase API 키
 - `VITE_FIREBASE_PROJECT_ID`: Firebase 프로젝트 ID
@@ -129,6 +144,7 @@ server/
 - `meta`: 메타데이터 (사용자 수 등)
 - `settlements`: 정산 데이터 (SettlementItem)
 - `consultations`: 랜딩페이지 상담 신청 데이터
+- `leave_requests`: 연차 신청 데이터 (LeaveRequest)
 
 ## 개발 서버 실행
 ```bash
@@ -137,6 +153,15 @@ npm run dev
 - 프론트엔드: http://localhost:5000
 
 ## 최근 변경사항
+- 2026-01-17: 연차 관리 시스템 추가
+  - **2단계 승인 워크플로우**: 팀장 1차 승인 → 총관리자 최종 승인
+  - **달력 UI**: 월별 달력에서 날짜 클릭 → 신청, 공휴일/주말 비활성화
+  - **한국 공휴일 API**: 한국천문연구원 API 연동 + fallback 데이터 (2025-2026)
+  - **자동 잔여일 계산**: 최종 승인 시 usedLeave 필드 자동 증가
+  - **역할별 탭**: 내 신청/승인 대기/전체 내역 (super_admin 전용)
+  - **사이드바 메뉴**: "연차관리" 메뉴 모든 사용자에게 표시
+  - **Firebase Rules**: leave_requests 컬렉션 규칙 추가
+
 - 2026-01-06: 랜딩페이지 상담 신청 자동 연동
   - **LandingPageListener**: consultations 컬렉션 실시간 감지
   - **자동 고객 생성**: 신규 상담 신청 시 customers 컬렉션에 자동 등록
