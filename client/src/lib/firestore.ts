@@ -2232,6 +2232,7 @@ const mapLeaveRequestDoc = (docSnap: any): LeaveRequest => ({
   leader_approved_at: docSnap.data().leader_approved_at ? toDate(docSnap.data().leader_approved_at) : undefined,
   admin_approved_at: docSnap.data().admin_approved_at ? toDate(docSnap.data().admin_approved_at) : undefined,
   rejected_at: docSnap.data().rejected_at ? toDate(docSnap.data().rejected_at) : undefined,
+  cancelled_at: docSnap.data().cancelled_at ? toDate(docSnap.data().cancelled_at) : undefined,
 });
 
 const sortByCreatedAtDesc = (a: LeaveRequest, b: LeaveRequest) => 
