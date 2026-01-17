@@ -2350,9 +2350,8 @@ export const cancelApprovedLeave = async (
   userId: string,
   leaveDays: number
 ): Promise<void> => {
-  const batch = writeBatch(db);
-  
-  batch.update(doc(db, 'leave_requests', requestId), {
+  // 1. 연차 신청 상태를 cancelled로 변경
+  await updateDoc(doc(db, 'leave_requests', requestId), {
     status: 'cancelled',
     cancelled_by: cancelledBy,
     cancelled_by_name: cancelledByName,
@@ -2360,19 +2359,18 @@ export const cancelApprovedLeave = async (
     updated_at: Timestamp.now(),
   });
   
+  // 2. 사용자의 usedLeave 차감 (잔여 연차 복원)
   const userDocRef = doc(db, 'users', userId);
   const userDoc = await getDoc(userDocRef);
   if (userDoc.exists()) {
     const userData = userDoc.data();
     const currentUsed = userData.usedLeave || 0;
     const newUsedLeave = Math.max(0, currentUsed - leaveDays);
-    batch.update(userDocRef, {
+    await updateDoc(userDocRef, {
       usedLeave: newUsedLeave,
       updated_at: Timestamp.now(),
     });
   }
-  
-  await batch.commit();
 };
 
 export const getLeaveSummary = async (userId: string): Promise<LeaveSummary> => {
