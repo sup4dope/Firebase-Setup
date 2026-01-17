@@ -574,6 +574,9 @@ export default function Settlements() {
             <p className="text-xs text-muted-foreground mt-1">
               계약 건수: {totals.contracts}건
             </p>
+            <p className="text-xs text-muted-foreground">
+              평균 계약금액: {totals.contracts > 0 ? Math.round(totals.contractAmount / totals.contracts).toLocaleString() : 0}만원
+            </p>
           </CardContent>
         </Card>
 
