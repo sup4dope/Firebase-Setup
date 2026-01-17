@@ -648,7 +648,7 @@ export default function Settlements() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              -{totals.clawbackAmount.toLocaleString()}만원
+              {totals.clawbackAmount > 0 ? `-${totals.clawbackAmount.toLocaleString()}` : '0'}만원
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">
