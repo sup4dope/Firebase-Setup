@@ -566,13 +566,13 @@ export default function Settlements() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Users className="w-4 h-4" />
-              계약 건수
+              총 계약금액
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totals.contracts}건</div>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totals.contractAmount.toLocaleString()}만원</div>
             <p className="text-xs text-muted-foreground mt-1">
-              총 계약금액: {totals.contractAmount.toLocaleString()}만원
+              계약 건수: {totals.contracts}건
             </p>
           </CardContent>
         </Card>
