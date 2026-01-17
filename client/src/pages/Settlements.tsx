@@ -287,9 +287,15 @@ export default function Settlements() {
     const clawbackItems = items.filter(item => item.is_clawback);
     
     const contractAmount = originalItems.reduce((sum, item) => sum + item.contract_amount, 0);
-    const executionCount = originalItems.filter(item => item.execution_amount > 0).length;
+    const executedItems = originalItems.filter(item => item.execution_amount > 0);
+    const executionCount = executedItems.length;
     const executionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
     const clawbackContractAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(item.contract_amount), 0);
+    
+    // 평균 자문료율: 집행된 항목들의 fee_rate 평균 (계약정보 입력 모달에서 입력된 자문료율)
+    const avgFeeRate = executedItems.length > 0 
+      ? executedItems.reduce((sum, item) => sum + (item.fee_rate || 0), 0) / executedItems.length 
+      : 0;
     
     // 해당월에 생성된 고객(DB) 수 계산
     const months = getMonthsForPeriod(selectedMonth);
@@ -330,6 +336,7 @@ export default function Settlements() {
       executionAmount,
       clawbackContractAmount,
       monthlyDbCount,
+      avgFeeRate,
     };
   }, [summaries, items, customers, selectedMonth]);
 
@@ -590,7 +597,7 @@ export default function Settlements() {
           <CardContent>
             <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{(totals.executionFee || 0).toLocaleString()}만원</div>
             <p className="text-xs text-muted-foreground mt-1">
-              평균 자문료율: {totals.executionAmount > 0 ? ((totals.executionFee || 0) / totals.executionAmount * 100).toFixed(1) : 0}%
+              평균 자문료율: {totals.avgFeeRate.toFixed(1)}%
             </p>
             <p className="text-xs text-muted-foreground">
               총 집행금액: {totals.executionAmount.toLocaleString()}만원
