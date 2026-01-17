@@ -759,136 +759,175 @@ export default function Settlements() {
         </CardContent>
       </Card>
 
-      {/* 직원별 상세 통계 */}
-      {summaries.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
-              직원별 상세 통계
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {summaries.map((summary) => {
-                const managerItems = items.filter(item => item.manager_id === summary.manager_id && !item.is_clawback);
-                const avgContractPerEmployee = summary.total_contracts > 0 
-                  ? managerItems.reduce((sum, item) => sum + item.contract_amount, 0) / summary.total_contracts 
-                  : 0;
-                const avgFeeRatePerEmployee = summary.execution_count > 0
-                  ? managerItems.filter(item => item.execution_amount > 0).reduce((sum, item) => sum + (item.fee_rate || 0), 0) / summary.execution_count
-                  : 0;
-                const executionRate = summary.total_contracts > 0 
-                  ? Math.round((summary.execution_count / summary.total_contracts) * 100) 
-                  : 0;
-                const avgExecutionAmount = summary.execution_count > 0
-                  ? Math.round(summary.total_execution_amount / summary.execution_count)
-                  : 0;
+      {/* 직원별 상세 통계 - team_leader 및 super_admin 전용 */}
+      {summaries.length > 0 && (isSuperAdmin || isTeamLeader) && (() => {
+        // 전체 평균 계산
+        const totalEmployees = summaries.length;
+        const avgContractsPerEmployee = totalEmployees > 0 ? totals.contracts / totalEmployees : 0;
+        const avgContractAmountPerEmployee = totalEmployees > 0 ? totals.contractAmount / totalEmployees : 0;
+        const avgExecutionCountPerEmployee = totalEmployees > 0 ? totals.executionCount / totalEmployees : 0;
+        const avgExecutionAmountPerEmployee = totalEmployees > 0 ? totals.executionAmount / totalEmployees : 0;
+        const avgExecutionFeePerEmployee = totalEmployees > 0 ? (totals.executionFee || 0) / totalEmployees : 0;
+        const avgGrossCommissionPerEmployee = totalEmployees > 0 ? totals.grossCommission / totalEmployees : 0;
+        const avgFinalPaymentPerEmployee = totalEmployees > 0 ? totals.finalPayment / totalEmployees : 0;
+        const overallExecutionRate = totals.contracts > 0 ? Math.round((totals.executionCount / totals.contracts) * 100) : 0;
 
-                return (
-                  <Card 
-                    key={summary.manager_id} 
-                    className="hover-elevate cursor-pointer"
-                    onClick={() => {
-                      const periodMonths = getMonthsForPeriod(selectedMonth);
-                      handleShowDetail(
-                        `${summary.manager_name} 정산 내역`,
-                        (item) => item.manager_id === summary.manager_id && periodMonths.includes(item.settlement_month)
-                      );
-                    }}
-                    data-testid={`card-employee-stats-${summary.manager_id}`}
-                  >
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base font-semibold flex items-center justify-between">
-                        <span>{summary.manager_name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          최종 {summary.final_payment.toLocaleString()}만원
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {/* 계약 관련 */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            계약
-                          </span>
-                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                            {summary.total_contract_amount.toLocaleString()}만원
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>건수: {summary.total_contracts}건</span>
-                          <span>평균: {Math.round(avgContractPerEmployee).toLocaleString()}만원</span>
-                        </div>
-                      </div>
+        const getDiffIndicator = (value: number, avg: number, suffix: string = '') => {
+          if (avg === 0) return null;
+          const diff = value - avg;
+          const diffPercent = Math.round((diff / avg) * 100);
+          if (Math.abs(diffPercent) < 5) return <span className="text-muted-foreground">평균</span>;
+          if (diff > 0) return <span className="text-green-600">+{diffPercent}%</span>;
+          return <span className="text-red-600">{diffPercent}%</span>;
+        };
 
-                      {/* 집행/자문 관련 */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground flex items-center gap-1">
-                            <TrendingUp className="w-3 h-3" />
-                            자문
-                          </span>
-                          <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">
-                            {(summary.total_execution_fee || 0).toLocaleString()}만원
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>집행: {summary.execution_count}건 ({executionRate}%)</span>
-                          <span>자문료율: {avgFeeRatePerEmployee.toFixed(1)}%</span>
-                        </div>
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>총 집행금액: {summary.total_execution_amount.toLocaleString()}만원</span>
-                          <span>평균: {avgExecutionAmount.toLocaleString()}만원</span>
-                        </div>
-                      </div>
+        return (
+          <Card data-testid="card-employee-detailed-stats">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5" />
+                  직원별 상세 통계
+                </span>
+                <Badge variant="secondary" className="text-xs">
+                  전체 평균: 계약 {avgContractsPerEmployee.toFixed(1)}건 / 최종지급 {Math.round(avgFinalPaymentPerEmployee).toLocaleString()}만원
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {summaries.map((summary) => {
+                  const managerItems = items.filter(item => item.manager_id === summary.manager_id && !item.is_clawback);
+                  const avgContractPerEmployee = summary.total_contracts > 0 
+                    ? managerItems.reduce((sum, item) => sum + item.contract_amount, 0) / summary.total_contracts 
+                    : 0;
+                  const avgFeeRatePerEmployee = summary.execution_count > 0
+                    ? managerItems.filter(item => item.execution_amount > 0).reduce((sum, item) => sum + (item.fee_rate || 0), 0) / summary.execution_count
+                    : 0;
+                  const executionRate = summary.total_contracts > 0 
+                    ? Math.round((summary.execution_count / summary.total_contracts) * 100) 
+                    : 0;
+                  const avgExecutionAmount = summary.execution_count > 0
+                    ? Math.round(summary.total_execution_amount / summary.execution_count)
+                    : 0;
 
-                      {/* 수당 관련 */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" />
-                            수당
-                          </span>
-                          <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                            {summary.total_gross_commission.toLocaleString()}만원
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>공제세액: {summary.total_tax.toLocaleString()}만원</span>
-                          <span className="text-purple-600 dark:text-purple-400 font-medium">
-                            세후: {summary.total_net_commission.toLocaleString()}만원
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 환수 관련 */}
-                      {summary.clawback_count > 0 && (
-                        <div className="space-y-1 pt-1 border-t">
+                  return (
+                    <Card 
+                      key={summary.manager_id} 
+                      className="hover-elevate cursor-pointer"
+                      onClick={() => {
+                        const periodMonths = getMonthsForPeriod(selectedMonth);
+                        handleShowDetail(
+                          `${summary.manager_name} 정산 내역`,
+                          (item) => item.manager_id === summary.manager_id && periodMonths.includes(item.settlement_month)
+                        );
+                      }}
+                      data-testid={`card-employee-stats-${summary.manager_id}`}
+                    >
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base font-semibold flex items-center justify-between">
+                          <span>{summary.manager_name}</span>
+                          <div className="flex items-center gap-2">
+                            {getDiffIndicator(summary.final_payment, avgFinalPaymentPerEmployee)}
+                            <Badge variant="outline" className="text-xs">
+                              최종 {summary.final_payment.toLocaleString()}만원
+                            </Badge>
+                          </div>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {/* 계약 관련 */}
+                        <div className="space-y-1">
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-muted-foreground flex items-center gap-1">
-                              <TrendingDown className="w-3 h-3" />
-                              환수
+                              <Users className="w-3 h-3" />
+                              계약
                             </span>
-                            <span className="text-sm font-medium text-red-600">
-                              -{summary.clawback_amount.toLocaleString()}만원
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {getDiffIndicator(summary.total_contract_amount, avgContractAmountPerEmployee)}
+                              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                                {summary.total_contract_amount.toLocaleString()}만원
+                              </span>
+                            </div>
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>환수 건수: {summary.clawback_count}건</span>
+                            <span>건수: {summary.total_contracts}건 (평균 {avgContractsPerEmployee.toFixed(1)}건)</span>
+                            <span>건당: {Math.round(avgContractPerEmployee).toLocaleString()}만원</span>
                           </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
+                        {/* 집행/자문 관련 */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground flex items-center gap-1">
+                              <TrendingUp className="w-3 h-3" />
+                              자문
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {getDiffIndicator(summary.total_execution_fee || 0, avgExecutionFeePerEmployee)}
+                              <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">
+                                {(summary.total_execution_fee || 0).toLocaleString()}만원
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>집행: {summary.execution_count}건 ({executionRate}% / 평균 {overallExecutionRate}%)</span>
+                            <span>자문료율: {avgFeeRatePerEmployee.toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>집행금액: {summary.total_execution_amount.toLocaleString()}만원</span>
+                            <span>건당: {avgExecutionAmount.toLocaleString()}만원</span>
+                          </div>
+                        </div>
+
+                        {/* 수당 관련 */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
+                              수당
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {getDiffIndicator(summary.total_gross_commission, avgGrossCommissionPerEmployee)}
+                              <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                                {summary.total_gross_commission.toLocaleString()}만원
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>공제세액: {summary.total_tax.toLocaleString()}만원</span>
+                            <span className="text-purple-600 dark:text-purple-400 font-medium">
+                              세후: {summary.total_net_commission.toLocaleString()}만원
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 환수 관련 */}
+                        {summary.clawback_count > 0 && (
+                          <div className="space-y-1 pt-1 border-t">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                <TrendingDown className="w-3 h-3" />
+                                환수
+                              </span>
+                              <span className="text-sm font-medium text-red-600">
+                                -{summary.clawback_amount.toLocaleString()}만원
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>환수 건수: {summary.clawback_count}건</span>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
         <DialogContent className="max-w-[95vw] max-h-[85vh]">
