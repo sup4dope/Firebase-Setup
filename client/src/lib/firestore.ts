@@ -1546,7 +1546,8 @@ export const calculateMonthlySettlementSummary = (
   const clawbackItems = managerItems.filter(item => item.is_clawback);
   
   const totalContracts = originalItems.length;
-  const totalContractAmount = originalItems.reduce((sum, item) => sum + item.contract_amount, 0);
+  // 계약금 수당: 계약금 * 수당율 적용
+  const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * item.commission_rate / 100), 0);
   const executionCount = originalItems.filter(item => item.execution_amount > 0).length;
   const totalExecutionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
   const totalRevenue = originalItems.reduce((sum, item) => sum + item.total_revenue, 0);
