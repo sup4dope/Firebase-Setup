@@ -619,7 +619,7 @@ export default function AnnualLeave() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>사유 (선택)</Label>
+                <Label>사유 (필수)</Label>
                 <Textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
@@ -631,7 +631,7 @@ export default function AnnualLeave() {
               <Button
                 className="w-full"
                 onClick={handleSubmitRequest}
-                disabled={!selectedDate || isSubmitting}
+                disabled={!selectedDate || !reason.trim() || isSubmitting}
                 data-testid="button-submit-leave"
               >
                 {isSubmitting ? (
