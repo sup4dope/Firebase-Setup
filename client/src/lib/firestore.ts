@@ -2224,63 +2224,49 @@ export const getCumulativeTaxReserve = async (upToMonth: string): Promise<number
 // 연차 관리 (Leave Requests)
 // ========================================
 
+const mapLeaveRequestDoc = (docSnap: any): LeaveRequest => ({
+  id: docSnap.id,
+  ...docSnap.data(),
+  created_at: toDate(docSnap.data().created_at),
+  updated_at: docSnap.data().updated_at ? toDate(docSnap.data().updated_at) : undefined,
+  leader_approved_at: docSnap.data().leader_approved_at ? toDate(docSnap.data().leader_approved_at) : undefined,
+  admin_approved_at: docSnap.data().admin_approved_at ? toDate(docSnap.data().admin_approved_at) : undefined,
+  rejected_at: docSnap.data().rejected_at ? toDate(docSnap.data().rejected_at) : undefined,
+});
+
+const sortByCreatedAtDesc = (a: LeaveRequest, b: LeaveRequest) => 
+  new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+
 export const getLeaveRequests = async (): Promise<LeaveRequest[]> => {
-  const q = query(collection(db, 'leave_requests'), orderBy('created_at', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(docSnap => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-    created_at: toDate(docSnap.data().created_at),
-    updated_at: docSnap.data().updated_at ? toDate(docSnap.data().updated_at) : undefined,
-    leader_approved_at: docSnap.data().leader_approved_at ? toDate(docSnap.data().leader_approved_at) : undefined,
-    admin_approved_at: docSnap.data().admin_approved_at ? toDate(docSnap.data().admin_approved_at) : undefined,
-    rejected_at: docSnap.data().rejected_at ? toDate(docSnap.data().rejected_at) : undefined,
-  })) as LeaveRequest[];
+  const snapshot = await getDocs(collection(db, 'leave_requests'));
+  return snapshot.docs.map(mapLeaveRequestDoc).sort(sortByCreatedAtDesc);
 };
 
 export const getLeaveRequestsByUser = async (userId: string): Promise<LeaveRequest[]> => {
   const q = query(
     collection(db, 'leave_requests'),
-    where('user_id', '==', userId),
-    orderBy('created_at', 'desc')
+    where('user_id', '==', userId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docSnap => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-    created_at: toDate(docSnap.data().created_at),
-    updated_at: docSnap.data().updated_at ? toDate(docSnap.data().updated_at) : undefined,
-  })) as LeaveRequest[];
+  return snapshot.docs.map(mapLeaveRequestDoc).sort(sortByCreatedAtDesc);
 };
 
 export const getLeaveRequestsByTeam = async (teamId: string): Promise<LeaveRequest[]> => {
   const q = query(
     collection(db, 'leave_requests'),
-    where('team_id', '==', teamId),
-    orderBy('created_at', 'desc')
+    where('team_id', '==', teamId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docSnap => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-    created_at: toDate(docSnap.data().created_at),
-    updated_at: docSnap.data().updated_at ? toDate(docSnap.data().updated_at) : undefined,
-  })) as LeaveRequest[];
+  return snapshot.docs.map(mapLeaveRequestDoc).sort(sortByCreatedAtDesc);
 };
 
 export const getLeaveRequestsByStatus = async (status: LeaveStatus): Promise<LeaveRequest[]> => {
   const q = query(
     collection(db, 'leave_requests'),
-    where('status', '==', status),
-    orderBy('created_at', 'desc')
+    where('status', '==', status)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docSnap => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-    created_at: toDate(docSnap.data().created_at),
-    updated_at: docSnap.data().updated_at ? toDate(docSnap.data().updated_at) : undefined,
-  })) as LeaveRequest[];
+  return snapshot.docs.map(mapLeaveRequestDoc).sort(sortByCreatedAtDesc);
 };
 
 export const createLeaveRequest = async (data: InsertLeaveRequest): Promise<string> => {
@@ -2369,18 +2355,22 @@ export const getLeaveSummary = async (userId: string): Promise<LeaveSummary> => 
     usedLeave = userData.usedLeave ?? 0;
   }
   
-  const pendingQuery = query(
+  const userRequestsQuery = query(
     collection(db, 'leave_requests'),
-    where('user_id', '==', userId),
-    where('status', 'in', ['pending_leader', 'pending_admin'])
+    where('user_id', '==', userId)
   );
-  const pendingSnapshot = await getDocs(pendingQuery);
+  const userRequestsSnapshot = await getDocs(userRequestsQuery);
+  
+  const pendingCount = userRequestsSnapshot.docs.filter(docSnap => {
+    const status = docSnap.data().status;
+    return status === 'pending_leader' || status === 'pending_admin';
+  }).length;
   
   return {
     totalLeave,
     usedLeave,
     remainingLeave: totalLeave - usedLeave,
-    pendingCount: pendingSnapshot.size,
+    pendingCount,
   };
 };
 
