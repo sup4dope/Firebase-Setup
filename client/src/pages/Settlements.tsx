@@ -771,27 +771,22 @@ export default function Settlements() {
         const avgGrossCommissionPerEmployee = totalEmployees > 0 ? totals.grossCommission / totalEmployees : 0;
         const avgFinalPaymentPerEmployee = totalEmployees > 0 ? totals.finalPayment / totalEmployees : 0;
         const overallExecutionRate = totals.contracts > 0 ? Math.round((totals.executionCount / totals.contracts) * 100) : 0;
+        const avgRawContractPerItem = totals.contracts > 0 ? totals.avgContractAmount : 0;
+        const avgExecutionAmountPerItem = totals.executionCount > 0 ? totals.executionAmount / totals.executionCount : 0;
 
-        const getDiffIndicator = (value: number, avg: number, suffix: string = '') => {
-          if (avg === 0) return null;
-          const diff = value - avg;
-          const diffPercent = Math.round((diff / avg) * 100);
-          if (Math.abs(diffPercent) < 5) return <span className="text-muted-foreground">평균</span>;
-          if (diff > 0) return <span className="text-green-600">+{diffPercent}%</span>;
-          return <span className="text-red-600">{diffPercent}%</span>;
+        const getDiffText = (value: number, avg: number) => {
+          const diff = Math.round(value - avg);
+          if (diff === 0) return null;
+          if (diff > 0) return <span className="text-green-600 text-xs">(+{diff})</span>;
+          return <span className="text-red-600 text-xs">({diff})</span>;
         };
 
         return (
           <Card data-testid="card-employee-detailed-stats">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5" />
-                  직원별 상세 통계
-                </span>
-                <Badge variant="secondary" className="text-xs">
-                  전체 평균: 계약 {avgContractsPerEmployee.toFixed(1)}건 / 최종지급 {Math.round(avgFinalPaymentPerEmployee).toLocaleString()}만원
-                </Badge>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                직원별 상세 통계
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -825,15 +820,17 @@ export default function Settlements() {
                       data-testid={`card-employee-stats-${summary.manager_id}`}
                     >
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-base font-semibold flex items-center justify-between">
-                          <span>{summary.manager_name}</span>
-                          <div className="flex items-center gap-2">
-                            {getDiffIndicator(summary.final_payment, avgFinalPaymentPerEmployee)}
-                            <Badge variant="outline" className="text-xs">
-                              최종 {summary.final_payment.toLocaleString()}만원
-                            </Badge>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-base font-semibold">{summary.manager_name}</CardTitle>
                           </div>
-                        </CardTitle>
+                          <div className="text-right">
+                            <Badge variant="outline" className="text-xs mb-1">평균</Badge>
+                            <div className="text-sm font-medium text-purple-600 dark:text-purple-400">
+                              최종 {Math.round(avgFinalPaymentPerEmployee).toLocaleString()}만원
+                            </div>
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
                         {/* 계약 관련 */}
@@ -843,16 +840,24 @@ export default function Settlements() {
                               <Users className="w-3 h-3" />
                               계약
                             </span>
-                            <div className="flex items-center gap-2">
-                              {getDiffIndicator(summary.total_contract_amount, avgContractAmountPerEmployee)}
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-muted-foreground">평균</span>
                               <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                {summary.total_contract_amount.toLocaleString()}만원
+                                {Math.round(avgContractAmountPerEmployee).toLocaleString()}만원
                               </span>
                             </div>
                           </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">
+                              건수: {summary.total_contracts}건 (평균 {avgContractsPerEmployee.toFixed(1)}건)
+                            </span>
+                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                              {summary.total_contract_amount.toLocaleString()}만원 {getDiffText(summary.total_contract_amount, avgContractAmountPerEmployee)}
+                            </span>
+                          </div>
                           <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>건수: {summary.total_contracts}건 (평균 {avgContractsPerEmployee.toFixed(1)}건)</span>
                             <span>건당: {Math.round(avgContractPerEmployee).toLocaleString()}만원</span>
+                            <span>건당: {Math.round(avgRawContractPerItem).toLocaleString()}만원</span>
                           </div>
                         </div>
 
@@ -863,19 +868,30 @@ export default function Settlements() {
                               <TrendingUp className="w-3 h-3" />
                               자문
                             </span>
-                            <div className="flex items-center gap-2">
-                              {getDiffIndicator(summary.total_execution_fee || 0, avgExecutionFeePerEmployee)}
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-muted-foreground">평균</span>
                               <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">
-                                {(summary.total_execution_fee || 0).toLocaleString()}만원
+                                {Math.round(avgExecutionFeePerEmployee).toLocaleString()}만원
                               </span>
                             </div>
                           </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">
+                              집행: {summary.execution_count}건 ({executionRate}% / 평균 {overallExecutionRate}%)
+                            </span>
+                            <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">
+                              {(summary.total_execution_fee || 0).toLocaleString()}만원 {getDiffText(summary.total_execution_fee || 0, avgExecutionFeePerEmployee)}
+                            </span>
+                          </div>
                           <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>집행: {summary.execution_count}건 ({executionRate}% / 평균 {overallExecutionRate}%)</span>
                             <span>자문료율: {avgFeeRatePerEmployee.toFixed(1)}%</span>
+                            <span>자문료율: {totals.avgFeeRate.toFixed(1)}%</span>
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>집행금액: {summary.total_execution_amount.toLocaleString()}만원</span>
+                            <span>건당: {Math.round(avgExecutionAmountPerItem).toLocaleString()}만원</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
                             <span>건당: {avgExecutionAmount.toLocaleString()}만원</span>
                           </div>
                         </div>
@@ -887,17 +903,25 @@ export default function Settlements() {
                               <DollarSign className="w-3 h-3" />
                               수당
                             </span>
-                            <div className="flex items-center gap-2">
-                              {getDiffIndicator(summary.total_gross_commission, avgGrossCommissionPerEmployee)}
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-muted-foreground">평균</span>
                               <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                                {summary.total_gross_commission.toLocaleString()}만원
+                                {Math.round(avgGrossCommissionPerEmployee).toLocaleString()}만원
                               </span>
                             </div>
                           </div>
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>공제세액: {summary.total_tax.toLocaleString()}만원</span>
-                            <span className="text-purple-600 dark:text-purple-400 font-medium">
-                              세후: {summary.total_net_commission.toLocaleString()}만원
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">
+                              공제세액: {summary.total_tax.toLocaleString()}만원
+                            </span>
+                            <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                              {summary.total_gross_commission.toLocaleString()}만원 {getDiffText(summary.total_gross_commission, avgGrossCommissionPerEmployee)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">세후:</span>
+                            <span className="text-purple-600 dark:text-purple-400 font-medium text-sm">
+                              {summary.final_payment.toLocaleString()}만원 {getDiffText(summary.final_payment, avgFinalPaymentPerEmployee)}
                             </span>
                           </div>
                         </div>
