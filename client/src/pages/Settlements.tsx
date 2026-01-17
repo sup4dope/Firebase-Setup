@@ -582,10 +582,10 @@ export default function Settlements() {
           <CardContent>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totals.contractAmount.toLocaleString()}만원</div>
             <p className="text-xs text-muted-foreground mt-1">
-              계약 건수: {totals.contracts}건
+              평균 계약금액: {totals.contracts > 0 ? Math.round(totals.contractAmount / totals.contracts).toLocaleString() : 0}만원
             </p>
             <p className="text-xs text-muted-foreground">
-              평균 계약금액: {totals.contracts > 0 ? Math.round(totals.contractAmount / totals.contracts).toLocaleString() : 0}만원
+              계약 건수: {totals.contracts}건
             </p>
           </CardContent>
         </Card>
