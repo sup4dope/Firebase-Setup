@@ -243,9 +243,8 @@ export default function Settlements() {
         const totalContractAmount = originalItems.reduce((sum, item) => sum + item.contract_amount, 0);
         const executionCount = originalItems.filter(item => item.execution_amount > 0).length;
         const totalExecutionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
-        // 총 자문금액: 자문료율 * 집행금액 (수당율 미적용)
         const totalExecutionFee = originalItems.reduce((sum, item) => {
-          return sum + (item.execution_amount * (item.fee_rate / 100));
+          return sum + (item.execution_amount * (item.fee_rate / 100) * (item.commission_rate / 100));
         }, 0);
         const totalGrossCommission = originalItems.reduce((sum, item) => sum + item.gross_commission, 0);
         const totalTax = originalItems.reduce((sum, item) => sum + item.tax_amount, 0);
