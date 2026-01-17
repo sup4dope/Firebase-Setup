@@ -289,6 +289,8 @@ export default function Settlements() {
     
     // 계약금 수당: 계약금 * 수당율 적용
     const contractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * item.commission_rate / 100), 0);
+    // 평균 계약금액 계산용: 수당율 적용된 개별 계약금의 평균 (총 계약금액 / 계약 건수)
+    const avgContractAmount = originalItems.length > 0 ? contractAmount / originalItems.length : 0;
     const executedItems = originalItems.filter(item => item.execution_amount > 0);
     const executionCount = executedItems.length;
     const executionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
@@ -334,6 +336,7 @@ export default function Settlements() {
     return {
       ...summaryTotals,
       contractAmount,
+      avgContractAmount,
       executionCount,
       executionAmount,
       clawbackContractAmount,
@@ -577,7 +580,7 @@ export default function Settlements() {
           <CardContent>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totals.contractAmount.toLocaleString()}만원</div>
             <p className="text-xs text-muted-foreground mt-1">
-              평균 계약금액: {totals.contracts > 0 ? Math.round(totals.contractAmount / totals.contracts).toLocaleString() : 0}만원
+              평균 계약금액: {Math.round(totals.avgContractAmount).toLocaleString()}만원
             </p>
             <p className="text-xs text-muted-foreground">
               계약 건수: {totals.contracts}건
