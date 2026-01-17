@@ -305,6 +305,15 @@ export default function Settlements() {
     const executionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
     const clawbackContractAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(item.contract_amount), 0);
     
+    // 해당월에 생성된 고객(DB) 수 계산
+    const months = getMonthsForPeriod(selectedMonth);
+    const monthlyDbCount = customers.filter(c => {
+      if (!c.created_at) return false;
+      const createdDate = c.created_at instanceof Date ? c.created_at : new Date(c.created_at);
+      const createdMonth = format(createdDate, 'yyyy-MM');
+      return months.includes(createdMonth);
+    }).length;
+    
     const summaryTotals = summaries.reduce(
       (acc, s) => ({
         contracts: acc.contracts + s.total_contracts,
@@ -334,8 +343,9 @@ export default function Settlements() {
       executionCount,
       executionAmount,
       clawbackContractAmount,
+      monthlyDbCount,
     };
-  }, [summaries, items]);
+  }, [summaries, items, customers, selectedMonth]);
 
   // Show loading skeleton while auth is still resolving
   if (authLoading) {
@@ -619,6 +629,9 @@ export default function Settlements() {
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
               {totals.grossCommission.toLocaleString()}만원
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              평균 잠재금액: {totals.monthlyDbCount > 0 ? Math.round((totals.contractAmount + (totals.executionFee || 0)) / totals.monthlyDbCount).toLocaleString() : 0}만원
+            </p>
           </CardContent>
         </Card>
 
