@@ -62,6 +62,8 @@ import {
   ChevronLeft,
   ChevronRight,
   HelpCircle,
+  FileText,
+  Calculator,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -152,6 +154,8 @@ export default function CompanySettlement() {
     employeeCommission: 0,
     contractCount: 0,
     executionCount: 0,
+    totalContractAmount: 0,
+    totalAdvisoryFee: 0,
   });
   const [expenseSummary, setExpenseSummary] = useState({
     marketing: 0,
@@ -275,6 +279,8 @@ export default function CompanySettlement() {
           employeeCommission: 0,
           contractCount: 0,
           executionCount: 0,
+          totalContractAmount: 0,
+          totalAdvisoryFee: 0,
         };
         const aggregatedExpense = {
           marketing: 0,
@@ -292,6 +298,8 @@ export default function CompanySettlement() {
           aggregatedRevenue.employeeCommission += revenue.employeeCommission;
           aggregatedRevenue.contractCount += revenue.contractCount;
           aggregatedRevenue.executionCount += revenue.executionCount;
+          aggregatedRevenue.totalContractAmount += revenue.totalContractAmount;
+          aggregatedRevenue.totalAdvisoryFee += revenue.totalAdvisoryFee;
           
           aggregatedExpense.marketing += expense.marketing;
           aggregatedExpense.fixed += expense.fixed;
@@ -486,7 +494,7 @@ export default function CompanySettlement() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
             <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -503,6 +511,40 @@ export default function CompanySettlement() {
                     환수 손실: -{formatAmount(revenueData.clawbackLoss)}
                   </p>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 border-indigo-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  총 계약금
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                  {formatAmount(revenueData.totalContractAmount)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {revenueData.contractCount}건 계약
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-teal-500/10 to-teal-600/5 border-teal-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Calculator className="w-4 h-4" />
+                  총 자문료
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+                  {formatAmount(Math.round(revenueData.totalAdvisoryFee))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {revenueData.executionCount}건 집행
+                </p>
               </CardContent>
             </Card>
 

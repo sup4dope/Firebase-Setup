@@ -2175,6 +2175,8 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
   employeeCommission: number;
   contractCount: number;
   executionCount: number;
+  totalContractAmount: number;
+  totalAdvisoryFee: number;
 }> => {
   const q = query(
     collection(db, 'settlements'),
@@ -2187,6 +2189,8 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
   let employeeCommission = 0;
   let contractCount = 0;
   let executionCount = 0;
+  let totalContractAmount = 0;
+  let totalAdvisoryFee = 0;
   
   snapshot.docs.forEach(doc => {
     const data = doc.data() as SettlementItem;
@@ -2200,8 +2204,11 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
       totalDeposits += data.total_revenue || 0;
       employeeCommission += data.gross_commission || 0;
       contractCount++;
+      totalContractAmount += data.contract_amount || 0;
       if ((data.execution_amount || 0) > 0) {
         executionCount++;
+        const advisoryFee = (data.execution_amount || 0) * ((data.fee_rate || 0) / 100);
+        totalAdvisoryFee += advisoryFee;
       }
     }
   });
@@ -2213,6 +2220,8 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
     employeeCommission,
     contractCount,
     executionCount,
+    totalContractAmount,
+    totalAdvisoryFee,
   };
 };
 
