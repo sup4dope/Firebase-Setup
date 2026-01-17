@@ -430,27 +430,28 @@ export default function AnnualLeave() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5" />
-                {format(currentMonth, 'yyyy년 M월', { locale: ko })}
-              </CardTitle>
-              <div className="flex gap-1">
+            <CardHeader className="flex flex-row items-center justify-center pb-2">
+              <div className="flex items-center bg-muted/50 rounded-lg border">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
                   onClick={handlePrevMonth}
+                  className="rounded-l-lg rounded-r-none border-r"
                   data-testid="button-prev-month"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="w-4 h-4" />
                 </Button>
+                <div className="px-6 py-2 min-w-[180px] text-center font-medium select-none">
+                  {format(currentMonth, 'yyyy년 M월', { locale: ko })}
+                </div>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
                   onClick={handleNextMonth}
+                  className="rounded-r-lg rounded-l-none border-l"
                   data-testid="button-next-month"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
             </CardHeader>
