@@ -1927,10 +1927,10 @@ export function CustomerDetailModal({
                       variant="outline"
                       size="sm"
                       onClick={() => setShowHomeAddressSearch(true)}
-                      disabled={isReadOnly}
+                      disabled={formData.is_same_as_business || isReadOnly}
                       className={cn(
                         "border-border h-7 w-7 p-0",
-                        isReadOnly && "opacity-50 cursor-not-allowed",
+                        (formData.is_same_as_business || isReadOnly) && "opacity-50 cursor-not-allowed",
                       )}
                     >
                       <Search className="w-3 h-3" />
@@ -1938,7 +1938,7 @@ export function CustomerDetailModal({
                   </div>
                 </div>
 
-                {/* Row 4: 상세주소 | 자가 | 사업장동일 */}
+                {/* Row 4: 상세주소 | 자가 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
                     <Label className="text-[10px] text-muted-foreground">
@@ -1951,7 +1951,7 @@ export function CustomerDetailModal({
                           home_address_detail: e.target.value,
                         })
                       }
-                      disabled={isReadOnly}
+                      disabled={formData.is_same_as_business || isReadOnly}
                       className={cn(
                         "border-border text-foreground h-7 text-xs",
                         isReadOnly
@@ -1968,7 +1968,7 @@ export function CustomerDetailModal({
                       onCheckedChange={(c) =>
                         handleFieldChange({ is_home_owned: !!c })
                       }
-                      disabled={isReadOnly}
+                      disabled={formData.is_same_as_business || isReadOnly}
                       className={cn(
                         "h-3 w-3",
                         isReadOnly && "opacity-50 cursor-not-allowed",
@@ -1979,38 +1979,6 @@ export function CustomerDetailModal({
                       className="text-[10px] text-muted-foreground"
                     >
                       자가
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-1 h-7">
-                    <Checkbox
-                      id="same-address"
-                      checked={formData.is_same_as_business || false}
-                      onCheckedChange={(c) => {
-                        handleFieldChangeObject({
-                          is_same_as_business: !!c,
-                          business_address: c
-                            ? formData.home_address
-                            : formData.business_address,
-                          business_address_detail: c
-                            ? formData.home_address_detail
-                            : formData.business_address_detail,
-                          // 자가 체크 시 사업장 자가도 동일하게 체크
-                          is_business_owned: c
-                            ? formData.is_home_owned
-                            : formData.is_business_owned,
-                        });
-                      }}
-                      disabled={isReadOnly}
-                      className={cn(
-                        "h-3 w-3",
-                        isReadOnly && "opacity-50 cursor-not-allowed",
-                      )}
-                    />
-                    <Label
-                      htmlFor="same-address"
-                      className="text-[10px] text-muted-foreground"
-                    >
-                      사업장동일
                     </Label>
                   </div>
                 </div>
@@ -2276,14 +2244,14 @@ export function CustomerDetailModal({
                         "border-border h-7 w-7 p-0",
                         isReadOnly && "opacity-50 cursor-not-allowed",
                       )}
-                      disabled={formData.is_same_as_business || isReadOnly}
+                      disabled={isReadOnly}
                     >
                       <Search className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>
 
-                {/* Row 9: 상세주소 | 자가 */}
+                {/* Row 9: 상세주소 | 자가 | 자택동일 */}
                 <div className="flex gap-1.5 items-end">
                   <div className="flex-1">
                     <Label className="text-[10px] text-muted-foreground">
@@ -2303,7 +2271,7 @@ export function CustomerDetailModal({
                           : "bg-muted",
                       )}
                       placeholder="동/호수"
-                      disabled={formData.is_same_as_business || isReadOnly}
+                      disabled={isReadOnly}
                     />
                   </div>
                   <div className="flex items-center gap-1 h-7">
@@ -2324,6 +2292,37 @@ export function CustomerDetailModal({
                       className="text-[10px] text-muted-foreground"
                     >
                       자가
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-1 h-7">
+                    <Checkbox
+                      id="same-address"
+                      checked={formData.is_same_as_business || false}
+                      onCheckedChange={(c) => {
+                        handleFieldChangeObject({
+                          is_same_as_business: !!c,
+                          home_address: c
+                            ? formData.business_address
+                            : formData.home_address,
+                          home_address_detail: c
+                            ? formData.business_address_detail
+                            : formData.home_address_detail,
+                          is_home_owned: c
+                            ? formData.is_business_owned
+                            : formData.is_home_owned,
+                        });
+                      }}
+                      disabled={isReadOnly}
+                      className={cn(
+                        "h-3 w-3",
+                        isReadOnly && "opacity-50 cursor-not-allowed",
+                      )}
+                    />
+                    <Label
+                      htmlFor="same-address"
+                      className="text-[10px] text-muted-foreground"
+                    >
+                      자택동일
                     </Label>
                   </div>
                 </div>
