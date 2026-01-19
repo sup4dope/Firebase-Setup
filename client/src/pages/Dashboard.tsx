@@ -11,6 +11,7 @@ import { StatusHistoryDialog } from '@/components/StatusHistoryDialog';
 import { CustomerDetailModal } from '@/components/CustomerDetailModal';
 import { CustomerInfoEditModal } from '@/components/CustomerInfoEditModal';
 import { CustomerInfoHistoryModal } from '@/components/CustomerInfoHistoryModal';
+import { ConsultationsPreviewModal } from '@/components/ConsultationsPreviewModal';
 import { useToast } from '@/hooks/use-toast';
 import { calculateKPI } from '@/lib/kpi';
 import { fetchYearlyHolidays } from '@/lib/publicHolidays';
@@ -28,7 +29,6 @@ import {
   updateCustomerInfo,
   syncSingleCustomerSettlement,
   getPendingConsultationsCount,
-  importAllPendingConsultations,
   processClawbackForFinalRejection,
   updateCustomerManager,
 } from '@/lib/firestore';
@@ -72,7 +72,7 @@ export default function Dashboard() {
   
   // 미처리 상담 유입 관련 상태 (super_admin 전용)
   const [pendingConsultationsCount, setPendingConsultationsCount] = useState(0);
-  const [isImporting, setIsImporting] = useState(false);
+  const [consultationsPreviewOpen, setConsultationsPreviewOpen] = useState(false);
 
   // Form states
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
@@ -182,34 +182,16 @@ export default function Dashboard() {
     fetchPendingCount();
   }, [isSuperAdmin]);
 
-  // 미처리 상담 일괄 유입 처리
-  const handleImportConsultations = async () => {
-    if (!window.confirm(`미처리 상담 ${pendingConsultationsCount}건을 고객으로 유입하시겠습니까?`)) {
-      return;
-    }
+  // 상담 유입 완료 콜백
+  const handleImportComplete = async (result: { success: number; failed: number; newCustomers: number; existingCustomers: number }) => {
+    toast({
+      title: 'DB 유입 완료',
+      description: `총 ${result.success}건 처리 (신규: ${result.newCustomers}건, 기존 고객 메모 추가: ${result.existingCustomers}건${result.failed > 0 ? `, 실패: ${result.failed}건` : ''})`,
+    });
 
-    setIsImporting(true);
-    try {
-      const result = await importAllPendingConsultations();
-      
-      toast({
-        title: 'DB 유입 완료',
-        description: `총 ${result.success}건 처리 (신규: ${result.newCustomers}건, 기존 고객 메모 추가: ${result.existingCustomers}건${result.failed > 0 ? `, 실패: ${result.failed}건` : ''})`,
-      });
-
-      // 카운트 새로고침 및 고객 목록 새로고침
-      setPendingConsultationsCount(0);
-      await fetchData();
-    } catch (error) {
-      console.error('Error importing consultations:', error);
-      toast({
-        title: '오류',
-        description: '상담 유입 처리 중 오류가 발생했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsImporting(false);
-    }
+    // 카운트 새로고침 및 고객 목록 새로고침
+    setPendingConsultationsCount(0);
+    await fetchData();
   };
 
   // Calculate KPI
@@ -1004,12 +986,11 @@ export default function Dashboard() {
             {isSuperAdmin && pendingConsultationsCount > 0 && (
               <Button
                 variant="outline"
-                onClick={handleImportConsultations}
-                disabled={isImporting}
+                onClick={() => setConsultationsPreviewOpen(true)}
                 data-testid="button-import-consultations"
               >
                 <Download className="w-4 h-4 mr-2" />
-                {isImporting ? '유입 중...' : `${pendingConsultationsCount}건 DB유입`}
+                {`${pendingConsultationsCount}건 DB유입`}
               </Button>
             )}
             
@@ -1328,6 +1309,13 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Consultations Preview Modal */}
+      <ConsultationsPreviewModal
+        open={consultationsPreviewOpen}
+        onOpenChange={setConsultationsPreviewOpen}
+        onImportComplete={handleImportComplete}
+      />
     </div>
   );
 }
