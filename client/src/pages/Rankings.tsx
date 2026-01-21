@@ -203,15 +203,31 @@ export default function Rankings() {
     const scores: ContractScore[] = [];
 
     customers.forEach(customer => {
-      if (!customer.execution_date || !customer.execution_amount) return;
+      let contractDate: string | undefined;
+      let contractAmount: number = 0;
 
-      const execDate = new Date(customer.execution_date);
-      if (execDate < startDate || execDate > endDate) return;
+      if (customer.execution_date && customer.execution_amount) {
+        contractDate = customer.execution_date;
+        contractAmount = customer.execution_amount;
+      } else if (customer.contract_completion_date) {
+        contractDate = customer.contract_completion_date;
+        contractAmount = customer.contract_amount || customer.deposit_amount || 0;
+      } else if (customer.status_code?.includes('계약완료')) {
+        contractDate = customer.updated_at 
+          ? (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : String(customer.updated_at).split('T')[0])
+          : customer.entry_date;
+        contractAmount = customer.contract_amount || customer.deposit_amount || 0;
+      }
+
+      if (!contractDate) return;
+
+      const cDate = new Date(contractDate);
+      if (cDate < startDate || cDate > endDate) return;
 
       const processingOrg = customer.processing_org || '미등록';
       const { baseScore, categoryBonus, amountBonus, totalScore } = calculateContractScore(
         processingOrg,
-        customer.execution_amount
+        contractAmount
       );
 
       scores.push({
@@ -223,8 +239,8 @@ export default function Rankings() {
         teamId: customer.team_id,
         teamName: customer.team_name || '',
         processingOrg,
-        executionAmount: customer.execution_amount,
-        executionDate: customer.execution_date,
+        executionAmount: contractAmount,
+        executionDate: contractDate,
         baseScore,
         categoryBonus,
         amountBonus,
