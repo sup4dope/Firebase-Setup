@@ -1,0 +1,563 @@
+import { useState, useEffect, useMemo } from 'react';
+import { format, startOfMonth, endOfMonth, startOfYear, subMonths } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
+import {
+  Trophy,
+  Medal,
+  Award,
+  TrendingUp,
+  Users,
+  User,
+  Crown,
+  Star,
+} from 'lucide-react';
+import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
+import type { Customer, User as UserType, Team } from '@shared/types';
+
+type PeriodType = 'month' | 'half' | 'year';
+
+interface ContractScore {
+  customerId: string;
+  customerName: string;
+  companyName: string;
+  managerId: string;
+  managerName: string;
+  teamId: string;
+  teamName: string;
+  processingOrg: string;
+  executionAmount: number;
+  executionDate: string;
+  baseScore: number;
+  categoryBonus: number;
+  amountBonus: number;
+  totalScore: number;
+}
+
+interface RankingEntry {
+  id: string;
+  name: string;
+  teamName?: string;
+  contractCount: number;
+  totalScore: number;
+  breakdown: {
+    baseScore: number;
+    categoryBonus: number;
+    amountBonus: number;
+  };
+}
+
+const CATEGORY_BONUS: Record<string, number> = {
+  '신보': 30,
+  '기보': 30,
+  '중진공': 30,
+  '농신보': 30,
+  '기업인증': 30,
+  '기타': 30,
+  '일시적': 20,
+  '상생': 20,
+  '재도전': 10,
+  '혁신': 10,
+  '미소금융': 10,
+  '신용취약': 0,
+  '지역재단': 0,
+  '미등록': 0,
+};
+
+const getAmountBonus = (amount: number): number => {
+  if (amount >= 15000) return 40;
+  if (amount >= 10000) return 30;
+  if (amount >= 5000) return 20;
+  return 10;
+};
+
+const calculateContractScore = (
+  processingOrg: string,
+  executionAmount: number
+): { baseScore: number; categoryBonus: number; amountBonus: number; totalScore: number } => {
+  const baseScore = 20;
+  const categoryBonus = CATEGORY_BONUS[processingOrg] ?? 0;
+  const amountBonus = getAmountBonus(executionAmount);
+  const totalScore = baseScore + categoryBonus + amountBonus;
+  return { baseScore, categoryBonus, amountBonus, totalScore };
+};
+
+const getRankIcon = (rank: number) => {
+  switch (rank) {
+    case 1:
+      return <Crown className="w-5 h-5 text-yellow-500" />;
+    case 2:
+      return <Medal className="w-5 h-5 text-gray-400" />;
+    case 3:
+      return <Award className="w-5 h-5 text-amber-600" />;
+    default:
+      return <span className="w-5 h-5 flex items-center justify-center text-sm font-medium text-muted-foreground">{rank}</span>;
+  }
+};
+
+const getRankBadgeColor = (rank: number): string => {
+  switch (rank) {
+    case 1:
+      return 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/50';
+    case 2:
+      return 'bg-gray-400/20 text-gray-600 dark:text-gray-300 border-gray-400/50';
+    case 3:
+      return 'bg-amber-600/20 text-amber-700 dark:text-amber-400 border-amber-600/50';
+    default:
+      return 'bg-muted text-muted-foreground';
+  }
+};
+
+export default function Rankings() {
+  const { user } = useAuth();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [periodType, setPeriodType] = useState<PeriodType>('month');
+  const [activeTab, setActiveTab] = useState<'individual' | 'team'>('individual');
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [fetchedCustomers, fetchedUsers, fetchedTeams] = await Promise.all([
+          getCustomers(),
+          getUsers(),
+          getTeams(),
+        ]);
+        setCustomers(fetchedCustomers);
+        setUsers(fetchedUsers);
+        setTeams(fetchedTeams);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const periodDates = useMemo(() => {
+    let startDate: Date;
+    let endDate: Date = endOfMonth(now);
+
+    switch (periodType) {
+      case 'month':
+        startDate = startOfMonth(now);
+        break;
+      case 'half':
+        if (currentMonth < 6) {
+          startDate = new Date(currentYear, 0, 1);
+          endDate = new Date(currentYear, 5, 30);
+        } else {
+          startDate = new Date(currentYear, 6, 1);
+          endDate = new Date(currentYear, 11, 31);
+        }
+        break;
+      case 'year':
+        startDate = startOfYear(now);
+        endDate = new Date(currentYear, 11, 31);
+        break;
+      default:
+        startDate = startOfMonth(now);
+    }
+
+    return { startDate, endDate };
+  }, [periodType, currentYear, currentMonth]);
+
+  const contractScores = useMemo(() => {
+    const { startDate, endDate } = periodDates;
+    const scores: ContractScore[] = [];
+
+    customers.forEach(customer => {
+      if (!customer.execution_date || !customer.execution_amount) return;
+
+      const execDate = new Date(customer.execution_date);
+      if (execDate < startDate || execDate > endDate) return;
+
+      const processingOrg = customer.processing_org || '미등록';
+      const { baseScore, categoryBonus, amountBonus, totalScore } = calculateContractScore(
+        processingOrg,
+        customer.execution_amount
+      );
+
+      scores.push({
+        customerId: customer.id,
+        customerName: customer.name,
+        companyName: customer.company_name,
+        managerId: customer.manager_id,
+        managerName: customer.manager_name || '',
+        teamId: customer.team_id,
+        teamName: customer.team_name || '',
+        processingOrg,
+        executionAmount: customer.execution_amount,
+        executionDate: customer.execution_date,
+        baseScore,
+        categoryBonus,
+        amountBonus,
+        totalScore,
+      });
+    });
+
+    return scores;
+  }, [customers, periodDates]);
+
+  const individualRankings = useMemo(() => {
+    const managerMap = new Map<string, RankingEntry>();
+
+    contractScores.forEach(score => {
+      const existing = managerMap.get(score.managerId);
+      if (existing) {
+        existing.contractCount += 1;
+        existing.totalScore += score.totalScore;
+        existing.breakdown.baseScore += score.baseScore;
+        existing.breakdown.categoryBonus += score.categoryBonus;
+        existing.breakdown.amountBonus += score.amountBonus;
+      } else {
+        const userInfo = users.find(u => u.uid === score.managerId);
+        managerMap.set(score.managerId, {
+          id: score.managerId,
+          name: userInfo?.name || score.managerName || '알 수 없음',
+          teamName: userInfo?.team_name || score.teamName,
+          contractCount: 1,
+          totalScore: score.totalScore,
+          breakdown: {
+            baseScore: score.baseScore,
+            categoryBonus: score.categoryBonus,
+            amountBonus: score.amountBonus,
+          },
+        });
+      }
+    });
+
+    return Array.from(managerMap.values())
+      .sort((a, b) => b.totalScore - a.totalScore);
+  }, [contractScores, users]);
+
+  const teamRankings = useMemo(() => {
+    const teamMap = new Map<string, RankingEntry>();
+
+    contractScores.forEach(score => {
+      if (!score.teamId) return;
+
+      const existing = teamMap.get(score.teamId);
+      if (existing) {
+        existing.contractCount += 1;
+        existing.totalScore += score.totalScore;
+        existing.breakdown.baseScore += score.baseScore;
+        existing.breakdown.categoryBonus += score.categoryBonus;
+        existing.breakdown.amountBonus += score.amountBonus;
+      } else {
+        const teamInfo = teams.find(t => t.team_id === score.teamId);
+        teamMap.set(score.teamId, {
+          id: score.teamId,
+          name: teamInfo?.team_name || score.teamName || '미배정',
+          contractCount: 1,
+          totalScore: score.totalScore,
+          breakdown: {
+            baseScore: score.baseScore,
+            categoryBonus: score.categoryBonus,
+            amountBonus: score.amountBonus,
+          },
+        });
+      }
+    });
+
+    return Array.from(teamMap.values())
+      .sort((a, b) => b.totalScore - a.totalScore);
+  }, [contractScores, teams]);
+
+  const maxScore = useMemo(() => {
+    const allScores = activeTab === 'individual' ? individualRankings : teamRankings;
+    if (allScores.length === 0) return 100;
+    const max = Math.max(...allScores.map(r => r.totalScore));
+    return Math.ceil(max / 100) * 100 || 100;
+  }, [activeTab, individualRankings, teamRankings]);
+
+  const getPeriodLabel = (): string => {
+    switch (periodType) {
+      case 'month':
+        return format(now, 'yyyy년 M월', { locale: ko });
+      case 'half':
+        return currentMonth < 6 
+          ? `${currentYear}년 상반기` 
+          : `${currentYear}년 하반기`;
+      case 'year':
+        return `${currentYear}년`;
+      default:
+        return '';
+    }
+  };
+
+  const renderRankingTable = (rankings: RankingEntry[]) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-16 text-center">순위</TableHead>
+          <TableHead>{activeTab === 'individual' ? '담당자' : '팀'}</TableHead>
+          {activeTab === 'individual' && <TableHead>소속팀</TableHead>}
+          <TableHead className="text-center">계약건수</TableHead>
+          <TableHead className="text-right">총점</TableHead>
+          <TableHead className="w-48">점수 분포</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rankings.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={activeTab === 'individual' ? 6 : 5} className="text-center py-8 text-muted-foreground">
+              해당 기간 집행 데이터가 없습니다
+            </TableCell>
+          </TableRow>
+        ) : (
+          rankings.map((entry, index) => {
+            const rank = index + 1;
+            const progressPercent = (entry.totalScore / maxScore) * 100;
+            
+            return (
+              <TableRow 
+                key={entry.id}
+                className={rank <= 3 ? 'bg-muted/30' : ''}
+              >
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center">
+                    {getRankIcon(rank)}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{entry.name}</span>
+                    {rank <= 3 && (
+                      <Badge className={getRankBadgeColor(rank)}>
+                        {rank === 1 ? '1위' : rank === 2 ? '2위' : '3위'}
+                      </Badge>
+                    )}
+                  </div>
+                </TableCell>
+                {activeTab === 'individual' && (
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">
+                      {entry.teamName || '-'}
+                    </span>
+                  </TableCell>
+                )}
+                <TableCell className="text-center">
+                  <Badge variant="outline">{entry.contractCount}건</Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <span className="font-bold text-lg">{entry.totalScore.toLocaleString()}</span>
+                  <span className="text-muted-foreground text-sm ml-1">점</span>
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    <Progress value={progressPercent} className="h-2" />
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>기본 {entry.breakdown.baseScore}</span>
+                      <span>카테고리 +{entry.breakdown.categoryBonus}</span>
+                      <span>금액 +{entry.breakdown.amountBonus}</span>
+                    </div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })
+        )}
+      </TableBody>
+    </Table>
+  );
+
+  const topThree = activeTab === 'individual' 
+    ? individualRankings.slice(0, 3) 
+    : teamRankings.slice(0, 3);
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-40" />
+          ))}
+        </div>
+        <Skeleton className="h-[400px]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-yellow-500/20 rounded-lg">
+            <Trophy className="w-6 h-6 text-yellow-500" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">매출 랭킹</h1>
+            <p className="text-sm text-muted-foreground">{getPeriodLabel()} 실적 순위</p>
+          </div>
+        </div>
+
+        <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
+          <SelectTrigger className="w-40" data-testid="select-period">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="month">월간 (당월)</SelectItem>
+            <SelectItem value="half">반기</SelectItem>
+            <SelectItem value="year">연간</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'individual' | 'team')}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="individual" className="flex items-center gap-2" data-testid="tab-individual">
+            <User className="w-4 h-4" />
+            개인 랭킹
+          </TabsTrigger>
+          <TabsTrigger value="team" className="flex items-center gap-2" data-testid="tab-team">
+            <Users className="w-4 h-4" />
+            팀 랭킹
+          </TabsTrigger>
+        </TabsList>
+
+        <div className="mt-6">
+          {topThree.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {topThree.map((entry, index) => {
+                const rank = index + 1;
+                const bgGradient = rank === 1 
+                  ? 'from-yellow-500/20 to-amber-500/10 border-yellow-500/30'
+                  : rank === 2 
+                    ? 'from-gray-400/20 to-gray-300/10 border-gray-400/30'
+                    : 'from-amber-600/20 to-orange-500/10 border-amber-600/30';
+
+                return (
+                  <Card 
+                    key={entry.id} 
+                    className={`bg-gradient-to-br ${bgGradient} relative overflow-hidden`}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {getRankIcon(rank)}
+                          <span className="text-lg font-bold">{rank}위</span>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {entry.contractCount}건
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xl font-bold">{entry.name}</p>
+                          {activeTab === 'individual' && entry.teamName && (
+                            <p className="text-sm text-muted-foreground">{entry.teamName}</p>
+                          )}
+                        </div>
+                        <div className="flex items-end gap-1">
+                          <span className="text-3xl font-bold text-primary">
+                            {entry.totalScore.toLocaleString()}
+                          </span>
+                          <span className="text-muted-foreground mb-1">점</span>
+                        </div>
+                        <div className="flex gap-2 text-xs text-muted-foreground">
+                          <span>기본 {entry.breakdown.baseScore}</span>
+                          <span>|</span>
+                          <span>카테고리 +{entry.breakdown.categoryBonus}</span>
+                          <span>|</span>
+                          <span>금액 +{entry.breakdown.amountBonus}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                    {rank === 1 && (
+                      <Star className="absolute -top-2 -right-2 w-16 h-16 text-yellow-500/10" />
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                {activeTab === 'individual' ? '전체 개인 순위' : '전체 팀 순위'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[500px]">
+                <TabsContent value="individual" className="mt-0">
+                  {renderRankingTable(individualRankings)}
+                </TabsContent>
+                <TabsContent value="team" className="mt-0">
+                  {renderRankingTable(teamRankings)}
+                </TabsContent>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+      </Tabs>
+
+      <Card className="bg-muted/30">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">점수 계산 기준</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+            <div>
+              <p className="font-medium mb-2">기본 점수</p>
+              <p className="text-muted-foreground">계약 1건당 +20점</p>
+            </div>
+            <div>
+              <p className="font-medium mb-2">카테고리 가점</p>
+              <div className="space-y-1 text-muted-foreground">
+                <p>+30점: 신보, 기보, 중진공, 농신보, 기업인증, 기타</p>
+                <p>+20점: 일시적, 상생</p>
+                <p>+10점: 재도전, 혁신, 미소금융</p>
+                <p>+0점: 신용취약, 지역재단</p>
+              </div>
+            </div>
+            <div>
+              <p className="font-medium mb-2">집행금액 가점 (만원)</p>
+              <div className="space-y-1 text-muted-foreground">
+                <p>+40점: 15,000 이상</p>
+                <p>+30점: 10,000 ~ 15,000 미만</p>
+                <p>+20점: 5,000 ~ 10,000 미만</p>
+                <p>+10점: 0 ~ 5,000 미만</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
