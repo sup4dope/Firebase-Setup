@@ -93,6 +93,7 @@ const CATEGORY_BONUS: Record<string, number> = {
 };
 
 const getAmountBonus = (amount: number): number => {
+  if (amount <= 0) return 0;
   if (amount >= 15000) return 40;
   if (amount >= 10000) return 30;
   if (amount >= 5000) return 20;
@@ -471,7 +472,8 @@ export default function Rankings() {
                       <p>+40점: 15,000 이상</p>
                       <p>+30점: 10,000 ~ 15,000 미만</p>
                       <p>+20점: 5,000 ~ 10,000 미만</p>
-                      <p>+10점: 0 ~ 5,000 미만</p>
+                      <p>+10점: 1 ~ 5,000 미만</p>
+                      <p>+0점: 금액 미입력</p>
                     </div>
                   </div>
                 </div>
