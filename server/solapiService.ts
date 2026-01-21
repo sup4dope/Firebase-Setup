@@ -4,6 +4,7 @@ const apiKey = process.env.SOLAPI_API_KEY || '';
 const apiSecret = process.env.SOLAPI_API_SECRET || '';
 const pfId = process.env.SOLAPI_KAKAO_PFID || '';
 const templateId = process.env.SOLAPI_TEMPLATE_ID || '';
+const delayTemplateId = process.env.SOLAPI_DELAY_TEMPLATE_ID || '';
 const senderNumber = process.env.SOLAPI_SENDER_NUMBER || '';
 
 let messageService: SolapiMessageService | null = null;
@@ -80,6 +81,94 @@ export const sendConsultationAlimtalk = async (data: ConsultationAlimtalkData): 
     console.error(`❌ [Solapi] 알림톡 발송 실패 (${cleanPhone}):`, error.message);
     return { success: false, message: `발송 실패: ${error.message}` };
   }
+};
+
+export interface DelayAlimtalkData {
+  customerPhone: string;
+  customerName: string;
+  services: string[];
+}
+
+export const sendDelayAlimtalk = async (data: DelayAlimtalkData): Promise<{
+  success: boolean;
+  message: string;
+  result?: any;
+}> => {
+  const service = getMessageService();
+  
+  if (!service) {
+    return { success: false, message: 'Solapi 서비스가 초기화되지 않았습니다. API 키를 확인해주세요.' };
+  }
+  
+  if (!pfId || !delayTemplateId || !senderNumber) {
+    return { 
+      success: false, 
+      message: 'Solapi 지연 알림 설정이 완료되지 않았습니다. PFID, 지연 템플릿ID, 발신번호를 확인해주세요.' 
+    };
+  }
+  
+  if (!data.customerPhone) {
+    return { success: false, message: '고객 전화번호가 입력되지 않았습니다.' };
+  }
+  
+  const cleanPhone = data.customerPhone.replace(/[^0-9]/g, '');
+  
+  if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+    return { success: false, message: '유효하지 않은 전화번호 형식입니다.' };
+  }
+  
+  const servicesText = data.services.length > 0 ? data.services.join(', ') : '미지정';
+  
+  try {
+    const result = await service.send({
+      to: cleanPhone,
+      from: senderNumber,
+      kakaoOptions: {
+        pfId: pfId,
+        templateId: delayTemplateId,
+        variables: {
+          '#{고객명}': data.customerName || '고객',
+          '#{상담분야}': servicesText,
+        },
+      },
+    });
+    
+    console.log(`✅ [Solapi] 지연 알림톡 발송 성공: ${cleanPhone}`);
+    return { success: true, message: '지연 알림톡이 정상 발송되었습니다.', result };
+  } catch (error: any) {
+    console.error(`❌ [Solapi] 지연 알림톡 발송 실패 (${cleanPhone}):`, error.message);
+    return { success: false, message: `발송 실패: ${error.message}` };
+  }
+};
+
+export const sendBulkDelayAlimtalk = async (customers: DelayAlimtalkData[]): Promise<{
+  success: boolean;
+  message: string;
+  successCount: number;
+  failCount: number;
+  results: Array<{ phone: string; success: boolean; error?: string }>;
+}> => {
+  const results: Array<{ phone: string; success: boolean; error?: string }> = [];
+  
+  for (const customer of customers) {
+    const result = await sendDelayAlimtalk(customer);
+    results.push({
+      phone: customer.customerPhone,
+      success: result.success,
+      error: result.success ? undefined : result.message,
+    });
+  }
+  
+  const successCount = results.filter(r => r.success).length;
+  const failCount = results.filter(r => !r.success).length;
+  
+  return {
+    success: successCount > 0,
+    message: `${successCount}건 발송 성공, ${failCount}건 실패`,
+    successCount,
+    failCount,
+    results,
+  };
 };
 
 const formatDate = (date: Date): string => {

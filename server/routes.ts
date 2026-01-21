@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims } from "./firebaseAdmin";
-import { sendConsultationAlimtalk, checkSolapiConfig } from "./solapiService";
+import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, checkSolapiConfig } from "./solapiService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -303,6 +303,34 @@ export async function registerRoutes(
       res.json(result);
     } catch (error: any) {
       console.error("❌ [Solapi] 알림톡 발송 오류:", error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // 지연 알림톡 일괄 발송 (미처리 상담 고객 대상)
+  app.post("/api/solapi/delay-notify", async (req, res) => {
+    console.log("📤 [Solapi] 지연 알림톡 일괄 발송 요청");
+    
+    try {
+      const { customers } = req.body;
+      
+      if (!customers || !Array.isArray(customers) || customers.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "customers 배열은 필수입니다.",
+        });
+      }
+      
+      const result = await sendBulkDelayAlimtalk(customers);
+      
+      console.log(`📤 [Solapi] 지연 알림톡 발송 결과: ${result.message}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("❌ [Solapi] 지연 알림톡 발송 오류:", error.message);
       res.status(500).json({
         success: false,
         error: error.message,

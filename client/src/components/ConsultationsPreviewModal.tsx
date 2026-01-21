@@ -6,7 +6,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Download, X, Phone, Building2, Calendar, CreditCard, MapPin, FileText, AlertCircle } from 'lucide-react';
+import { Download, X, Phone, Building2, Calendar, CreditCard, MapPin, FileText, AlertCircle, Clock } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { getPendingConsultations, getCustomerByBusinessNumber, importAllPendingConsultations } from '@/lib/firestore';
 import type { Consultation } from '@shared/types';
 
@@ -26,6 +27,8 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
   const [consultations, setConsultations] = useState<ConsultationWithDuplicate[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [sendingDelay, setSendingDelay] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (open) {
@@ -67,6 +70,58 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
       console.error('Error importing consultations:', error);
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleSendDelayNotification = async () => {
+    if (consultations.length === 0) return;
+    
+    setSendingDelay(true);
+    try {
+      const customers = consultations.map(({ data }) => ({
+        customerPhone: data.phone || '',
+        customerName: data.name || '',
+        services: data.services || [],
+      })).filter(c => c.customerPhone);
+      
+      if (customers.length === 0) {
+        toast({
+          title: '발송 실패',
+          description: '전화번호가 있는 고객이 없습니다.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      const response = await fetch('/api/solapi/delay-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customers }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: '지연 알림 발송 완료',
+          description: `${result.successCount}건 발송 성공, ${result.failCount}건 실패`,
+        });
+      } else {
+        toast({
+          title: '발송 실패',
+          description: result.error || result.message,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error sending delay notification:', error);
+      toast({
+        title: '발송 오류',
+        description: '지연 알림 발송 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingDelay(false);
     }
   };
 
@@ -225,13 +280,22 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
             * 신규 고객은 자동 생성되고, 중복 고객은 기존 고객에 메모로 추가됩니다.
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={importing}>
+            <Button 
+              variant="outline" 
+              onClick={handleSendDelayNotification}
+              disabled={sendingDelay || importing || consultations.length === 0}
+              data-testid="button-send-delay-notification"
+            >
+              <Clock className="w-4 h-4 mr-1" />
+              {sendingDelay ? '발송 중...' : '지연 알림 발송'}
+            </Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={importing || sendingDelay}>
               <X className="w-4 h-4 mr-1" />
               취소
             </Button>
             <Button 
               onClick={handleImport} 
-              disabled={importing || consultations.length === 0}
+              disabled={importing || sendingDelay || consultations.length === 0}
               data-testid="button-confirm-import"
             >
               <Download className="w-4 h-4 mr-2" />
