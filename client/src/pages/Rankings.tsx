@@ -25,6 +25,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Trophy,
   Medal,
   Award,
@@ -33,6 +38,7 @@ import {
   User,
   Crown,
   Star,
+  HelpCircle,
 } from 'lucide-react';
 import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
 import type { Customer, User as UserType, Team } from '@shared/types';
@@ -417,9 +423,44 @@ export default function Rankings() {
           <div className="p-2 bg-yellow-500/20 rounded-lg">
             <Trophy className="w-6 h-6 text-yellow-500" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">매출 랭킹</h1>
-            <p className="text-sm text-muted-foreground">{getPeriodLabel()} 실적 순위</p>
+          <div className="flex items-center gap-2">
+            <div>
+              <h1 className="text-2xl font-bold">매출 랭킹</h1>
+              <p className="text-sm text-muted-foreground">{getPeriodLabel()} 실적 순위</p>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                  <HelpCircle className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-sm p-4">
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <p className="font-semibold mb-1">기본 점수</p>
+                    <p className="text-muted-foreground">계약 1건당 +20점</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold mb-1">카테고리 가점</p>
+                    <div className="space-y-0.5 text-muted-foreground">
+                      <p>+30점: 신보, 기보, 중진공, 농신보, 기업인증, 기타</p>
+                      <p>+20점: 일시적, 상생</p>
+                      <p>+10점: 재도전, 혁신, 미소금융</p>
+                      <p>+0점: 신용취약, 지역재단</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-semibold mb-1">집행금액 가점 (만원)</p>
+                    <div className="space-y-0.5 text-muted-foreground">
+                      <p>+40점: 15,000 이상</p>
+                      <p>+30점: 10,000 ~ 15,000 미만</p>
+                      <p>+20점: 5,000 ~ 10,000 미만</p>
+                      <p>+10점: 0 ~ 5,000 미만</p>
+                    </div>
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
@@ -527,37 +568,6 @@ export default function Rankings() {
         </div>
       </Tabs>
 
-      <Card className="bg-muted/30">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">점수 계산 기준</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-            <div>
-              <p className="font-medium mb-2">기본 점수</p>
-              <p className="text-muted-foreground">계약 1건당 +20점</p>
-            </div>
-            <div>
-              <p className="font-medium mb-2">카테고리 가점</p>
-              <div className="space-y-1 text-muted-foreground">
-                <p>+30점: 신보, 기보, 중진공, 농신보, 기업인증, 기타</p>
-                <p>+20점: 일시적, 상생</p>
-                <p>+10점: 재도전, 혁신, 미소금융</p>
-                <p>+0점: 신용취약, 지역재단</p>
-              </div>
-            </div>
-            <div>
-              <p className="font-medium mb-2">집행금액 가점 (만원)</p>
-              <div className="space-y-1 text-muted-foreground">
-                <p>+40점: 15,000 이상</p>
-                <p>+30점: 10,000 ~ 15,000 미만</p>
-                <p>+20점: 5,000 ~ 10,000 미만</p>
-                <p>+10점: 0 ~ 5,000 미만</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
