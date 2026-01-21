@@ -7,6 +7,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  setDoc,
   query,
   where,
   orderBy,
@@ -546,6 +547,73 @@ export const deleteHoliday = async (id: string): Promise<void> => {
 export const promoteToAdmin = async (uid: string): Promise<void> => {
   const userRef = doc(db, 'users', uid);
   await updateDoc(userRef, { role: 'super_admin' });
+};
+
+// ============================================
+// 담당자 자동배정 시스템 (라운드로빈)
+// ============================================
+
+// 배정 가능한 활성 직원 목록 조회 (재직 상태만)
+export const getActiveStaffForAssignment = async (): Promise<User[]> => {
+  const snapshot = await getDocs(collection(db, 'users'));
+  const allUsers = snapshot.docs.map(docSnap => ({
+    ...docSnap.data(),
+    uid: docSnap.data().uid || docSnap.id,
+  } as User));
+  
+  // 재직 상태인 직원만 필터 (status가 '재직'이거나 없는 경우 - 기존 데이터 호환)
+  return allUsers
+    .filter(user => user.status !== '퇴사')
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko')); // 이름순 정렬
+};
+
+// 마지막 배정 인덱스 조회
+export const getLastAssignmentIndex = async (): Promise<number> => {
+  const docRef = doc(db, 'meta', 'assignment_rotation');
+  const docSnap = await getDoc(docRef);
+  
+  if (docSnap.exists()) {
+    return docSnap.data().lastIndex || 0;
+  }
+  return 0;
+};
+
+// 마지막 배정 인덱스 업데이트
+export const updateLastAssignmentIndex = async (index: number): Promise<void> => {
+  const docRef = doc(db, 'meta', 'assignment_rotation');
+  await setDoc(docRef, {
+    lastIndex: index,
+    updatedAt: Timestamp.now(),
+  }, { merge: true });
+};
+
+// 다음 담당자 조회 및 배정 (라운드로빈 + 무작위 시작점)
+export const getNextManagerForAssignment = async (): Promise<{ managerId: string; managerName: string; teamId: string; teamName: string } | null> => {
+  const activeStaff = await getActiveStaffForAssignment();
+  
+  if (activeStaff.length === 0) {
+    console.log('⚠️ 배정 가능한 활성 직원이 없습니다.');
+    return null;
+  }
+  
+  // 현재 인덱스 조회
+  let lastIndex = await getLastAssignmentIndex();
+  
+  // 다음 인덱스 계산 (순환)
+  const nextIndex = (lastIndex + 1) % activeStaff.length;
+  const assignee = activeStaff[nextIndex];
+  
+  // 인덱스 업데이트
+  await updateLastAssignmentIndex(nextIndex);
+  
+  console.log(`✅ 담당자 배정: ${assignee.name} (${nextIndex + 1}/${activeStaff.length}번째)`);
+  
+  return {
+    managerId: assignee.uid,
+    managerName: assignee.name,
+    teamId: assignee.team_id || '',
+    teamName: assignee.team_name || '미배정',
+  };
 };
 
 // ============================================
@@ -1912,6 +1980,9 @@ export const processConsultationToCustomer = async (
       // 신규 고객 생성
       console.log(`✨ 신규 고객 생성: ${name || companyName}`);
       
+      // 담당자 자동 배정 (라운드로빈)
+      const assignedManager = await getNextManagerForAssignment();
+      
       const customerData: InsertCustomer & { manager_name?: string; team_name?: string; memo_history?: any[] } = {
         name: name,
         company_name: companyName,
@@ -1923,10 +1994,10 @@ export const processConsultationToCustomer = async (
         status_code: '상담대기' as StatusCode,
         recent_memo: memoSummary,
         memo_history: [memoEntry], // 메모 이력에도 저장
-        manager_id: '',
-        manager_name: '미배정',
-        team_id: '',
-        team_name: '미배정',
+        manager_id: assignedManager?.managerId || '',
+        manager_name: assignedManager?.managerName || '미배정',
+        team_id: assignedManager?.teamId || '',
+        team_name: assignedManager?.teamName || '미배정',
         approved_amount: 0,
         commission_rate: 0,
       };
