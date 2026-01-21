@@ -588,7 +588,13 @@ export const updateLastAssignmentIndex = async (index: number): Promise<void> =>
 };
 
 // 다음 담당자 조회 및 배정 (라운드로빈 + 무작위 시작점)
-export const getNextManagerForAssignment = async (): Promise<{ managerId: string; managerName: string; teamId: string; teamName: string } | null> => {
+export const getNextManagerForAssignment = async (): Promise<{ 
+  managerId: string; 
+  managerName: string; 
+  managerPhone: string;
+  teamId: string; 
+  teamName: string;
+} | null> => {
   const activeStaff = await getActiveStaffForAssignment();
   
   if (activeStaff.length === 0) {
@@ -611,6 +617,7 @@ export const getNextManagerForAssignment = async (): Promise<{ managerId: string
   return {
     managerId: assignee.uid,
     managerName: assignee.name,
+    managerPhone: assignee.phone_work || assignee.phone || '',
     teamId: assignee.team_id || '',
     teamName: assignee.team_name || '미배정',
   };
@@ -2017,6 +2024,27 @@ export const processConsultationToCustomer = async (
       // 상담 처리 완료 및 연결
       await markConsultationProcessed(consultationId);
       await linkConsultationToCustomer(consultationId, newCustomer.id);
+      
+      // 담당자 배정 알림톡 발송 (담당자가 배정된 경우에만)
+      if (assignedManager && phone) {
+        try {
+          await fetch('/api/solapi/assignment-notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customerPhone: phone,
+              customerName: name || companyName,
+              managerName: assignedManager.managerName,
+              managerPhone: assignedManager.managerPhone,
+              region: consultation.region || '',
+            }),
+          });
+          console.log(`📤 담당자 배정 알림톡 발송 요청: ${name || companyName} → ${assignedManager.managerName}`);
+        } catch (notifyError) {
+          console.error('담당자 배정 알림톡 발송 실패:', notifyError);
+          // 알림톡 발송 실패해도 고객 생성은 성공으로 처리
+        }
+      }
       
       return newCustomer;
     }

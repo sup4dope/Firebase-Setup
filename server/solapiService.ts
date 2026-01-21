@@ -5,6 +5,7 @@ const apiSecret = process.env.SOLAPI_API_SECRET || '';
 const pfId = process.env.SOLAPI_KAKAO_PFID || '';
 const templateId = process.env.SOLAPI_TEMPLATE_ID || '';
 const delayTemplateId = process.env.SOLAPI_DELAY_TEMPLATE_ID || '';
+const assignTemplateId = process.env.SOLAPI_ASSIGN_TEMPLATE_ID || '';
 const senderNumber = process.env.SOLAPI_SENDER_NUMBER || '';
 
 let messageService: SolapiMessageService | null = null;
@@ -137,6 +138,107 @@ export const sendDelayAlimtalk = async (data: DelayAlimtalkData): Promise<{
     return { success: true, message: '지연 알림톡이 정상 발송되었습니다.', result };
   } catch (error: any) {
     console.error(`❌ [Solapi] 지연 알림톡 발송 실패 (${cleanPhone}):`, error.message);
+    return { success: false, message: `발송 실패: ${error.message}` };
+  }
+};
+
+// 지역 → 지점 매핑 함수
+const getBranchFromRegion = (region: string): string => {
+  const regionLower = region.toLowerCase();
+  
+  // 서울 지점: 서울
+  if (regionLower.includes('서울')) {
+    return '서울';
+  }
+  
+  // 경인 지점: 경기, 인천
+  if (regionLower.includes('경기') || regionLower.includes('인천')) {
+    return '경인';
+  }
+  
+  // 대전 지점: 대전, 충청, 세종, 강원
+  if (regionLower.includes('대전') || regionLower.includes('충청') || 
+      regionLower.includes('충북') || regionLower.includes('충남') ||
+      regionLower.includes('세종') || regionLower.includes('강원')) {
+    return '대전';
+  }
+  
+  // 부산 지점: 부산, 울산, 경상, 대구
+  if (regionLower.includes('부산') || regionLower.includes('울산') || 
+      regionLower.includes('경상') || regionLower.includes('경북') || 
+      regionLower.includes('경남') || regionLower.includes('대구')) {
+    return '부산';
+  }
+  
+  // 광주 지점: 광주, 전라, 제주
+  if (regionLower.includes('광주') || regionLower.includes('전라') || 
+      regionLower.includes('전북') || regionLower.includes('전남') ||
+      regionLower.includes('제주')) {
+    return '광주';
+  }
+  
+  // 기본값: 서울
+  return '서울';
+};
+
+export { getBranchFromRegion };
+
+export interface AssignmentAlimtalkData {
+  customerPhone: string;
+  customerName: string;
+  managerName: string;
+  managerPhone: string;
+  branchName: string;
+}
+
+export const sendAssignmentAlimtalk = async (data: AssignmentAlimtalkData): Promise<{
+  success: boolean;
+  message: string;
+  result?: any;
+}> => {
+  const service = getMessageService();
+  
+  if (!service) {
+    return { success: false, message: 'Solapi 서비스가 초기화되지 않았습니다. API 키를 확인해주세요.' };
+  }
+  
+  if (!pfId || !assignTemplateId || !senderNumber) {
+    return { 
+      success: false, 
+      message: 'Solapi 담당자 배정 알림 설정이 완료되지 않았습니다. PFID, 배정 템플릿ID, 발신번호를 확인해주세요.' 
+    };
+  }
+  
+  if (!data.customerPhone) {
+    return { success: false, message: '고객 전화번호가 입력되지 않았습니다.' };
+  }
+  
+  const cleanPhone = data.customerPhone.replace(/[^0-9]/g, '');
+  
+  if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+    return { success: false, message: '유효하지 않은 전화번호 형식입니다.' };
+  }
+  
+  try {
+    const result = await service.send({
+      to: cleanPhone,
+      from: senderNumber,
+      kakaoOptions: {
+        pfId: pfId,
+        templateId: assignTemplateId,
+        variables: {
+          '#{고객명}': data.customerName || '고객',
+          '#{담당자명}': data.managerName || '담당자',
+          '#{지점명}': data.branchName || '서울',
+          '#{담당자번호}': data.managerPhone || '',
+        },
+      },
+    });
+    
+    console.log(`✅ [Solapi] 담당자 배정 알림톡 발송 성공: ${cleanPhone} → ${data.managerName} (${data.branchName}지점)`);
+    return { success: true, message: '담당자 배정 알림톡이 정상 발송되었습니다.', result };
+  } catch (error: any) {
+    console.error(`❌ [Solapi] 담당자 배정 알림톡 발송 실패 (${cleanPhone}):`, error.message);
     return { success: false, message: `발송 실패: ${error.message}` };
   }
 };

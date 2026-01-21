@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims } from "./firebaseAdmin";
-import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, checkSolapiConfig } from "./solapiService";
+import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -331,6 +331,43 @@ export async function registerRoutes(
       res.json(result);
     } catch (error: any) {
       console.error("❌ [Solapi] 지연 알림톡 발송 오류:", error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // 담당자 배정 알림톡 발송
+  app.post("/api/solapi/assignment-notify", async (req, res) => {
+    console.log("📤 [Solapi] 담당자 배정 알림톡 발송 요청");
+    
+    try {
+      const { customerPhone, customerName, managerName, managerPhone, region } = req.body;
+      
+      if (!customerPhone || !customerName || !managerName) {
+        return res.status(400).json({
+          success: false,
+          error: "customerPhone, customerName, managerName은 필수입니다.",
+        });
+      }
+      
+      // 지역 → 지점 변환
+      const branchName = getBranchFromRegion(region || '');
+      
+      const result = await sendAssignmentAlimtalk({
+        customerPhone,
+        customerName,
+        managerName,
+        managerPhone: managerPhone || '',
+        branchName,
+      });
+      
+      console.log(`📤 [Solapi] 담당자 배정 알림톡 발송 결과: ${result.message}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("❌ [Solapi] 담당자 배정 알림톡 발송 오류:", error.message);
       res.status(500).json({
         success: false,
         error: error.message,
