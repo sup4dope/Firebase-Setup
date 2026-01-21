@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims } from "./firebaseAdmin";
+import { sendConsultationAlimtalk, checkSolapiConfig } from "./solapiService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -253,6 +254,50 @@ export async function registerRoutes(
       res.status(500).json({ 
         success: false, 
         error: error.message 
+      });
+    }
+  });
+
+  // Solapi 설정 상태 확인
+  app.get("/api/solapi/status", async (req, res) => {
+    console.log("🔍 [Solapi] 설정 상태 조회");
+    
+    const config = checkSolapiConfig();
+    res.json({
+      success: true,
+      configured: config.configured,
+      missing: config.missing,
+    });
+  });
+
+  // 상담 접수 알림톡 발송 (랜딩페이지에서 호출)
+  app.post("/api/solapi/consultation-notify", async (req, res) => {
+    console.log("📤 [Solapi] 상담 접수 알림톡 발송 요청");
+    
+    try {
+      const { customerName, services, createdAt } = req.body;
+      
+      if (!customerName) {
+        return res.status(400).json({
+          success: false,
+          error: "customerName은 필수입니다.",
+        });
+      }
+      
+      const result = await sendConsultationAlimtalk({
+        customerName,
+        services: services || [],
+        createdAt: createdAt ? new Date(createdAt) : new Date(),
+      });
+      
+      console.log(`📤 [Solapi] 알림톡 발송 결과: ${result.message}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("❌ [Solapi] 알림톡 발송 오류:", error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message,
       });
     }
   });
