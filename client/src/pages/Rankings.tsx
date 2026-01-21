@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, startOfYear, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,12 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -39,11 +39,39 @@ import {
   Crown,
   Star,
   HelpCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
 import type { Customer, User as UserType, Team } from '@shared/types';
 
-type PeriodType = 'month' | 'half' | 'year';
+type PeriodType = 'month' | 'H1' | 'H2' | 'year';
+
+const parsePeriod = (period: string): { type: PeriodType; year: number; month?: number } => {
+  if (period.endsWith('-H1')) {
+    return { type: 'H1', year: parseInt(period.slice(0, 4)) };
+  }
+  if (period.endsWith('-H2')) {
+    return { type: 'H2', year: parseInt(period.slice(0, 4)) };
+  }
+  if (period.endsWith('-Y')) {
+    return { type: 'year', year: parseInt(period.slice(0, 4)) };
+  }
+  const [year, month] = period.split('-').map(Number);
+  return { type: 'month', year, month };
+};
+
+const getPeriodLabel = (period: string): string => {
+  const { type, year, month } = parsePeriod(period);
+  if (type === 'H1') return `${year}년 상반기`;
+  if (type === 'H2') return `${year}년 하반기`;
+  if (type === 'year') return `${year}년`;
+  return format(new Date(year, (month || 1) - 1, 1), 'yyyy년 M월', { locale: ko });
+};
+
+const isPeriodSummary = (period: string): boolean => {
+  return period.endsWith('-H1') || period.endsWith('-H2') || period.endsWith('-Y');
+};
 
 interface ContractScore {
   customerId: string;
@@ -143,12 +171,62 @@ export default function Rankings() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
-  const [periodType, setPeriodType] = useState<PeriodType>('month');
+  const [selectedPeriod, setSelectedPeriod] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'individual' | 'team'>('individual');
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
+  const monthOptions = useMemo(() => {
+    const options: string[] = [];
+    const now = new Date();
+
+    for (let i = 0; i < 24; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const monthStr = format(date, 'yyyy-MM');
+      
+      if (month === 12) {
+        options.push(`${year}-Y`);
+        options.push(`${year}-H2`);
+      }
+      
+      if (month === 6) {
+        options.push(`${year}-H1`);
+      }
+      
+      options.push(monthStr);
+    }
+    return options;
+  }, []);
+
+  const handlePrevPeriod = () => {
+    if (isPeriodSummary(selectedPeriod)) return;
+    const [year, month] = selectedPeriod.split('-').map(Number);
+    const prevDate = new Date(year, month - 2, 1);
+    setSelectedPeriod(format(prevDate, 'yyyy-MM'));
+  };
+
+  const handleNextPeriod = () => {
+    if (isPeriodSummary(selectedPeriod)) return;
+    const [year, month] = selectedPeriod.split('-').map(Number);
+    const nextDate = new Date(year, month, 1);
+    const now = new Date();
+    if (nextDate <= now) {
+      setSelectedPeriod(format(nextDate, 'yyyy-MM'));
+    }
+  };
+
+  const isNextPeriodDisabled = useMemo(() => {
+    if (isPeriodSummary(selectedPeriod)) return true;
+    const [year, month] = selectedPeriod.split('-').map(Number);
+    const nextDate = new Date(year, month, 1);
+    const now = new Date();
+    return nextDate > now;
+  }, [selectedPeriod]);
+
+  const isPrevPeriodDisabled = useMemo(() => {
+    return isPeriodSummary(selectedPeriod);
+  }, [selectedPeriod]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -172,32 +250,34 @@ export default function Rankings() {
   }, []);
 
   const periodDates = useMemo(() => {
+    const { type, year, month } = parsePeriod(selectedPeriod);
     let startDate: Date;
-    let endDate: Date = endOfMonth(now);
+    let endDate: Date;
 
-    switch (periodType) {
+    switch (type) {
       case 'month':
-        startDate = startOfMonth(now);
+        startDate = new Date(year, (month || 1) - 1, 1);
+        endDate = endOfMonth(startDate);
         break;
-      case 'half':
-        if (currentMonth < 6) {
-          startDate = new Date(currentYear, 0, 1);
-          endDate = new Date(currentYear, 5, 30);
-        } else {
-          startDate = new Date(currentYear, 6, 1);
-          endDate = new Date(currentYear, 11, 31);
-        }
+      case 'H1':
+        startDate = new Date(year, 0, 1);
+        endDate = new Date(year, 5, 30);
+        break;
+      case 'H2':
+        startDate = new Date(year, 6, 1);
+        endDate = new Date(year, 11, 31);
         break;
       case 'year':
-        startDate = startOfYear(now);
-        endDate = new Date(currentYear, 11, 31);
+        startDate = new Date(year, 0, 1);
+        endDate = new Date(year, 11, 31);
         break;
       default:
-        startDate = startOfMonth(now);
+        startDate = startOfMonth(new Date());
+        endDate = endOfMonth(new Date());
     }
 
     return { startDate, endDate };
-  }, [periodType, currentYear, currentMonth]);
+  }, [selectedPeriod]);
 
   const contractScores = useMemo(() => {
     const { startDate, endDate } = periodDates;
@@ -324,21 +404,6 @@ export default function Rankings() {
     return Math.ceil(max / 100) * 100 || 100;
   }, [activeTab, individualRankings, teamRankings]);
 
-  const getPeriodLabel = (): string => {
-    switch (periodType) {
-      case 'month':
-        return format(now, 'yyyy년 M월', { locale: ko });
-      case 'half':
-        return currentMonth < 6 
-          ? `${currentYear}년 상반기` 
-          : `${currentYear}년 하반기`;
-      case 'year':
-        return `${currentYear}년`;
-      default:
-        return '';
-    }
-  };
-
   const renderRankingTable = (rankings: RankingEntry[]) => (
     <Table>
       <TableHeader>
@@ -435,7 +500,7 @@ export default function Rankings() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-yellow-500/20 rounded-lg">
             <Trophy className="w-6 h-6 text-yellow-500" />
@@ -443,7 +508,7 @@ export default function Rankings() {
           <div className="flex items-center gap-2">
             <div>
               <h1 className="text-2xl font-bold">매출 랭킹</h1>
-              <p className="text-sm text-muted-foreground">{getPeriodLabel()} 실적 순위</p>
+              <p className="text-sm text-muted-foreground">{getPeriodLabel(selectedPeriod)} 실적 순위</p>
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -482,16 +547,35 @@ export default function Rankings() {
           </div>
         </div>
 
-        <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
-          <SelectTrigger className="w-40" data-testid="select-period">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="month">월간 (당월)</SelectItem>
-            <SelectItem value="half">반기</SelectItem>
-            <SelectItem value="year">연간</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center bg-muted/50 rounded-lg border">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handlePrevPeriod}
+            disabled={isPrevPeriodDisabled}
+            className="rounded-l-lg rounded-r-none border-r"
+            data-testid="button-prev-period"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <button
+            className="px-6 py-2 min-w-[180px] text-center font-medium cursor-pointer select-none"
+            onDoubleClick={() => setPeriodPickerOpen(true)}
+            data-testid="text-selected-period"
+          >
+            {getPeriodLabel(selectedPeriod)} 랭킹
+          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleNextPeriod}
+            disabled={isNextPeriodDisabled}
+            className="rounded-r-lg rounded-l-none border-l"
+            data-testid="button-next-period"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'individual' | 'team')}>
@@ -586,6 +670,46 @@ export default function Rankings() {
         </div>
       </Tabs>
 
+      <Dialog open={periodPickerOpen} onOpenChange={setPeriodPickerOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>기간 선택</DialogTitle>
+            <DialogDescription>조회할 월 또는 기간을 선택하세요</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[350px]">
+            <div className="space-y-1 p-1">
+              {monthOptions.map(option => {
+                const isSummary = isPeriodSummary(option);
+                const label = getPeriodLabel(option);
+                return (
+                  <button
+                    key={option}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                      option === selectedPeriod 
+                        ? 'bg-primary text-primary-foreground' 
+                        : isSummary
+                          ? 'bg-muted/50 font-semibold hover-elevate'
+                          : 'hover-elevate'
+                    } ${isSummary ? 'border-l-2 border-primary/50 ml-2' : ''}`}
+                    onClick={() => {
+                      setSelectedPeriod(option);
+                      setPeriodPickerOpen(false);
+                    }}
+                    data-testid={`button-select-period-${option}`}
+                  >
+                    {label}
+                    {isSummary && (
+                      <Badge variant="outline" className="ml-2 text-[10px] py-0">
+                        {option.endsWith('-H1') ? '1~6월' : option.endsWith('-H2') ? '7~12월' : '1~12월'}
+                      </Badge>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
