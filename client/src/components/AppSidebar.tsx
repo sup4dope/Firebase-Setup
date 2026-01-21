@@ -218,9 +218,11 @@ export function AppSidebar({
     <Sidebar className="border-r border-border dark:border-gray-800">
       <SidebarHeader className="p-4 bg-muted/50 dark:bg-gray-900/50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
-            <Building2 className="w-5 h-5 text-white" />
-          </div>
+          <img 
+            src="/assets/onlylogo_square_white-removebg-preview_1769003389420.png" 
+            alt="MSGY Logo" 
+            className="w-10 h-10 rounded-lg shadow-lg object-contain"
+          />
           <div className="flex-1 min-w-0">
             <h1 className="font-bold text-sm text-foreground">MSGY CRM</h1>
             <p className="text-xs text-muted-foreground">Management Support Group Yieum</p>

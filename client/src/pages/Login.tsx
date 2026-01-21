@@ -51,9 +51,11 @@ export default function Login() {
     <div className="min-h-screen w-full flex items-center justify-center bg-background">
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-primary-foreground" />
-          </div>
+          <img 
+            src="/assets/onlylogo_square_white-removebg-preview_1769003389420.png" 
+            alt="MSGY Logo" 
+            className="mx-auto w-16 h-16 rounded-lg object-contain"
+          />
           <div className="space-y-2">
             <CardTitle className="text-2xl font-bold">경영지원그륩 이음 CRM</CardTitle>
             <CardDescription className="text-base">Management Support Group Yieum CRM</CardDescription>
