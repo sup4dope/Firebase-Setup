@@ -132,11 +132,10 @@ service cloud.firestore {
     }
     
     // ========================================
-    // 9. 메타데이터
+    // 9. 메타데이터 (담당자 배정 순번 등)
     // ========================================
     match /meta/{docId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
+      allow read, write: if isAuthenticated();
     }
     
     // ========================================
