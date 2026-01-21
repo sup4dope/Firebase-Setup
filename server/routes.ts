@@ -270,27 +270,35 @@ export async function registerRoutes(
     });
   });
 
-  // 상담 접수 알림톡 발송 (랜딩페이지에서 호출)
+  // 상담 접수 알림톡 발송 (랜딩페이지에서 호출 - 고객에게 접수 확인 알림)
   app.post("/api/solapi/consultation-notify", async (req, res) => {
-    console.log("📤 [Solapi] 상담 접수 알림톡 발송 요청");
+    console.log("📤 [Solapi] 상담 접수 확인 알림톡 발송 요청");
     
     try {
-      const { customerName, services, createdAt } = req.body;
+      const { customerPhone, customerName, services, createdAt } = req.body;
+      
+      if (!customerPhone) {
+        return res.status(400).json({
+          success: false,
+          error: "customerPhone(고객 전화번호)은 필수입니다.",
+        });
+      }
       
       if (!customerName) {
         return res.status(400).json({
           success: false,
-          error: "customerName은 필수입니다.",
+          error: "customerName(고객명)은 필수입니다.",
         });
       }
       
       const result = await sendConsultationAlimtalk({
+        customerPhone,
         customerName,
         services: services || [],
         createdAt: createdAt ? new Date(createdAt) : new Date(),
       });
       
-      console.log(`📤 [Solapi] 알림톡 발송 결과: ${result.message}`);
+      console.log(`📤 [Solapi] 고객(${customerPhone}) 알림톡 발송 결과: ${result.message}`);
       
       res.json(result);
     } catch (error: any) {
