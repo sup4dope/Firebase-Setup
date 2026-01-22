@@ -397,13 +397,6 @@ export default function Rankings() {
       .sort((a, b) => b.totalScore - a.totalScore);
   }, [contractScores, teams]);
 
-  const maxScore = useMemo(() => {
-    const allScores = activeTab === 'individual' ? individualRankings : teamRankings;
-    if (allScores.length === 0) return 100;
-    const max = Math.max(...allScores.map(r => r.totalScore));
-    return Math.ceil(max / 100) * 100 || 100;
-  }, [activeTab, individualRankings, teamRankings]);
-
   const renderRankingTable = (rankings: RankingEntry[]) => (
     <Table>
       <TableHeader>
@@ -426,7 +419,6 @@ export default function Rankings() {
         ) : (
           rankings.map((entry, index) => {
             const rank = index + 1;
-            const progressPercent = (entry.totalScore / maxScore) * 100;
             
             return (
               <TableRow 
@@ -464,11 +456,61 @@ export default function Rankings() {
                 </TableCell>
                 <TableCell>
                   <div className="space-y-1">
-                    <Progress value={progressPercent} className="h-2" />
+                    {entry.totalScore > 0 ? (
+                      <div className="flex h-2.5 w-full rounded-full overflow-hidden">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div 
+                              className="bg-blue-500 transition-all duration-300"
+                              style={{ width: `${(entry.breakdown.baseScore / entry.totalScore) * 100}%` }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            <p className="font-medium">기본 점수</p>
+                            <p>{entry.breakdown.baseScore}점 ({Math.round((entry.breakdown.baseScore / entry.totalScore) * 100)}%)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div 
+                              className="bg-purple-500 transition-all duration-300"
+                              style={{ width: `${(entry.breakdown.categoryBonus / entry.totalScore) * 100}%` }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            <p className="font-medium">카테고리 가점</p>
+                            <p>+{entry.breakdown.categoryBonus}점 ({Math.round((entry.breakdown.categoryBonus / entry.totalScore) * 100)}%)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div 
+                              className="bg-emerald-500 transition-all duration-300"
+                              style={{ width: `${(entry.breakdown.amountBonus / entry.totalScore) * 100}%` }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            <p className="font-medium">금액 가점</p>
+                            <p>+{entry.breakdown.amountBonus}점 ({Math.round((entry.breakdown.amountBonus / entry.totalScore) * 100)}%)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    ) : (
+                      <div className="h-2.5 w-full rounded-full bg-muted" />
+                    )}
                     <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>기본 {entry.breakdown.baseScore}</span>
-                      <span>카테고리 +{entry.breakdown.categoryBonus}</span>
-                      <span>금액 +{entry.breakdown.amountBonus}</span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        기본 {entry.breakdown.baseScore}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                        카테고리 +{entry.breakdown.categoryBonus}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        금액 +{entry.breakdown.amountBonus}
+                      </span>
                     </div>
                   </div>
                 </TableCell>
