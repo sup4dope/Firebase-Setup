@@ -637,9 +637,6 @@ export default function Rankings() {
                       {getRankIcon(rank)}
                       <span className="text-lg font-bold">{rank}위</span>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {entry.contractCount}건
-                    </Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
