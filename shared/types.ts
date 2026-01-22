@@ -46,6 +46,8 @@ export interface User {
   commissionRates?: CommissionRates; // 수당 정책 설정
   totalLeave?: number; // 총 연차 (기본 15일)
   usedLeave?: number;  // 사용한 연차
+  db_distribution_enabled?: boolean; // DB 분배 활성화 여부 (기본 true)
+  daily_db_limit?: number; // 일일 최대 DB 할당 수 (0 = 무제한)
   created_at?: Date;
   updated_at?: Date;
 }

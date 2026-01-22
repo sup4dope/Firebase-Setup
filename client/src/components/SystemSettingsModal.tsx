@@ -36,7 +36,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Users, Building2, Plus, Trash2, Pencil, UserPlus, X, Search } from 'lucide-react';
+import { Users, Building2, Plus, Trash2, Pencil, UserPlus, X, Search, Settings2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import {
   getAllUsers,
@@ -80,6 +81,11 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   const [deleteTargetUser, setDeleteTargetUser] = useState<(User & { docId?: string }) | null>(null);
   const [deleteTargetTeam, setDeleteTargetTeam] = useState<Team | null>(null);
   const [showDeleteTeamConfirm, setShowDeleteTeamConfirm] = useState(false);
+  const [showDistributionSettings, setShowDistributionSettings] = useState(false);
+  const [distributionSettings, setDistributionSettings] = useState<{
+    [userId: string]: { enabled: boolean; limit: number };
+  }>({});
+  const [savingDistribution, setSavingDistribution] = useState(false);
 
   const [newTeamName, setNewTeamName] = useState('');
 
@@ -372,6 +378,42 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     }
   };
 
+  const handleOpenDistributionSettings = () => {
+    const settings: { [userId: string]: { enabled: boolean; limit: number } } = {};
+    users.forEach((user) => {
+      settings[user.docId || user.uid] = {
+        enabled: user.db_distribution_enabled !== false,
+        limit: user.daily_db_limit || 0,
+      };
+    });
+    setDistributionSettings(settings);
+    setShowDistributionSettings(true);
+  };
+
+  const handleSaveDistributionSettings = async () => {
+    setSavingDistribution(true);
+    try {
+      for (const user of users) {
+        const userId = user.docId || user.uid;
+        const settings = distributionSettings[userId];
+        if (settings) {
+          await updateUserInfo(userId, {
+            db_distribution_enabled: settings.enabled,
+            daily_db_limit: settings.limit,
+          });
+        }
+      }
+      await loadData();
+      setShowDistributionSettings(false);
+      alert('분배 설정이 저장되었습니다.');
+    } catch (error) {
+      console.error('Error saving distribution settings:', error);
+      alert('분배 설정 저장 중 오류가 발생했습니다.');
+    } finally {
+      setSavingDistribution(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -420,15 +462,27 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                     />
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => setShowAddEmployee(true)}
-                  className="bg-blue-600 hover:bg-blue-700"
-                  data-testid="button-add-employee"
-                >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  직원 등록
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleOpenDistributionSettings}
+                    className="border-border"
+                    data-testid="button-distribution-settings"
+                  >
+                    <Settings2 className="w-4 h-4 mr-2" />
+                    분배 설정
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAddEmployee(true)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                    data-testid="button-add-employee"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    직원 등록
+                  </Button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto min-h-0">
@@ -1396,6 +1450,109 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {showDistributionSettings && (
+        <Dialog open={showDistributionSettings} onOpenChange={setShowDistributionSettings}>
+          <DialogContent className="max-w-2xl max-h-[80vh] bg-background border-border text-foreground flex flex-col overflow-hidden">
+            <DialogHeader className="shrink-0">
+              <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                <Settings2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                DB 분배 설정
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground mb-4">
+              직원별 일일 최대 DB 할당 수를 설정하고, 분배 ON/OFF를 관리합니다. (0 = 무제한)
+            </p>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border h-10">
+                    <TableHead className="text-muted-foreground py-2">직원명</TableHead>
+                    <TableHead className="text-muted-foreground py-2">소속팀</TableHead>
+                    <TableHead className="text-muted-foreground py-2 text-center">DB 분배</TableHead>
+                    <TableHead className="text-muted-foreground py-2 text-center">일일 최대 DB</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users
+                    .filter((user) => user.status !== '퇴사')
+                    .sort((a, b) => {
+                      const teamA = teams.find(t => t.id === a.team_id);
+                      const teamB = teams.find(t => t.id === b.team_id);
+                      const teamNameA = teamA?.team_name || teamA?.name || '';
+                      const teamNameB = teamB?.team_name || teamB?.name || '';
+                      return teamNameA.localeCompare(teamNameB, 'ko');
+                    })
+                    .map((user) => {
+                      const userId = user.docId || user.uid;
+                      const settings = distributionSettings[userId] || { enabled: true, limit: 0 };
+                      const team = teams.find(t => t.id === user.team_id);
+                      return (
+                        <TableRow key={userId} className="border-border h-12">
+                          <TableCell className="text-foreground font-medium py-2">
+                            {user.name}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm py-2">
+                            {team?.team_name || team?.name || '-'}
+                          </TableCell>
+                          <TableCell className="py-2 text-center">
+                            <Switch
+                              checked={settings.enabled}
+                              onCheckedChange={(checked) => {
+                                setDistributionSettings((prev) => ({
+                                  ...prev,
+                                  [userId]: { ...settings, enabled: checked },
+                                }));
+                              }}
+                              data-testid={`switch-distribution-${userId}`}
+                            />
+                          </TableCell>
+                          <TableCell className="py-2 text-center">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={settings.limit}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 0;
+                                setDistributionSettings((prev) => ({
+                                  ...prev,
+                                  [userId]: { ...settings, limit: value },
+                                }));
+                              }}
+                              disabled={!settings.enabled}
+                              className={cn(
+                                "w-20 h-8 text-center bg-muted border-border",
+                                !settings.enabled && "opacity-50"
+                              )}
+                              data-testid={`input-db-limit-${userId}`}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 shrink-0 border-t border-border mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowDistributionSettings(false)}
+                className="border-border text-muted-foreground"
+              >
+                취소
+              </Button>
+              <Button
+                onClick={handleSaveDistributionSettings}
+                disabled={savingDistribution}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="button-save-distribution"
+              >
+                {savingDistribution ? '저장 중...' : '저장'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
