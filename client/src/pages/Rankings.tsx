@@ -656,12 +656,39 @@ export default function Rankings() {
                       </span>
                       <span className="text-muted-foreground mb-1">점</span>
                     </div>
-                    <div className="flex gap-2 text-xs text-muted-foreground">
-                      <span>계약 +{entry.breakdown.baseScore}</span>
-                      <span>|</span>
-                      <span>카테고리 +{entry.breakdown.categoryBonus}</span>
-                      <span>|</span>
-                      <span>금액 +{entry.breakdown.amountBonus}</span>
+                    <div className="space-y-1">
+                      {entry.totalScore > 0 ? (
+                        <div className="flex h-2 w-full rounded-full overflow-hidden">
+                          <div 
+                            className="bg-blue-500"
+                            style={{ width: `${(entry.breakdown.baseScore / entry.totalScore) * 100}%` }}
+                          />
+                          <div 
+                            className="bg-purple-500"
+                            style={{ width: `${(entry.breakdown.categoryBonus / entry.totalScore) * 100}%` }}
+                          />
+                          <div 
+                            className="bg-emerald-500"
+                            style={{ width: `${(entry.breakdown.amountBonus / entry.totalScore) * 100}%` }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-2 w-full rounded-full bg-muted" />
+                      )}
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          계약 +{entry.breakdown.baseScore}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                          카테고리 +{entry.breakdown.categoryBonus}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          금액 +{entry.breakdown.amountBonus}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
