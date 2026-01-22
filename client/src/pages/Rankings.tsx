@@ -578,78 +578,94 @@ export default function Rankings() {
         </div>
       </div>
 
+      {topThree.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {topThree.map((entry, index) => {
+            const rank = index + 1;
+            const bgGradient = rank === 1 
+              ? 'from-yellow-500/20 to-amber-500/10 border-yellow-500/30'
+              : rank === 2 
+                ? 'from-gray-400/20 to-gray-300/10 border-gray-400/30'
+                : 'from-amber-600/20 to-orange-500/10 border-amber-600/30';
+
+            return (
+              <Card 
+                key={entry.id} 
+                className={`bg-gradient-to-br ${bgGradient} relative overflow-hidden`}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {getRankIcon(rank)}
+                      <span className="text-lg font-bold">{rank}위</span>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      {entry.contractCount}건
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-xl font-bold">{entry.name}</p>
+                      {activeTab === 'individual' && entry.teamName && (
+                        <p className="text-sm text-muted-foreground">{entry.teamName}</p>
+                      )}
+                    </div>
+                    <div className="flex items-end gap-1">
+                      <span className="text-3xl font-bold text-primary">
+                        {entry.totalScore.toLocaleString()}
+                      </span>
+                      <span className="text-muted-foreground mb-1">점</span>
+                    </div>
+                    <div className="flex gap-2 text-xs text-muted-foreground">
+                      <span>기본 {entry.breakdown.baseScore}</span>
+                      <span>|</span>
+                      <span>카테고리 +{entry.breakdown.categoryBonus}</span>
+                      <span>|</span>
+                      <span>금액 +{entry.breakdown.amountBonus}</span>
+                    </div>
+                  </div>
+                </CardContent>
+                {rank === 1 && (
+                  <Star className="absolute -top-2 -right-2 w-16 h-16 text-yellow-500/10" />
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'individual' | 'team')}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="individual" className="flex items-center gap-2" data-testid="tab-individual">
-            <User className="w-4 h-4" />
-            개인 랭킹
-          </TabsTrigger>
-          <TabsTrigger value="team" className="flex items-center gap-2" data-testid="tab-team">
-            <Users className="w-4 h-4" />
-            팀 랭킹
-          </TabsTrigger>
-        </TabsList>
-
-        <div className="mt-6">
-          {topThree.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              {topThree.map((entry, index) => {
-                const rank = index + 1;
-                const bgGradient = rank === 1 
-                  ? 'from-yellow-500/20 to-amber-500/10 border-yellow-500/30'
-                  : rank === 2 
-                    ? 'from-gray-400/20 to-gray-300/10 border-gray-400/30'
-                    : 'from-amber-600/20 to-orange-500/10 border-amber-600/30';
-
-                return (
-                  <Card 
-                    key={entry.id} 
-                    className={`bg-gradient-to-br ${bgGradient} relative overflow-hidden`}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {getRankIcon(rank)}
-                          <span className="text-lg font-bold">{rank}위</span>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {entry.contractCount}건
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-xl font-bold">{entry.name}</p>
-                          {activeTab === 'individual' && entry.teamName && (
-                            <p className="text-sm text-muted-foreground">{entry.teamName}</p>
-                          )}
-                        </div>
-                        <div className="flex items-end gap-1">
-                          <span className="text-3xl font-bold text-primary">
-                            {entry.totalScore.toLocaleString()}
-                          </span>
-                          <span className="text-muted-foreground mb-1">점</span>
-                        </div>
-                        <div className="flex gap-2 text-xs text-muted-foreground">
-                          <span>기본 {entry.breakdown.baseScore}</span>
-                          <span>|</span>
-                          <span>카테고리 +{entry.breakdown.categoryBonus}</span>
-                          <span>|</span>
-                          <span>금액 +{entry.breakdown.amountBonus}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                    {rank === 1 && (
-                      <Star className="absolute -top-2 -right-2 w-16 h-16 text-yellow-500/10" />
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-
-          <Card>
+        <div className="relative">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('individual')}
+              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all duration-200 ${
+                activeTab === 'individual'
+                  ? 'bg-card text-primary font-bold border border-border border-b-0 relative z-10'
+                  : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted/80 border border-transparent'
+              }`}
+              data-testid="tab-individual"
+            >
+              <User className="w-4 h-4" />
+              개인 랭킹
+            </button>
+            <button
+              onClick={() => setActiveTab('team')}
+              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all duration-200 ${
+                activeTab === 'team'
+                  ? 'bg-card text-primary font-bold border border-border border-b-0 relative z-10'
+                  : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted/80 border border-transparent'
+              }`}
+              data-testid="tab-team"
+            >
+              <Users className="w-4 h-4" />
+              팀 랭킹
+            </button>
+          </div>
+          
+          <Card className="rounded-tl-none border-t">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5" />
