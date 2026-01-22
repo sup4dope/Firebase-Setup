@@ -404,15 +404,14 @@ export default function Rankings() {
           <TableHead className="w-16 text-center">순위</TableHead>
           <TableHead>{activeTab === 'individual' ? '담당자' : '팀'}</TableHead>
           {activeTab === 'individual' && <TableHead>소속팀</TableHead>}
-          <TableHead className="text-center">계약건수</TableHead>
           <TableHead className="text-right">총점</TableHead>
-          <TableHead className="w-48">점수 분포</TableHead>
+          <TableHead className="min-w-[280px]">점수 분포</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rankings.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={activeTab === 'individual' ? 6 : 5} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={activeTab === 'individual' ? 5 : 4} className="text-center py-8 text-muted-foreground">
               해당 기간 집행 데이터가 없습니다
             </TableCell>
           </TableRow>
@@ -447,9 +446,6 @@ export default function Rankings() {
                     </span>
                   </TableCell>
                 )}
-                <TableCell className="text-center">
-                  <Badge variant="outline">{entry.contractCount}건</Badge>
-                </TableCell>
                 <TableCell className="text-right">
                   <span className="font-bold text-lg">{entry.totalScore.toLocaleString()}</span>
                   <span className="text-muted-foreground text-sm ml-1">점</span>
