@@ -30,6 +30,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { MemoModal } from './MemoModal';
 import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -167,9 +173,58 @@ export function CustomerTable({
   const [memoModalOpen, setMemoModalOpen] = useState(false);
   const [selectedCustomerForMemo, setSelectedCustomerForMemo] = useState<Customer | null>(null);
 
+  // 장기부재 확인 모달 state
+  const [longAbsenceConfirm, setLongAbsenceConfirm] = useState<{
+    isOpen: boolean;
+    customer: Customer | null;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    customer: null,
+    isLoading: false,
+  });
+
   const handleMemoDoubleClick = (customer: Customer) => {
     setSelectedCustomerForMemo(customer);
     setMemoModalOpen(true);
+  };
+
+  // 장기부재 확인 후 처리
+  const handleLongAbsenceConfirm = async () => {
+    if (!longAbsenceConfirm.customer) return;
+    
+    setLongAbsenceConfirm(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      // 상태 변경 실행
+      await onStatusChange(
+        longAbsenceConfirm.customer.id, 
+        longAbsenceConfirm.customer.status_code, 
+        "장기부재" as StatusCode
+      );
+      
+      // 장기부재 알림톡 발송
+      const services = (longAbsenceConfirm.customer as any).services || [];
+      const response = await fetch("/api/solapi/send-longabsence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerPhone: longAbsenceConfirm.customer.phone,
+          customerName: longAbsenceConfirm.customer.name || longAbsenceConfirm.customer.company_name,
+          services: services,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        console.log("장기부재 알림톡 발송 성공");
+      } else {
+        console.warn("장기부재 알림톡 발송 실패:", result.message);
+      }
+    } catch (error) {
+      console.error("장기부재 처리 오류:", error);
+    } finally {
+      setLongAbsenceConfirm({ isOpen: false, customer: null, isLoading: false });
+    }
   };
 
   const handleAddMemo = (content: string) => {
@@ -288,6 +343,15 @@ export function CustomerTable({
                         value={customer.status_code || ''}
                         onValueChange={(newStatus) => {
                           if (newStatus && newStatus !== customer.status_code) {
+                            // 장기부재 상태 변경 시 확인 다이얼로그 표시
+                            if (newStatus === "장기부재") {
+                              setLongAbsenceConfirm({
+                                isOpen: true,
+                                customer: customer,
+                                isLoading: false,
+                              });
+                              return;
+                            }
                             onStatusChange(customer.id, customer.status_code, newStatus as StatusCode);
                           }
                         }}
@@ -660,6 +724,48 @@ export function CustomerTable({
         memoHistory={selectedCustomerForMemo?.memo_history || []}
         onAddMemo={handleAddMemo}
       />
+
+      {/* 장기부재 확인 모달 */}
+      <Dialog 
+        open={longAbsenceConfirm.isOpen} 
+        onOpenChange={(open) => {
+          if (!open && !longAbsenceConfirm.isLoading) {
+            setLongAbsenceConfirm({ isOpen: false, customer: null, isLoading: false });
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[400px] bg-background border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">장기부재 상태 변경</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-md">
+            <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+              정말 "{longAbsenceConfirm.customer?.name || longAbsenceConfirm.customer?.company_name}"님을 장기부재 상태로 변경하시겠습니까?
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              상태 변경 시 고객에게 장기부재 안내 알림톡이 발송됩니다.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setLongAbsenceConfirm({ isOpen: false, customer: null, isLoading: false })}
+              disabled={longAbsenceConfirm.isLoading}
+              className="border-border text-muted-foreground"
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleLongAbsenceConfirm}
+              disabled={longAbsenceConfirm.isLoading}
+              className="bg-amber-600 hover:bg-amber-700"
+              data-testid="button-confirm-long-absence"
+            >
+              {longAbsenceConfirm.isLoading ? "처리 중..." : "확인"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
