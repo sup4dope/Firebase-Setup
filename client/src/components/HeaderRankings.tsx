@@ -165,7 +165,6 @@ export function HeaderRankings() {
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-muted-foreground mr-1 hidden sm:inline">이번달 TOP</span>
       {top3Rankings.map((entry, index) => {
         const rank = index + 1;
         return (
