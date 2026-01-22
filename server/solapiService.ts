@@ -7,6 +7,7 @@ const templateId = process.env.SOLAPI_TEMPLATE_ID || '';
 const delayTemplateId = process.env.SOLAPI_DELAY_TEMPLATE_ID || '';
 const assignTemplateId = process.env.SOLAPI_ASSIGN_TEMPLATE_ID || '';
 const businessCardTemplateId = process.env.SOLAPI_BUSINESSCARD_TEMPLATE_ID || '';
+const longAbsenceTemplateId = process.env.SOLAPI_LONGABSENCE_TEMPLATE_ID || '';
 const senderNumber = process.env.SOLAPI_SENDER_NUMBER || '';
 
 let messageService: SolapiMessageService | null = null;
@@ -183,6 +184,64 @@ const getBranchFromRegion = (region: string): string => {
 };
 
 export { getBranchFromRegion };
+
+export interface LongAbsenceAlimtalkData {
+  customerPhone: string;
+  customerName: string;
+  services: string[];
+}
+
+export const sendLongAbsenceAlimtalk = async (data: LongAbsenceAlimtalkData): Promise<{
+  success: boolean;
+  message: string;
+  result?: any;
+}> => {
+  const service = getMessageService();
+  
+  if (!service) {
+    return { success: false, message: 'Solapi 서비스가 초기화되지 않았습니다. API 키를 확인해주세요.' };
+  }
+  
+  if (!pfId || !longAbsenceTemplateId || !senderNumber) {
+    return { 
+      success: false, 
+      message: 'Solapi 장기부재 알림 설정이 완료되지 않았습니다. PFID, 장기부재 템플릿ID, 발신번호를 확인해주세요.' 
+    };
+  }
+  
+  if (!data.customerPhone) {
+    return { success: false, message: '고객 전화번호가 입력되지 않았습니다.' };
+  }
+  
+  const cleanPhone = data.customerPhone.replace(/[^0-9]/g, '');
+  
+  if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+    return { success: false, message: '유효하지 않은 전화번호 형식입니다.' };
+  }
+  
+  const servicesText = data.services.length > 0 ? data.services.join(', ') : '미지정';
+  
+  try {
+    const result = await service.send({
+      to: cleanPhone,
+      from: senderNumber,
+      kakaoOptions: {
+        pfId: pfId,
+        templateId: longAbsenceTemplateId,
+        variables: {
+          '#{고객명}': data.customerName || '고객',
+          '#{상담분야}': servicesText,
+        },
+      },
+    });
+    
+    console.log(`✅ [Solapi] 장기부재 알림톡 발송 성공: ${cleanPhone}`);
+    return { success: true, message: '장기부재 알림톡이 정상 발송되었습니다.', result };
+  } catch (error: any) {
+    console.error(`❌ [Solapi] 장기부재 알림톡 발송 실패 (${cleanPhone}):`, error.message);
+    return { success: false, message: `발송 실패: ${error.message}` };
+  }
+};
 
 export interface AssignmentAlimtalkData {
   customerPhone: string;

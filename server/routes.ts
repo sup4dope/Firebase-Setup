@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims } from "./firebaseAdmin";
-import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
+import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -368,6 +368,36 @@ export async function registerRoutes(
       res.json(result);
     } catch (error: any) {
       console.error("❌ [Solapi] 담당자 배정 알림톡 발송 오류:", error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // 장기부재 알림 발송 API
+  app.post("/api/solapi/send-longabsence", async (req, res) => {
+    try {
+      const { customerPhone, customerName, services } = req.body;
+      
+      if (!customerPhone) {
+        return res.status(400).json({
+          success: false,
+          error: "customerPhone은 필수입니다.",
+        });
+      }
+      
+      const result = await sendLongAbsenceAlimtalk({
+        customerPhone,
+        customerName: customerName || '고객',
+        services: services || [],
+      });
+      
+      console.log(`📤 [Solapi] 장기부재 알림 발송 결과: ${result.message}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("❌ [Solapi] 장기부재 알림 발송 오류:", error.message);
       res.status(500).json({
         success: false,
         error: error.message,

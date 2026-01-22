@@ -2750,7 +2750,8 @@ export function CustomerDetailModal({
                                         (option.value.includes("계약완료") && !hasContractInfo) ||
                                         (option.value.includes("신청완료") && !hasProcessingOrg) ||
                                         (option.value.includes("집행완료") && !hasExecutionInfo) ||
-                                        (option.value === "최종부결"); // 최종부결은 항상 모달 표시 (환수 적용일자 입력)
+                                        (option.value === "최종부결") || // 최종부결은 항상 모달 표시 (환수 적용일자 입력)
+                                        (option.value === "장기 부재"); // 장기 부재는 확인 모달 표시 및 알림톡 발송
 
                                       if (requiresModal) {
                                         setStatusChangeModal({
@@ -3540,6 +3541,18 @@ export function CustomerDetailModal({
                 </p>
               </div>
             )}
+
+            {/* 장기 부재 상태: 확인 메시지 */}
+            {statusChangeModal.targetStatus === "장기 부재" && (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-md">
+                <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+                  정말 "{formData.name || formData.company_name}"님을 장기 부재 상태로 변경하시겠습니까?
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  상태 변경 시 고객에게 장기부재 안내 알림톡이 발송됩니다.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 mt-6">
@@ -3604,6 +3617,30 @@ export function CustomerDetailModal({
                     const result = await processClawbackForFinalRejection(formData.id, clawbackMonth);
                     if (result.clawbackCreated) {
                       console.log("환수 처리 완료:", result.clawbackItems.length, "건, 정산월:", clawbackMonth, ", 총 환수액:", result.totalClawbackAmount, "만원");
+                    }
+                  }
+                  
+                  // 장기 부재 상태로 변경 시 알림톡 발송
+                  if (statusChangeModal.targetStatus === "장기 부재") {
+                    try {
+                      const services = formData.services || [];
+                      const response = await fetch("/api/solapi/send-longabsence", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          customerPhone: formData.phone,
+                          customerName: formData.name || formData.company_name,
+                          services: services,
+                        }),
+                      });
+                      const result = await response.json();
+                      if (result.success) {
+                        console.log("장기부재 알림톡 발송 성공");
+                      } else {
+                        console.warn("장기부재 알림톡 발송 실패:", result.message);
+                      }
+                    } catch (error) {
+                      console.error("장기부재 알림톡 발송 오류:", error);
                     }
                   }
 
