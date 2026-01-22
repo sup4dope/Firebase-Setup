@@ -3623,7 +3623,7 @@ export function CustomerDetailModal({
                   // 장기 부재 상태로 변경 시 알림톡 발송
                   if (statusChangeModal.targetStatus === "장기 부재") {
                     try {
-                      const services = formData.services || [];
+                      const services = (formData as any).services || [];
                       const response = await fetch("/api/solapi/send-longabsence", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
