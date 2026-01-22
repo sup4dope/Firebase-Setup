@@ -172,11 +172,12 @@ export function HeaderRankings() {
           <Tooltip key={entry.id}>
             <TooltipTrigger asChild>
               <div
-                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getRankStyle(rank)} cursor-default`}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border ${getRankStyle(rank)} cursor-default`}
                 data-testid={`header-rank-${rank}`}
               >
                 {getRankIcon(rank)}
                 <span className="max-w-[60px] truncate">{entry.name}</span>
+                <span className="opacity-70">{entry.totalScore}점</span>
               </div>
             </TooltipTrigger>
             <TooltipContent>
