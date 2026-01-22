@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppSidebar } from '@/components/AppSidebar';
 import { TodoForm } from '@/components/TodoForm';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { HeaderRankings } from '@/components/HeaderRankings';
 import { LandingPageListener } from '@/components/LandingPageListener';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -193,7 +194,10 @@ function AuthenticatedApp() {
         />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between gap-4 h-14 px-4 border-b bg-background sticky top-0 z-50">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-4">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <HeaderRankings />
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
