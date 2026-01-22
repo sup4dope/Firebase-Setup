@@ -405,7 +405,7 @@ export default function Rankings() {
           <TableHead>{activeTab === 'individual' ? '담당자' : '팀'}</TableHead>
           {activeTab === 'individual' && <TableHead>소속팀</TableHead>}
           <TableHead className="text-right pr-10">총점</TableHead>
-          <TableHead className="w-52 pl-6">점수 분포</TableHead>
+          <TableHead className="pl-6" style={{ width: '312px', minWidth: '312px', maxWidth: '312px' }}>점수 분포</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -450,7 +450,7 @@ export default function Rankings() {
                   <span className="font-bold text-lg">{entry.totalScore.toLocaleString()}</span>
                   <span className="text-muted-foreground text-sm ml-1">점</span>
                 </TableCell>
-                <TableCell className="w-52 pl-6">
+                <TableCell className="pl-6" style={{ width: '312px', minWidth: '312px', maxWidth: '312px' }}>
                   <div className="space-y-1">
                     {entry.totalScore > 0 ? (
                       <div className="flex h-2.5 w-full rounded-full overflow-hidden">
