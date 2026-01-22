@@ -78,6 +78,8 @@ import { ReviewSummaryTab } from "@/components/ReviewSummaryTab";
 import { ProposalModal, ProposalPreview, type ProposalFormData } from "@/components/report";
 import { format, differenceInDays, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
+import { useToast } from "@/hooks/use-toast";
+import { CreditCard } from "lucide-react";
 import { TodoForm } from "@/components/TodoForm";
 import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
 import { 
@@ -255,6 +257,9 @@ export function CustomerDetailModal({
     monthlyPayment: string;
   }[]>([]);
   const [proposalDesiredAmount, setProposalDesiredAmount] = useState("");
+  const [isSendingBusinessCard, setIsSendingBusinessCard] = useState(false);
+  
+  const { toast } = useToast();
 
   // Form state
   const [formData, setFormData] = useState<
@@ -1611,6 +1616,73 @@ export function CustomerDetailModal({
     }
   };
 
+  const handleSendBusinessCard = async () => {
+    if (!customer?.id) return;
+    
+    const customerPhone = [formData.phone_part1, formData.phone_part2, formData.phone_part3]
+      .filter(Boolean)
+      .join('-');
+    
+    if (!customerPhone || customerPhone === '-') {
+      toast({
+        title: "발송 실패",
+        description: "고객 연락처가 없습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const manager = users.find(u => u.uid === customer.manager_id) || currentUser;
+    if (!manager) {
+      toast({
+        title: "발송 실패",
+        description: "담당자 정보를 찾을 수 없습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSendingBusinessCard(true);
+    
+    try {
+      const response = await fetch('/api/solapi/send-businesscard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerPhone,
+          customerName: formData.name || '고객',
+          managerName: manager.name || manager.email,
+          managerPhone: manager.phone_work || manager.phone || '',
+          managerEmail: manager.email || '',
+          businessAddress: formData.business_address || '',
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: "명함 발송 완료",
+          description: `${formData.name}님에게 명함이 발송되었습니다.`,
+        });
+      } else {
+        toast({
+          title: "발송 실패",
+          description: result.message || result.error || "알 수 없는 오류",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "발송 오류",
+        description: error.message || "서버 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingBusinessCard(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] p-0 bg-card flex flex-col overflow-hidden">
@@ -1629,13 +1701,22 @@ export function CustomerDetailModal({
                 ? "신규 고객 등록"
                 : `${customer?.name || "고객"} 상세정보`}
             </h2>
-            {customer?.id && (
-              <Badge
+            {customer?.id && !isNewCustomer && (
+              <Button
                 variant="outline"
-                className="text-muted-foreground border-border text-xs"
+                size="sm"
+                onClick={handleSendBusinessCard}
+                disabled={isSendingBusinessCard}
+                className="h-7 text-xs"
+                data-testid="button-send-businesscard"
               >
-                {customer.id}
-              </Badge>
+                {isSendingBusinessCard ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <CreditCard className="w-3 h-3 mr-1" />
+                )}
+                명함발송
+              </Button>
             )}
             {/* Read-only indicator for staff users */}
             {isReadOnly && (

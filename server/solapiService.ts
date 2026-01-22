@@ -6,6 +6,7 @@ const pfId = process.env.SOLAPI_KAKAO_PFID || '';
 const templateId = process.env.SOLAPI_TEMPLATE_ID || '';
 const delayTemplateId = process.env.SOLAPI_DELAY_TEMPLATE_ID || '';
 const assignTemplateId = process.env.SOLAPI_ASSIGN_TEMPLATE_ID || '';
+const businessCardTemplateId = process.env.SOLAPI_BUSINESSCARD_TEMPLATE_ID || '';
 const senderNumber = process.env.SOLAPI_SENDER_NUMBER || '';
 
 let messageService: SolapiMessageService | null = null;
@@ -239,6 +240,67 @@ export const sendAssignmentAlimtalk = async (data: AssignmentAlimtalkData): Prom
     return { success: true, message: '담당자 배정 알림톡이 정상 발송되었습니다.', result };
   } catch (error: any) {
     console.error(`❌ [Solapi] 담당자 배정 알림톡 발송 실패 (${cleanPhone}):`, error.message);
+    return { success: false, message: `발송 실패: ${error.message}` };
+  }
+};
+
+export interface BusinessCardAlimtalkData {
+  customerPhone: string;
+  customerName: string;
+  managerName: string;
+  branchName: string;
+  managerPhone: string;
+  managerEmail: string;
+}
+
+export const sendBusinessCardAlimtalk = async (data: BusinessCardAlimtalkData): Promise<{
+  success: boolean;
+  message: string;
+  result?: any;
+}> => {
+  const service = getMessageService();
+  
+  if (!service) {
+    return { success: false, message: 'Solapi 서비스가 초기화되지 않았습니다. API 키를 확인해주세요.' };
+  }
+  
+  if (!pfId || !businessCardTemplateId || !senderNumber) {
+    return { 
+      success: false, 
+      message: 'Solapi 명함 발송 설정이 완료되지 않았습니다. PFID, 명함 템플릿ID, 발신번호를 확인해주세요.' 
+    };
+  }
+  
+  if (!data.customerPhone) {
+    return { success: false, message: '고객 전화번호가 입력되지 않았습니다.' };
+  }
+  
+  const cleanPhone = data.customerPhone.replace(/[^0-9]/g, '');
+  
+  if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+    return { success: false, message: '유효하지 않은 전화번호 형식입니다.' };
+  }
+  
+  try {
+    const result = await service.send({
+      to: cleanPhone,
+      from: senderNumber,
+      kakaoOptions: {
+        pfId: pfId,
+        templateId: businessCardTemplateId,
+        variables: {
+          '#{담당자명}': data.managerName || '담당자',
+          '#{지점명}': data.branchName || '본사',
+          '#{담당자번호}': data.managerPhone || '',
+          '#{담당자이메일}': data.managerEmail || '',
+        },
+      },
+    });
+    
+    console.log(`✅ [Solapi] 명함 발송 성공: ${cleanPhone} ← ${data.managerName} (${data.branchName}지점)`);
+    return { success: true, message: '명함이 정상 발송되었습니다.', result };
+  } catch (error: any) {
+    console.error(`❌ [Solapi] 명함 발송 실패 (${cleanPhone}):`, error.message);
     return { success: false, message: `발송 실패: ${error.message}` };
   }
 };

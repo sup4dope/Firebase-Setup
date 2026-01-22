@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims } from "./firebaseAdmin";
-import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
+import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -368,6 +368,42 @@ export async function registerRoutes(
       res.json(result);
     } catch (error: any) {
       console.error("❌ [Solapi] 담당자 배정 알림톡 발송 오류:", error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // 명함 발송 API
+  app.post("/api/solapi/send-businesscard", async (req, res) => {
+    try {
+      const { customerPhone, customerName, managerName, managerPhone, managerEmail, businessAddress } = req.body;
+      
+      if (!customerPhone || !managerName) {
+        return res.status(400).json({
+          success: false,
+          error: "customerPhone, managerName은 필수입니다.",
+        });
+      }
+      
+      // 사업장 주소 → 지점 변환 (없으면 본사)
+      const branchName = businessAddress ? getBranchFromRegion(businessAddress) : '본사';
+      
+      const result = await sendBusinessCardAlimtalk({
+        customerPhone,
+        customerName: customerName || '고객',
+        managerName,
+        branchName,
+        managerPhone: managerPhone || '',
+        managerEmail: managerEmail || '',
+      });
+      
+      console.log(`📤 [Solapi] 명함 발송 결과: ${result.message}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("❌ [Solapi] 명함 발송 오류:", error.message);
       res.status(500).json({
         success: false,
         error: error.message,
