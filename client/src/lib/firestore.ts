@@ -1990,7 +1990,7 @@ export const processConsultationToCustomer = async (
       // 담당자 자동 배정 (라운드로빈)
       const assignedManager = await getNextManagerForAssignment();
       
-      const customerData: InsertCustomer & { manager_name?: string; team_name?: string; memo_history?: any[] } = {
+      const customerData: InsertCustomer & { manager_name?: string; team_name?: string; memo_history?: any[]; services?: string[] } = {
         name: name,
         company_name: companyName,
         phone: phone,
@@ -2007,6 +2007,7 @@ export const processConsultationToCustomer = async (
         team_name: assignedManager?.teamName || '미배정',
         approved_amount: 0,
         commission_rate: 0,
+        services: consultation.services || [], // 신청 서비스 저장 (알림톡용)
       };
       
       const newCustomer = await createCustomer(customerData);

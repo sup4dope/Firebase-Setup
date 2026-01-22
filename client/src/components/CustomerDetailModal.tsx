@@ -3623,7 +3623,15 @@ export function CustomerDetailModal({
                   // 장기부재 상태로 변경 시 알림톡 발송
                   if (statusChangeModal.targetStatus === "장기부재") {
                     try {
-                      const services = (formData as any).services || [];
+                      // services 필드가 없으면 메모에서 파싱 시도
+                      let services = (formData as any).services || [];
+                      if (services.length === 0 && formData.memo_history && formData.memo_history.length > 0) {
+                        const firstMemo = formData.memo_history[0]?.content || '';
+                        const serviceMatch = firstMemo.match(/- 신청 서비스: (.+)/);
+                        if (serviceMatch) {
+                          services = serviceMatch[1].split(', ').map((s: string) => s.trim());
+                        }
+                      }
                       const response = await fetch("/api/solapi/send-longabsence", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },

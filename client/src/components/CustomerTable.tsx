@@ -204,7 +204,15 @@ export function CustomerTable({
       );
       
       // 장기부재 알림톡 발송
-      const services = (longAbsenceConfirm.customer as any).services || [];
+      // services 필드가 없으면 메모에서 파싱 시도
+      let services = (longAbsenceConfirm.customer as any).services || [];
+      if (services.length === 0 && longAbsenceConfirm.customer.memo_history && longAbsenceConfirm.customer.memo_history.length > 0) {
+        const firstMemo = longAbsenceConfirm.customer.memo_history[0]?.content || '';
+        const serviceMatch = firstMemo.match(/- 신청 서비스: (.+)/);
+        if (serviceMatch) {
+          services = serviceMatch[1].split(', ').map((s: string) => s.trim());
+        }
+      }
       const response = await fetch("/api/solapi/send-longabsence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
