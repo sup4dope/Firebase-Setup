@@ -462,8 +462,8 @@ export default function Rankings() {
                             />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="text-xs">
-                            <p className="font-medium">기본 점수</p>
-                            <p>{entry.breakdown.baseScore}점 ({Math.round((entry.breakdown.baseScore / entry.totalScore) * 100)}%)</p>
+                            <p className="font-medium">계약 점수</p>
+                            <p>+{entry.breakdown.baseScore}점 ({Math.round((entry.breakdown.baseScore / entry.totalScore) * 100)}%)</p>
                           </TooltipContent>
                         </Tooltip>
                         <Tooltip>
@@ -497,7 +497,7 @@ export default function Rankings() {
                     <div className="flex justify-between text-[10px] text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-blue-500" />
-                        기본 {entry.breakdown.baseScore}
+                        계약 +{entry.breakdown.baseScore}
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-purple-500" />
@@ -557,7 +557,7 @@ export default function Rankings() {
               <TooltipContent side="right" className="max-w-sm p-4">
                 <div className="space-y-3 text-xs">
                   <div>
-                    <p className="font-semibold mb-1">기본 점수</p>
+                    <p className="font-semibold mb-1">계약 점수</p>
                     <p className="text-muted-foreground">계약 1건당 +20점</p>
                   </div>
                   <div>
@@ -657,7 +657,7 @@ export default function Rankings() {
                       <span className="text-muted-foreground mb-1">점</span>
                     </div>
                     <div className="flex gap-2 text-xs text-muted-foreground">
-                      <span>기본 {entry.breakdown.baseScore}</span>
+                      <span>계약 +{entry.breakdown.baseScore}</span>
                       <span>|</span>
                       <span>카테고리 +{entry.breakdown.categoryBonus}</span>
                       <span>|</span>
