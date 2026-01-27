@@ -595,7 +595,7 @@ export default function Dashboard() {
   };
 
   // 진행기관 추가 + 자동 상태 변경 + 이력 기록
-  const handleAddProcessingOrgWithAutoStatus = async (customerId: string, customer: Customer, orgName: string) => {
+  const handleAddProcessingOrgWithAutoStatus = async (customerId: string, customer: Customer, orgName: string, isReExecution?: boolean) => {
     if (!user) return;
     
     const currentOrgs = customer.processing_orgs || [];
@@ -605,6 +605,7 @@ export default function Dashboard() {
       org: orgName,
       status: '진행중',
       applied_at: new Date().toISOString().split('T')[0],
+      is_re_execution: isReExecution || false,
     };
     const updatedOrgs = [...currentOrgs, newOrg];
     
@@ -630,14 +631,15 @@ export default function Dashboard() {
       await updateCustomer(customerId, updates);
       
       // 이력 기록 - 진행기관 추가
+      const reExecLabel = isReExecution ? ' (재집행)' : '';
       await addCustomerHistoryLog({
         customer_id: customerId,
         action_type: 'org_change',
-        description: `진행기관 추가: ${orgName}`,
+        description: `진행기관 추가: ${orgName}${reExecLabel}`,
         changed_by: user.uid,
         changed_by_name: user.name,
         old_value: '',
-        new_value: orgName,
+        new_value: orgName + reExecLabel,
       });
       
       // 상태 자동 변경된 경우 상태 변경 이력도 기록

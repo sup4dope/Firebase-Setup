@@ -39,7 +39,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MemoModal } from './MemoModal';
-import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users, Plus, XCircle, CheckCircle } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users, Plus, XCircle, CheckCircle, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   Popover,
@@ -122,7 +122,7 @@ interface CustomerTableProps {
   onProcessingOrgsChange?: (customerId: string, processingOrgs: ProcessingOrg[]) => void;
   onAddMemo?: (customerId: string, content: string) => void;
   onManagerChange?: (customerId: string, newManagerId: string, newManagerName: string, newTeamId: string, newTeamName: string) => void;
-  onAddProcessingOrgWithAutoStatus?: (customerId: string, customer: Customer, orgName: string) => void;
+  onAddProcessingOrgWithAutoStatus?: (customerId: string, customer: Customer, orgName: string, isReExecution?: boolean) => void;
   onApproveOrg?: (customerId: string, customer: Customer, orgName: string, executionDate: string, executionAmount: number) => void;
 }
 
@@ -196,6 +196,9 @@ export function CustomerTable({
     customer: null,
     isLoading: false,
   });
+
+  // 재집행으로 추가 토글 state
+  const [addAsReExecution, setAddAsReExecution] = useState(false);
 
   // 진행기관 승인 모달 state (집행일자/금액 입력)
   const [orgApprovalModal, setOrgApprovalModal] = useState<{
@@ -299,23 +302,32 @@ export function CustomerTable({
   };
 
   // 다중 기관 관리 함수 - 자동 상태 변경 및 이력 기록 포함
-  const handleAddProcessingOrg = (customerId: string, customer: Customer, orgName: string) => {
+  const handleAddProcessingOrg = (customerId: string, customer: Customer, orgName: string, isReExecution?: boolean) => {
     const currentOrgs = customer.processing_orgs || [];
     // 중복 체크
     if (currentOrgs.find(o => o.org === orgName)) return;
     
     // 새 콜백이 있으면 사용 (이력 기록 + 자동 상태 변경)
     if (onAddProcessingOrgWithAutoStatus) {
-      onAddProcessingOrgWithAutoStatus(customerId, customer, orgName);
+      onAddProcessingOrgWithAutoStatus(customerId, customer, orgName, isReExecution);
+      // 재집행 토글 초기화
+      if (isReExecution) {
+        setAddAsReExecution(false);
+      }
     } else {
       // 기존 로직 (호환성)
       const newOrg: ProcessingOrg = {
         org: orgName,
         status: '진행중',
         applied_at: new Date().toISOString().split('T')[0],
+        is_re_execution: isReExecution || false,
       };
       const updatedOrgs = [...currentOrgs, newOrg];
       onProcessingOrgsChange?.(customerId, updatedOrgs);
+      // 재집행 토글 초기화
+      if (isReExecution) {
+        setAddAsReExecution(false);
+      }
     }
   };
 
@@ -735,7 +747,15 @@ export function CustomerTable({
                                 return (
                                   <div key={idx} className={cn("flex items-center justify-between p-2 rounded border", colors.border, colors.bg)}>
                                     <div className="flex-1">
-                                      <div className={cn("font-medium text-sm", colors.text)}>{org.org}</div>
+                                      <div className={cn("font-medium text-sm flex items-center gap-1", colors.text)}>
+                                        {org.org}
+                                        {org.is_re_execution && (
+                                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-500/50">
+                                            <RotateCcw className="w-2 h-2 mr-0.5" />
+                                            재집행
+                                          </Badge>
+                                        )}
+                                      </div>
                                       <div className="text-xs text-muted-foreground">
                                         {org.applied_at && `접수: ${org.applied_at}`}
                                         {org.rejected_at && ` | 부결: ${org.rejected_at}`}
@@ -787,7 +807,26 @@ export function CustomerTable({
                         
                         {/* 기관 추가 */}
                         <div className="border-t pt-2">
-                          <p className="text-xs text-muted-foreground mb-2">기관 추가</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs text-muted-foreground">기관 추가</p>
+                            {/* 재집행으로 추가 토글 */}
+                            <label className="flex items-center gap-1 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={addAsReExecution}
+                                onChange={(e) => setAddAsReExecution(e.target.checked)}
+                                className="w-3 h-3 rounded border-gray-300"
+                                data-testid="checkbox-add-as-re-execution"
+                              />
+                              <span className={cn(
+                                "text-[10px]",
+                                addAsReExecution ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"
+                              )}>
+                                <RotateCcw className="w-2.5 h-2.5 inline mr-0.5" />
+                                재집행
+                              </span>
+                            </label>
+                          </div>
                           <div className="flex flex-wrap gap-1">
                             {PROCESSING_ORGS.filter(org => {
                               const existingOrgs = getProcessingOrgsFromCustomer(customer);
@@ -796,8 +835,13 @@ export function CustomerTable({
                               <Badge
                                 key={org}
                                 variant="outline"
-                                className="text-xs cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                                onClick={() => handleAddProcessingOrg(customer.id, customer, org)}
+                                className={cn(
+                                  "text-xs cursor-pointer",
+                                  addAsReExecution 
+                                    ? "hover:bg-amber-100 dark:hover:bg-amber-900/30 border-amber-500/50" 
+                                    : "hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                                )}
+                                onClick={() => handleAddProcessingOrg(customer.id, customer, org, addAsReExecution)}
                                 data-testid={`btn-add-org-${org}`}
                               >
                                 <Plus className="w-3 h-3 mr-0.5" />
