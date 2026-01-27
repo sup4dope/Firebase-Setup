@@ -2670,12 +2670,45 @@ export function CustomerDetailModal({
                                     size="sm"
                                     variant="ghost"
                                     className="h-6 w-6 p-0 text-red-600 hover:bg-red-100"
-                                    onClick={() => {
+                                    onClick={async () => {
+                                      if (!formData.id) return;
                                       const today = format(new Date(), 'yyyy-MM-dd');
                                       const updatedOrgs = (formData.processing_orgs || []).map(o =>
                                         o.org === org.org ? { ...o, status: '부결' as ProcessingOrgStatus, rejected_at: today } : o
                                       );
-                                      handleFieldChange({ processing_orgs: updatedOrgs });
+                                      
+                                      try {
+                                        const customerRef = doc(db, "customers", formData.id);
+                                        await updateDoc(customerRef, {
+                                          processing_orgs: updatedOrgs,
+                                          updated_at: new Date(),
+                                        });
+                                        
+                                        setFormData(prev => ({ ...prev, processing_orgs: updatedOrgs }));
+                                        
+                                        await addDoc(collection(db, "customer_history_logs"), {
+                                          customer_id: formData.id,
+                                          action_type: "org_change",
+                                          description: `진행기관 부결: ${org.org}`,
+                                          changed_by: currentUser?.uid || "",
+                                          changed_by_name: currentUser?.name || "",
+                                          old_value: '진행중',
+                                          new_value: '부결',
+                                          changed_at: new Date(),
+                                        });
+                                        
+                                        onSave?.({
+                                          id: formData.id,
+                                          processing_orgs: updatedOrgs,
+                                        });
+                                        
+                                        toast({
+                                          title: "부결 처리",
+                                          description: `${org.org} 기관이 부결 처리되었습니다.`,
+                                        });
+                                      } catch (error) {
+                                        console.error("부결 처리 실패:", error);
+                                      }
                                     }}
                                     data-testid={`btn-detail-reject-${org.org}`}
                                   >
@@ -2706,9 +2739,37 @@ export function CustomerDetailModal({
                                   size="sm"
                                   variant="ghost"
                                   className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted"
-                                  onClick={() => {
+                                  onClick={async () => {
+                                    if (!formData.id) return;
                                     const updatedOrgs = (formData.processing_orgs || []).filter(o => o.org !== org.org);
-                                    handleFieldChange({ processing_orgs: updatedOrgs });
+                                    
+                                    try {
+                                      const customerRef = doc(db, "customers", formData.id);
+                                      await updateDoc(customerRef, {
+                                        processing_orgs: updatedOrgs,
+                                        updated_at: new Date(),
+                                      });
+                                      
+                                      setFormData(prev => ({ ...prev, processing_orgs: updatedOrgs }));
+                                      
+                                      await addDoc(collection(db, "customer_history_logs"), {
+                                        customer_id: formData.id,
+                                        action_type: "org_change",
+                                        description: `진행기관 삭제: ${org.org}`,
+                                        changed_by: currentUser?.uid || "",
+                                        changed_by_name: currentUser?.name || "",
+                                        old_value: org.org,
+                                        new_value: '',
+                                        changed_at: new Date(),
+                                      });
+                                      
+                                      onSave?.({
+                                        id: formData.id,
+                                        processing_orgs: updatedOrgs,
+                                      });
+                                    } catch (error) {
+                                      console.error("기관 삭제 실패:", error);
+                                    }
                                   }}
                                   data-testid={`btn-detail-remove-${org.org}`}
                                 >
@@ -2771,7 +2832,9 @@ export function CustomerDetailModal({
                                 ? "hover:bg-amber-100 dark:hover:bg-amber-900/30 border-amber-300 dark:border-amber-700" 
                                 : "hover:bg-blue-100 dark:hover:bg-blue-900/30"
                             )}
-                            onClick={() => {
+                            onClick={async () => {
+                              if (!formData.id) return;
+                              
                               const today = format(new Date(), 'yyyy-MM-dd');
                               const newOrg: ProcessingOrg = {
                                 org,
@@ -2780,7 +2843,82 @@ export function CustomerDetailModal({
                                 is_re_execution: addAsReExecution,
                               };
                               const updatedOrgs = [...(formData.processing_orgs || []), newOrg];
-                              handleFieldChange({ processing_orgs: updatedOrgs });
+                              
+                              // 상태 자동 변경 로직: 서류취합완료 → 신청완료
+                              const statusMap: Record<string, string> = {
+                                '서류취합완료(선불)': '신청완료(선불)',
+                                '서류취합완료(외주)': '신청완료(외주)',
+                                '서류취합완료(후불)': '신청완료(후불)',
+                              };
+                              const newStatus = statusMap[formData.status_code || ''];
+                              
+                              try {
+                                const updates: any = {
+                                  processing_orgs: updatedOrgs,
+                                  updated_at: new Date(),
+                                };
+                                
+                                // 상태 자동 변경이 필요하면 적용
+                                if (newStatus) {
+                                  updates.status_code = newStatus;
+                                }
+                                
+                                // 직접 Firebase에 저장
+                                const customerRef = doc(db, "customers", formData.id);
+                                await updateDoc(customerRef, updates);
+                                
+                                // 로컬 상태 업데이트
+                                setFormData(prev => ({
+                                  ...prev,
+                                  processing_orgs: updatedOrgs,
+                                  ...(newStatus ? { status_code: newStatus as StatusCode } : {}),
+                                }));
+                                
+                                // 이력 기록
+                                await addDoc(collection(db, "customer_history_logs"), {
+                                  customer_id: formData.id,
+                                  action_type: "org_change",
+                                  description: `진행기관 추가: ${org}${addAsReExecution ? ' (재집행)' : ''}`,
+                                  changed_by: currentUser?.uid || "",
+                                  changed_by_name: currentUser?.name || "",
+                                  old_value: "",
+                                  new_value: org,
+                                  changed_at: new Date(),
+                                });
+                                
+                                // 상태 변경 이력
+                                if (newStatus) {
+                                  await addDoc(collection(db, "customer_history_logs"), {
+                                    customer_id: formData.id,
+                                    action_type: "status_change",
+                                    description: `상태 자동 변경: ${formData.status_code} → ${newStatus}`,
+                                    changed_by: currentUser?.uid || "",
+                                    changed_by_name: currentUser?.name || "",
+                                    old_value: formData.status_code,
+                                    new_value: newStatus,
+                                    changed_at: new Date(),
+                                  });
+                                }
+                                
+                                // 부모 컴포넌트에도 알림
+                                onSave?.({
+                                  id: formData.id,
+                                  processing_orgs: updatedOrgs,
+                                  ...(newStatus ? { status_code: newStatus } : {}),
+                                });
+                                
+                                toast({
+                                  title: "기관 추가 완료",
+                                  description: `${org} 기관이 추가되었습니다.${newStatus ? ` (상태: ${newStatus})` : ''}`,
+                                });
+                              } catch (error) {
+                                console.error("기관 추가 실패:", error);
+                                toast({
+                                  title: "오류",
+                                  description: "기관 추가 중 오류가 발생했습니다.",
+                                  variant: "destructive",
+                                });
+                              }
                             }}
                             data-testid={`btn-detail-add-${org}`}
                           >
@@ -4069,32 +4207,72 @@ export function CustomerDetailModal({
                       : o
                   );
                   
-                  // 직접 Firebase에 저장 (debounce 없이 즉시 저장)
+                  // 총 집행금액 계산 (모든 승인된 기관의 집행금액 합산)
+                  const totalExecutionAmount = updatedOrgs
+                    .filter(o => o.status === '승인')
+                    .reduce((sum, o) => sum + (o.execution_amount || 0), 0);
+                  
+                  // 가장 최근 집행일 (현재 승인하는 기관의 집행일)
+                  const latestExecutionDate = orgApprovalModal.executionDate;
+                  
+                  // 이전 상태 저장
+                  const oldStatus = formData.status_code;
+                  
+                  // 직접 Firebase에 저장 - 상태도 집행완료로 변경
                   const customerRef = doc(db, "customers", formData.id);
                   await updateDoc(customerRef, {
                     processing_orgs: updatedOrgs,
+                    status_code: '집행완료',
+                    execution_date: latestExecutionDate,
+                    execution_amount: totalExecutionAmount,
+                    approved_amount: totalExecutionAmount,
                     updated_at: new Date(),
                   });
                   
                   // 로컬 상태도 업데이트
-                  setFormData(prev => ({ ...prev, processing_orgs: updatedOrgs }));
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    processing_orgs: updatedOrgs,
+                    status_code: '집행완료' as StatusCode,
+                    execution_date: latestExecutionDate,
+                    execution_amount: totalExecutionAmount,
+                    approved_amount: totalExecutionAmount,
+                  }));
                   
-                  // 이력 기록
+                  // 이력 기록 - 진행기관 승인
                   await addDoc(collection(db, "customer_history_logs"), {
                     customer_id: formData.id,
                     action_type: "org_change",
                     description: `진행기관 승인: ${orgApprovalModal.orgName} (집행일: ${orgApprovalModal.executionDate}, 집행금액: ${orgApprovalModal.executionAmount}만원)`,
                     changed_by: currentUser?.uid || "",
                     changed_by_name: currentUser?.name || "",
-                    old_value: "",
-                    new_value: `${orgApprovalModal.orgName} 승인`,
+                    old_value: '진행중',
+                    new_value: '승인',
                     changed_at: new Date(),
                   });
+                  
+                  // 이력 기록 - 상태 변경 (이미 집행완료가 아닌 경우에만)
+                  if (oldStatus !== '집행완료') {
+                    await addDoc(collection(db, "customer_history_logs"), {
+                      customer_id: formData.id,
+                      action_type: "status_change",
+                      description: `상태 자동 변경: ${oldStatus} → 집행완료`,
+                      changed_by: currentUser?.uid || "",
+                      changed_by_name: currentUser?.name || "",
+                      old_value: oldStatus || '',
+                      new_value: '집행완료',
+                      changed_at: new Date(),
+                    });
+                  }
                   
                   // 부모 컴포넌트에도 알림
                   onSave?.({
                     id: formData.id,
                     processing_orgs: updatedOrgs,
+                    status_code: '집행완료',
+                    execution_date: latestExecutionDate,
+                    execution_amount: totalExecutionAmount,
+                    approved_amount: totalExecutionAmount,
                   });
                   
                   // 모달 닫기
@@ -4108,7 +4286,7 @@ export function CustomerDetailModal({
                   
                   toast({
                     title: "승인 완료",
-                    description: `${orgApprovalModal.orgName} 기관이 승인되었습니다.`,
+                    description: `${orgApprovalModal.orgName} 기관이 승인되었습니다. (상태: 집행완료)`,
                   });
                 } catch (error) {
                   console.error("승인 처리 실패:", error);
