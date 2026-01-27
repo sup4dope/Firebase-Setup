@@ -888,7 +888,7 @@ export default function Settlements() {
                                 <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
                                 <TableCell className="font-medium">{customerName}</TableCell>
                                 <TableCell>
-                                  <Badge className="bg-lime-500 hover:bg-lime-600 text-white border-none">자문료</Badge>
+                                  <Badge className="bg-lime-500 hover:bg-lime-600 text-white border-none">{item.org_name || '자문료'}</Badge>
                                 </TableCell>
                                 <TableCell className="text-right text-muted-foreground">-</TableCell>
                                 <TableCell className="text-right">{item.fee_rate}%</TableCell>
