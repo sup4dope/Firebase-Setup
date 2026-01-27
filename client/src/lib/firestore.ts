@@ -1275,11 +1275,15 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       return;
     }
     
-    // 4. 승인된 진행기관 목록 확인
-    const approvedOrgs = (customer.processing_orgs || []).filter(
-      (org: { status: string; execution_amount?: number; execution_date?: string }) => 
-        org.status === '승인' && org.execution_amount && org.execution_date
-    );
+    // 4. 승인된 진행기관 목록 확인 (execution_date 기준 정렬하여 결정론적 순서 보장)
+    const approvedOrgs = (customer.processing_orgs || [])
+      .filter(
+        (org: { status: string; execution_amount?: number; execution_date?: string }) => 
+          org.status === '승인' && org.execution_amount && org.execution_date
+      )
+      .sort((a: { execution_date?: string }, b: { execution_date?: string }) => 
+        (a.execution_date || '').localeCompare(b.execution_date || '')
+      );
     
     // 담당자 정보
     const manager = users.find(u => u.uid === customer.manager_id);
@@ -1290,8 +1294,20 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     
     // 5. 승인된 기관이 있으면 각 기관별로 정산 생성/업데이트
     if (approvedOrgs.length > 0) {
-      for (const org of approvedOrgs) {
+      // 처리된 org_name 추적 (중복 방지)
+      const processedOrgNames = new Set<string>();
+      
+      for (let i = 0; i < approvedOrgs.length; i++) {
+        const org = approvedOrgs[i];
         const orgName = org.org;
+        
+        // 동일 기관명 중복 방지
+        if (processedOrgNames.has(orgName)) {
+          console.log(`[Settlement Sync] 중복 기관 건너뜀: ${customer.company_name || customer.name} - ${orgName}`);
+          continue;
+        }
+        processedOrgNames.add(orgName);
+        
         const orgExecutionAmount = org.execution_amount || 0;
         const orgExecutionDate = org.execution_date || '';
         const dateForMonth = orgExecutionDate || contractDate;
@@ -1302,13 +1318,13 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
           continue;
         }
         
-        // 계약금은 첫 번째 기관에만 포함 (중복 방지)
-        const isFirstOrg = approvedOrgs.indexOf(org) === 0;
+        // 계약금은 가장 빠른 집행일의 기관에만 포함 (중복 방지, 정렬로 첫번째가 가장 빠름)
+        const isFirstOrg = i === 0;
         const contractAmount = isFirstOrg ? (customer.contract_amount || customer.deposit_amount || 0) : 0;
         
         const calc = calculateSettlement(contractAmount, orgExecutionAmount, feeRate, commissionRate);
         
-        // 기존 정산 항목 찾기 (customer_id + org_name 조합)
+        // 기존 정산 항목 찾기 (customer_id + org_name 조합, 활성 상태만)
         const existingOrgSettlement = existingSettlements.find(s => 
           s.status === '정상' && !s.is_clawback && s.org_name === orgName
         );
