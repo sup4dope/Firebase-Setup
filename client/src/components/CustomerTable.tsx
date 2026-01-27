@@ -788,15 +788,18 @@ export function CustomerTable({
                                           )}
                                         </>
                                       )}
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted"
-                                        onClick={() => handleRemoveProcessingOrg(customer.id, customer, org.org)}
-                                        data-testid={`btn-remove-${org.org}`}
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
+                                      {/* 삭제 버튼: 승인된 기관은 super_admin만 삭제 가능 */}
+                                      {(org.status !== '승인' || canDelete) && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted"
+                                          onClick={() => handleRemoveProcessingOrg(customer.id, customer, org.org)}
+                                          data-testid={`btn-remove-${org.org}`}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
                                 );

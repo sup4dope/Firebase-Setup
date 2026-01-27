@@ -2737,7 +2737,8 @@ export function CustomerDetailModal({
                                   )}
                                 </>
                               )}
-                              {!isReadOnly && (
+                              {/* 삭제 버튼: 승인된 기관은 super_admin만 삭제 가능 */}
+                              {!isReadOnly && (org.status !== '승인' || currentUser?.role === 'super_admin') && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
