@@ -1484,6 +1484,8 @@ export function CustomerDetailModal({
         documents,
         // 금융 채무 데이터 저장 (핵심!)
         financial_obligations: dataToSave.financial_obligations || [],
+        // 진행기관 데이터 저장
+        processing_orgs: dataToSave.processing_orgs || [],
         updated_at: new Date(),
       };
 
@@ -4049,7 +4051,7 @@ export function CustomerDetailModal({
             </Button>
             <Button
               onClick={async () => {
-                if (!orgApprovalModal.orgName) return;
+                if (!orgApprovalModal.orgName || !formData.id) return;
                 
                 setOrgApprovalModal(prev => ({ ...prev, isLoading: true }));
                 
@@ -4067,8 +4069,33 @@ export function CustomerDetailModal({
                       : o
                   );
                   
-                  // 로컬 상태 업데이트
-                  handleFieldChange({ processing_orgs: updatedOrgs });
+                  // 직접 Firebase에 저장 (debounce 없이 즉시 저장)
+                  const customerRef = doc(db, "customers", formData.id);
+                  await updateDoc(customerRef, {
+                    processing_orgs: updatedOrgs,
+                    updated_at: new Date(),
+                  });
+                  
+                  // 로컬 상태도 업데이트
+                  setFormData(prev => ({ ...prev, processing_orgs: updatedOrgs }));
+                  
+                  // 이력 기록
+                  await addDoc(collection(db, "customer_history_logs"), {
+                    customer_id: formData.id,
+                    action_type: "org_change",
+                    description: `진행기관 승인: ${orgApprovalModal.orgName} (집행일: ${orgApprovalModal.executionDate}, 집행금액: ${orgApprovalModal.executionAmount}만원)`,
+                    changed_by: currentUser?.uid || "",
+                    changed_by_name: currentUser?.name || "",
+                    old_value: "",
+                    new_value: `${orgApprovalModal.orgName} 승인`,
+                    changed_at: new Date(),
+                  });
+                  
+                  // 부모 컴포넌트에도 알림
+                  onSave?.({
+                    id: formData.id,
+                    processing_orgs: updatedOrgs,
+                  });
                   
                   // 모달 닫기
                   setOrgApprovalModal({
