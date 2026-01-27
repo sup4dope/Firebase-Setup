@@ -287,3 +287,16 @@ export const DEFAULT_STATUS = "상담대기";
 export function getStatusStyle(status: string): { bg: string; text: string; border?: string } {
   return STATUS_STYLES[status] || { bg: "bg-gray-500/20", text: "text-gray-700 dark:text-gray-300", border: "border-gray-500/30" };
 }
+
+// 진행기관 목록
+export const PROCESSING_ORGS = ['신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
+
+// 진행기관 상태 타입
+export type ProcessingOrgStatus = '진행중' | '부결' | '승인';
+
+// 진행기관 상태별 색상
+export const ORG_STATUS_COLORS: Record<ProcessingOrgStatus, { bg: string; text: string; border: string }> = {
+  '진행중': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-300 dark:border-blue-600' },
+  '부결': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', border: 'border-red-300 dark:border-red-600' },
+  '승인': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300', border: 'border-green-300 dark:border-green-600' },
+};

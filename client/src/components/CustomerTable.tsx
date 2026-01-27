@@ -44,8 +44,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { Customer, UserRole, StatusCode, CustomerMemo, User, ProcessingOrg, ProcessingOrgStatus } from '@shared/types';
-import { STATUS_OPTIONS, STATUS_STYLES, getStatusStyle, FUNNEL_GROUPS } from '@/lib/constants';
+import type { Customer, UserRole, StatusCode, CustomerMemo, User, ProcessingOrg } from '@shared/types';
+import { STATUS_OPTIONS, STATUS_STYLES, getStatusStyle, FUNNEL_GROUPS, PROCESSING_ORGS, ORG_STATUS_COLORS, type ProcessingOrgStatus } from '@/lib/constants';
 
 // 쓰레기통 상세사유 (한글)
 const TRASH_REASONS = [
@@ -120,14 +120,6 @@ interface CustomerTableProps {
   onAddMemo?: (customerId: string, content: string) => void;
   onManagerChange?: (customerId: string, newManagerId: string, newManagerName: string, newTeamId: string, newTeamName: string) => void;
 }
-
-const PROCESSING_ORGS = ['신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
-
-const ORG_STATUS_COLORS: Record<ProcessingOrgStatus, { bg: string; text: string; border: string }> = {
-  '진행중': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-300 dark:border-blue-600' },
-  '부결': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', border: 'border-red-300 dark:border-red-600' },
-  '승인': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300', border: 'border-green-300 dark:border-green-600' },
-};
 
 // 스테이지 이름 가져오기 (한글 상태명 기반)
 const getStageName = (stageId: string | null): string => {

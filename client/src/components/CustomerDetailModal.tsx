@@ -21,6 +21,9 @@ import {
   ExternalLink,
   Download,
   Plus,
+  CheckCircle,
+  XCircle,
+  Building,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -63,7 +66,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { STATUS_OPTIONS, getStatusStyle } from "@/lib/constants";
+import { STATUS_OPTIONS, getStatusStyle, PROCESSING_ORGS, ORG_STATUS_COLORS, type ProcessingOrgStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
   Customer,
@@ -72,6 +75,7 @@ import {
   StatusCode,
   CustomerHistoryLog,
   FinancialObligation,
+  ProcessingOrg,
 } from "@shared/types";
 import { FinancialAnalysisTab } from "@/components/FinancialAnalysisTab";
 import { ReviewSummaryTab } from "@/components/ReviewSummaryTab";
@@ -190,22 +194,7 @@ const BUSINESS_TYPES = [
 ];
 const RETRY_OPTIONS = ["해당없음", "폐업", "이전", "변경"];
 const INNOVATION_OPTIONS = ["해당없음", "배달앱", "효율화", "매출신장", "기타"];
-const PROCESSING_ORGS = [
-  "미등록",
-  "신용취약",
-  "재도전",
-  "혁신",
-  "일시적",
-  "상생",
-  "지역재단",
-  "미소금융",
-  "신보",
-  "기보",
-  "중진공",
-  "농신보",
-  "기업인증",
-  "기타",
-];
+const DETAIL_PROCESSING_ORGS = ["미등록", ...PROCESSING_ORGS];
 
 export function CustomerDetailModal({
   isOpen,
@@ -358,6 +347,16 @@ export function CustomerDetailModal({
   useEffect(() => {
     if (customer) {
       const phoneParts = customer.phone?.split("-") || ["010", "", ""];
+      // 기존 processing_org를 processing_orgs로 변환 (호환성)
+      const migratedProcessingOrgs = (): ProcessingOrg[] => {
+        if (customer.processing_orgs && customer.processing_orgs.length > 0) {
+          return customer.processing_orgs;
+        }
+        if (customer.processing_org && customer.processing_org !== '미등록') {
+          return [{ org: customer.processing_org, status: '진행중' }];
+        }
+        return [];
+      };
       setFormData({
         ...customer,
         entry_source: customer.entry_source || "광고",
@@ -381,6 +380,7 @@ export function CustomerDetailModal({
         sales_y1: customer.sales_y1 || 0,
         sales_y2: customer.sales_y2 || 0,
         sales_y3: customer.sales_y3 || 0,
+        processing_orgs: migratedProcessingOrgs(),
       });
       setMemos(
         customer.memo_history?.map((m, i) => ({
@@ -2591,6 +2591,158 @@ export function CustomerDetailModal({
                   </div>
                 )}
               </div>
+
+              {/* 진행기관 관리 섹션 */}
+              {formData.id && (
+                <div className="border rounded-lg p-3 space-y-2 mx-1.5 mt-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-purple-400 text-[14px] flex items-center gap-1.5">
+                      <Building className="w-4 h-4" />
+                      진행기관 관리
+                    </h3>
+                    <span className="text-xs text-muted-foreground">
+                      {(() => {
+                        const orgs = formData.processing_orgs || [];
+                        const inProgress = orgs.filter(o => o.status === '진행중').length;
+                        const approved = orgs.filter(o => o.status === '승인').length;
+                        const rejected = orgs.filter(o => o.status === '부결').length;
+                        if (orgs.length === 0) return '등록된 기관 없음';
+                        return `진행 ${inProgress} / 승인 ${approved} / 부결 ${rejected}`;
+                      })()}
+                    </span>
+                  </div>
+
+                  {/* 현재 등록된 기관 목록 타임라인 */}
+                  {(formData.processing_orgs || []).length > 0 ? (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {(formData.processing_orgs || []).map((org, idx) => {
+                        const colors = ORG_STATUS_COLORS[org.status as ProcessingOrgStatus] || ORG_STATUS_COLORS['진행중'];
+                        return (
+                          <div 
+                            key={idx} 
+                            className={cn(
+                              "flex items-center justify-between p-2 rounded border",
+                              colors.border,
+                              colors.bg
+                            )}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className={cn("font-medium text-sm flex items-center gap-1", colors.text)}>
+                                {org.status === '부결' && <XCircle className="w-3.5 h-3.5" />}
+                                {org.status === '승인' && <CheckCircle className="w-3.5 h-3.5" />}
+                                {org.org}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground space-x-2">
+                                {org.applied_at && <span>접수: {org.applied_at}</span>}
+                                {org.rejected_at && <span className="text-red-500">부결: {org.rejected_at}</span>}
+                                {org.approved_at && <span className="text-green-500">승인: {org.approved_at}</span>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-0.5">
+                              {org.status === '진행중' && !isReadOnly && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 text-red-600 hover:bg-red-100"
+                                    onClick={() => {
+                                      const today = format(new Date(), 'yyyy-MM-dd');
+                                      const updatedOrgs = (formData.processing_orgs || []).map(o =>
+                                        o.org === org.org ? { ...o, status: '부결' as ProcessingOrgStatus, rejected_at: today } : o
+                                      );
+                                      handleFieldChange({ processing_orgs: updatedOrgs });
+                                    }}
+                                    data-testid={`btn-detail-reject-${org.org}`}
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 text-green-600 hover:bg-green-100"
+                                    onClick={() => {
+                                      const today = format(new Date(), 'yyyy-MM-dd');
+                                      const updatedOrgs = (formData.processing_orgs || []).map(o =>
+                                        o.org === org.org ? { ...o, status: '승인' as ProcessingOrgStatus, approved_at: today } : o
+                                      );
+                                      handleFieldChange({ processing_orgs: updatedOrgs });
+                                    }}
+                                    data-testid={`btn-detail-approve-${org.org}`}
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
+                              {!isReadOnly && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted"
+                                  onClick={() => {
+                                    const updatedOrgs = (formData.processing_orgs || []).filter(o => o.org !== org.org);
+                                    handleFieldChange({ processing_orgs: updatedOrgs });
+                                  }}
+                                  data-testid={`btn-detail-remove-${org.org}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      등록된 진행기관이 없습니다.
+                    </p>
+                  )}
+
+                  {/* 기관 추가 섹션 */}
+                  {!isReadOnly && (
+                    <div className="pt-2 border-t">
+                      <p className="text-[10px] text-muted-foreground mb-1.5">기관 추가</p>
+                      <div className="flex flex-wrap gap-1">
+                        {PROCESSING_ORGS.filter(org => {
+                          const existingOrgs = formData.processing_orgs || [];
+                          return !existingOrgs.find(o => o.org === org);
+                        }).slice(0, 8).map(org => (
+                          <Badge
+                            key={org}
+                            variant="outline"
+                            className="text-[10px] cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 px-1.5 py-0.5"
+                            onClick={() => {
+                              const today = format(new Date(), 'yyyy-MM-dd');
+                              const newOrg: ProcessingOrg = {
+                                org,
+                                status: '진행중',
+                                applied_at: today,
+                              };
+                              const updatedOrgs = [...(formData.processing_orgs || []), newOrg];
+                              handleFieldChange({ processing_orgs: updatedOrgs });
+                            }}
+                            data-testid={`btn-detail-add-${org}`}
+                          >
+                            <Plus className="w-2.5 h-2.5 mr-0.5" />
+                            {org}
+                          </Badge>
+                        ))}
+                        {PROCESSING_ORGS.filter(org => {
+                          const existingOrgs = formData.processing_orgs || [];
+                          return !existingOrgs.find(o => o.org === org);
+                        }).length > 8 && (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground px-1.5 py-0.5">
+                            +{PROCESSING_ORGS.filter(org => {
+                              const existingOrgs = formData.processing_orgs || [];
+                              return !existingOrgs.find(o => o.org === org);
+                            }).length - 8}개 더
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -3463,7 +3615,7 @@ export function CustomerDetailModal({
                     <SelectValue placeholder="기관 선택" />
                   </SelectTrigger>
                   <SelectContent className="bg-muted border-border">
-                    {PROCESSING_ORGS.filter((org) => org && org.trim() !== "").map(
+                    {DETAIL_PROCESSING_ORGS.filter((org) => org && org.trim() !== "").map(
                       (org) => (
                         <SelectItem key={org} value={org} className="text-foreground">
                           {org}
