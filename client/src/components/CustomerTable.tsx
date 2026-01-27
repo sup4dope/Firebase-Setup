@@ -36,8 +36,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { MemoModal } from './MemoModal';
 import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users, Plus, XCircle, CheckCircle } from 'lucide-react';
+import { format } from 'date-fns';
 import {
   Popover,
   PopoverContent,
@@ -119,6 +122,8 @@ interface CustomerTableProps {
   onProcessingOrgsChange?: (customerId: string, processingOrgs: ProcessingOrg[]) => void;
   onAddMemo?: (customerId: string, content: string) => void;
   onManagerChange?: (customerId: string, newManagerId: string, newManagerName: string, newTeamId: string, newTeamName: string) => void;
+  onAddProcessingOrgWithAutoStatus?: (customerId: string, customer: Customer, orgName: string) => void;
+  onApproveOrg?: (customerId: string, customer: Customer, orgName: string, executionDate: string, executionAmount: number) => void;
 }
 
 // 스테이지 이름 가져오기 (한글 상태명 기반)
@@ -147,8 +152,11 @@ export function CustomerTable({
   onProcessingOrgsChange,
   onAddMemo,
   onManagerChange,
+  onAddProcessingOrgWithAutoStatus,
+  onApproveOrg,
 }: CustomerTableProps) {
   const canDelete = userRole === 'super_admin';
+  const canApproveOrg = userRole === 'super_admin'; // 승인은 super_admin만 가능
   
   // 담당자 변경 권한 체크 함수
   // super_admin: 모든 고객의 담당자 변경 가능
@@ -186,6 +194,25 @@ export function CustomerTable({
   }>({
     isOpen: false,
     customer: null,
+    isLoading: false,
+  });
+
+  // 진행기관 승인 모달 state (집행일자/금액 입력)
+  const [orgApprovalModal, setOrgApprovalModal] = useState<{
+    isOpen: boolean;
+    customerId: string;
+    customer: Customer | null;
+    orgName: string;
+    executionDate: string;
+    executionAmount: number;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    customerId: '',
+    customer: null,
+    orgName: '',
+    executionDate: format(new Date(), 'yyyy-MM-dd'),
+    executionAmount: 0,
     isLoading: false,
   });
 
@@ -271,36 +298,102 @@ export function CustomerTable({
     onProcessingOrgChange?.(customerId, newOrg);
   };
 
-  // 다중 기관 관리 함수
+  // 다중 기관 관리 함수 - 자동 상태 변경 및 이력 기록 포함
   const handleAddProcessingOrg = (customerId: string, customer: Customer, orgName: string) => {
     const currentOrgs = customer.processing_orgs || [];
     // 중복 체크
     if (currentOrgs.find(o => o.org === orgName)) return;
     
-    const newOrg: ProcessingOrg = {
-      org: orgName,
-      status: '진행중',
-      applied_at: new Date().toISOString().split('T')[0],
-    };
-    const updatedOrgs = [...currentOrgs, newOrg];
-    onProcessingOrgsChange?.(customerId, updatedOrgs);
+    // 새 콜백이 있으면 사용 (이력 기록 + 자동 상태 변경)
+    if (onAddProcessingOrgWithAutoStatus) {
+      onAddProcessingOrgWithAutoStatus(customerId, customer, orgName);
+    } else {
+      // 기존 로직 (호환성)
+      const newOrg: ProcessingOrg = {
+        org: orgName,
+        status: '진행중',
+        applied_at: new Date().toISOString().split('T')[0],
+      };
+      const updatedOrgs = [...currentOrgs, newOrg];
+      onProcessingOrgsChange?.(customerId, updatedOrgs);
+    }
   };
 
   const handleUpdateOrgStatus = (customerId: string, customer: Customer, orgName: string, newStatus: ProcessingOrgStatus) => {
+    // 승인의 경우 모달을 통해 집행일자/금액 입력 필요
+    if (newStatus === '승인') {
+      setOrgApprovalModal({
+        isOpen: true,
+        customerId,
+        customer,
+        orgName,
+        executionDate: format(new Date(), 'yyyy-MM-dd'),
+        executionAmount: 0,
+        isLoading: false,
+      });
+      return;
+    }
+    
+    // 부결의 경우 직접 처리
     const currentOrgs = customer.processing_orgs || [];
     const updatedOrgs = currentOrgs.map(o => {
       if (o.org === orgName) {
         const updated = { ...o, status: newStatus };
         if (newStatus === '부결') {
           updated.rejected_at = new Date().toISOString().split('T')[0];
-        } else if (newStatus === '승인') {
-          updated.approved_at = new Date().toISOString().split('T')[0];
         }
         return updated;
       }
       return o;
     });
     onProcessingOrgsChange?.(customerId, updatedOrgs);
+  };
+
+  // 진행기관 승인 확정 처리 (모달에서 확인 버튼 클릭 시)
+  const handleOrgApprovalConfirm = async () => {
+    if (!orgApprovalModal.customer || !orgApprovalModal.orgName) return;
+    
+    setOrgApprovalModal(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      if (onApproveOrg) {
+        // 새 콜백 사용 (이력 기록 포함)
+        await onApproveOrg(
+          orgApprovalModal.customerId,
+          orgApprovalModal.customer,
+          orgApprovalModal.orgName,
+          orgApprovalModal.executionDate,
+          orgApprovalModal.executionAmount
+        );
+      } else {
+        // 기존 로직 (호환성)
+        const currentOrgs = orgApprovalModal.customer.processing_orgs || [];
+        const updatedOrgs = currentOrgs.map(o => {
+          if (o.org === orgApprovalModal.orgName) {
+            return { 
+              ...o, 
+              status: '승인' as ProcessingOrgStatus, 
+              approved_at: orgApprovalModal.executionDate 
+            };
+          }
+          return o;
+        });
+        onProcessingOrgsChange?.(orgApprovalModal.customerId, updatedOrgs);
+      }
+      
+      setOrgApprovalModal({
+        isOpen: false,
+        customerId: '',
+        customer: null,
+        orgName: '',
+        executionDate: format(new Date(), 'yyyy-MM-dd'),
+        executionAmount: 0,
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error('Error approving org:', error);
+      setOrgApprovalModal(prev => ({ ...prev, isLoading: false }));
+    }
   };
 
   const handleRemoveProcessingOrg = (customerId: string, customer: Customer, orgName: string) => {
@@ -660,15 +753,18 @@ export function CustomerTable({
                                           >
                                             <XCircle className="w-4 h-4" />
                                           </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-6 w-6 p-0 text-green-600 hover:bg-green-100"
-                                            onClick={() => handleUpdateOrgStatus(customer.id, customer, org.org, '승인')}
-                                            data-testid={`btn-approve-${org.org}`}
-                                          >
-                                            <CheckCircle className="w-4 h-4" />
-                                          </Button>
+                                          {/* 승인 버튼은 super_admin만 가능 */}
+                                          {canApproveOrg && (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-6 w-6 p-0 text-green-600 hover:bg-green-100"
+                                              onClick={() => handleUpdateOrgStatus(customer.id, customer, org.org, '승인')}
+                                              data-testid={`btn-approve-${org.org}`}
+                                            >
+                                              <CheckCircle className="w-4 h-4" />
+                                            </Button>
+                                          )}
                                         </>
                                       )}
                                       <Button
@@ -937,6 +1033,98 @@ export function CustomerTable({
               data-testid="button-confirm-long-absence"
             >
               {longAbsenceConfirm.isLoading ? "처리 중..." : "확인"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 진행기관 승인 모달 (집행일자/금액 입력) */}
+      <Dialog
+        open={orgApprovalModal.isOpen}
+        onOpenChange={(open) => {
+          if (!open && !orgApprovalModal.isLoading) {
+            setOrgApprovalModal({
+              isOpen: false,
+              customerId: '',
+              customer: null,
+              orgName: '',
+              executionDate: format(new Date(), 'yyyy-MM-dd'),
+              executionAmount: 0,
+              isLoading: false,
+            });
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[400px] bg-background border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">상태 변경 확인</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            ○ 고객의 상태를 "집행완료"(으)로 변경합니다.
+          </p>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label className="text-sm">집행일</Label>
+              <Input
+                type="date"
+                value={orgApprovalModal.executionDate}
+                onChange={(e) =>
+                  setOrgApprovalModal(prev => ({
+                    ...prev,
+                    executionDate: e.target.value,
+                  }))
+                }
+                data-testid="input-org-approval-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm">
+                집행금액 <span className="text-muted-foreground text-xs">(단위: 만원)</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="0"
+                  value={orgApprovalModal.executionAmount || ''}
+                  onChange={(e) =>
+                    setOrgApprovalModal(prev => ({
+                      ...prev,
+                      executionAmount: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                  className="pr-12"
+                  placeholder="예: 10000 (만원 단위로 입력)"
+                  data-testid="input-org-approval-amount"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                  만원
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setOrgApprovalModal({
+                isOpen: false,
+                customerId: '',
+                customer: null,
+                orgName: '',
+                executionDate: format(new Date(), 'yyyy-MM-dd'),
+                executionAmount: 0,
+                isLoading: false,
+              })}
+              disabled={orgApprovalModal.isLoading}
+              className="border-border text-muted-foreground"
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleOrgApprovalConfirm}
+              disabled={orgApprovalModal.isLoading}
+              data-testid="button-confirm-org-approval"
+            >
+              {orgApprovalModal.isLoading ? "처리 중..." : "확인"}
             </Button>
           </div>
         </DialogContent>

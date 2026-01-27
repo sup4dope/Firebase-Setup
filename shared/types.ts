@@ -184,7 +184,7 @@ export interface CustomerDocument {
 export interface CustomerHistoryLog {
   id: string;
   customer_id: string;
-  action_type: 'status_change' | 'manager_change' | 'info_update' | 'document_upload' | 'memo_added';
+  action_type: 'status_change' | 'manager_change' | 'info_update' | 'document_upload' | 'memo_added' | 'org_change';
   description: string;
   changed_by: string;
   changed_by_name?: string;

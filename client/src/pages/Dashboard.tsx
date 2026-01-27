@@ -39,13 +39,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { db } from '@/lib/firebase';
+import { db, addCustomerHistoryLog } from '@/lib/firebase';
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
 import { FUNNEL_GROUPS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Customer, User, Team, StatusLog, StatusCode, InsertCustomer } from '@shared/types';
+import type { Customer, User, Team, StatusLog, StatusCode, InsertCustomer, ProcessingOrg } from '@shared/types';
 
 const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
@@ -594,6 +594,173 @@ export default function Dashboard() {
     }
   };
 
+  // 진행기관 추가 + 자동 상태 변경 + 이력 기록
+  const handleAddProcessingOrgWithAutoStatus = async (customerId: string, customer: Customer, orgName: string) => {
+    if (!user) return;
+    
+    const currentOrgs = customer.processing_orgs || [];
+    if (currentOrgs.find(o => o.org === orgName)) return;
+    
+    const newOrg: ProcessingOrg = {
+      org: orgName,
+      status: '진행중',
+      applied_at: new Date().toISOString().split('T')[0],
+    };
+    const updatedOrgs = [...currentOrgs, newOrg];
+    
+    // 상태 자동 변경 로직: 서류취합완료 → 신청완료
+    const statusMap: Record<string, string> = {
+      '서류취합완료(선불)': '신청완료(선불)',
+      '서류취합완료(외주)': '신청완료(외주)',
+      '서류취합완료(후불)': '신청완료(후불)',
+    };
+    const newStatus = statusMap[customer.status_code];
+    
+    try {
+      const updates: any = {
+        processing_orgs: updatedOrgs,
+        updated_at: new Date(),
+      };
+      
+      // 상태 자동 변경이 필요하면 적용
+      if (newStatus) {
+        updates.status_code = newStatus;
+      }
+      
+      await updateCustomer(customerId, updates);
+      
+      // 이력 기록 - 진행기관 추가
+      await addCustomerHistoryLog({
+        customer_id: customerId,
+        action_type: 'org_change',
+        description: `진행기관 추가: ${orgName}`,
+        changed_by: user.uid,
+        changed_by_name: user.name,
+        old_value: '',
+        new_value: orgName,
+      });
+      
+      // 상태 자동 변경된 경우 상태 변경 이력도 기록
+      if (newStatus) {
+        await addCustomerHistoryLog({
+          customer_id: customerId,
+          action_type: 'status_change',
+          description: `상태 변경: ${customer.status_code} → ${newStatus} (진행기관 추가로 자동 변경)`,
+          changed_by: user.uid,
+          changed_by_name: user.name,
+          old_value: customer.status_code,
+          new_value: newStatus,
+        });
+      }
+      
+      // Update local state
+      setCustomers(prev =>
+        prev.map(c => c.id === customerId ? {
+          ...c,
+          processing_orgs: updatedOrgs,
+          status_code: (newStatus || c.status_code) as StatusCode,
+          updated_at: new Date(),
+        } : c)
+      );
+      
+      toast({
+        title: '성공',
+        description: newStatus 
+          ? `진행기관 "${orgName}" 추가 및 상태가 "${newStatus}"로 변경되었습니다.`
+          : `진행기관 "${orgName}"이 추가되었습니다.`,
+      });
+    } catch (error) {
+      console.error('Error adding processing org with auto status:', error);
+      toast({
+        title: '오류',
+        description: '진행기관 추가 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // 진행기관 승인 처리 (집행일자/금액 입력 후 호출)
+  const handleApproveOrg = async (
+    customerId: string, 
+    customer: Customer, 
+    orgName: string, 
+    executionDate: string, 
+    executionAmount: number
+  ) => {
+    if (!user) return;
+    
+    const currentOrgs = customer.processing_orgs || [];
+    const updatedOrgs = currentOrgs.map(o => {
+      if (o.org === orgName) {
+        return { ...o, status: '승인' as const, approved_at: executionDate };
+      }
+      return o;
+    });
+    
+    try {
+      // 고객 상태를 집행완료로 변경하고, 집행금액/일자 저장
+      await updateCustomer(customerId, {
+        processing_orgs: updatedOrgs,
+        status_code: '집행완료',
+        execution_date: executionDate,
+        execution_amount: executionAmount,
+        approved_amount: executionAmount, // approved_amount도 동기화
+        updated_at: new Date(),
+      });
+      
+      // 이력 기록 - 진행기관 승인
+      await addCustomerHistoryLog({
+        customer_id: customerId,
+        action_type: 'org_change',
+        description: `진행기관 승인: ${orgName} (집행일: ${executionDate}, 집행금액: ${executionAmount}만원)`,
+        changed_by: user.uid,
+        changed_by_name: user.name,
+        old_value: '진행중',
+        new_value: '승인',
+      });
+      
+      // 이력 기록 - 상태 변경
+      await addCustomerHistoryLog({
+        customer_id: customerId,
+        action_type: 'status_change',
+        description: `상태 변경: ${customer.status_code} → 집행완료 (진행기관 승인)`,
+        changed_by: user.uid,
+        changed_by_name: user.name,
+        old_value: customer.status_code,
+        new_value: '집행완료',
+      });
+      
+      // 정산 데이터 동기화
+      await syncSingleCustomerSettlement(customerId, users);
+      
+      // Update local state
+      setCustomers(prev =>
+        prev.map(c => c.id === customerId ? {
+          ...c,
+          processing_orgs: updatedOrgs,
+          status_code: '집행완료' as StatusCode,
+          execution_date: executionDate,
+          execution_amount: executionAmount,
+          approved_amount: executionAmount,
+          updated_at: new Date(),
+        } : c)
+      );
+      
+      toast({
+        title: '성공',
+        description: `진행기관 "${orgName}" 승인 완료. 집행금액: ${executionAmount}만원`,
+      });
+    } catch (error) {
+      console.error('Error approving org:', error);
+      toast({
+        title: '오류',
+        description: '진행기관 승인 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+      throw error; // re-throw to let the modal know it failed
+    }
+  };
+
   // Handle adding memo from dashboard table (syncs with detail modal chat history)
   const handleAddMemo = async (customerId: string, content: string) => {
     if (!user) return;
@@ -1078,6 +1245,8 @@ export default function Dashboard() {
             onProcessingOrgsChange={handleProcessingOrgsChange}
             onAddMemo={handleAddMemo}
             onManagerChange={handleManagerChange}
+            onAddProcessingOrgWithAutoStatus={handleAddProcessingOrgWithAutoStatus}
+            onApproveOrg={handleApproveOrg}
           />
         </div>
       </div>
