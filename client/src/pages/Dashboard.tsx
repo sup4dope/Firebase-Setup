@@ -692,19 +692,33 @@ export default function Dashboard() {
     const currentOrgs = customer.processing_orgs || [];
     const updatedOrgs = currentOrgs.map(o => {
       if (o.org === orgName) {
-        return { ...o, status: '승인' as const, approved_at: executionDate };
+        return { 
+          ...o, 
+          status: '승인' as const, 
+          approved_at: executionDate,
+          execution_date: executionDate,
+          execution_amount: executionAmount,
+        };
       }
       return o;
     });
     
+    // 총 집행금액 계산 (모든 승인된 기관의 집행금액 합계)
+    const totalExecutionAmount = updatedOrgs
+      .filter(o => o.status === '승인' && o.execution_amount)
+      .reduce((sum, o) => sum + (o.execution_amount || 0), 0);
+    
+    // 가장 최근 집행일 (최신 승인된 기관의 집행일)
+    const latestExecutionDate = executionDate;
+    
     try {
-      // 고객 상태를 집행완료로 변경하고, 집행금액/일자 저장
+      // 고객 상태를 집행완료로 변경하고, 총 집행금액/최신 집행일 저장
       await updateCustomer(customerId, {
         processing_orgs: updatedOrgs,
         status_code: '집행완료',
-        execution_date: executionDate,
-        execution_amount: executionAmount,
-        approved_amount: executionAmount, // approved_amount도 동기화
+        execution_date: latestExecutionDate,
+        execution_amount: totalExecutionAmount,
+        approved_amount: totalExecutionAmount,
         updated_at: new Date(),
       });
       
@@ -719,18 +733,20 @@ export default function Dashboard() {
         new_value: '승인',
       });
       
-      // 이력 기록 - 상태 변경
-      await addCustomerHistoryLog({
-        customer_id: customerId,
-        action_type: 'status_change',
-        description: `상태 변경: ${customer.status_code} → 집행완료 (진행기관 승인)`,
-        changed_by: user.uid,
-        changed_by_name: user.name,
-        old_value: customer.status_code,
-        new_value: '집행완료',
-      });
+      // 이력 기록 - 상태 변경 (이미 집행완료가 아닌 경우에만)
+      if (customer.status_code !== '집행완료') {
+        await addCustomerHistoryLog({
+          customer_id: customerId,
+          action_type: 'status_change',
+          description: `상태 변경: ${customer.status_code} → 집행완료 (진행기관 승인)`,
+          changed_by: user.uid,
+          changed_by_name: user.name,
+          old_value: customer.status_code,
+          new_value: '집행완료',
+        });
+      }
       
-      // 정산 데이터 동기화
+      // 정산 데이터 동기화 - 각 승인된 기관별로 정산 생성
       await syncSingleCustomerSettlement(customerId, users);
       
       // Update local state
@@ -739,9 +755,9 @@ export default function Dashboard() {
           ...c,
           processing_orgs: updatedOrgs,
           status_code: '집행완료' as StatusCode,
-          execution_date: executionDate,
-          execution_amount: executionAmount,
-          approved_amount: executionAmount,
+          execution_date: latestExecutionDate,
+          execution_amount: totalExecutionAmount,
+          approved_amount: totalExecutionAmount,
           updated_at: new Date(),
         } : c)
       );

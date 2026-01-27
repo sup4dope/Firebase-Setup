@@ -158,6 +158,8 @@ export interface ProcessingOrg {
   applied_at?: string; // 접수일 YYYY-MM-DD
   rejected_at?: string; // 부결일 YYYY-MM-DD
   approved_at?: string; // 승인일 YYYY-MM-DD
+  execution_date?: string; // 집행일 YYYY-MM-DD
+  execution_amount?: number; // 집행금액 (만원)
 }
 
 // Customer Memo
@@ -357,6 +359,7 @@ export interface SettlementItem {
   manager_name: string; // 담당 직원명
   team_id: string; // 팀 ID
   team_name?: string; // 팀명
+  org_name?: string; // 진행기관명 (다중 기관 지원)
   
   // 계약 정보
   entry_source: EntrySourceType; // 유입경로
