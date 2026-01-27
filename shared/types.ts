@@ -96,7 +96,8 @@ export interface Customer {
   contract_fee_rate?: number; // 자문료율 (%)
   execution_amount?: number; // 최종 집행 금액 (만원 단위)
   execution_date?: string; // 집행일자 YYYY-MM-DD
-  processing_org?: string; // 신청/진행기관
+  processing_org?: string; // 신청/진행기관 (deprecated, use processing_orgs)
+  processing_orgs?: ProcessingOrg[]; // 진행기관 목록 (다중 기관 지원)
   contract_completion_date?: string; // 최초 계약 도달일
   notes?: string;
   created_at: Date;
@@ -145,6 +146,18 @@ export interface Customer {
   financial_obligations?: FinancialObligation[]; // 대출/보증 내역
   credit_summary?: CreditSummary; // 신용 요약
   proposal_summary?: ProposalSummary; // 1초 제안서 요약
+}
+
+// 진행기관 상태
+export type ProcessingOrgStatus = '진행중' | '부결' | '승인';
+
+// 진행기관 정보
+export interface ProcessingOrg {
+  org: string; // 기관명
+  status: ProcessingOrgStatus; // 진행 상태
+  applied_at?: string; // 접수일 YYYY-MM-DD
+  rejected_at?: string; // 부결일 YYYY-MM-DD
+  approved_at?: string; // 승인일 YYYY-MM-DD
 }
 
 // Customer Memo
