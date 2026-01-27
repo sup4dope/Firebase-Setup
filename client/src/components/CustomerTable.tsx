@@ -496,6 +496,7 @@ export function CustomerTable({
                     const badgeInfo = getStatusBadgeInfo(customer.status_code || '');
                     return (
                       <Select
+                        key={`status-select-${customer.id}-${customer.status_code}`}
                         value={customer.status_code || ''}
                         onValueChange={(newStatus) => {
                           if (newStatus && newStatus !== customer.status_code) {
