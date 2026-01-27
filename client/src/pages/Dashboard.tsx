@@ -32,7 +32,8 @@ import {
   processClawbackForFinalRejection,
   updateCustomerManager,
 } from '@/lib/firestore';
-import { Plus, Search, RefreshCw, CalendarIcon, Download } from 'lucide-react';
+import { Plus, Search, RefreshCw, CalendarIcon, Download, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { DataExport } from '@/components/DataExport';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -107,6 +108,8 @@ export default function Dashboard() {
     processingOrg: string;
     contractDate: string;
     clawbackDate: string;
+    selectedOrgs: ProcessingOrg[];
+    existingOrgs: ProcessingOrg[];
   }>({
     isOpen: false,
     customerId: '',
@@ -120,6 +123,8 @@ export default function Dashboard() {
     processingOrg: '미등록',
     contractDate: format(new Date(), 'yyyy-MM-dd'),
     clawbackDate: format(new Date(), 'yyyy-MM-dd'),
+    selectedOrgs: [],
+    existingOrgs: [],
   });
 
   // Fetch data
@@ -375,6 +380,8 @@ export default function Dashboard() {
           processingOrg: customer.processing_org || '미등록',
           contractDate: (customer as any).contract_date || format(new Date(), 'yyyy-MM-dd'),
           clawbackDate: format(new Date(), 'yyyy-MM-dd'),
+          selectedOrgs: [],
+          existingOrgs: customer.processing_orgs || [],
         });
         return;
       }
@@ -433,8 +440,15 @@ export default function Dashboard() {
         }
       }
       if (statusChangeModal.targetStatus.includes('신청완료')) {
-        if (statusChangeModal.processingOrg && statusChangeModal.processingOrg !== '미등록') {
-          additionalData.processing_org = statusChangeModal.processingOrg;
+        // 기존 기관 + 신규 선택 기관 합치기
+        const allOrgs = [...statusChangeModal.existingOrgs, ...statusChangeModal.selectedOrgs];
+        if (allOrgs.length > 0) {
+          additionalData.processing_orgs = allOrgs;
+          // 하위 호환성을 위해 첫 번째 기관을 processing_org에도 저장
+          const firstOrg = allOrgs.find(o => o.status === '진행중');
+          if (firstOrg) {
+            additionalData.processing_org = firstOrg.org;
+          }
         }
       }
       if (statusChangeModal.targetStatus.includes('집행완료')) {
@@ -481,6 +495,7 @@ export default function Dashboard() {
           ...(additionalData.contract_date ? { contract_date: additionalData.contract_date } : {}),
           execution_amount: additionalData.execution_amount ?? c.execution_amount,
           processing_org: additionalData.processing_org ?? c.processing_org,
+          processing_orgs: additionalData.processing_orgs ?? c.processing_orgs,
         } : c)
       );
 
@@ -1430,32 +1445,117 @@ export default function Dashboard() {
               </>
             )}
 
-            {/* 신청완료: 진행기관 */}
+            {/* 신청완료: 진행기관 관리 (배지 기반 UI) */}
             {statusChangeModal.targetStatus.includes('신청완료') && (
-              <div className="space-y-2">
-                <Label className="text-sm">신청 기관</Label>
-                <Select
-                  value={statusChangeModal.processingOrg || '미등록'}
-                  onValueChange={(value) =>
-                    setStatusChangeModal(prev => ({
-                      ...prev,
-                      processingOrg: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger data-testid="select-dashboard-processing-org">
-                    <SelectValue placeholder="기관 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROCESSING_ORGS.filter((org) => org && org.trim() !== '').map(
-                      (org) => (
-                        <SelectItem key={org} value={org}>
-                          {org}
-                        </SelectItem>
-                      )
-                    )}
-                  </SelectContent>
-                </Select>
+              <div className="border rounded-lg p-3 space-y-3">
+                <Label className="text-sm font-medium">진행기관 관리</Label>
+                
+                {/* 기존 진행 기관 표시 */}
+                {statusChangeModal.existingOrgs.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">기존 진행기관</p>
+                    <div className="space-y-1 max-h-[120px] overflow-y-auto">
+                      {statusChangeModal.existingOrgs.map((org, idx) => {
+                        const statusColors: Record<string, { bg: string; text: string; border: string }> = {
+                          '진행중': { bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800' },
+                          '승인': { bg: 'bg-green-50 dark:bg-green-950/30', text: 'text-green-700 dark:text-green-300', border: 'border-green-200 dark:border-green-800' },
+                          '부결': { bg: 'bg-red-50 dark:bg-red-950/30', text: 'text-red-700 dark:text-red-300', border: 'border-red-200 dark:border-red-800' },
+                        };
+                        const colors = statusColors[org.status] || statusColors['진행중'];
+                        return (
+                          <div 
+                            key={idx} 
+                            className={cn(
+                              "flex items-center justify-between p-2 rounded border text-sm",
+                              colors.border,
+                              colors.bg
+                            )}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              {org.status === '승인' && <CheckCircle className="w-3.5 h-3.5 text-green-600" />}
+                              {org.status === '부결' && <XCircle className="w-3.5 h-3.5 text-red-600" />}
+                              <span className={cn("font-medium", colors.text)}>{org.org}</span>
+                              <span className="text-xs text-muted-foreground">({org.status})</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* 선택한 신규 기관 표시 */}
+                {statusChangeModal.selectedOrgs.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">신규 추가 기관</p>
+                    <div className="space-y-1">
+                      {statusChangeModal.selectedOrgs.map((org, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-center justify-between p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 text-sm"
+                        >
+                          <span className="font-medium text-blue-700 dark:text-blue-300">{org.org}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted"
+                            onClick={() => {
+                              setStatusChangeModal(prev => ({
+                                ...prev,
+                                selectedOrgs: prev.selectedOrgs.filter((_, i) => i !== idx),
+                              }));
+                            }}
+                            data-testid={`btn-remove-selected-${org.org}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* 기관 추가 섹션 */}
+                <div className="pt-2 border-t">
+                  <p className="text-xs text-muted-foreground mb-2">기관 추가 (클릭하여 선택)</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PROCESSING_ORGS.filter(org => {
+                      if (org === '미등록') return false;
+                      const existingOrgNames = statusChangeModal.existingOrgs.map(o => o.org);
+                      const selectedOrgNames = statusChangeModal.selectedOrgs.map(o => o.org);
+                      return !existingOrgNames.includes(org) && !selectedOrgNames.includes(org);
+                    }).map(org => (
+                      <Badge
+                        key={org}
+                        variant="outline"
+                        className="text-xs cursor-pointer px-2 py-1 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                        onClick={() => {
+                          const today = format(new Date(), 'yyyy-MM-dd');
+                          const newOrg: ProcessingOrg = {
+                            org,
+                            status: '진행중',
+                            applied_at: today,
+                          };
+                          setStatusChangeModal(prev => ({
+                            ...prev,
+                            selectedOrgs: [...prev.selectedOrgs, newOrg],
+                          }));
+                        }}
+                        data-testid={`badge-add-${org}`}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        {org}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* 안내 메시지 */}
+                {statusChangeModal.existingOrgs.length === 0 && statusChangeModal.selectedOrgs.length === 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
+                    최소 1개 이상의 기관을 선택해주세요.
+                  </p>
+                )}
               </div>
             )}
 
