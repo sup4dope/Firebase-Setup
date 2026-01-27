@@ -2714,24 +2714,27 @@ export function CustomerDetailModal({
                                   >
                                     <XCircle className="w-4 h-4" />
                                   </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 w-6 p-0 text-green-600 hover:bg-green-100"
-                                    onClick={() => {
-                                      // 승인 모달 열기 (집행일자/금액 입력)
-                                      setOrgApprovalModal({
-                                        isOpen: true,
-                                        orgName: org.org,
-                                        executionDate: format(new Date(), 'yyyy-MM-dd'),
-                                        executionAmount: 0,
-                                        isLoading: false,
-                                      });
-                                    }}
-                                    data-testid={`btn-detail-approve-${org.org}`}
-                                  >
-                                    <CheckCircle className="w-4 h-4" />
-                                  </Button>
+                                  {/* 승인 버튼은 super_admin만 가능 (수당과 직결되는 기록) */}
+                                  {currentUser?.role === 'super_admin' && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 w-6 p-0 text-green-600 hover:bg-green-100"
+                                      onClick={() => {
+                                        // 승인 모달 열기 (집행일자/금액 입력)
+                                        setOrgApprovalModal({
+                                          isOpen: true,
+                                          orgName: org.org,
+                                          executionDate: format(new Date(), 'yyyy-MM-dd'),
+                                          executionAmount: 0,
+                                          isLoading: false,
+                                        });
+                                      }}
+                                      data-testid={`btn-detail-approve-${org.org}`}
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                 </>
                               )}
                               {!isReadOnly && (
