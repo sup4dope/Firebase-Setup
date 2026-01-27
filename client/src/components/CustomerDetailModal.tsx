@@ -4218,11 +4218,19 @@ export function CustomerDetailModal({
                   // 이전 상태 저장
                   const oldStatus = formData.status_code;
                   
+                  // 상태 자동 변경 로직: 신청완료 → 집행완료 (타입 유지)
+                  const executionStatusMap: Record<string, string> = {
+                    '신청완료(선불)': '집행완료(선불)',
+                    '신청완료(외주)': '집행완료(외주)',
+                    '신청완료(후불)': '집행완료(후불)',
+                  };
+                  const newStatus = executionStatusMap[oldStatus || ''] || '집행완료';
+                  
                   // 직접 Firebase에 저장 - 상태도 집행완료로 변경
                   const customerRef = doc(db, "customers", formData.id);
                   await updateDoc(customerRef, {
                     processing_orgs: updatedOrgs,
-                    status_code: '집행완료',
+                    status_code: newStatus,
                     execution_date: latestExecutionDate,
                     execution_amount: totalExecutionAmount,
                     approved_amount: totalExecutionAmount,
@@ -4233,7 +4241,7 @@ export function CustomerDetailModal({
                   setFormData(prev => ({ 
                     ...prev, 
                     processing_orgs: updatedOrgs,
-                    status_code: '집행완료' as StatusCode,
+                    status_code: newStatus as StatusCode,
                     execution_date: latestExecutionDate,
                     execution_amount: totalExecutionAmount,
                     approved_amount: totalExecutionAmount,
@@ -4252,15 +4260,15 @@ export function CustomerDetailModal({
                   });
                   
                   // 이력 기록 - 상태 변경 (이미 집행완료가 아닌 경우에만)
-                  if (oldStatus !== '집행완료') {
+                  if (!oldStatus?.includes('집행완료')) {
                     await addDoc(collection(db, "customer_history_logs"), {
                       customer_id: formData.id,
                       action_type: "status_change",
-                      description: `상태 자동 변경: ${oldStatus} → 집행완료`,
+                      description: `상태 자동 변경: ${oldStatus} → ${newStatus}`,
                       changed_by: currentUser?.uid || "",
                       changed_by_name: currentUser?.name || "",
                       old_value: oldStatus || '',
-                      new_value: '집행완료',
+                      new_value: newStatus,
                       changed_at: new Date(),
                     });
                   }
@@ -4269,7 +4277,7 @@ export function CustomerDetailModal({
                   onSave?.({
                     id: formData.id,
                     processing_orgs: updatedOrgs,
-                    status_code: '집행완료',
+                    status_code: newStatus,
                     execution_date: latestExecutionDate,
                     execution_amount: totalExecutionAmount,
                     approved_amount: totalExecutionAmount,
@@ -4286,7 +4294,7 @@ export function CustomerDetailModal({
                   
                   toast({
                     title: "승인 완료",
-                    description: `${orgApprovalModal.orgName} 기관이 승인되었습니다. (상태: 집행완료)`,
+                    description: `${orgApprovalModal.orgName} 기관이 승인되었습니다. (상태: ${newStatus})`,
                   });
                 } catch (error) {
                   console.error("승인 처리 실패:", error);
