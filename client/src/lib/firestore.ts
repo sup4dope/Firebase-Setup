@@ -307,6 +307,19 @@ export const updateCustomer = async (id: string, data: Partial<Customer>): Promi
 };
 
 export const deleteCustomer = async (id: string): Promise<void> => {
+  // 1. 해당 고객의 정산 항목 삭제
+  const settlementsQuery = query(
+    collection(db, 'settlements'),
+    where('customer_id', '==', id)
+  );
+  const settlementsSnapshot = await getDocs(settlementsQuery);
+  const deletePromises = settlementsSnapshot.docs.map(docSnap => 
+    deleteDoc(doc(db, 'settlements', docSnap.id))
+  );
+  await Promise.all(deletePromises);
+  console.log(`[Delete Customer] 정산 ${settlementsSnapshot.docs.length}건 삭제: ${id}`);
+  
+  // 2. 고객 문서 삭제
   await deleteDoc(doc(db, 'customers', id));
 };
 
