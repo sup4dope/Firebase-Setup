@@ -713,11 +713,19 @@ export default function Dashboard() {
     // 가장 최근 집행일 (최신 승인된 기관의 집행일)
     const latestExecutionDate = executionDate;
     
+    // 상태 자동 변경 로직: 신청완료 → 집행완료 (타입 유지)
+    const executionStatusMap: Record<string, string> = {
+      '신청완료(선불)': '집행완료(선불)',
+      '신청완료(외주)': '집행완료(외주)',
+      '신청완료(후불)': '집행완료(후불)',
+    };
+    const newStatus = executionStatusMap[customer.status_code] || '집행완료';
+    
     try {
       // 고객 상태를 집행완료로 변경하고, 총 집행금액/최신 집행일 저장
       await updateCustomer(customerId, {
         processing_orgs: updatedOrgs,
-        status_code: '집행완료',
+        status_code: newStatus,
         execution_date: latestExecutionDate,
         execution_amount: totalExecutionAmount,
         approved_amount: totalExecutionAmount,
@@ -736,15 +744,15 @@ export default function Dashboard() {
       });
       
       // 이력 기록 - 상태 변경 (이미 집행완료가 아닌 경우에만)
-      if (customer.status_code !== '집행완료') {
+      if (!customer.status_code.includes('집행완료')) {
         await addCustomerHistoryLog({
           customer_id: customerId,
           action_type: 'status_change',
-          description: `상태 변경: ${customer.status_code} → 집행완료 (진행기관 승인)`,
+          description: `상태 변경: ${customer.status_code} → ${newStatus} (진행기관 승인)`,
           changed_by: user.uid,
           changed_by_name: user.name,
           old_value: customer.status_code,
-          new_value: '집행완료',
+          new_value: newStatus,
         });
       }
       
@@ -756,7 +764,7 @@ export default function Dashboard() {
         prev.map(c => c.id === customerId ? {
           ...c,
           processing_orgs: updatedOrgs,
-          status_code: '집행완료' as StatusCode,
+          status_code: newStatus as StatusCode,
           execution_date: latestExecutionDate,
           execution_amount: totalExecutionAmount,
           approved_amount: totalExecutionAmount,
@@ -766,7 +774,7 @@ export default function Dashboard() {
       
       toast({
         title: '성공',
-        description: `진행기관 "${orgName}" 승인 완료. 집행금액: ${executionAmount}만원`,
+        description: `진행기관 "${orgName}" 승인 완료. 집행금액: ${executionAmount}만원 (상태: ${newStatus})`,
       });
     } catch (error) {
       console.error('Error approving org:', error);
