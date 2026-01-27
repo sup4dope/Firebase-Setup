@@ -48,6 +48,7 @@ import type {
   InsertLeaveRequest,
   LeaveStatus,
   LeaveSummary,
+  ProcessingOrg,
 } from '@shared/types';
 // STATUS_LABELS removed - using Korean status names directly
 
@@ -903,15 +904,14 @@ export const addCustomerInfoLog = async (log: Omit<CustomerInfoLog, 'id' | 'chan
   });
 };
 
-// 고객 정보 수정 (자문료율, 계약금, 집행금액, 계약일, 집행일) 및 변경 이력 기록
+// 고객 정보 수정 (자문료율, 계약금, 계약일, 기관별 집행정보) 및 변경 이력 기록
 export const updateCustomerInfo = async (
   customerId: string,
   updates: {
     commission_rate?: number;
     contract_amount?: number;
-    execution_amount?: number;
     contract_date?: string;
-    execution_date?: string;
+    processing_orgs?: ProcessingOrg[];
   },
   currentCustomer: Customer,
   changedBy: string,
@@ -954,21 +954,6 @@ export const updateCustomerInfo = async (
     }
   }
   
-  if (updates.execution_amount !== undefined) {
-    const oldValue = currentCustomer.execution_amount || 0;
-    if (Number(oldValue) !== updates.execution_amount) {
-      fieldsToUpdate.execution_amount = updates.execution_amount;
-      logsToAdd.push({
-        customer_id: customerId,
-        field_name: 'execution_amount',
-        old_value: String(oldValue),
-        new_value: String(updates.execution_amount),
-        changed_by: changedBy,
-        changed_by_name: changedByName,
-      });
-    }
-  }
-  
   if (updates.contract_date !== undefined) {
     const oldValue = (currentCustomer as any).contract_date || '';
     if (oldValue !== updates.contract_date) {
@@ -984,44 +969,46 @@ export const updateCustomerInfo = async (
     }
   }
   
-  if (updates.execution_date !== undefined) {
-    const oldValue = (currentCustomer as any).execution_date || '';
-    if (oldValue !== updates.execution_date) {
-      fieldsToUpdate.execution_date = updates.execution_date;
-      logsToAdd.push({
-        customer_id: customerId,
-        field_name: 'execution_date',
-        old_value: String(oldValue || '미설정'),
-        new_value: String(updates.execution_date),
-        changed_by: changedBy,
-        changed_by_name: changedByName,
-      });
-    }
-  }
-  
-  // 승인된 기관의 집행금액/집행일도 함께 업데이트 (정산 연동을 위해)
-  const processingOrgs = currentCustomer.processing_orgs || [];
-  const approvedOrgs = processingOrgs.filter(
-    (org: { status: string }) => org.status === '승인'
-  );
-  
-  if (approvedOrgs.length > 0) {
-    const needsOrgUpdate = 
-      (updates.execution_amount !== undefined && Number(currentCustomer.execution_amount || 0) !== updates.execution_amount) ||
-      (updates.execution_date !== undefined && ((currentCustomer as any).execution_date || '') !== updates.execution_date);
+  // 기관별 집행 정보 업데이트 (processing_orgs)
+  if (updates.processing_orgs) {
+    const currentOrgs = currentCustomer.processing_orgs || [];
+    let hasChanges = false;
     
-    if (needsOrgUpdate) {
-      const updatedOrgs = processingOrgs.map((org: any) => {
-        if (org.status === '승인') {
-          return {
-            ...org,
-            execution_amount: updates.execution_amount !== undefined ? updates.execution_amount : org.execution_amount,
-            execution_date: updates.execution_date !== undefined ? updates.execution_date : org.execution_date,
-          };
-        }
-        return org;
-      });
-      fieldsToUpdate.processing_orgs = updatedOrgs;
+    for (const updatedOrg of updates.processing_orgs) {
+      if (updatedOrg.status !== '승인') continue;
+      
+      const currentOrg = currentOrgs.find((o: ProcessingOrg) => o.org === updatedOrg.org);
+      if (!currentOrg) continue;
+      
+      // 집행금액 변경 확인
+      if (updatedOrg.execution_amount !== currentOrg.execution_amount) {
+        hasChanges = true;
+        logsToAdd.push({
+          customer_id: customerId,
+          field_name: 'execution_amount',
+          old_value: `${currentOrg.org}: ${currentOrg.execution_amount || 0}`,
+          new_value: `${updatedOrg.org}: ${updatedOrg.execution_amount || 0}`,
+          changed_by: changedBy,
+          changed_by_name: changedByName,
+        });
+      }
+      
+      // 집행일 변경 확인
+      if (updatedOrg.execution_date !== currentOrg.execution_date) {
+        hasChanges = true;
+        logsToAdd.push({
+          customer_id: customerId,
+          field_name: 'execution_date',
+          old_value: `${currentOrg.org}: ${currentOrg.execution_date || '미설정'}`,
+          new_value: `${updatedOrg.org}: ${updatedOrg.execution_date || '미설정'}`,
+          changed_by: changedBy,
+          changed_by_name: changedByName,
+        });
+      }
+    }
+    
+    if (hasChanges) {
+      fieldsToUpdate.processing_orgs = updates.processing_orgs;
     }
   }
   

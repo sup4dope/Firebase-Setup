@@ -898,7 +898,7 @@ export default function Dashboard() {
 
   const handleInfoEditSave = async (
     customerId: string,
-    data: { commission_rate: number; contract_amount: number; execution_amount: number; contract_date?: string; execution_date?: string }
+    data: { commission_rate: number; contract_amount: number; contract_date?: string; processing_orgs?: ProcessingOrg[] }
   ) => {
     const customer = customers.find(c => c.id === customerId);
     if (!customer || !user) return;
@@ -916,7 +916,13 @@ export default function Dashboard() {
       setCustomers(prev =>
         prev.map(c =>
           c.id === customerId
-            ? { ...c, ...data }
+            ? { 
+                ...c, 
+                commission_rate: data.commission_rate,
+                contract_amount: data.contract_amount,
+                contract_date: data.contract_date,
+                processing_orgs: data.processing_orgs || c.processing_orgs,
+              }
             : c
         )
       );
