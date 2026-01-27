@@ -7,11 +7,12 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History, TrendingUp, Banknote, Wallet, Calendar } from 'lucide-react';
+import { Loader2, History, TrendingUp, Banknote, Wallet, Calendar, UserCheck, RefreshCw, Building2, FileText, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import type { Customer } from '@shared/types';
+import type { Customer, CustomerHistoryLog } from '@shared/types';
 import { getCustomerInfoLogs, type CustomerInfoLog } from '@/lib/firestore';
+import { getCustomerHistoryLogs } from '@/lib/firebase';
 
 interface CustomerInfoHistoryModalProps {
   open: boolean;
@@ -27,12 +28,34 @@ const FIELD_LABELS: Record<string, { label: string; icon: typeof TrendingUp; uni
   execution_date: { label: '집행일', icon: Calendar, unit: '' },
 };
 
+const ACTION_TYPE_LABELS: Record<string, { label: string; icon: typeof History }> = {
+  status_change: { label: '상태 변경', icon: RefreshCw },
+  manager_change: { label: '담당자 변경', icon: UserCheck },
+  info_update: { label: '정보 수정', icon: FileText },
+  document_upload: { label: '문서 업로드', icon: FileText },
+  memo_added: { label: '메모 추가', icon: MessageSquare },
+  org_change: { label: '기관 변경', icon: Building2 },
+};
+
+interface UnifiedLog {
+  id: string;
+  type: 'info' | 'history';
+  label: string;
+  icon: typeof History;
+  unit: string;
+  old_value: string;
+  new_value: string;
+  changed_by_name: string;
+  changed_at: Date;
+  description?: string;
+}
+
 export function CustomerInfoHistoryModal({
   open,
   onClose,
   customer,
 }: CustomerInfoHistoryModalProps) {
-  const [logs, setLogs] = useState<CustomerInfoLog[]>([]);
+  const [logs, setLogs] = useState<UnifiedLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -46,10 +69,56 @@ export function CustomerInfoHistoryModal({
     
     setIsLoading(true);
     try {
-      const fetchedLogs = await getCustomerInfoLogs(customer.id);
-      setLogs(fetchedLogs);
+      const [infoLogs, historyLogs] = await Promise.all([
+        getCustomerInfoLogs(customer.id),
+        getCustomerHistoryLogs(customer.id),
+      ]);
+      
+      const unifiedInfoLogs: UnifiedLog[] = infoLogs.map((log: CustomerInfoLog) => {
+        const fieldInfo = FIELD_LABELS[log.field_name] || { 
+          label: log.field_name, 
+          icon: History, 
+          unit: '' 
+        };
+        return {
+          id: `info-${log.id}`,
+          type: 'info' as const,
+          label: fieldInfo.label,
+          icon: fieldInfo.icon,
+          unit: fieldInfo.unit,
+          old_value: log.old_value || '-',
+          new_value: log.new_value || '-',
+          changed_by_name: log.changed_by_name || '알 수 없음',
+          changed_at: log.changed_at.toDate(),
+        };
+      });
+      
+      const unifiedHistoryLogs: UnifiedLog[] = historyLogs.map((log: CustomerHistoryLog) => {
+        const actionInfo = ACTION_TYPE_LABELS[log.action_type] || { 
+          label: log.action_type, 
+          icon: History 
+        };
+        return {
+          id: `history-${log.id}`,
+          type: 'history' as const,
+          label: actionInfo.label,
+          icon: actionInfo.icon,
+          unit: '',
+          old_value: log.old_value || '-',
+          new_value: log.new_value || '-',
+          changed_by_name: log.changed_by_name || '알 수 없음',
+          changed_at: log.changed_at instanceof Date ? log.changed_at : new Date(log.changed_at),
+          description: log.description,
+        };
+      });
+      
+      const allLogs = [...unifiedInfoLogs, ...unifiedHistoryLogs].sort(
+        (a, b) => b.changed_at.getTime() - a.changed_at.getTime()
+      );
+      
+      setLogs(allLogs);
     } catch (error) {
-      console.error('Failed to load info logs:', error);
+      console.error('Failed to load logs:', error);
     } finally {
       setIsLoading(false);
     }
@@ -83,12 +152,7 @@ export function CustomerInfoHistoryModal({
           ) : (
             <div className="space-y-3">
               {logs.map((log) => {
-                const fieldInfo = FIELD_LABELS[log.field_name] || { 
-                  label: log.field_name, 
-                  icon: History, 
-                  unit: '' 
-                };
-                const IconComponent = fieldInfo.icon;
+                const IconComponent = log.icon;
                 
                 return (
                   <div 
@@ -99,26 +163,32 @@ export function CustomerInfoHistoryModal({
                       <div className="flex items-center gap-2">
                         <IconComponent className="w-4 h-4 text-muted-foreground" />
                         <Badge variant="outline" className="text-xs">
-                          {fieldInfo.label}
+                          {log.label}
                         </Badge>
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        {format(log.changed_at.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko })}
+                        {format(log.changed_at, 'yyyy.MM.dd HH:mm', { locale: ko })}
                       </span>
                     </div>
                     
-                    <div className="mt-2 flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground line-through">
-                        {log.old_value || '-'}{fieldInfo.unit}
-                      </span>
-                      <span className="text-muted-foreground">→</span>
-                      <span className="text-foreground font-medium">
-                        {log.new_value || '-'}{fieldInfo.unit}
-                      </span>
-                    </div>
+                    {log.description ? (
+                      <div className="mt-2 text-sm text-foreground">
+                        {log.description}
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground line-through">
+                          {log.old_value}{log.unit}
+                        </span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className="text-foreground font-medium">
+                          {log.new_value}{log.unit}
+                        </span>
+                      </div>
+                    )}
                     
                     <div className="mt-1 text-xs text-muted-foreground">
-                      변경자: {log.changed_by_name || '알 수 없음'}
+                      변경자: {log.changed_by_name}
                     </div>
                   </div>
                 );
