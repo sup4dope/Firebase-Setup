@@ -2711,21 +2711,31 @@ export function CustomerDetailModal({
                     <div className="pt-2 border-t">
                       <div className="flex items-center justify-between mb-1.5">
                         <p className="text-[10px] text-muted-foreground">기관 추가</p>
-                        <label className="flex items-center gap-1 cursor-pointer">
-                          <Checkbox
-                            checked={addAsReExecution}
-                            onCheckedChange={(checked) => setAddAsReExecution(checked === true)}
-                            className="h-3 w-3"
-                            data-testid="checkbox-add-as-reexecution"
-                          />
-                          <span className={cn(
-                            "text-[10px]",
-                            addAsReExecution ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"
-                          )}>
-                            <RotateCcw className="w-2.5 h-2.5 inline mr-0.5" />
-                            재집행으로 추가
-                          </span>
-                        </label>
+                        {/* 재집행으로 추가 토글 - 선행 집행건이 있을 때만 표시 */}
+                        {(() => {
+                          const existingOrgs = formData.processing_orgs || [];
+                          const hasExecutedOrg = existingOrgs.some(o => 
+                            o.status === '승인' && o.execution_date && o.execution_amount
+                          );
+                          if (!hasExecutedOrg) return null;
+                          return (
+                            <label className="flex items-center gap-1 cursor-pointer">
+                              <Checkbox
+                                checked={addAsReExecution}
+                                onCheckedChange={(checked) => setAddAsReExecution(checked === true)}
+                                className="h-3 w-3"
+                                data-testid="checkbox-add-as-reexecution"
+                              />
+                              <span className={cn(
+                                "text-[10px]",
+                                addAsReExecution ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"
+                              )}>
+                                <RotateCcw className="w-2.5 h-2.5 inline mr-0.5" />
+                                재집행으로 추가
+                              </span>
+                            </label>
+                          );
+                        })()}
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {PROCESSING_ORGS.filter(org => {

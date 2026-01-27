@@ -809,23 +809,32 @@ export function CustomerTable({
                         <div className="border-t pt-2">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-xs text-muted-foreground">기관 추가</p>
-                            {/* 재집행으로 추가 토글 */}
-                            <label className="flex items-center gap-1 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={addAsReExecution}
-                                onChange={(e) => setAddAsReExecution(e.target.checked)}
-                                className="w-3 h-3 rounded border-gray-300"
-                                data-testid="checkbox-add-as-re-execution"
-                              />
-                              <span className={cn(
-                                "text-[10px]",
-                                addAsReExecution ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"
-                              )}>
-                                <RotateCcw className="w-2.5 h-2.5 inline mr-0.5" />
-                                재집행
-                              </span>
-                            </label>
+                            {/* 재집행으로 추가 토글 - 선행 집행건이 있을 때만 표시 */}
+                            {(() => {
+                              const existingOrgs = getProcessingOrgsFromCustomer(customer);
+                              const hasExecutedOrg = existingOrgs.some(o => 
+                                o.status === '승인' && o.execution_date && o.execution_amount
+                              );
+                              if (!hasExecutedOrg) return null;
+                              return (
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={addAsReExecution}
+                                    onChange={(e) => setAddAsReExecution(e.target.checked)}
+                                    className="w-3 h-3 rounded border-gray-300"
+                                    data-testid="checkbox-add-as-re-execution"
+                                  />
+                                  <span className={cn(
+                                    "text-[10px]",
+                                    addAsReExecution ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"
+                                  )}>
+                                    <RotateCcw className="w-2.5 h-2.5 inline mr-0.5" />
+                                    재집행
+                                  </span>
+                                </label>
+                              );
+                            })()}
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {PROCESSING_ORGS.filter(org => {
