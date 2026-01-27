@@ -16,10 +16,12 @@ export interface LoginHistory {
 // Commission Rates for employee compensation
 export interface CommissionRates {
   teamOverride: number; // 팀 오버라이딩율 (팀장만)
-  ad: number; // 광고 수당율
-  referral: number; // 지인소개 수당율
+  ad: number; // 광고 수당율 (자문료)
+  referral: number; // 지인소개 수당율 (자문료)
   reExecution: number; // 재집행 수당율
   outsource: number; // 외주 수당율
+  adDeposit?: number; // 광고 계약금 수당율
+  referralDeposit?: number; // 지인소개 계약금 수당율
 }
 
 // User (Firestore: users collection)

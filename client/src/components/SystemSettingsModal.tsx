@@ -134,6 +134,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       referral: 0,
       reExecution: 0,
       outsource: 0,
+      adDeposit: 0,
+      referralDeposit: 0,
     },
   });
 
@@ -304,6 +306,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         referral: userCommissionRates.referral || 0,
         reExecution: userCommissionRates.reExecution || 0,
         outsource: userCommissionRates.outsource || 0,
+        adDeposit: userCommissionRates.adDeposit || 0,
+        referralDeposit: userCommissionRates.referralDeposit || 0,
       },
     });
     setShowEditEmployee(true);
@@ -1164,98 +1168,155 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   </div>
                 )}
 
-                {/* 유입 채널별 수당율 - 2x2 그리드 */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-muted-foreground text-sm">광고</Label>
-                    <div className="relative mt-1">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={editEmployee.commissionRates.ad || ''}
-                        onChange={(e) => setEditEmployee({
-                          ...editEmployee,
-                          commissionRates: {
-                            ...editEmployee.commissionRates,
-                            ad: parseFloat(e.target.value) || 0,
-                          },
-                        })}
-                        placeholder="0"
-                        className="bg-muted border-border text-foreground pr-8"
-                        data-testid="input-edit-employee-commission-ad"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                {/* 유입 채널별 수당율 */}
+                <div className="space-y-3">
+                  {/* 광고 */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-muted-foreground text-sm">광고 (자문료)</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={editEmployee.commissionRates.ad || ''}
+                          onChange={(e) => setEditEmployee({
+                            ...editEmployee,
+                            commissionRates: {
+                              ...editEmployee.commissionRates,
+                              ad: parseFloat(e.target.value) || 0,
+                            },
+                          })}
+                          placeholder="0"
+                          className="bg-muted border-border text-foreground pr-8"
+                          data-testid="input-edit-employee-commission-ad"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-sm">광고 (계약금)</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={editEmployee.commissionRates.adDeposit || ''}
+                          onChange={(e) => setEditEmployee({
+                            ...editEmployee,
+                            commissionRates: {
+                              ...editEmployee.commissionRates,
+                              adDeposit: parseFloat(e.target.value) || 0,
+                            },
+                          })}
+                          placeholder="0"
+                          className="bg-muted border-border text-foreground pr-8"
+                          data-testid="input-edit-employee-commission-ad-deposit"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground text-sm">지인소개</Label>
-                    <div className="relative mt-1">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={editEmployee.commissionRates.referral || ''}
-                        onChange={(e) => setEditEmployee({
-                          ...editEmployee,
-                          commissionRates: {
-                            ...editEmployee.commissionRates,
-                            referral: parseFloat(e.target.value) || 0,
-                          },
-                        })}
-                        placeholder="0"
-                        className="bg-muted border-border text-foreground pr-8"
-                        data-testid="input-edit-employee-commission-referral"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                  
+                  {/* 지인소개 */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-muted-foreground text-sm">지인소개 (자문료)</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={editEmployee.commissionRates.referral || ''}
+                          onChange={(e) => setEditEmployee({
+                            ...editEmployee,
+                            commissionRates: {
+                              ...editEmployee.commissionRates,
+                              referral: parseFloat(e.target.value) || 0,
+                            },
+                          })}
+                          placeholder="0"
+                          className="bg-muted border-border text-foreground pr-8"
+                          data-testid="input-edit-employee-commission-referral"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-sm">지인소개 (계약금)</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={editEmployee.commissionRates.referralDeposit || ''}
+                          onChange={(e) => setEditEmployee({
+                            ...editEmployee,
+                            commissionRates: {
+                              ...editEmployee.commissionRates,
+                              referralDeposit: parseFloat(e.target.value) || 0,
+                            },
+                          })}
+                          placeholder="0"
+                          className="bg-muted border-border text-foreground pr-8"
+                          data-testid="input-edit-employee-commission-referral-deposit"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground text-sm">재집행</Label>
-                    <div className="relative mt-1">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={editEmployee.commissionRates.reExecution || ''}
-                        onChange={(e) => setEditEmployee({
-                          ...editEmployee,
-                          commissionRates: {
-                            ...editEmployee.commissionRates,
-                            reExecution: parseFloat(e.target.value) || 0,
-                          },
-                        })}
-                        placeholder="0"
-                        className="bg-muted border-border text-foreground pr-8"
-                        data-testid="input-edit-employee-commission-reexecution"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                  
+                  {/* 재집행/외주 */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-muted-foreground text-sm">재집행</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={editEmployee.commissionRates.reExecution || ''}
+                          onChange={(e) => setEditEmployee({
+                            ...editEmployee,
+                            commissionRates: {
+                              ...editEmployee.commissionRates,
+                              reExecution: parseFloat(e.target.value) || 0,
+                            },
+                          })}
+                          placeholder="0"
+                          className="bg-muted border-border text-foreground pr-8"
+                          data-testid="input-edit-employee-commission-reexecution"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground text-sm">외주</Label>
-                    <div className="relative mt-1">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={editEmployee.commissionRates.outsource || ''}
-                        onChange={(e) => setEditEmployee({
-                          ...editEmployee,
-                          commissionRates: {
-                            ...editEmployee.commissionRates,
-                            outsource: parseFloat(e.target.value) || 0,
-                          },
-                        })}
-                        placeholder="0"
-                        className="bg-muted border-border text-foreground pr-8"
-                        data-testid="input-edit-employee-commission-outsource"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    <div>
+                      <Label className="text-muted-foreground text-sm">외주</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={editEmployee.commissionRates.outsource || ''}
+                          onChange={(e) => setEditEmployee({
+                            ...editEmployee,
+                            commissionRates: {
+                              ...editEmployee.commissionRates,
+                              outsource: parseFloat(e.target.value) || 0,
+                            },
+                          })}
+                          placeholder="0"
+                          className="bg-muted border-border text-foreground pr-8"
+                          data-testid="input-edit-employee-commission-outsource"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                      </div>
                     </div>
                   </div>
                 </div>

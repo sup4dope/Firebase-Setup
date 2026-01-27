@@ -1233,6 +1233,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     const manager = users.find(u => u.uid === customer.manager_id);
     const entrySource = (customer.entry_source as EntrySourceType) || '기타';
     const commissionRate = getCommissionRate(manager?.commissionRates, entrySource);
+    const depositCommissionRate = getDepositCommissionRate(manager?.commissionRates, entrySource);
     const contractDate = (customer as any).contract_date || customer.contract_completion_date || customer.entry_date || '';
     const feeRate = customer.contract_fee_rate || customer.commission_rate || 3;
     
@@ -1275,7 +1276,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         const isFirstOrg = i === 0;
         const contractAmount = isFirstOrg ? (customer.contract_amount || customer.deposit_amount || 0) : 0;
         
-        const calc = calculateSettlement(contractAmount, orgExecutionAmount, feeRate, commissionRate);
+        const calc = calculateSettlement(contractAmount, orgExecutionAmount, feeRate, commissionRate, depositCommissionRate);
         
         // 기존 정산 항목 찾기 (customer_id + org_name 조합, 활성 상태만)
         const existingOrgSettlement = existingSettlements.find(s => 
@@ -1351,7 +1352,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         return;
       }
       
-      const calc = calculateSettlement(contractAmount, executionAmount, feeRate, commissionRate);
+      const calc = calculateSettlement(contractAmount, executionAmount, feeRate, commissionRate, depositCommissionRate);
       
       if (activeSettlement) {
         await updateSettlementItem(activeSettlement.id, {
@@ -1630,15 +1631,38 @@ export const getCommissionRate = (rates: CommissionRates | undefined, entrySourc
   }
 };
 
-// 정산 계산
+// 계약금(선수금) 수당율 조회 - 광고, 지인소개만 해당
+export const getDepositCommissionRate = (rates: CommissionRates | undefined, entrySource: EntrySourceType): number => {
+  if (!rates) return 0;
+  switch (entrySource) {
+    case '광고':
+      return rates.adDeposit || rates.ad || 0;
+    case '고객소개':
+      return rates.referralDeposit || rates.referral || 0;
+    case '승인복제':
+    case '외주':
+      return 0;
+    default:
+      return 0;
+  }
+};
+
+// 정산 계산 (계약금과 자문료에 별도 수당율 적용)
 export const calculateSettlement = (
   contractAmount: number,
   executionAmount: number,
   feeRate: number,
-  commissionRate: number
+  commissionRate: number,
+  depositCommissionRate?: number
 ): { totalRevenue: number; grossCommission: number; taxAmount: number; netCommission: number } => {
-  const totalRevenue = contractAmount + (executionAmount * feeRate / 100);
-  const grossCommission = totalRevenue * commissionRate / 100;
+  const advisoryFee = executionAmount * feeRate / 100;
+  const totalRevenue = contractAmount + advisoryFee;
+  
+  const depositRate = depositCommissionRate ?? commissionRate;
+  const contractCommission = contractAmount * depositRate / 100;
+  const advisoryCommission = advisoryFee * commissionRate / 100;
+  const grossCommission = contractCommission + advisoryCommission;
+  
   const taxAmount = grossCommission * 0.033;
   const netCommission = grossCommission * 0.967;
   return {
