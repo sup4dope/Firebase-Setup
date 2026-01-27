@@ -41,7 +41,7 @@ import {
   type CreditReportData
 } from "@/lib/geminiOCR";
 import { DocumentViewer } from "@/components/DocumentViewer";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -249,6 +249,21 @@ export function CustomerDetailModal({
   const [proposalDesiredAmount, setProposalDesiredAmount] = useState("");
   const [isSendingBusinessCard, setIsSendingBusinessCard] = useState(false);
   const [addAsReExecution, setAddAsReExecution] = useState(false);
+  
+  // 진행기관 승인 모달 state (집행일자/금액 입력)
+  const [orgApprovalModal, setOrgApprovalModal] = useState<{
+    isOpen: boolean;
+    orgName: string;
+    executionDate: string;
+    executionAmount: number;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    orgName: '',
+    executionDate: format(new Date(), 'yyyy-MM-dd'),
+    executionAmount: 0,
+    isLoading: false,
+  });
   
   const { toast } = useToast();
 
@@ -2669,11 +2684,14 @@ export function CustomerDetailModal({
                                     variant="ghost"
                                     className="h-6 w-6 p-0 text-green-600 hover:bg-green-100"
                                     onClick={() => {
-                                      const today = format(new Date(), 'yyyy-MM-dd');
-                                      const updatedOrgs = (formData.processing_orgs || []).map(o =>
-                                        o.org === org.org ? { ...o, status: '승인' as ProcessingOrgStatus, approved_at: today } : o
-                                      );
-                                      handleFieldChange({ processing_orgs: updatedOrgs });
+                                      // 승인 모달 열기 (집행일자/금액 입력)
+                                      setOrgApprovalModal({
+                                        isOpen: true,
+                                        orgName: org.org,
+                                        executionDate: format(new Date(), 'yyyy-MM-dd'),
+                                        executionAmount: 0,
+                                        isLoading: false,
+                                      });
                                     }}
                                     data-testid={`btn-detail-approve-${org.org}`}
                                   >
@@ -3951,6 +3969,138 @@ export function CustomerDetailModal({
         agencies={proposalAgencies}
         desiredAmount={proposalDesiredAmount}
       />
+
+      {/* 진행기관 승인 모달 (집행일자/금액 입력) */}
+      <Dialog
+        open={orgApprovalModal.isOpen}
+        onOpenChange={(open) => {
+          if (!open && !orgApprovalModal.isLoading) {
+            setOrgApprovalModal({
+              isOpen: false,
+              orgName: '',
+              executionDate: format(new Date(), 'yyyy-MM-dd'),
+              executionAmount: 0,
+              isLoading: false,
+            });
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[400px] bg-background border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">상태 변경 확인</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            ○ "{orgApprovalModal.orgName}" 기관을 "집행완료" 상태로 변경합니다.
+          </p>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label className="text-sm">집행일</Label>
+              <Input
+                type="date"
+                value={orgApprovalModal.executionDate}
+                onChange={(e) =>
+                  setOrgApprovalModal(prev => ({
+                    ...prev,
+                    executionDate: e.target.value,
+                  }))
+                }
+                data-testid="input-detail-org-approval-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm">
+                집행금액 <span className="text-muted-foreground text-xs">(단위: 만원)</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="0"
+                  value={orgApprovalModal.executionAmount || ''}
+                  onChange={(e) =>
+                    setOrgApprovalModal(prev => ({
+                      ...prev,
+                      executionAmount: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                  className="pr-12"
+                  placeholder="예: 10000 (만원 단위로 입력)"
+                  data-testid="input-detail-org-approval-amount"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                  만원
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setOrgApprovalModal({
+                isOpen: false,
+                orgName: '',
+                executionDate: format(new Date(), 'yyyy-MM-dd'),
+                executionAmount: 0,
+                isLoading: false,
+              })}
+              disabled={orgApprovalModal.isLoading}
+              className="border-border text-muted-foreground"
+            >
+              취소
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!orgApprovalModal.orgName) return;
+                
+                setOrgApprovalModal(prev => ({ ...prev, isLoading: true }));
+                
+                try {
+                  const today = format(new Date(), 'yyyy-MM-dd');
+                  const updatedOrgs = (formData.processing_orgs || []).map(o =>
+                    o.org === orgApprovalModal.orgName 
+                      ? { 
+                          ...o, 
+                          status: '승인' as ProcessingOrgStatus, 
+                          approved_at: today,
+                          execution_date: orgApprovalModal.executionDate,
+                          execution_amount: orgApprovalModal.executionAmount,
+                        } 
+                      : o
+                  );
+                  
+                  // 로컬 상태 업데이트
+                  handleFieldChange({ processing_orgs: updatedOrgs });
+                  
+                  // 모달 닫기
+                  setOrgApprovalModal({
+                    isOpen: false,
+                    orgName: '',
+                    executionDate: format(new Date(), 'yyyy-MM-dd'),
+                    executionAmount: 0,
+                    isLoading: false,
+                  });
+                  
+                  toast({
+                    title: "승인 완료",
+                    description: `${orgApprovalModal.orgName} 기관이 승인되었습니다.`,
+                  });
+                } catch (error) {
+                  console.error("승인 처리 실패:", error);
+                  setOrgApprovalModal(prev => ({ ...prev, isLoading: false }));
+                  toast({
+                    title: "오류",
+                    description: "승인 처리 중 오류가 발생했습니다.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={orgApprovalModal.isLoading}
+              data-testid="button-confirm-detail-org-approval"
+            >
+              {orgApprovalModal.isLoading ? "처리 중..." : "확인"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
