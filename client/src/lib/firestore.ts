@@ -999,6 +999,32 @@ export const updateCustomerInfo = async (
     }
   }
   
+  // 승인된 기관의 집행금액/집행일도 함께 업데이트 (정산 연동을 위해)
+  const processingOrgs = currentCustomer.processing_orgs || [];
+  const approvedOrgs = processingOrgs.filter(
+    (org: { status: string }) => org.status === '승인'
+  );
+  
+  if (approvedOrgs.length > 0) {
+    const needsOrgUpdate = 
+      (updates.execution_amount !== undefined && Number(currentCustomer.execution_amount || 0) !== updates.execution_amount) ||
+      (updates.execution_date !== undefined && ((currentCustomer as any).execution_date || '') !== updates.execution_date);
+    
+    if (needsOrgUpdate) {
+      const updatedOrgs = processingOrgs.map((org: any) => {
+        if (org.status === '승인') {
+          return {
+            ...org,
+            execution_amount: updates.execution_amount !== undefined ? updates.execution_amount : org.execution_amount,
+            execution_date: updates.execution_date !== undefined ? updates.execution_date : org.execution_date,
+          };
+        }
+        return org;
+      });
+      fieldsToUpdate.processing_orgs = updatedOrgs;
+    }
+  }
+  
   // 변경사항이 있을 때만 업데이트
   if (Object.keys(fieldsToUpdate).length > 0) {
     batch.update(customerRef, fieldsToUpdate);
