@@ -37,9 +37,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { MemoModal } from './MemoModal';
-import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users, Plus, XCircle, CheckCircle } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { Customer, UserRole, StatusCode, CustomerMemo, User } from '@shared/types';
+import type { Customer, UserRole, StatusCode, CustomerMemo, User, ProcessingOrg, ProcessingOrgStatus } from '@shared/types';
 import { STATUS_OPTIONS, STATUS_STYLES, getStatusStyle, FUNNEL_GROUPS } from '@/lib/constants';
 
 // 쓰레기통 상세사유 (한글)
@@ -111,11 +116,18 @@ interface CustomerTableProps {
   onViewHistory: (customerId: string) => void;
   onCustomerClick?: (customer: Customer) => void;
   onProcessingOrgChange?: (customerId: string, newOrg: string) => void;
+  onProcessingOrgsChange?: (customerId: string, processingOrgs: ProcessingOrg[]) => void;
   onAddMemo?: (customerId: string, content: string) => void;
   onManagerChange?: (customerId: string, newManagerId: string, newManagerName: string, newTeamId: string, newTeamName: string) => void;
 }
 
-const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
+const PROCESSING_ORGS = ['신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
+
+const ORG_STATUS_COLORS: Record<ProcessingOrgStatus, { bg: string; text: string; border: string }> = {
+  '진행중': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-300 dark:border-blue-600' },
+  '부결': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', border: 'border-red-300 dark:border-red-600' },
+  '승인': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300', border: 'border-green-300 dark:border-green-600' },
+};
 
 // 스테이지 이름 가져오기 (한글 상태명 기반)
 const getStageName = (stageId: string | null): string => {
@@ -140,6 +152,7 @@ export function CustomerTable({
   onViewHistory,
   onCustomerClick,
   onProcessingOrgChange,
+  onProcessingOrgsChange,
   onAddMemo,
   onManagerChange,
 }: CustomerTableProps) {
@@ -264,6 +277,56 @@ export function CustomerTable({
   const handleProcessingOrgChange = (customerId: string, newOrg: string) => {
     // Call external handler if provided
     onProcessingOrgChange?.(customerId, newOrg);
+  };
+
+  // 다중 기관 관리 함수
+  const handleAddProcessingOrg = (customerId: string, customer: Customer, orgName: string) => {
+    const currentOrgs = customer.processing_orgs || [];
+    // 중복 체크
+    if (currentOrgs.find(o => o.org === orgName)) return;
+    
+    const newOrg: ProcessingOrg = {
+      org: orgName,
+      status: '진행중',
+      applied_at: new Date().toISOString().split('T')[0],
+    };
+    const updatedOrgs = [...currentOrgs, newOrg];
+    onProcessingOrgsChange?.(customerId, updatedOrgs);
+  };
+
+  const handleUpdateOrgStatus = (customerId: string, customer: Customer, orgName: string, newStatus: ProcessingOrgStatus) => {
+    const currentOrgs = customer.processing_orgs || [];
+    const updatedOrgs = currentOrgs.map(o => {
+      if (o.org === orgName) {
+        const updated = { ...o, status: newStatus };
+        if (newStatus === '부결') {
+          updated.rejected_at = new Date().toISOString().split('T')[0];
+        } else if (newStatus === '승인') {
+          updated.approved_at = new Date().toISOString().split('T')[0];
+        }
+        return updated;
+      }
+      return o;
+    });
+    onProcessingOrgsChange?.(customerId, updatedOrgs);
+  };
+
+  const handleRemoveProcessingOrg = (customerId: string, customer: Customer, orgName: string) => {
+    const currentOrgs = customer.processing_orgs || [];
+    const updatedOrgs = currentOrgs.filter(o => o.org !== orgName);
+    onProcessingOrgsChange?.(customerId, updatedOrgs);
+  };
+
+  // 기존 processing_org를 processing_orgs로 변환 (호환성)
+  const getProcessingOrgsFromCustomer = (customer: Customer): ProcessingOrg[] => {
+    if (customer.processing_orgs && customer.processing_orgs.length > 0) {
+      return customer.processing_orgs;
+    }
+    // 기존 processing_org 필드가 있고 '미등록'이 아니면 변환
+    if (customer.processing_org && customer.processing_org !== '미등록') {
+      return [{ org: customer.processing_org, status: '진행중' }];
+    }
+    return [];
   };
 
   if (customers.length === 0) {
@@ -525,26 +588,138 @@ export function CustomerTable({
                   {customer.business_type || customer.industry || '-'}
                 </TableCell>
                 
-                {/* 진행기관 - Dropdown */}
+                {/* 진행기관 - 다중 기관 뱃지 */}
                 <TableCell>
-                  <Select
-                    value={customer.processing_org || '미등록'}
-                    onValueChange={(value) => handleProcessingOrgChange(customer.id, value)}
-                  >
-                    <SelectTrigger 
-                      className="h-8 text-xs w-[90px]"
-                      data-testid={`select-org-${customer.id}`}
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {PROCESSING_ORGS.map(org => (
-                        <SelectItem key={org} value={org}>
-                          {org}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <div 
+                        className="flex flex-wrap gap-1 min-w-[100px] max-w-[200px] cursor-pointer hover:bg-muted/50 p-1 rounded"
+                        data-testid={`orgs-trigger-${customer.id}`}
+                      >
+                        {(() => {
+                          const orgs = getProcessingOrgsFromCustomer(customer);
+                          if (orgs.length === 0) {
+                            return (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Plus className="w-3 h-3" />
+                                기관 추가
+                              </span>
+                            );
+                          }
+                          return orgs.map((org, idx) => {
+                            const colors = ORG_STATUS_COLORS[org.status];
+                            return (
+                              <Badge
+                                key={idx}
+                                variant="outline"
+                                className={cn(
+                                  "text-xs px-1.5 py-0.5 flex items-center gap-0.5",
+                                  colors.bg,
+                                  colors.text,
+                                  colors.border
+                                )}
+                              >
+                                {org.status === '부결' && <XCircle className="w-3 h-3" />}
+                                {org.status === '승인' && <CheckCircle className="w-3 h-3" />}
+                                {org.org}
+                              </Badge>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-3" align="start">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">진행기관 관리</span>
+                        </div>
+                        
+                        {/* 현재 기관 목록 */}
+                        {(() => {
+                          const orgs = getProcessingOrgsFromCustomer(customer);
+                          if (orgs.length === 0) {
+                            return (
+                              <p className="text-xs text-muted-foreground py-2">등록된 기관이 없습니다.</p>
+                            );
+                          }
+                          return (
+                            <div className="space-y-2">
+                              {orgs.map((org, idx) => {
+                                const colors = ORG_STATUS_COLORS[org.status];
+                                return (
+                                  <div key={idx} className={cn("flex items-center justify-between p-2 rounded border", colors.border, colors.bg)}>
+                                    <div className="flex-1">
+                                      <div className={cn("font-medium text-sm", colors.text)}>{org.org}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {org.applied_at && `접수: ${org.applied_at}`}
+                                        {org.rejected_at && ` | 부결: ${org.rejected_at}`}
+                                        {org.approved_at && ` | 승인: ${org.approved_at}`}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      {org.status === '진행중' && (
+                                        <>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0 text-red-600 hover:bg-red-100"
+                                            onClick={() => handleUpdateOrgStatus(customer.id, customer, org.org, '부결')}
+                                            data-testid={`btn-reject-${org.org}`}
+                                          >
+                                            <XCircle className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0 text-green-600 hover:bg-green-100"
+                                            onClick={() => handleUpdateOrgStatus(customer.id, customer, org.org, '승인')}
+                                            data-testid={`btn-approve-${org.org}`}
+                                          >
+                                            <CheckCircle className="w-4 h-4" />
+                                          </Button>
+                                        </>
+                                      )}
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted"
+                                        onClick={() => handleRemoveProcessingOrg(customer.id, customer, org.org)}
+                                        data-testid={`btn-remove-${org.org}`}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                        
+                        {/* 기관 추가 */}
+                        <div className="border-t pt-2">
+                          <p className="text-xs text-muted-foreground mb-2">기관 추가</p>
+                          <div className="flex flex-wrap gap-1">
+                            {PROCESSING_ORGS.filter(org => {
+                              const existingOrgs = getProcessingOrgsFromCustomer(customer);
+                              return !existingOrgs.find(o => o.org === org);
+                            }).map(org => (
+                              <Badge
+                                key={org}
+                                variant="outline"
+                                className="text-xs cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                                onClick={() => handleAddProcessingOrg(customer.id, customer, org)}
+                                data-testid={`btn-add-org-${org}`}
+                              >
+                                <Plus className="w-3 h-3 mr-0.5" />
+                                {org}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </TableCell>
                 
                 {/* 최근 메모 - truncate with tooltip, double-click to open modal */}

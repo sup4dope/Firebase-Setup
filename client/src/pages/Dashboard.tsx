@@ -532,7 +532,7 @@ export default function Dashboard() {
     }
   };
 
-  // Handle processing org change from dashboard table
+  // Handle processing org change from dashboard table (legacy single org)
   const handleProcessingOrgChange = async (customerId: string, newOrg: string) => {
     try {
       await updateCustomer(customerId, {
@@ -555,6 +555,37 @@ export default function Dashboard() {
       });
     } catch (error) {
       console.error('Error updating processing org:', error);
+      toast({
+        title: '오류',
+        description: '진행기관 변경 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle processing orgs change from dashboard table (multi-org support)
+  const handleProcessingOrgsChange = async (customerId: string, processingOrgs: any[]) => {
+    try {
+      await updateCustomer(customerId, {
+        processing_orgs: processingOrgs,
+        updated_at: new Date(),
+      });
+      
+      // Update local state
+      setCustomers(prev =>
+        prev.map(c => c.id === customerId ? {
+          ...c,
+          processing_orgs: processingOrgs,
+          updated_at: new Date(),
+        } : c)
+      );
+      
+      toast({
+        title: '성공',
+        description: '진행기관이 업데이트되었습니다.',
+      });
+    } catch (error) {
+      console.error('Error updating processing orgs:', error);
       toast({
         title: '오류',
         description: '진행기관 변경 중 오류가 발생했습니다.',
@@ -1044,6 +1075,7 @@ export default function Dashboard() {
             onViewHistory={handleViewHistory}
             onCustomerClick={handleCustomerClick}
             onProcessingOrgChange={handleProcessingOrgChange}
+            onProcessingOrgsChange={handleProcessingOrgsChange}
             onAddMemo={handleAddMemo}
             onManagerChange={handleManagerChange}
           />
