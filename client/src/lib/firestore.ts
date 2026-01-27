@@ -1101,6 +1101,19 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
         status.includes('계약') || status.includes('집행');
       if (!isTargetStatus) return false;
       
+      // 기관별 집행일 확인 (processing_orgs 내 승인된 기관의 execution_date)
+      const approvedOrgs = (customer.processing_orgs || []).filter(
+        (org: ProcessingOrg) => org.status === '승인' && org.execution_amount && org.execution_date
+      );
+      
+      // 기관별 정산월 중 해당 월과 일치하는 것이 있는지 확인
+      const hasOrgInMonth = approvedOrgs.some(
+        (org: ProcessingOrg) => org.execution_date && org.execution_date.slice(0, 7) === month
+      );
+      
+      if (hasOrgInMonth) return true;
+      
+      // 레거시 호환: 고객 레벨 execution_date 확인
       const dateForSettlement = customer.execution_date || (customer as any).contract_date || customer.contract_completion_date || customer.entry_date;
       if (!dateForSettlement) return false;
       
@@ -1136,13 +1149,18 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
         status.includes('계약') || status.includes('집행');
       
-      // 정산월 확인 (집행일자 > 계약일 > 계약도달일 > 등록일)
-      const dateForSettlement = customer.execution_date || (customer as any).contract_date || customer.contract_completion_date || customer.entry_date;
-      const settlementMonth = dateForSettlement ? dateForSettlement.slice(0, 7) : '';
-      
       // 정산 대상 상태가 아니거나 정산월이 다른 경우에는 활성 정산만 삭제 (환수/취소 항목은 유지)
       if (settlement.status === '정상' && !settlement.is_clawback) {
-        if (!isTargetStatus || settlementMonth !== month) {
+        if (!isTargetStatus) {
+          await deleteDoc(doc(db, 'settlements', settlement.id));
+          deletedCount++;
+          continue;
+        }
+        
+        // 정산월 확인 - 정산 항목 자체의 settlement_month 기준으로 확인
+        // (정산 항목은 생성 시 이미 올바른 settlement_month가 설정됨)
+        if (settlement.settlement_month !== month) {
+          // 해당 월 정산이 아닌 경우 삭제 (다른 월로 이동된 경우)
           await deleteDoc(doc(db, 'settlements', settlement.id));
           deletedCount++;
         }
