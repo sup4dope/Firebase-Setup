@@ -1219,27 +1219,59 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       return;
     }
     
-    // 4. 승인된 진행기관 목록 확인 (execution_date 기준 정렬하여 결정론적 순서 보장)
+    // 4. 승인된 진행기관 목록 확인
     const approvedOrgs = (customer.processing_orgs || [])
-      .filter(
-        (org: { status: string; execution_amount?: number; execution_date?: string }) => 
-          org.status === '승인' && org.execution_amount && org.execution_date
-      )
-      .sort((a: { execution_date?: string }, b: { execution_date?: string }) => 
-        (a.execution_date || '').localeCompare(b.execution_date || '')
-      );
+      .filter((org: { status: string }) => org.status === '승인');
     
     // 담당자 정보
     const manager = users.find(u => u.uid === customer.manager_id);
     const entrySource = (customer.entry_source as EntrySourceType) || '기타';
     const commissionRate = getCommissionRate(manager?.commissionRates, entrySource);
     const depositCommissionRate = getDepositCommissionRate(manager?.commissionRates, entrySource);
+    const reExecutionRate = manager?.commissionRates?.reExecution || 0;
     const contractDate = (customer as any).contract_date || customer.contract_completion_date || customer.entry_date || '';
     const feeRate = customer.contract_fee_rate || customer.commission_rate || 3;
     
-    // 5. 승인된 기관이 있으면 각 기관별로 정산 생성/업데이트
-    if (approvedOrgs.length > 0) {
-      // 먼저 레거시 정산(org_name 없는) 삭제하여 중복 방지
+    // 모든 집행 항목 수집 (executions 배열 또는 레거시 필드)
+    interface ExecutionEntry {
+      orgName: string;
+      executionId: string;
+      executionDate: string;
+      executionAmount: number;
+      isReExecution: boolean;
+    }
+    const allExecutions: ExecutionEntry[] = [];
+    
+    for (const org of approvedOrgs) {
+      const orgName = org.org;
+      
+      if (org.executions && org.executions.length > 0) {
+        for (const exec of org.executions) {
+          if (exec.execution_date && exec.execution_amount) {
+            allExecutions.push({
+              orgName,
+              executionId: exec.id,
+              executionDate: exec.execution_date,
+              executionAmount: exec.execution_amount,
+              isReExecution: exec.is_re_execution || false,
+            });
+          }
+        }
+      } else if (org.execution_date && org.execution_amount) {
+        allExecutions.push({
+          orgName,
+          executionId: `legacy_${orgName}`,
+          executionDate: org.execution_date,
+          executionAmount: org.execution_amount,
+          isReExecution: false,
+        });
+      }
+    }
+    
+    allExecutions.sort((a, b) => a.executionDate.localeCompare(b.executionDate));
+    
+    // 5. 집행 항목이 있으면 각각 정산 생성/업데이트
+    if (allExecutions.length > 0) {
       const legacySettlements = existingSettlements.filter(s => 
         s.status === '정상' && !s.is_clawback && !s.org_name
       );
@@ -1248,91 +1280,110 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         console.log(`[Settlement Sync] 레거시 정산 삭제 (org_name 없음): ${customer.company_name || customer.name}`);
       }
       
-      // 처리된 org_name 추적 (중복 방지)
-      const processedOrgNames = new Set<string>();
+      const processedExecutionIds = new Set<string>();
+      let isFirstExecution = true;
       
-      for (let i = 0; i < approvedOrgs.length; i++) {
-        const org = approvedOrgs[i];
-        const orgName = org.org;
+      for (const execEntry of allExecutions) {
+        const { orgName, executionId, executionDate, executionAmount, isReExecution } = execEntry;
         
-        // 동일 기관명 중복 방지
-        if (processedOrgNames.has(orgName)) {
-          console.log(`[Settlement Sync] 중복 기관 건너뜀: ${customer.company_name || customer.name} - ${orgName}`);
+        if (processedExecutionIds.has(executionId)) {
           continue;
         }
-        processedOrgNames.add(orgName);
+        processedExecutionIds.add(executionId);
         
-        const orgExecutionAmount = org.execution_amount || 0;
-        const orgExecutionDate = org.execution_date || '';
-        const dateForMonth = orgExecutionDate || contractDate;
-        const settlementMonth = dateForMonth ? dateForMonth.slice(0, 7) : '';
-        
+        const settlementMonth = executionDate.slice(0, 7);
         if (!settlementMonth) {
           console.log(`[Settlement Sync] 정산월 결정 불가: ${customer.company_name || customer.name} - ${orgName}`);
           continue;
         }
         
-        // 계약금은 가장 빠른 집행일의 기관에만 포함 (중복 방지, 정렬로 첫번째가 가장 빠름)
-        const isFirstOrg = i === 0;
-        const contractAmount = isFirstOrg ? (customer.contract_amount || customer.deposit_amount || 0) : 0;
+        const contractAmount = isFirstExecution && !isReExecution 
+          ? (customer.contract_amount || customer.deposit_amount || 0) 
+          : 0;
         
-        const calc = calculateSettlement(contractAmount, orgExecutionAmount, feeRate, commissionRate, depositCommissionRate);
+        const effectiveCommissionRate = isReExecution ? reExecutionRate : commissionRate;
+        const effectiveDepositRate = isReExecution ? 0 : depositCommissionRate;
         
-        // 기존 정산 항목 찾기 (customer_id + org_name 조합, 활성 상태만)
-        const existingOrgSettlement = existingSettlements.find(s => 
-          s.status === '정상' && !s.is_clawback && s.org_name === orgName
+        const calc = calculateSettlement(contractAmount, executionAmount, feeRate, effectiveCommissionRate, effectiveDepositRate);
+        
+        const settlementOrgName = isReExecution ? `${orgName}(재집행)` : orgName;
+        
+        let existingOrgSettlement = existingSettlements.find(s => 
+          s.status === '정상' && !s.is_clawback && s.org_name === settlementOrgName && 
+          (s as any).execution_id === executionId
         );
         
+        if (!existingOrgSettlement) {
+          existingOrgSettlement = existingSettlements.find(s =>
+            s.status === '정상' && !s.is_clawback && s.org_name === settlementOrgName &&
+            s.execution_date === executionDate && !(s as any).execution_id
+          );
+        }
+        
+        if (!existingOrgSettlement) {
+          const orgSettlementsWithoutId = existingSettlements.filter(s =>
+            s.status === '정상' && !s.is_clawback && s.org_name === settlementOrgName &&
+            !(s as any).execution_id
+          );
+          if (orgSettlementsWithoutId.length === 1) {
+            existingOrgSettlement = orgSettlementsWithoutId[0];
+          }
+        }
+        
         if (existingOrgSettlement) {
-          // 기존 정산 항목 업데이트
           await updateSettlementItem(existingOrgSettlement.id, {
             customer_name: customer.company_name || customer.name,
             manager_id: customer.manager_id,
             manager_name: customer.manager_name || manager?.name || '',
             team_id: customer.team_id,
             team_name: customer.team_name || '',
-            entry_source: entrySource,
+            entry_source: isReExecution ? '승인복제' as EntrySourceType : entrySource,
             contract_amount: contractAmount,
-            execution_amount: orgExecutionAmount,
+            execution_amount: executionAmount,
             fee_rate: feeRate,
             total_revenue: calc.totalRevenue,
-            commission_rate: commissionRate,
+            commission_rate: effectiveCommissionRate,
             gross_commission: calc.grossCommission,
             tax_amount: calc.taxAmount,
             net_commission: calc.netCommission,
             contract_date: contractDate,
-            execution_date: orgExecutionDate,
+            execution_date: executionDate,
             settlement_month: settlementMonth,
-          });
-          console.log(`[Settlement Sync] 기관별 정산 업데이트: ${customer.company_name || customer.name} - ${orgName}, 집행금액: ${orgExecutionAmount}만원`);
+            execution_id: executionId,
+          } as any);
+          console.log(`[Settlement Sync] 집행별 정산 업데이트: ${customer.company_name || customer.name} - ${settlementOrgName}, 집행금액: ${executionAmount}만원`);
         } else {
-          // 해당 기관의 정산 항목이 없으면 신규 생성
-          const settlementData: InsertSettlementItem = {
+          const settlementData: InsertSettlementItem & { execution_id?: string } = {
             customer_id: customer.id,
             customer_name: customer.company_name || customer.name,
             manager_id: customer.manager_id,
             manager_name: customer.manager_name || manager?.name || '',
             team_id: customer.team_id,
             team_name: customer.team_name || '',
-            org_name: orgName,
-            entry_source: entrySource,
+            org_name: settlementOrgName,
+            entry_source: isReExecution ? '승인복제' as EntrySourceType : entrySource,
             contract_amount: contractAmount,
-            execution_amount: orgExecutionAmount,
+            execution_amount: executionAmount,
             fee_rate: feeRate,
             total_revenue: calc.totalRevenue,
-            commission_rate: commissionRate,
+            commission_rate: effectiveCommissionRate,
             gross_commission: calc.grossCommission,
             tax_amount: calc.taxAmount,
             net_commission: calc.netCommission,
             settlement_month: settlementMonth,
             contract_date: contractDate,
-            execution_date: orgExecutionDate,
+            execution_date: executionDate,
             status: '정상',
             is_clawback: false,
+            execution_id: executionId,
           };
           
-          await createSettlementItem(settlementData);
-          console.log(`[Settlement Sync] 기관별 정산 생성: ${customer.company_name || customer.name} - ${orgName}, 집행금액: ${orgExecutionAmount}만원`);
+          await createSettlementItem(settlementData as InsertSettlementItem);
+          console.log(`[Settlement Sync] 집행별 정산 생성: ${customer.company_name || customer.name} - ${settlementOrgName}, 집행금액: ${executionAmount}만원, 재집행: ${isReExecution}`);
+        }
+        
+        if (!isReExecution) {
+          isFirstExecution = false;
         }
       }
     } else {
