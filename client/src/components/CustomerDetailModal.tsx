@@ -24,6 +24,7 @@ import {
   CheckCircle,
   XCircle,
   Building,
+  RotateCcw,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -247,6 +248,7 @@ export function CustomerDetailModal({
   }[]>([]);
   const [proposalDesiredAmount, setProposalDesiredAmount] = useState("");
   const [isSendingBusinessCard, setIsSendingBusinessCard] = useState(false);
+  const [addAsReExecution, setAddAsReExecution] = useState(false);
   
   const { toast } = useToast();
 
@@ -2631,6 +2633,12 @@ export function CustomerDetailModal({
                                 {org.status === '부결' && <XCircle className="w-3.5 h-3.5" />}
                                 {org.status === '승인' && <CheckCircle className="w-3.5 h-3.5" />}
                                 {org.org}
+                                {org.is_re_execution && (
+                                  <Badge variant="secondary" className="text-[9px] ml-1 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-1 py-0">
+                                    <RotateCcw className="w-2.5 h-2.5 mr-0.5" />
+                                    재집행
+                                  </Badge>
+                                )}
                               </div>
                               <div className="text-[10px] text-muted-foreground space-x-2">
                                 {org.applied_at && <span>접수: {org.applied_at}</span>}
@@ -2701,7 +2709,24 @@ export function CustomerDetailModal({
                   {/* 기관 추가 섹션 */}
                   {!isReadOnly && (
                     <div className="pt-2 border-t">
-                      <p className="text-[10px] text-muted-foreground mb-1.5">기관 추가</p>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[10px] text-muted-foreground">기관 추가</p>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <Checkbox
+                            checked={addAsReExecution}
+                            onCheckedChange={(checked) => setAddAsReExecution(checked === true)}
+                            className="h-3 w-3"
+                            data-testid="checkbox-add-as-reexecution"
+                          />
+                          <span className={cn(
+                            "text-[10px]",
+                            addAsReExecution ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"
+                          )}>
+                            <RotateCcw className="w-2.5 h-2.5 inline mr-0.5" />
+                            재집행으로 추가
+                          </span>
+                        </label>
+                      </div>
                       <div className="flex flex-wrap gap-1">
                         {PROCESSING_ORGS.filter(org => {
                           const existingOrgs = formData.processing_orgs || [];
@@ -2710,20 +2735,30 @@ export function CustomerDetailModal({
                           <Badge
                             key={org}
                             variant="outline"
-                            className="text-[10px] cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 px-1.5 py-0.5"
+                            className={cn(
+                              "text-[10px] cursor-pointer px-1.5 py-0.5",
+                              addAsReExecution 
+                                ? "hover:bg-amber-100 dark:hover:bg-amber-900/30 border-amber-300 dark:border-amber-700" 
+                                : "hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                            )}
                             onClick={() => {
                               const today = format(new Date(), 'yyyy-MM-dd');
                               const newOrg: ProcessingOrg = {
                                 org,
                                 status: '진행중',
                                 applied_at: today,
+                                is_re_execution: addAsReExecution,
                               };
                               const updatedOrgs = [...(formData.processing_orgs || []), newOrg];
                               handleFieldChange({ processing_orgs: updatedOrgs });
                             }}
                             data-testid={`btn-detail-add-${org}`}
                           >
-                            <Plus className="w-2.5 h-2.5 mr-0.5" />
+                            {addAsReExecution ? (
+                              <RotateCcw className="w-2.5 h-2.5 mr-0.5 text-amber-600 dark:text-amber-400" />
+                            ) : (
+                              <Plus className="w-2.5 h-2.5 mr-0.5" />
+                            )}
                             {org}
                           </Badge>
                         ))}

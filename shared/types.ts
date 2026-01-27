@@ -153,15 +153,6 @@ export interface Customer {
 // 진행기관 상태
 export type ProcessingOrgStatus = '진행중' | '부결' | '승인';
 
-// 집행 정보 (재집행 지원)
-export interface Execution {
-  id: string; // 고유 ID
-  execution_date: string; // 집행일 YYYY-MM-DD
-  execution_amount: number; // 집행금액 (만원)
-  is_re_execution: boolean; // 재집행 여부
-  created_at?: Date; // 생성일
-}
-
 // 진행기관 정보
 export interface ProcessingOrg {
   org: string; // 기관명
@@ -169,9 +160,9 @@ export interface ProcessingOrg {
   applied_at?: string; // 접수일 YYYY-MM-DD
   rejected_at?: string; // 부결일 YYYY-MM-DD
   approved_at?: string; // 승인일 YYYY-MM-DD
-  execution_date?: string; // 집행일 YYYY-MM-DD (레거시, executions 없는 경우 사용)
-  execution_amount?: number; // 집행금액 (만원) (레거시, executions 없는 경우 사용)
-  executions?: Execution[]; // 집행 목록 (재집행 포함)
+  execution_date?: string; // 집행일 YYYY-MM-DD
+  execution_amount?: number; // 집행금액 (만원)
+  is_re_execution?: boolean; // 재집행 여부 (첫 자금 이후 추가 자금)
 }
 
 // Customer Memo

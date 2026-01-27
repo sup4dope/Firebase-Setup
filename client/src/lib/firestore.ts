@@ -1232,10 +1232,9 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     const contractDate = (customer as any).contract_date || customer.contract_completion_date || customer.entry_date || '';
     const feeRate = customer.contract_fee_rate || customer.commission_rate || 3;
     
-    // 모든 집행 항목 수집 (executions 배열 또는 레거시 필드)
+    // 모든 집행 항목 수집 (기관별 is_re_execution 플래그 사용)
     interface ExecutionEntry {
       orgName: string;
-      executionId: string;
       executionDate: string;
       executionAmount: number;
       isReExecution: boolean;
@@ -1243,27 +1242,12 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     const allExecutions: ExecutionEntry[] = [];
     
     for (const org of approvedOrgs) {
-      const orgName = org.org;
-      
-      if (org.executions && org.executions.length > 0) {
-        for (const exec of org.executions) {
-          if (exec.execution_date && exec.execution_amount) {
-            allExecutions.push({
-              orgName,
-              executionId: exec.id,
-              executionDate: exec.execution_date,
-              executionAmount: exec.execution_amount,
-              isReExecution: exec.is_re_execution || false,
-            });
-          }
-        }
-      } else if (org.execution_date && org.execution_amount) {
+      if (org.execution_date && org.execution_amount) {
         allExecutions.push({
-          orgName,
-          executionId: `legacy_${orgName}`,
+          orgName: org.org,
           executionDate: org.execution_date,
           executionAmount: org.execution_amount,
-          isReExecution: false,
+          isReExecution: org.is_re_execution || false,
         });
       }
     }
@@ -1280,16 +1264,18 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         console.log(`[Settlement Sync] 레거시 정산 삭제 (org_name 없음): ${customer.company_name || customer.name}`);
       }
       
-      const processedExecutionIds = new Set<string>();
+      const processedOrgs = new Set<string>();
       let isFirstExecution = true;
       
       for (const execEntry of allExecutions) {
-        const { orgName, executionId, executionDate, executionAmount, isReExecution } = execEntry;
+        const { orgName, executionDate, executionAmount, isReExecution } = execEntry;
         
-        if (processedExecutionIds.has(executionId)) {
+        const settlementOrgName = isReExecution ? `${orgName}(재집행)` : orgName;
+        
+        if (processedOrgs.has(settlementOrgName)) {
           continue;
         }
-        processedExecutionIds.add(executionId);
+        processedOrgs.add(settlementOrgName);
         
         const settlementMonth = executionDate.slice(0, 7);
         if (!settlementMonth) {
@@ -1306,29 +1292,9 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         
         const calc = calculateSettlement(contractAmount, executionAmount, feeRate, effectiveCommissionRate, effectiveDepositRate);
         
-        const settlementOrgName = isReExecution ? `${orgName}(재집행)` : orgName;
-        
-        let existingOrgSettlement = existingSettlements.find(s => 
-          s.status === '정상' && !s.is_clawback && s.org_name === settlementOrgName && 
-          (s as any).execution_id === executionId
+        const existingOrgSettlement = existingSettlements.find(s => 
+          s.status === '정상' && !s.is_clawback && s.org_name === settlementOrgName
         );
-        
-        if (!existingOrgSettlement) {
-          existingOrgSettlement = existingSettlements.find(s =>
-            s.status === '정상' && !s.is_clawback && s.org_name === settlementOrgName &&
-            s.execution_date === executionDate && !(s as any).execution_id
-          );
-        }
-        
-        if (!existingOrgSettlement) {
-          const orgSettlementsWithoutId = existingSettlements.filter(s =>
-            s.status === '정상' && !s.is_clawback && s.org_name === settlementOrgName &&
-            !(s as any).execution_id
-          );
-          if (orgSettlementsWithoutId.length === 1) {
-            existingOrgSettlement = orgSettlementsWithoutId[0];
-          }
-        }
         
         if (existingOrgSettlement) {
           await updateSettlementItem(existingOrgSettlement.id, {
@@ -1349,11 +1315,10 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
             contract_date: contractDate,
             execution_date: executionDate,
             settlement_month: settlementMonth,
-            execution_id: executionId,
-          } as any);
-          console.log(`[Settlement Sync] 집행별 정산 업데이트: ${customer.company_name || customer.name} - ${settlementOrgName}, 집행금액: ${executionAmount}만원`);
+          });
+          console.log(`[Settlement Sync] 기관별 정산 업데이트: ${customer.company_name || customer.name} - ${settlementOrgName}, 집행금액: ${executionAmount}만원`);
         } else {
-          const settlementData: InsertSettlementItem & { execution_id?: string } = {
+          const settlementData: InsertSettlementItem = {
             customer_id: customer.id,
             customer_name: customer.company_name || customer.name,
             manager_id: customer.manager_id,
@@ -1375,11 +1340,10 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
             execution_date: executionDate,
             status: '정상',
             is_clawback: false,
-            execution_id: executionId,
           };
           
-          await createSettlementItem(settlementData as InsertSettlementItem);
-          console.log(`[Settlement Sync] 집행별 정산 생성: ${customer.company_name || customer.name} - ${settlementOrgName}, 집행금액: ${executionAmount}만원, 재집행: ${isReExecution}`);
+          await createSettlementItem(settlementData);
+          console.log(`[Settlement Sync] 기관별 정산 생성: ${customer.company_name || customer.name} - ${settlementOrgName}, 집행금액: ${executionAmount}만원, 재집행: ${isReExecution}`);
         }
         
         if (!isReExecution) {
