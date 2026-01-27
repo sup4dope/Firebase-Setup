@@ -713,11 +713,10 @@ export default function Dashboard() {
     // 가장 최근 집행일 (최신 승인된 기관의 집행일)
     const latestExecutionDate = executionDate;
     
-    // 상태 자동 변경 로직: 신청완료 → 집행완료 (타입 유지)
+    // 상태 자동 변경 로직: 신청완료 → 집행완료
+    // 신청완료(외주)만 집행완료(외주)로, 나머지는 집행완료로 이동
     const executionStatusMap: Record<string, string> = {
-      '신청완료(선불)': '집행완료(선불)',
       '신청완료(외주)': '집행완료(외주)',
-      '신청완료(후불)': '집행완료(후불)',
     };
     const newStatus = executionStatusMap[customer.status_code] || '집행완료';
     
