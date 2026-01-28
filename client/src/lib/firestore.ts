@@ -1055,6 +1055,7 @@ export const getCounselingLogs = async (): Promise<CounselingLog[]> => {
 // 정산 대상 상태 목록 (이 상태를 가진 고객은 정산에 포함)
 const SETTLEMENT_TARGET_STATUSES = [
   '계약', '계약완료', '계약완료(선불)', '계약완료(후불)',
+  '서류취합완료', '서류취합완료(선불)', '서류취합완료(후불)',
   '집행', '집행완료', '집행대기', '집행중',
 ];
 
