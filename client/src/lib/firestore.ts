@@ -1708,10 +1708,15 @@ export const calculateMonthlySettlementSummary = (
   // 환수 항목: 해당 월에 환수가 적용된 항목 (음수 값)
   const clawbackItems = managerItems.filter(item => item.is_clawback);
   
-  const totalContracts = originalItems.length;
+  // 계약 건수: 고유 고객 수로 계산 (같은 고객의 중복 승인/재집행은 1건으로 처리)
+  const uniqueCustomerIds = new Set(originalItems.map(item => item.customer_id));
+  const totalContracts = uniqueCustomerIds.size;
   // 계약금 수당: 계약금 * 수당율 적용
   const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * item.commission_rate / 100), 0);
-  const executionCount = originalItems.filter(item => item.execution_amount > 0).length;
+  // 집행 건수: 고유 고객 수로 계산 (같은 고객의 중복 집행은 1건으로 처리)
+  const executedItems = originalItems.filter(item => item.execution_amount > 0);
+  const uniqueExecutedCustomerIds = new Set(executedItems.map(item => item.customer_id));
+  const executionCount = uniqueExecutedCustomerIds.size;
   const totalExecutionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
   const totalRevenue = originalItems.reduce((sum, item) => sum + item.total_revenue, 0);
   // 총 자문금액 = 집행금액 × 자문료율% × 수당률%
