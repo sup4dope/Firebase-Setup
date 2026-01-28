@@ -1713,10 +1713,9 @@ export const calculateMonthlySettlementSummary = (
   const totalContracts = uniqueCustomerIds.size;
   // 계약금 수당: 계약금 * 수당율 적용
   const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * item.commission_rate / 100), 0);
-  // 집행 건수: 고유 고객 수로 계산 (같은 고객의 중복 집행은 1건으로 처리)
+  // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
   const executedItems = originalItems.filter(item => item.execution_amount > 0);
-  const uniqueExecutedCustomerIds = new Set(executedItems.map(item => item.customer_id));
-  const executionCount = uniqueExecutedCustomerIds.size;
+  const executionCount = executedItems.length;
   const totalExecutionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
   const totalRevenue = originalItems.reduce((sum, item) => sum + item.total_revenue, 0);
   // 총 자문금액 = 집행금액 × 자문료율% × 수당률%
@@ -2383,9 +2382,10 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
   let totalContractAmount = 0;
   let totalAdvisoryFee = 0;
   
-  // 고유 고객 수 추적 (같은 고객의 중복 승인/재집행은 1건으로 처리)
+  // 고유 고객 수 추적 (계약 건수용)
   const uniqueContractCustomerIds = new Set<string>();
-  const uniqueExecutionCustomerIds = new Set<string>();
+  // 집행 건수: 실제 집행된 기관 수
+  let executionCount = 0;
   
   snapshot.docs.forEach(doc => {
     const data = doc.data() as SettlementItem;
@@ -2406,10 +2406,8 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
       }
       
       if ((data.execution_amount || 0) > 0) {
-        // 고유 고객 ID로 집행 건수 집계
-        if (data.customer_id) {
-          uniqueExecutionCustomerIds.add(data.customer_id);
-        }
+        // 집행 건수: 각 기관별 집행을 개별 건수로 카운트
+        executionCount++;
         const advisoryFee = (data.execution_amount || 0) * ((data.fee_rate || 0) / 100);
         totalAdvisoryFee += advisoryFee;
       }
@@ -2422,7 +2420,7 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
     grossRevenue: totalDeposits - clawbackLoss,
     employeeCommission,
     contractCount: uniqueContractCustomerIds.size,
-    executionCount: uniqueExecutionCustomerIds.size,
+    executionCount,
     totalContractAmount,
     totalAdvisoryFee,
   };

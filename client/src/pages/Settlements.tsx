@@ -244,10 +244,9 @@ export default function Settlements() {
         const totalContracts = uniqueCustomerIds.size;
         // 계약금 수당: 계약금 * 수당율 적용
         const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * item.commission_rate / 100), 0);
-        // 집행 건수: 고유 고객 수로 계산 (같은 고객의 중복 집행은 1건으로 처리)
+        // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
         const executedItems = originalItems.filter(item => item.execution_amount > 0);
-        const uniqueExecutedCustomerIds = new Set(executedItems.map(item => item.customer_id));
-        const executionCount = uniqueExecutedCustomerIds.size;
+        const executionCount = executedItems.length;
         const totalExecutionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
         const totalExecutionFee = originalItems.reduce((sum, item) => {
           return sum + (item.execution_amount * (item.fee_rate / 100) * (item.commission_rate / 100));
@@ -301,9 +300,8 @@ export default function Settlements() {
     const rawContractAmount = originalItems.reduce((sum, item) => sum + item.contract_amount, 0);
     const avgContractAmount = uniqueCustomerCount > 0 ? rawContractAmount / uniqueCustomerCount : 0;
     const executedItems = originalItems.filter(item => item.execution_amount > 0);
-    // 집행 건수: 고유 고객 수로 계산
-    const uniqueExecutedCustomerIds = new Set(executedItems.map(item => item.customer_id));
-    const executionCount = uniqueExecutedCustomerIds.size;
+    // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
+    const executionCount = executedItems.length;
     const executionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
     const clawbackContractAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(item.contract_amount), 0);
     
