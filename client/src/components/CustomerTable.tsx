@@ -491,15 +491,49 @@ export function CustomerTable({
                   {customer.daily_no || customer.daily_sequence || '-'}
                 </TableCell>
                 
-                {/* 고객명 - clickable */}
+                {/* 고객명 - clickable with hover info popup */}
                 <TableCell>
-                  <button
-                    onClick={() => onCustomerClick?.(customer)}
-                    className="font-medium text-primary hover:underline cursor-pointer"
-                    data-testid={`text-customer-name-${customer.id}`}
-                  >
-                    {customer.name}
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => onCustomerClick?.(customer)}
+                        className="font-medium text-primary hover:underline cursor-pointer"
+                        data-testid={`text-customer-name-${customer.id}`}
+                      >
+                        {customer.name}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="p-3 max-w-xs">
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground w-16 shrink-0">고객명</span>
+                          <span className="font-medium">{customer.name || '-'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground w-16 shrink-0">주민번호</span>
+                          <span className="font-mono">
+                            {customer.ssn_front && customer.ssn_back 
+                              ? `${customer.ssn_front}-${customer.ssn_back}` 
+                              : customer.ssn_front 
+                                ? `${customer.ssn_front}-*******` 
+                                : '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground w-16 shrink-0">전화번호</span>
+                          <span className="font-mono">{customer.phone || '-'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground w-16 shrink-0">통신사</span>
+                          <span>{customer.carrier || '-'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground w-16 shrink-0">상호명</span>
+                          <span>{customer.company_name || '-'}</span>
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </TableCell>
                 
                 {/* 상태 - Custom dark dropdown with grouped options */}
