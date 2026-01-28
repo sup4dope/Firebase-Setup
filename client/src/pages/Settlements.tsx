@@ -242,8 +242,8 @@ export default function Settlements() {
         // 계약 건수: 고유 고객 수로 계산 (같은 고객의 중복 승인/재집행은 1건으로 처리)
         const uniqueCustomerIds = new Set(originalItems.map(item => item.customer_id));
         const totalContracts = uniqueCustomerIds.size;
-        // 계약금 수당: 계약금 * 수당율 적용
-        const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * item.commission_rate / 100), 0);
+        // 계약금 수당: 계약금 * 계약금 수당율 적용 (deposit_commission_rate 우선, 없으면 commission_rate 사용)
+        const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
         // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
         const executedItems = originalItems.filter(item => item.execution_amount > 0);
         const executionCount = executedItems.length;
@@ -291,8 +291,8 @@ export default function Settlements() {
     const originalItems = items.filter(item => !item.is_clawback);
     const clawbackItems = items.filter(item => item.is_clawback);
     
-    // 계약금 수당: 계약금 * 수당율 적용
-    const contractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * item.commission_rate / 100), 0);
+    // 계약금 수당: 계약금 * 계약금 수당율 적용 (deposit_commission_rate 우선, 없으면 commission_rate 사용)
+    const contractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
     // 고유 고객 수 (같은 고객의 중복 승인/재집행은 1건으로 처리)
     const uniqueCustomerIds = new Set(originalItems.map(item => item.customer_id));
     const uniqueCustomerCount = uniqueCustomerIds.size;
@@ -302,7 +302,6 @@ export default function Settlements() {
     const executedItems = originalItems.filter(item => item.execution_amount > 0);
     // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
     const executionCount = executedItems.length;
-    console.log('[정산 집계] 총 정산항목:', items.length, '원본항목:', originalItems.length, '집행항목:', executedItems.length, '집행건수:', executionCount);
     const executionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
     const clawbackContractAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(item.contract_amount), 0);
     
@@ -407,7 +406,9 @@ export default function Settlements() {
       const customer = customers.find(c => c.id === item.customer_id);
       const customerName = customer?.name || item.customer_name;
       const advisoryFee = Math.round(item.execution_amount * (item.fee_rate || 0) / 100 * 100) / 100;
-      const contractCommission = item.contract_amount * (item.commission_rate / 100);
+      // 계약금 수당률: deposit_commission_rate 우선 사용, 없으면 commission_rate 사용
+      const depositRate = item.deposit_commission_rate ?? item.commission_rate;
+      const contractCommission = item.contract_amount * (depositRate / 100);
       const advisoryCommission = advisoryFee * (item.commission_rate / 100);
       const contractNet = Math.round(contractCommission * 0.967 * 100) / 100;
       const advisoryNet = Math.round(advisoryCommission * 0.967 * 100) / 100;
@@ -493,7 +494,9 @@ export default function Settlements() {
     let totalConsultingFee = 0;
     
     managerItems.forEach(item => {
-      totalContractPayment += item.contract_amount * (item.commission_rate / 100);
+      // 계약금 수당률: deposit_commission_rate 우선 사용, 없으면 commission_rate 사용
+      const depositRate = item.deposit_commission_rate ?? item.commission_rate;
+      totalContractPayment += item.contract_amount * (depositRate / 100);
       const advisoryFee = item.execution_amount * (item.fee_rate || 0) / 100;
       totalConsultingFee += advisoryFee * (item.commission_rate / 100);
     });
@@ -819,7 +822,9 @@ export default function Settlements() {
                       const customerName = customer?.name || item.customer_name;
                       const advisoryFee = Math.round(item.execution_amount * (item.fee_rate || 0) / 100 * 100) / 100;
                       
-                      const contractCommission = item.contract_amount * (item.commission_rate / 100);
+                      // 계약금 수당률: deposit_commission_rate 우선 사용, 없으면 commission_rate 사용
+                      const depositRate = item.deposit_commission_rate ?? item.commission_rate;
+                      const contractCommission = item.contract_amount * (depositRate / 100);
                       const advisoryCommission = advisoryFee * (item.commission_rate / 100);
                       const contractNet = Math.round(contractCommission * 0.967 * 100) / 100;
                       const advisoryNet = Math.round(advisoryCommission * 0.967 * 100) / 100;

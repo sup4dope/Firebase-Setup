@@ -1309,6 +1309,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
             fee_rate: feeRate,
             total_revenue: calc.totalRevenue,
             commission_rate: effectiveCommissionRate,
+            deposit_commission_rate: effectiveDepositRate,
             gross_commission: calc.grossCommission,
             tax_amount: calc.taxAmount,
             net_commission: calc.netCommission,
@@ -1332,6 +1333,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
             fee_rate: feeRate,
             total_revenue: calc.totalRevenue,
             commission_rate: effectiveCommissionRate,
+            deposit_commission_rate: effectiveDepositRate,
             gross_commission: calc.grossCommission,
             tax_amount: calc.taxAmount,
             net_commission: calc.netCommission,
@@ -1382,6 +1384,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
           fee_rate: feeRate,
           total_revenue: calc.totalRevenue,
           commission_rate: commissionRate,
+          deposit_commission_rate: depositCommissionRate,
           gross_commission: calc.grossCommission,
           tax_amount: calc.taxAmount,
           net_commission: calc.netCommission,
@@ -1404,6 +1407,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
           fee_rate: feeRate,
           total_revenue: calc.totalRevenue,
           commission_rate: commissionRate,
+          deposit_commission_rate: depositCommissionRate,
           gross_commission: calc.grossCommission,
           tax_amount: calc.taxAmount,
           net_commission: calc.netCommission,
@@ -1543,8 +1547,9 @@ export const processClawbackForFinalRejection = async (
     let totalClawbackAmount = 0;
     
     for (const settlement of unclawbackedSettlements) {
-      // 계약금 수당 계산
-      const contractCommission = Math.round(settlement.contract_amount * (settlement.commission_rate / 100) * 100) / 100;
+      // 계약금 수당 계산 (deposit_commission_rate 우선 사용, 없으면 commission_rate 사용)
+      const depositRate = settlement.deposit_commission_rate ?? settlement.commission_rate;
+      const contractCommission = Math.round(settlement.contract_amount * (depositRate / 100) * 100) / 100;
       const contractTax = Math.round(contractCommission * 0.033 * 100) / 100;
       const contractNet = Math.round(contractCommission * 0.967 * 100) / 100;
       
@@ -1711,8 +1716,8 @@ export const calculateMonthlySettlementSummary = (
   // 계약 건수: 고유 고객 수로 계산 (같은 고객의 중복 승인/재집행은 1건으로 처리)
   const uniqueCustomerIds = new Set(originalItems.map(item => item.customer_id));
   const totalContracts = uniqueCustomerIds.size;
-  // 계약금 수당: 계약금 * 수당율 적용
-  const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * item.commission_rate / 100), 0);
+  // 계약금 수당: 계약금 * 계약금 수당율 적용 (deposit_commission_rate 우선, 없으면 commission_rate 사용)
+  const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
   // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
   const executedItems = originalItems.filter(item => item.execution_amount > 0);
   const executionCount = executedItems.length;

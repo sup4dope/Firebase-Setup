@@ -373,7 +373,8 @@ export interface SettlementItem {
   
   // 수당 계산 결과
   total_revenue: number; // 총수익 = 계약금 + (집행금액 * 자문료율%)
-  commission_rate: number; // 적용된 수당률 (%)
+  commission_rate: number; // 자문료 수당률 (%)
+  deposit_commission_rate?: number; // 계약금 수당률 (%) - 미설정시 commission_rate 사용
   gross_commission: number; // 세전수당 (만원)
   tax_amount: number; // 원천세 (3.3%)
   net_commission: number; // 세후실지급액 (만원)
