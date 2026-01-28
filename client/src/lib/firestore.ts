@@ -2380,10 +2380,12 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
   let totalDeposits = 0;
   let clawbackLoss = 0;
   let employeeCommission = 0;
-  let contractCount = 0;
-  let executionCount = 0;
   let totalContractAmount = 0;
   let totalAdvisoryFee = 0;
+  
+  // 고유 고객 수 추적 (같은 고객의 중복 승인/재집행은 1건으로 처리)
+  const uniqueContractCustomerIds = new Set<string>();
+  const uniqueExecutionCustomerIds = new Set<string>();
   
   snapshot.docs.forEach(doc => {
     const data = doc.data() as SettlementItem;
@@ -2396,10 +2398,18 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
       // 나중에 환수/취소되더라도 해당 월에는 원래 수익으로 표시
       totalDeposits += data.total_revenue || 0;
       employeeCommission += data.gross_commission || 0;
-      contractCount++;
       totalContractAmount += data.contract_amount || 0;
+      
+      // 고유 고객 ID로 계약 건수 집계
+      if (data.customer_id) {
+        uniqueContractCustomerIds.add(data.customer_id);
+      }
+      
       if ((data.execution_amount || 0) > 0) {
-        executionCount++;
+        // 고유 고객 ID로 집행 건수 집계
+        if (data.customer_id) {
+          uniqueExecutionCustomerIds.add(data.customer_id);
+        }
         const advisoryFee = (data.execution_amount || 0) * ((data.fee_rate || 0) / 100);
         totalAdvisoryFee += advisoryFee;
       }
@@ -2411,8 +2421,8 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
     clawbackLoss,
     grossRevenue: totalDeposits - clawbackLoss,
     employeeCommission,
-    contractCount,
-    executionCount,
+    contractCount: uniqueContractCustomerIds.size,
+    executionCount: uniqueExecutionCustomerIds.size,
     totalContractAmount,
     totalAdvisoryFee,
   };
