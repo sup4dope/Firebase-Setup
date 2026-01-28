@@ -302,6 +302,7 @@ export default function Settlements() {
     const executedItems = originalItems.filter(item => item.execution_amount > 0);
     // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
     const executionCount = executedItems.length;
+    console.log('[정산 집계] 총 정산항목:', items.length, '원본항목:', originalItems.length, '집행항목:', executedItems.length, '집행건수:', executionCount);
     const executionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
     const clawbackContractAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(item.contract_amount), 0);
     
