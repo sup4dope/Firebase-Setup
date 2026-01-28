@@ -1056,6 +1056,7 @@ export const getCounselingLogs = async (): Promise<CounselingLog[]> => {
 const SETTLEMENT_TARGET_STATUSES = [
   '계약', '계약완료', '계약완료(선불)', '계약완료(후불)',
   '서류취합완료', '서류취합완료(선불)', '서류취합완료(후불)',
+  '신청완료', '신청완료(선불)', '신청완료(외주)', '신청완료(후불)',
   '집행', '집행완료', '집행대기', '집행중',
 ];
 
