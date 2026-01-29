@@ -127,34 +127,38 @@ export default function Dashboard() {
     existingOrgs: [],
   });
 
-  // Fetch data
+  // Fetch data - 모든 데이터를 병렬로 로딩하여 성능 최적화
   const fetchData = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
       const currentYear = new Date().getFullYear();
-      const [fetchedUsers, fetchedTeams, fetchedHolidayMap, fetchedLogs] = await Promise.all([
+      
+      // 고객 데이터 조회 함수 (역할 기반)
+      const fetchCustomersByRole = () => {
+        if (isSuperAdmin) {
+          return getCustomers();
+        } else if (isTeamLeader && user.team_id) {
+          return getCustomersByTeam(user.team_id);
+        } else {
+          return getCustomersByManager(user.uid);
+        }
+      };
+
+      // 모든 데이터를 한번에 병렬 로딩
+      const [fetchedUsers, fetchedTeams, fetchedHolidayMap, fetchedLogs, fetchedCustomers] = await Promise.all([
         getUsers(),
         getTeams(),
         fetchYearlyHolidays(currentYear),
         getStatusLogs(),
+        fetchCustomersByRole(),
       ]);
 
       setUsers(fetchedUsers);
       setTeams(fetchedTeams);
       setHolidayMap(fetchedHolidayMap);
       setStatusLogs(fetchedLogs);
-
-      // Fetch customers based on role
-      let fetchedCustomers: Customer[];
-      if (isSuperAdmin) {
-        fetchedCustomers = await getCustomers();
-      } else if (isTeamLeader && user.team_id) {
-        fetchedCustomers = await getCustomersByTeam(user.team_id);
-      } else {
-        fetchedCustomers = await getCustomersByManager(user.uid);
-      }
       setCustomers(fetchedCustomers);
     } catch (error) {
       console.error('Error fetching data:', error);

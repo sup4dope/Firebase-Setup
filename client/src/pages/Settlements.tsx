@@ -174,39 +174,53 @@ export default function Settlements() {
     if (!user || authLoading) return;
     setDataLoading(true);
     try {
-      const fetchedUsers = await getUsers();
-      setUsers(fetchedUsers);
-      
       const months = getMonthsForPeriod(selectedMonth);
       const isSummary = isPeriodSummary(selectedMonth);
       
       // 권한에 따라 필터 결정 (Firebase 보안 규칙 대응)
-      // staff: manager_id 필터 (본인 것만)
-      // team_leader: team_id 필터 (팀원 것만)
-      // super_admin: 필터 없음 (전체)
       const managerId = isStaff ? user.uid : undefined;
       const teamId = isTeamLeader && user.team_id ? user.team_id : undefined;
       
       if (isSummary) {
-        const allItemsPromises = months.map(m => getSettlementItems(m, managerId, teamId));
-        const allItemsArrays = await Promise.all(allItemsPromises);
-        const allItems = allItemsArrays.flat();
+        // 기간 요약 뷰: 모든 데이터 병렬 로딩
+        const [fetchedUsers, allItemsArrays, fetchedCustomers] = await Promise.all([
+          getUsers(),
+          Promise.all(months.map(m => getSettlementItems(m, managerId, teamId))),
+          getCustomers(),
+        ]);
         
-        const fetchedCustomers = await getCustomers();
-        setItems(allItems);
+        setUsers(fetchedUsers);
+        setItems(allItemsArrays.flat());
         setCustomers(fetchedCustomers);
       } else {
-        if (isSuperAdmin) {
-          await syncCustomerSettlements(selectedMonth, fetchedUsers);
-        }
-        
-        const [fetchedItems, fetchedCustomers] = await Promise.all([
+        // 월간 뷰: 사용자, 정산, 고객 데이터 병렬 로딩
+        const [fetchedUsers, fetchedItems, fetchedCustomers] = await Promise.all([
+          getUsers(),
           getSettlementItems(selectedMonth, managerId, teamId),
           getCustomers(),
         ]);
         
+        setUsers(fetchedUsers);
         setItems(fetchedItems);
         setCustomers(fetchedCustomers);
+        
+        // Super admin만 동기화 실행 (데이터 표시 후 백그라운드에서)
+        if (isSuperAdmin) {
+          const syncMonth = selectedMonth; // 현재 월 캡처 (stale check용)
+          syncCustomerSettlements(syncMonth, fetchedUsers).then(() => {
+            // 동기화 후 정산 데이터 새로고침 (월이 변경되지 않은 경우에만)
+            getSettlementItems(syncMonth, managerId, teamId).then(refreshedItems => {
+              // 사용자가 다른 월로 이동했으면 업데이트 건너뜀
+              setItems(prev => {
+                // 이전 데이터의 월과 동기화 월이 다르면 업데이트 건너뜀
+                if (prev.length > 0 && prev[0]?.settlement_month !== syncMonth) {
+                  return prev;
+                }
+                return refreshedItems;
+              });
+            });
+          }).catch(err => console.error('Settlement sync error:', err));
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);

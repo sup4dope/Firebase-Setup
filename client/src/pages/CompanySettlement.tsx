@@ -264,13 +264,19 @@ export default function CompanySettlement() {
       const isSummary = isPeriodSummary(selectedMonth);
       
       if (isSummary) {
-        const results = await Promise.all(
-          months.map(m => Promise.all([
-            getRevenueDataByMonth(m),
-            getExpenseSummaryByMonth(m),
-            getAdDbCountByMonth(m),
-          ]))
-        );
+        const lastMonth = months[months.length - 1];
+        
+        // 모든 데이터를 병렬로 로딩 (누적 세금 적립금 포함)
+        const [results, cumTax] = await Promise.all([
+          Promise.all(
+            months.map(m => Promise.all([
+              getRevenueDataByMonth(m),
+              getExpenseSummaryByMonth(m),
+              getAdDbCountByMonth(m),
+            ]))
+          ),
+          getCumulativeTaxReserve(lastMonth),
+        ]);
         
         const aggregatedRevenue = {
           totalDeposits: 0,
@@ -314,9 +320,6 @@ export default function CompanySettlement() {
         setRevenueData(aggregatedRevenue);
         setExpenseSummary(aggregatedExpense);
         setAdDbCount(totalAdDb);
-        
-        const lastMonth = months[months.length - 1];
-        const cumTax = await getCumulativeTaxReserve(lastMonth);
         setCumulativeTaxReserve(cumTax);
       } else {
         const [expensesData, revenue, summary, dbCount, cumTaxReserve] = await Promise.all([

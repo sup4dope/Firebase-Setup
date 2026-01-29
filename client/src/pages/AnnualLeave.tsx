@@ -123,30 +123,36 @@ export default function AnnualLeave() {
     setLoading(true);
     try {
       const year = currentMonth.getFullYear();
-      const [holidays, summary, myReqs] = await Promise.all([
+      
+      // 역할에 따른 추가 데이터 로딩 함수
+      const fetchRoleBasedData = async (): Promise<{ pending: LeaveRequest[], all: LeaveRequest[] }> => {
+        if (isSuperAdmin) {
+          const [leaderPending, adminPending, all] = await Promise.all([
+            getLeaveRequestsByStatus('pending_leader'),
+            getLeaveRequestsByStatus('pending_admin'),
+            getLeaveRequests(),
+          ]);
+          return { pending: [...leaderPending, ...adminPending], all };
+        } else if (isTeamLeader && user.team_id) {
+          const teamReqs = await getLeaveRequestsByTeam(user.team_id);
+          return { pending: teamReqs.filter(r => r.status === 'pending_leader'), all: teamReqs };
+        }
+        return { pending: [], all: [] };
+      };
+
+      // 모든 데이터 병렬 로딩
+      const [holidays, summary, myReqs, roleData] = await Promise.all([
         fetchYearlyHolidays(year),
         getLeaveSummary(user.uid),
         getLeaveRequestsByUser(user.uid),
+        fetchRoleBasedData(),
       ]);
 
       setPublicHolidays(holidays);
       setLeaveSummary(summary);
       setMyRequests(myReqs);
-
-      if (isSuperAdmin) {
-        const [leaderPending, adminPending] = await Promise.all([
-          getLeaveRequestsByStatus('pending_leader'),
-          getLeaveRequestsByStatus('pending_admin'),
-        ]);
-        setPendingRequests([...leaderPending, ...adminPending]);
-        const all = await getLeaveRequests();
-        setAllRequests(all);
-      } else if (isTeamLeader && user.team_id) {
-        const teamReqs = await getLeaveRequestsByTeam(user.team_id);
-        const pending = teamReqs.filter(r => r.status === 'pending_leader');
-        setPendingRequests(pending);
-        setAllRequests(teamReqs);
-      }
+      setPendingRequests(roleData.pending);
+      setAllRequests(roleData.all);
     } catch (error) {
       console.error('Error fetching leave data:', error);
       toast({
