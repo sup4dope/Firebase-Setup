@@ -132,12 +132,13 @@ const getAmountBonus = (amount: number): number => {
 const calculateContractScore = (
   processingOrg: string,
   executionAmount: number,
-  contractAmount: number = 0
+  contractAmount: number = 0,
+  isPostpaidExecution: boolean = false
 ): { baseScore: number; categoryBonus: number; amountBonus: number; totalScore: number } => {
-  // 계약금 유무에 따른 기본 점수
-  // - 계약금 있음 (선불/후불): +10점
-  // - 계약금 없음 (자문료만): +5점
-  const baseScore = contractAmount > 0 ? 10 : 5;
+  // 기본 점수 계산:
+  // - 선불 계약 (계약완료 선불): 계약금 있으면 +10점, 없으면 +5점
+  // - 후불 계약 집행완료: 항상 +5점 (계약금 유무 관계없이)
+  const baseScore = isPostpaidExecution ? 5 : (contractAmount > 0 ? 10 : 5);
   const categoryBonus = CATEGORY_BONUS[processingOrg] ?? 0;
   const amountBonus = getAmountBonus(executionAmount);
   const totalScore = baseScore + categoryBonus + amountBonus;
@@ -320,10 +321,13 @@ export default function Rankings() {
 
       const processingOrg = customer.processing_org || '미등록';
       const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
+      // 집행완료 상태 = 후불 계약 집행 (항상 5점)
+      const isPostpaidExecution = customer.status_code?.includes('집행완료') || false;
       const { baseScore, categoryBonus, amountBonus, totalScore } = calculateContractScore(
         processingOrg,
         executionAmount,
-        contractAmount
+        contractAmount,
+        isPostpaidExecution
       );
 
       scores.push({
@@ -575,8 +579,9 @@ export default function Rankings() {
                   <div>
                     <p className="font-semibold mb-1">계약 점수</p>
                     <div className="space-y-0.5 text-muted-foreground">
-                      <p>+10점: 계약금 있음 (선불/후불)</p>
-                      <p>+5점: 자문료만 (계약금 없음)</p>
+                      <p>+10점: 선불 계약 (계약금 있음)</p>
+                      <p>+5점: 후불 계약 집행완료</p>
+                      <p>+5점: 선불 계약 (계약금 없음, 자문료만)</p>
                     </div>
                   </div>
                   <div>
