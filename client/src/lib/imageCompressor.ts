@@ -159,3 +159,109 @@ export function formatFileSize(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+/**
+ * OCR용 이미지 압축 (더 작은 크기로 압축하여 API 속도 향상)
+ * - 최대 1500px로 리사이즈
+ * - 70% 품질로 압축
+ * - base64 문자열로 반환
+ */
+const OCR_MAX_DIMENSION = 1500;
+const OCR_COMPRESSION_QUALITY = 0.7;
+
+export async function compressImageForOCR(file: File): Promise<{ base64: string; mimeType: string; originalSize: number; compressedSize: number }> {
+  const originalSize = file.size;
+  
+  if (!file.type.startsWith('image/')) {
+    const base64 = await fileToBase64Internal(file);
+    return {
+      base64,
+      mimeType: file.type,
+      originalSize,
+      compressedSize: originalSize
+    };
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      const img = new Image();
+      
+      img.onload = () => {
+        try {
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > OCR_MAX_DIMENSION || height > OCR_MAX_DIMENSION) {
+            if (width > height) {
+              height = (height / width) * OCR_MAX_DIMENSION;
+              width = OCR_MAX_DIMENSION;
+            } else {
+              width = (width / height) * OCR_MAX_DIMENSION;
+              height = OCR_MAX_DIMENSION;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(width);
+          canvas.height = Math.round(height);
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Canvas context not available'));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Canvas to Blob conversion failed'));
+                return;
+              }
+
+              const reader2 = new FileReader();
+              reader2.onload = () => {
+                const result = reader2.result as string;
+                const base64 = result.split(',')[1];
+                resolve({
+                  base64,
+                  mimeType: 'image/jpeg',
+                  originalSize,
+                  compressedSize: blob.size
+                });
+              };
+              reader2.onerror = () => reject(new Error('Base64 conversion failed'));
+              reader2.readAsDataURL(blob);
+            },
+            'image/jpeg',
+            OCR_COMPRESSION_QUALITY
+          );
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      img.onerror = () => reject(new Error('Image load failed'));
+      img.src = event.target?.result as string;
+    };
+
+    reader.onerror = () => reject(new Error('FileReader failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function fileToBase64Internal(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}

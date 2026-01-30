@@ -1,7 +1,10 @@
 /**
  * 사업자등록증 OCR 클라이언트 서비스
  * 서버 측 Gemini API를 호출하여 사업자등록증 정보 추출
+ * 이미지 압축 적용으로 API 응답 속도 향상
  */
+
+import { compressImageForOCR, formatFileSize } from './imageCompressor';
 
 export interface BusinessRegistrationData {
   company_name?: string;
@@ -58,10 +61,18 @@ export async function extractBusinessRegistration(
     let imageMimeType: string;
     
     if (imageSource instanceof File) {
-      console.log(`📁 파일 정보: ${imageSource.name}, 크기: ${imageSource.size}bytes, 타입: ${imageSource.type}`);
-      base64Data = await fileToBase64(imageSource);
-      imageMimeType = imageSource.type || 'image/jpeg';
-      console.log(`📦 Base64 변환 완료, 길이: ${base64Data.length}, MIME: ${imageMimeType}`);
+      console.log(`📁 파일 정보: ${imageSource.name}, 크기: ${formatFileSize(imageSource.size)}, 타입: ${imageSource.type}`);
+      
+      if (imageSource.type.startsWith('image/')) {
+        const compressed = await compressImageForOCR(imageSource);
+        base64Data = compressed.base64;
+        imageMimeType = compressed.mimeType;
+        console.log(`📦 OCR용 압축 완료: ${formatFileSize(compressed.originalSize)} → ${formatFileSize(compressed.compressedSize)} (${Math.round((1 - compressed.compressedSize / compressed.originalSize) * 100)}% 감소)`);
+      } else {
+        base64Data = await fileToBase64(imageSource);
+        imageMimeType = imageSource.type || 'image/jpeg';
+        console.log(`📦 Base64 변환 완료, 길이: ${base64Data.length}, MIME: ${imageMimeType}`);
+      }
     } else {
       console.log(`🔗 URL에서 이미지 로드: ${imageSource.substring(0, 100)}...`);
       const result = await urlToBase64(imageSource);
@@ -175,9 +186,17 @@ export async function extractVatCertificate(
     let imageMimeType: string;
     
     if (imageSource instanceof File) {
-      console.log(`📁 파일 정보: ${imageSource.name}, 크기: ${imageSource.size}bytes`);
-      base64Data = await fileToBase64(imageSource);
-      imageMimeType = imageSource.type || 'application/pdf';
+      console.log(`📁 파일 정보: ${imageSource.name}, 크기: ${formatFileSize(imageSource.size)}`);
+      
+      if (imageSource.type.startsWith('image/')) {
+        const compressed = await compressImageForOCR(imageSource);
+        base64Data = compressed.base64;
+        imageMimeType = compressed.mimeType;
+        console.log(`📦 OCR용 압축 완료: ${formatFileSize(compressed.originalSize)} → ${formatFileSize(compressed.compressedSize)}`);
+      } else {
+        base64Data = await fileToBase64(imageSource);
+        imageMimeType = imageSource.type || 'application/pdf';
+      }
     } else {
       const result = await urlToBase64(imageSource);
       base64Data = result.base64;
@@ -256,9 +275,17 @@ export async function extractCreditReport(
     let imageMimeType: string;
     
     if (imageSource instanceof File) {
-      console.log(`📁 파일 정보: ${imageSource.name}, 크기: ${imageSource.size}bytes`);
-      base64Data = await fileToBase64(imageSource);
-      imageMimeType = imageSource.type || 'application/pdf';
+      console.log(`📁 파일 정보: ${imageSource.name}, 크기: ${formatFileSize(imageSource.size)}`);
+      
+      if (imageSource.type.startsWith('image/')) {
+        const compressed = await compressImageForOCR(imageSource);
+        base64Data = compressed.base64;
+        imageMimeType = compressed.mimeType;
+        console.log(`📦 OCR용 압축 완료: ${formatFileSize(compressed.originalSize)} → ${formatFileSize(compressed.compressedSize)}`);
+      } else {
+        base64Data = await fileToBase64(imageSource);
+        imageMimeType = imageSource.type || 'application/pdf';
+      }
     } else {
       const result = await urlToBase64(imageSource);
       base64Data = result.base64;

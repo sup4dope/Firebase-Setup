@@ -750,30 +750,28 @@ export function CustomerDetailModal({
     if (files.length === 0) return;
     
     setIsUploading(true);
-    const uploadedDocs: CustomerDocument[] = [];
-    let currentDocs = [...documents];
+    setUploadProgress({ current: 0, total: files.length, fileName: '파일 업로드 중...' });
     
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setUploadProgress({ current: i + 1, total: files.length, fileName: file.name });
-        
-        const newDoc = await uploadSingleFile(file);
-        if (newDoc) {
-          uploadedDocs.push(newDoc);
-          currentDocs = [...currentDocs, newDoc];
-          
-          // UI 즉시 반영
-          setDocuments(currentDocs);
-          setSelectedDocument(newDoc);
-        }
+      // 병렬 업로드: 모든 파일을 동시에 업로드
+      console.log(`🚀 ${files.length}개 파일 병렬 업로드 시작...`);
+      const uploadPromises = files.map(file => uploadSingleFile(file));
+      const uploadResults = await Promise.all(uploadPromises);
+      
+      const uploadedDocs = uploadResults.filter((doc): doc is CustomerDocument => doc !== null);
+      const currentDocs = [...documents, ...uploadedDocs];
+      
+      // UI 즉시 반영
+      setDocuments(currentDocs);
+      if (uploadedDocs.length > 0) {
+        setSelectedDocument(uploadedDocs[uploadedDocs.length - 1]);
       }
 
       // Firestore 저장 (기존 고객일 경우)
       if (formData.id && uploadedDocs.length > 0) {
         const customerRef = doc(db, "customers", formData.id);
 
-        // DB에 모든 새 문서 추가
+        // DB에 모든 새 문서 추가 (arrayUnion으로 원자적 추가)
         for (const newDoc of uploadedDocs) {
           await updateDoc(customerRef, {
             documents: arrayUnion(newDoc),
@@ -805,21 +803,17 @@ export function CustomerDetailModal({
       if (uploadedDocs.length > 0) {
         console.log(`✅ ${uploadedDocs.length}개 파일 업로드 완료`);
         
-        // 모든 OCR 대상 파일 수집 및 순차 처리
+        // OCR 대상 파일 수집
         console.log("🔍 OCR 대상 파일 검색 시작...");
         const ocrTasks: { file: File; type: 'business' | 'vat' | 'credit' }[] = [];
         
         for (const uploadedFile of files) {
-          console.log(`📄 파일 확인: "${uploadedFile.name}", 타입: "${uploadedFile.type}", 크기: ${uploadedFile.size}bytes`);
-          
           const isBusinessReg = isBusinessRegistrationFile(uploadedFile.name);
           const isVatCert = isVatCertificateFile(uploadedFile.name);
           const isCreditReport = isCreditReportFile(uploadedFile.name);
           const isImage = uploadedFile.type.startsWith('image/');
           const isPdf = uploadedFile.type === 'application/pdf' || uploadedFile.type.includes('pdf');
           const isOCRSupported = isImage || isPdf;
-          
-          console.log(`   -> 사업자등록증: ${isBusinessReg}, 부가세: ${isVatCert}, 신용공여: ${isCreditReport}, OCR지원: ${isOCRSupported}`);
           
           if (isBusinessReg && isOCRSupported) {
             ocrTasks.push({ file: uploadedFile, type: 'business' });
@@ -830,10 +824,10 @@ export function CustomerDetailModal({
           }
         }
         
-        // 수집된 OCR 작업 순차 실행
+        // OCR 병렬 처리 실행
         if (ocrTasks.length > 0) {
-          console.log(`📋 OCR 처리 대상: ${ocrTasks.length}개 파일`);
-          processAllOCRFiles(ocrTasks);
+          console.log(`📋 OCR 처리 대상: ${ocrTasks.length}개 파일 (병렬 처리)`);
+          processAllOCRFilesParallel(ocrTasks);
         }
       }
     } catch (error) {
@@ -1049,6 +1043,206 @@ export function CustomerDetailModal({
       
     } catch (error) {
       console.error("❌ OCR 순차 처리 중 오류:", error);
+    } finally {
+      setIsProcessingOCR(false);
+    }
+  };
+
+  // [신규] OCR 병렬 처리 함수 - 여러 파일을 동시에 분석하고 결과를 병합
+  const processAllOCRFilesParallel = async (tasks: { file: File; type: 'business' | 'vat' | 'credit' }[]) => {
+    setIsProcessingOCR(true);
+    const allHighlightedFields = new Set<string>();
+    
+    console.log(`🚀 OCR 병렬 처리 시작: ${tasks.length}개 파일`);
+    
+    try {
+      // 모든 OCR 작업을 병렬로 실행
+      const ocrPromises = tasks.map(async (task) => {
+        console.log(`📋 처리 시작: ${task.file.name} (${task.type})`);
+        
+        if (task.type === 'business') {
+          return { type: 'business' as const, result: await extractBusinessRegistration(task.file), file: task.file };
+        } else if (task.type === 'vat') {
+          return { type: 'vat' as const, result: await extractVatCertificate(task.file), file: task.file };
+        } else {
+          return { type: 'credit' as const, result: await extractCreditReport(task.file), file: task.file };
+        }
+      });
+      
+      const results = await Promise.all(ocrPromises);
+      
+      // 모든 결과를 먼저 수집 (병합 데이터)
+      const mergedFormUpdates: Partial<typeof formData> = {};
+      let allNewObligations: FinancialObligation[] = [];
+      let lastBusinessTypeList: string[] | null = null;
+      
+      for (const { type, result, file } of results) {
+        if (!result) continue;
+        
+        if (type === 'business') {
+          const ocrResult = result as BusinessRegistrationData;
+          
+          if (ocrResult.company_name) {
+            mergedFormUpdates.company_name = ocrResult.company_name;
+            allHighlightedFields.add('company_name');
+          }
+          if (ocrResult.ceo_name) {
+            mergedFormUpdates.name = ocrResult.ceo_name;
+            allHighlightedFields.add('name');
+          }
+          if (ocrResult.founding_date) {
+            mergedFormUpdates.founding_date = ocrResult.founding_date;
+            allHighlightedFields.add('founding_date');
+            const foundingDate = parseISO(ocrResult.founding_date);
+            const daysOld = differenceInDays(new Date(), foundingDate);
+            mergedFormUpdates.over_7_years = daysOld > 2555;
+          }
+          if (ocrResult.business_registration_number) {
+            mergedFormUpdates.business_registration_number = ocrResult.business_registration_number;
+            allHighlightedFields.add('business_registration_number');
+          }
+          if (ocrResult.resident_id_front) {
+            mergedFormUpdates.ssn_front = ocrResult.resident_id_front;
+            allHighlightedFields.add('ssn_front');
+          }
+          if (ocrResult.resident_id_back) {
+            mergedFormUpdates.ssn_back = ocrResult.resident_id_back;
+            allHighlightedFields.add('ssn_back');
+          }
+          if (ocrResult.business_type_list && ocrResult.business_type_list.length > 0) {
+            mergedFormUpdates.business_type = ocrResult.business_type_list[0];
+            allHighlightedFields.add('business_type');
+            lastBusinessTypeList = ocrResult.business_type_list;
+          }
+          if (ocrResult.business_item) {
+            mergedFormUpdates.business_item = ocrResult.business_item;
+            allHighlightedFields.add('business_item');
+          }
+          if (ocrResult.business_address) {
+            mergedFormUpdates.business_address = ocrResult.business_address;
+            allHighlightedFields.add('business_address');
+          }
+          if (ocrResult.business_address_detail) {
+            mergedFormUpdates.business_address_detail = ocrResult.business_address_detail;
+            allHighlightedFields.add('business_address_detail');
+          }
+          console.log(`✅ 사업자등록증 완료: ${file.name}`);
+          
+        } else if (type === 'vat') {
+          const ocrResult = result as VatCertificateData;
+          
+          if (ocrResult.recent_sales !== undefined) {
+            mergedFormUpdates.recent_sales = ocrResult.recent_sales;
+            allHighlightedFields.add('recent_sales');
+          }
+          if (ocrResult.sales_y1 !== undefined) {
+            mergedFormUpdates.sales_y1 = ocrResult.sales_y1;
+            allHighlightedFields.add('sales_y1');
+          }
+          if (ocrResult.sales_y2 !== undefined) {
+            mergedFormUpdates.sales_y2 = ocrResult.sales_y2;
+            allHighlightedFields.add('sales_y2');
+          }
+          if (ocrResult.sales_y3 !== undefined) {
+            mergedFormUpdates.sales_y3 = ocrResult.sales_y3;
+            allHighlightedFields.add('sales_y3');
+          }
+          console.log(`✅ 부가세과세표준증명 완료: ${file.name}`);
+          
+        } else if (type === 'credit') {
+          const ocrResult = result as CreditReportData;
+          if (ocrResult.obligations && ocrResult.obligations.length > 0) {
+            const newObligations: FinancialObligation[] = ocrResult.obligations.map((ob, idx) => ({
+              id: `ocr-${Date.now()}-${Math.random().toString(36).substr(2, 5)}-${idx}`,
+              type: ob.type as 'loan' | 'guarantee',
+              institution: ob.institution,
+              product_name: ob.product_name,
+              account_type: ob.account_type,
+              balance: ob.balance,
+              occurred_at: ob.occurred_at,
+              maturity_date: ob.maturity_date,
+            }));
+            allNewObligations = [...allNewObligations, ...newObligations];
+            console.log(`✅ 신용공여내역 완료: ${file.name} (${ocrResult.obligations.length}건)`);
+          }
+        }
+      }
+      
+      // 업종 리스트 업데이트 (외부에서 한 번만)
+      if (lastBusinessTypeList) {
+        setOcrBusinessTypes(lastBusinessTypeList);
+      }
+      
+      // 모든 formData 업데이트를 한 번에 적용
+      if (Object.keys(mergedFormUpdates).length > 0) {
+        setFormData(prev => {
+          const updatedData = { ...prev, ...mergedFormUpdates };
+          debouncedSave(updatedData);
+          return updatedData;
+        });
+      }
+      
+      // 신용공여 내역 일괄 추가
+      if (allNewObligations.length > 0) {
+        setFinancialObligations(prev => {
+          const merged = [...prev];
+          let addedCount = 0;
+          
+          allNewObligations.forEach(newOb => {
+            const isDuplicate = merged.some(
+              existing => 
+                existing.institution === newOb.institution &&
+                existing.product_name === newOb.product_name &&
+                existing.balance === newOb.balance &&
+                existing.occurred_at === newOb.occurred_at
+            );
+            if (!isDuplicate) {
+              merged.push(newOb);
+              addedCount++;
+            }
+          });
+          
+          if (addedCount > 0) {
+            setOcrExtractedCount(addedCount);
+            setTimeout(() => setOcrExtractedCount(0), 5000);
+          }
+          
+          return merged;
+        });
+        
+        setFormData(prev => {
+          const existingObligations = prev.financial_obligations || [];
+          const mergedObligations = [...existingObligations];
+          
+          allNewObligations.forEach(newOb => {
+            const isDuplicate = mergedObligations.some(
+              existing => 
+                existing.institution === newOb.institution &&
+                existing.product_name === newOb.product_name &&
+                existing.balance === newOb.balance &&
+                existing.occurred_at === newOb.occurred_at
+            );
+            if (!isDuplicate) {
+              mergedObligations.push(newOb);
+            }
+          });
+          
+          const updatedData = { ...prev, financial_obligations: mergedObligations };
+          debouncedSave(updatedData);
+          return updatedData;
+        });
+        
+        setActiveCenterTab("financial");
+      }
+      
+      // 하이라이트 적용
+      setHighlightedFields(allHighlightedFields);
+      setTimeout(() => setHighlightedFields(new Set()), 2000);
+      
+      console.log(`\n✅ 전체 OCR 병렬 처리 완료: ${tasks.length}개 파일`);
+      
+    } catch (error) {
+      console.error("❌ OCR 병렬 처리 중 오류:", error);
     } finally {
       setIsProcessingOCR(false);
     }
@@ -3335,19 +3529,19 @@ export function CustomerDetailModal({
                           <div className="text-center w-full max-w-xs">
                             <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-400 animate-spin" />
                             <p className="text-blue-400 font-medium mb-2">
-                              업로드 중... ({uploadProgress.current}/{uploadProgress.total})
+                              {uploadProgress.total}개 파일 업로드 중...
                             </p>
-                            <p className="text-sm text-muted-foreground mb-3 truncate">
+                            <p className="text-sm text-muted-foreground mb-3">
                               {uploadProgress.fileName}
                             </p>
                             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                               <div 
-                                className="bg-blue-500 h-full transition-all duration-300"
-                                style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                                className="bg-blue-500 h-full animate-pulse"
+                                style={{ width: '100%' }}
                               />
                             </div>
                             <p className="text-xs text-muted-foreground mt-2">
-                              {Math.round((uploadProgress.current / uploadProgress.total) * 100)}% 완료
+                              병렬 업로드 진행 중
                             </p>
                           </div>
                         </div>
@@ -3389,7 +3583,7 @@ export function CustomerDetailModal({
                     >
                       <Upload className="w-4 h-4 mr-1" />
                       {isUploading && uploadProgress 
-                        ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})...` 
+                        ? `${uploadProgress.total}개 업로드 중...` 
                         : "파일 업로드"}
                     </Button>
 
