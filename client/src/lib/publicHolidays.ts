@@ -102,7 +102,49 @@ const getFallbackHolidays = (year: number): Map<string, string> => {
   return new Map();
 };
 
+const HOLIDAY_CACHE_KEY = 'crm_holidays_cache';
+const HOLIDAY_CACHE_DURATION = 24 * 60 * 60 * 1000;
+
+interface HolidayCache {
+  year: number;
+  data: [string, string][];
+  timestamp: number;
+}
+
+const getCachedHolidays = (year: number): Map<string, string> | null => {
+  try {
+    const cached = sessionStorage.getItem(`${HOLIDAY_CACHE_KEY}_${year}`);
+    if (!cached) return null;
+    
+    const parsed: HolidayCache = JSON.parse(cached);
+    if (parsed.year !== year) return null;
+    if (Date.now() - parsed.timestamp > HOLIDAY_CACHE_DURATION) return null;
+    
+    return new Map(parsed.data);
+  } catch {
+    return null;
+  }
+};
+
+const setCachedHolidays = (year: number, holidayMap: Map<string, string>): void => {
+  try {
+    const cache: HolidayCache = {
+      year,
+      data: Array.from(holidayMap.entries()),
+      timestamp: Date.now(),
+    };
+    sessionStorage.setItem(`${HOLIDAY_CACHE_KEY}_${year}`, JSON.stringify(cache));
+  } catch {
+    // sessionStorage full or unavailable
+  }
+};
+
 export const fetchYearlyHolidays = async (year: number): Promise<Map<string, string>> => {
+  const cached = getCachedHolidays(year);
+  if (cached && cached.size > 0) {
+    return cached;
+  }
+
   const fallbackHolidays = getFallbackHolidays(year);
   
   try {
@@ -118,12 +160,14 @@ export const fetchYearlyHolidays = async (year: number): Promise<Map<string, str
         const formatted = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
         holidayMap.set(formatted, holiday.dateName);
       });
+      setCachedHolidays(year, holidayMap);
       return holidayMap;
     }
   } catch (error) {
     console.warn('API fetch failed, using fallback holidays');
   }
   
+  setCachedHolidays(year, fallbackHolidays);
   return fallbackHolidays;
 };
 

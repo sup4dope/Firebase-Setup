@@ -21,7 +21,7 @@ import {
   getCustomersByTeam,
   getUsers,
   getTeams,
-  getStatusLogs,
+  getContractLogsForMonth,
   createCustomer,
   updateCustomer,
   deleteCustomer,
@@ -133,7 +133,9 @@ export default function Dashboard() {
 
     setLoading(true);
     try {
-      const currentYear = new Date().getFullYear();
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
       
       // 고객 데이터 조회 함수 (역할 기반)
       const fetchCustomersByRole = () => {
@@ -146,12 +148,12 @@ export default function Dashboard() {
         }
       };
 
-      // 모든 데이터를 한번에 병렬 로딩
+      // 모든 데이터를 한번에 병렬 로딩 (statusLogs는 현재 월 계약 로그만)
       const [fetchedUsers, fetchedTeams, fetchedHolidayMap, fetchedLogs, fetchedCustomers] = await Promise.all([
         getUsers(),
         getTeams(),
         fetchYearlyHolidays(currentYear),
-        getStatusLogs(),
+        getContractLogsForMonth(currentYear, currentMonth),
         fetchCustomersByRole(),
       ]);
 
@@ -402,8 +404,9 @@ export default function Dashboard() {
       setCustomers(prev =>
         prev.map(c => c.id === customerId ? { ...c, status_code: newStatus } : c)
       );
-      // Refresh status logs
-      const logs = await getStatusLogs();
+      // Refresh contract logs for current month
+      const now = new Date();
+      const logs = await getContractLogsForMonth(now.getFullYear(), now.getMonth() + 1);
       setStatusLogs(logs);
       toast({
         title: '성공',
@@ -508,8 +511,9 @@ export default function Dashboard() {
         } : c)
       );
 
-      // Refresh status logs
-      const logs = await getStatusLogs();
+      // Refresh contract logs for current month
+      const now = new Date();
+      const logs = await getContractLogsForMonth(now.getFullYear(), now.getMonth() + 1);
       setStatusLogs(logs);
 
       setStatusChangeModal(prev => ({ ...prev, isOpen: false }));
@@ -1100,17 +1104,44 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-4">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-24 w-full" />
+      <div className="flex flex-col h-full w-full overflow-hidden bg-background">
+        {/* Header Skeleton */}
+        <div className="flex-shrink-0 p-4 border-b bg-card dark:bg-gray-900/30">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-6">
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-24" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-44" />
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-9 w-28" />
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
+        {/* Main Content Skeleton */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Funnel Chart Skeleton */}
+          <div className="w-64 flex-shrink-0 border-r p-4">
+            <Skeleton className="h-6 w-24 mb-4" />
+            <div className="space-y-2">
+              {[...Array(8)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </div>
+          {/* Table Skeleton */}
+          <div className="flex-1 p-4">
+            <Skeleton className="h-6 w-32 mb-4" />
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              {[...Array(10)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          </div>
         </div>
-        <Skeleton className="h-64 w-full" />
       </div>
     );
   }

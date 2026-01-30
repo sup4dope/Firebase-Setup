@@ -465,6 +465,30 @@ export const getStatusLogs = async (customerId?: string): Promise<StatusLog[]> =
   } as StatusLog));
 };
 
+// Get contract status logs for a specific month (optimized for KPI calculation)
+export const getContractLogsForMonth = async (year: number, month: number): Promise<StatusLog[]> => {
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+  
+  const contractStatuses = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
+  
+  const q = query(
+    collection(db, 'status_logs'),
+    where('changed_at', '>=', Timestamp.fromDate(startDate)),
+    where('changed_at', '<=', Timestamp.fromDate(endDate)),
+    orderBy('changed_at', 'desc')
+  );
+  
+  const snapshot = await getDocs(q);
+  const logs = snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    changed_at: toDate(doc.data().changed_at),
+  } as StatusLog));
+  
+  return logs.filter(log => contractStatuses.includes(log.new_status));
+};
+
 // Todos
 export const getTodos = async (): Promise<Todo[]> => {
   const q = query(collection(db, 'todos'), orderBy('due_date', 'asc'));
