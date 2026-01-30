@@ -371,6 +371,11 @@ export default function Dashboard() {
     if (requiresModal) {
       const customer = customers.find(c => c.id === customerId);
       if (customer) {
+        // 계약완료(외주)는 계약금 기본값 0
+        const defaultContractAmount = newStatus === '계약완료(외주)' 
+          ? 0 
+          : (customer.contract_amount || 0);
+        
         setStatusChangeModal({
           isOpen: true,
           customerId,
@@ -378,7 +383,7 @@ export default function Dashboard() {
           currentStatus,
           targetStatus: newStatus,
           commissionRate: customer.commission_rate || 0,
-          contractAmount: customer.contract_amount || 0,
+          contractAmount: defaultContractAmount,
           executionAmount: customer.execution_amount || 0,
           executionDate: (customer as any).execution_date || format(new Date(), 'yyyy-MM-dd'),
           processingOrg: customer.processing_org || '미등록',
@@ -1406,11 +1411,11 @@ export default function Dashboard() {
                     <Input
                       type="number"
                       min="0"
-                      value={statusChangeModal.contractAmount || ''}
+                      value={statusChangeModal.contractAmount}
                       onChange={(e) =>
                         setStatusChangeModal(prev => ({
                           ...prev,
-                          contractAmount: parseFloat(e.target.value) || 0,
+                          contractAmount: e.target.value === '' ? 0 : parseFloat(e.target.value),
                         }))
                       }
                       className="pr-12"
