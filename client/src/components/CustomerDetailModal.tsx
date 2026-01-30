@@ -3768,15 +3768,15 @@ export function CustomerDetailModal({
                     <Input
                       type="number"
                       min="0"
-                      value={statusChangeModal.contractAmount || ""}
+                      value={statusChangeModal.contractAmount}
                       onChange={(e) =>
                         setStatusChangeModal((prev) => ({
                           ...prev,
-                          contractAmount: parseInt(e.target.value) || 0,
+                          contractAmount: e.target.value === "" ? 0 : parseInt(e.target.value),
                         }))
                       }
                       className="bg-muted border-border text-foreground pr-12"
-                      placeholder="예: 500 (만원 단위로 입력)"
+                      placeholder="0 (자문료만 받는 경우)"
                       data-testid="input-status-contract-amount"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
@@ -4030,9 +4030,8 @@ export function CustomerDetailModal({
                   if (statusChangeModal.commissionRate > 0) {
                     updateData.commission_rate = statusChangeModal.commissionRate;
                   }
-                  if (statusChangeModal.contractAmount > 0) {
-                    updateData.contract_amount = statusChangeModal.contractAmount;
-                  }
+                  // 계약금은 0원도 허용 (자문료만 받는 경우)
+                  updateData.contract_amount = statusChangeModal.contractAmount;
                   if (statusChangeModal.contractDate) {
                     updateData.contract_date = statusChangeModal.contractDate;
                   }
