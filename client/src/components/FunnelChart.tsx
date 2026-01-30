@@ -62,8 +62,8 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
   ],
   '집행완료_그룹': [
     { id: '집행완료(선불)', label: '집행완료(선불)' },
-    { id: '집행완료(후불)', label: '집행완료(후불)' },
     { id: '집행완료(외주)', label: '집행완료(외주)' },
+    { id: '집행완료(후불)', label: '집행완료(후불)' },
     { id: '최종부결', label: '최종부결' },
   ],
   '쓰레기통': [
