@@ -33,9 +33,13 @@ const getAmountBonus = (amount: number): number => {
 
 const calculateContractScore = (
   processingOrg: string,
-  executionAmount: number
+  executionAmount: number,
+  contractAmount: number = 0
 ): { baseScore: number; categoryBonus: number; amountBonus: number; totalScore: number } => {
-  const baseScore = 20;
+  // 계약금 유무에 따른 기본 점수
+  // - 계약금 있음 (선불/후불): +10점
+  // - 계약금 없음 (자문료만): +5점
+  const baseScore = contractAmount > 0 ? 10 : 5;
   const categoryBonus = CATEGORY_BONUS[processingOrg] ?? 0;
   const amountBonus = getAmountBonus(executionAmount);
   const totalScore = baseScore + categoryBonus + amountBonus;
@@ -108,7 +112,8 @@ export function HeaderRankings() {
 
       const processingOrg = customer.processing_org || '미등록';
       const executionAmount = customer.execution_amount || 0;
-      const score = calculateContractScore(processingOrg, executionAmount);
+      const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
+      const score = calculateContractScore(processingOrg, executionAmount, contractAmount);
 
       const existing = scoresByUser.get(managerId) || { name: user.name || user.email, totalScore: 0 };
       existing.totalScore += score.totalScore;

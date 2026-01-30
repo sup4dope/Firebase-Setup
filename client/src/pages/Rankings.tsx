@@ -83,6 +83,7 @@ interface ContractScore {
   teamName: string;
   processingOrg: string;
   executionAmount: number;
+  contractAmount: number;
   executionDate: string;
   baseScore: number;
   categoryBonus: number;
@@ -130,9 +131,13 @@ const getAmountBonus = (amount: number): number => {
 
 const calculateContractScore = (
   processingOrg: string,
-  executionAmount: number
+  executionAmount: number,
+  contractAmount: number = 0
 ): { baseScore: number; categoryBonus: number; amountBonus: number; totalScore: number } => {
-  const baseScore = 20;
+  // 계약금 유무에 따른 기본 점수
+  // - 계약금 있음 (선불/후불): +10점
+  // - 계약금 없음 (자문료만): +5점
+  const baseScore = contractAmount > 0 ? 10 : 5;
   const categoryBonus = CATEGORY_BONUS[processingOrg] ?? 0;
   const amountBonus = getAmountBonus(executionAmount);
   const totalScore = baseScore + categoryBonus + amountBonus;
@@ -306,9 +311,11 @@ export default function Rankings() {
       if (cDate < startDate || cDate > endDate) return;
 
       const processingOrg = customer.processing_org || '미등록';
+      const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
       const { baseScore, categoryBonus, amountBonus, totalScore } = calculateContractScore(
         processingOrg,
-        executionAmount
+        executionAmount,
+        contractAmount
       );
 
       scores.push({
@@ -321,6 +328,7 @@ export default function Rankings() {
         teamName: customer.team_name || '',
         processingOrg,
         executionAmount: executionAmount,
+        contractAmount,
         executionDate: contractDate,
         baseScore,
         categoryBonus,
@@ -558,7 +566,10 @@ export default function Rankings() {
                 <div className="space-y-3 text-xs">
                   <div>
                     <p className="font-semibold mb-1">계약 점수</p>
-                    <p className="text-muted-foreground">계약 1건당 +20점</p>
+                    <div className="space-y-0.5 text-muted-foreground">
+                      <p>+10점: 계약금 있음 (선불/후불)</p>
+                      <p>+5점: 자문료만 (계약금 없음)</p>
+                    </div>
                   </div>
                   <div>
                     <p className="font-semibold mb-1">카테고리 가점</p>
