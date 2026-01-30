@@ -477,25 +477,24 @@ export async function extractCreditReportFromBase64(
 Extract all loan and guarantee records from this document.
 
 CRITICAL RULES:
-1. If the document shows "(단위 : 천원)" or "단위: 천원", all amounts are in thousands of Korean Won. You must multiply by 1000 to convert to Won.
+1. The amounts in this document are ALWAYS in units of 천원 (thousands of Won). DO NOT multiply or convert - just extract the raw number as shown.
 2. Extract these fields from each row:
    - institution: Financial institution name (금융기관명)
    - product_name: Product/loan type (상품명 - e.g., 운전자금, 시설자금)
    - account_type: Account category (계정과목 - e.g., 대출, 지급보증)
-   - balance: Remaining balance in Won (신용공여잔액)
+   - balance: The raw number shown in 신용공여잔액 column (DO NOT multiply, just the number as displayed)
    - occurred_at: Origination date in YYYY-MM-DD format (발생일자)
    - maturity_date: Maturity date in YYYY-MM-DD format if available (만기일자)
    - type: "loan" if account_type contains 대출/할부금융/운전자금/시설자금, "guarantee" if it contains 지급보증/보증
 
 You MUST respond ONLY with valid JSON in this exact format:
 {
-  "unit_type": "천원" or "원",
   "obligations": [
     {
       "institution": "국민은행",
       "product_name": "운전자금(일반)",
       "account_type": "대출",
-      "balance": 50000000,
+      "balance": 583,
       "occurred_at": "2024-03-15",
       "maturity_date": "2025-03-15",
       "type": "loan"
@@ -505,7 +504,7 @@ You MUST respond ONLY with valid JSON in this exact format:
 
 IMPORTANT:
 - Use English keys exactly as shown above
-- balance must be in Won (multiply by 1000 if unit_type is 천원)
+- balance must be the RAW number as displayed (e.g., if document shows "583", return 583, NOT 583000)
 - Dates must be YYYY-MM-DD format
 - Extract ALL rows without missing any`;
 
@@ -566,11 +565,10 @@ IMPORTANT:
     const parsedData = JSON.parse(jsonMatch[0]);
     console.log("✅ [서버] JSON 파싱 성공");
     
-    // 단위 처리
-    const unitType = parsedData.unit_type || '원';
-    const unitMultiplier = unitType === '천원' ? 1000 : 1;
+    // 신용공여내역 금액은 항상 천원 단위 - 원본 값에 1000을 곱함
+    const unitMultiplier = 1000;
     
-    console.log(`   - 단위: ${unitType} (승수: ${unitMultiplier})`);
+    console.log(`   - 단위: 천원 (승수: ${unitMultiplier})`);
     
     // 금융기관명 가나다순 정렬
     const obligations = (parsedData.obligations || [])
@@ -578,7 +576,7 @@ IMPORTANT:
         institution: ob.institution?.trim() || '',
         product_name: ob.product_name?.trim() || '',
         account_type: ob.account_type?.trim() || '',
-        balance: Math.round((Number(ob.balance) || 0) * (unitType === '천원' && ob.balance < 1000000 ? 1000 : 1)),
+        balance: Math.round((Number(ob.balance) || 0) * unitMultiplier),
         occurred_at: formatDate(ob.occurred_at || ''),
         maturity_date: ob.maturity_date ? formatDate(ob.maturity_date) : undefined,
         type: ob.type === 'guarantee' ? 'guarantee' : 'loan'
