@@ -133,12 +133,26 @@ const calculateContractScore = (
   processingOrg: string,
   executionAmount: number,
   contractAmount: number = 0,
-  isPostpaidExecution: boolean = false
+  statusCode: string = ''
 ): { baseScore: number; categoryBonus: number; amountBonus: number; totalScore: number } => {
-  // 기본 점수 계산:
-  // - 선불 계약 (계약완료 선불): 계약금 있으면 +10점, 없으면 +5점
-  // - 후불 계약 집행완료: 항상 +5점 (계약금 유무 관계없이)
-  const baseScore = isPostpaidExecution ? 5 : (contractAmount > 0 ? 10 : 5);
+  // 기본 점수 계산 (상태 코드 기반):
+  // - 계약완료(선불): 계약금 있으면 +10점, 없으면 +5점 (계약 시점)
+  // - 계약완료(후불): 점수 없음 (집행 시점까지 대기)
+  // - 집행완료(선불): 점수 없음 (이미 계약 시점에 점수 반영됨)
+  // - 집행완료(후불): +5점 (집행 시점에 점수 반영)
+  // - 집행완료(외주): +5점
+  let baseScore = 0;
+  
+  if (statusCode === '계약완료(선불)') {
+    baseScore = contractAmount > 0 ? 10 : 5;
+  } else if (statusCode === '집행완료(후불)' || statusCode === '집행완료(외주)') {
+    baseScore = 5;
+  } else if (statusCode === '집행완료(선불)') {
+    // 선불 집행완료는 이미 계약 시점에 점수가 반영되었으므로 0점
+    baseScore = 0;
+  }
+  // 계약완료(후불)은 점수 없음 (나중에 집행완료(후불)로 변경시 점수 부여)
+  
   const categoryBonus = CATEGORY_BONUS[processingOrg] ?? 0;
   const amountBonus = getAmountBonus(executionAmount);
   const totalScore = baseScore + categoryBonus + amountBonus;
@@ -321,13 +335,12 @@ export default function Rankings() {
 
       const processingOrg = customer.processing_org || '미등록';
       const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
-      // 집행완료 상태 = 후불 계약 집행 (항상 5점)
-      const isPostpaidExecution = customer.status_code?.includes('집행완료') || false;
+      const statusCode = customer.status_code || '';
       const { baseScore, categoryBonus, amountBonus, totalScore } = calculateContractScore(
         processingOrg,
         executionAmount,
         contractAmount,
-        isPostpaidExecution
+        statusCode
       );
 
       scores.push({
