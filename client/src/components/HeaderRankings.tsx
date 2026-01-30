@@ -83,22 +83,31 @@ export function HeaderRankings() {
     const startDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const endDate = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
 
+    // 랭킹 기준:
+    // - 계약완료(선불): 계약 시점에 바로 점수 반영 (계약일 기준)
+    // - 계약완료(후불): 집행완료 상태에서만 점수 반영 (집행일 기준)
+    // - 집행완료: 모든 집행 완료 건에 점수 반영 (집행일 기준)
     const executedCustomers = customers.filter(c => {
-      let contractDate: string | undefined;
+      let scoreDate: string | undefined;
       
-      if (c.execution_date && c.execution_amount) {
-        contractDate = c.execution_date;
-      } else if (c.contract_completion_date) {
-        contractDate = c.contract_completion_date;
-      } else if (c.status_code?.includes('계약완료')) {
-        contractDate = c.updated_at 
-          ? (c.updated_at instanceof Date ? c.updated_at.toISOString().split('T')[0] : String(c.updated_at).split('T')[0])
-          : c.entry_date;
+      // 집행완료 상태: 집행일 기준 (집행일 없으면 updated_at fallback)
+      if (c.status_code?.includes('집행완료')) {
+        scoreDate = c.execution_date || c.contract_completion_date ||
+          (c.updated_at instanceof Date ? c.updated_at.toISOString().split('T')[0] : 
+           c.updated_at ? String(c.updated_at).split('T')[0] : c.entry_date);
+      } 
+      // 계약완료(선불): 계약일 기준으로 바로 점수 반영
+      else if (c.status_code === '계약완료(선불)') {
+        scoreDate = c.contract_completion_date ||
+          (c.updated_at instanceof Date ? c.updated_at.toISOString().split('T')[0] : 
+           c.updated_at ? String(c.updated_at).split('T')[0] : c.entry_date);
       }
+      // 계약완료(후불)은 집행완료 상태가 아니면 랭킹에서 제외
+      // (위의 집행완료 조건에서만 포함됨)
       
-      if (!contractDate) return false;
-      const cDate = new Date(contractDate);
-      return cDate >= startDate && cDate <= endDate;
+      if (!scoreDate) return false;
+      const sDate = new Date(scoreDate);
+      return sDate >= startDate && sDate <= endDate;
     });
 
     const scoresByUser = new Map<string, { name: string; totalScore: number }>();

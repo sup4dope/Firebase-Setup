@@ -288,27 +288,35 @@ export default function Rankings() {
     const { startDate, endDate } = periodDates;
     const scores: ContractScore[] = [];
 
+    // 랭킹 기준:
+    // - 계약완료(선불): 계약 시점에 바로 점수 반영 (계약일 기준)
+    // - 계약완료(후불): 집행완료 상태에서만 점수 반영 (집행일 기준)
+    // - 집행완료: 모든 집행 완료 건에 점수 반영 (집행일 기준)
     customers.forEach(customer => {
-      let contractDate: string | undefined;
+      let scoreDate: string | undefined;
       let executionAmount: number = 0;
 
-      if (customer.execution_date && customer.execution_amount) {
-        contractDate = customer.execution_date;
-        executionAmount = customer.execution_amount;
-      } else if (customer.contract_completion_date) {
-        contractDate = customer.contract_completion_date;
-        executionAmount = 0;
-      } else if (customer.status_code?.includes('계약완료')) {
-        contractDate = customer.updated_at 
-          ? (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : String(customer.updated_at).split('T')[0])
-          : customer.entry_date;
+      // 집행완료 상태: 집행일 기준 (집행일 없으면 updated_at fallback)
+      if (customer.status_code?.includes('집행완료')) {
+        scoreDate = customer.execution_date || customer.contract_completion_date ||
+          (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
+           customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
+        executionAmount = customer.execution_amount || 0;
+      } 
+      // 계약완료(선불): 계약일 기준으로 바로 점수 반영
+      else if (customer.status_code === '계약완료(선불)') {
+        scoreDate = customer.contract_completion_date ||
+          (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
+           customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
         executionAmount = 0;
       }
+      // 계약완료(후불)은 집행완료 상태가 아니면 랭킹에서 제외
+      // (위의 집행완료 조건에서만 포함됨)
 
-      if (!contractDate) return;
+      if (!scoreDate) return;
 
-      const cDate = new Date(contractDate);
-      if (cDate < startDate || cDate > endDate) return;
+      const sDate = new Date(scoreDate);
+      if (sDate < startDate || sDate > endDate) return;
 
       const processingOrg = customer.processing_org || '미등록';
       const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
@@ -329,7 +337,7 @@ export default function Rankings() {
         processingOrg,
         executionAmount: executionAmount,
         contractAmount,
-        executionDate: contractDate,
+        executionDate: scoreDate,
         baseScore,
         categoryBonus,
         amountBonus,
