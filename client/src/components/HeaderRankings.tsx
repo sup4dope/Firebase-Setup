@@ -40,15 +40,19 @@ const calculateContractScore = (
   // 기본 점수 계산 (상태 코드 기반):
   // - 계약완료(선불): 계약금 있으면 +10점, 없으면 +5점 (계약 시점)
   // - 계약완료(후불): 점수 없음 (집행 시점까지 대기)
+  // - 계약완료(외주): 점수 없음 (외주는 계약 가점 없음)
   // - 집행완료(선불): 점수 없음 (이미 계약 시점에 점수 반영됨)
   // - 집행완료(후불): +5점 (집행 시점에 점수 반영)
-  // - 집행완료(외주): +5점
+  // - 집행완료(외주): 점수 없음 (외주는 계약 가점 없음)
   let baseScore = 0;
   
   if (statusCode === '계약완료(선불)') {
     baseScore = contractAmount > 0 ? 10 : 5;
-  } else if (statusCode === '집행완료(후불)' || statusCode === '집행완료(외주)') {
+  } else if (statusCode === '집행완료(후불)') {
     baseScore = 5;
+  } else if (statusCode === '집행완료(외주)') {
+    // 외주는 계약 가점 없음
+    baseScore = 0;
   } else if (statusCode === '집행완료(선불)') {
     // 선불 집행완료는 이미 계약 시점에 점수가 반영되었으므로 0점
     baseScore = 0;
