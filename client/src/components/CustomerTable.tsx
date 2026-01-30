@@ -540,6 +540,44 @@ export function CustomerTable({
                 <TableCell>
                   {(() => {
                     const badgeInfo = getStatusBadgeInfo(customer.status_code || '');
+                    const isSuperAdmin = userRole === 'super_admin';
+                    const canChangeToExecution = userRole === 'team_leader' || userRole === 'super_admin';
+                    
+                    // 카테고리 추출 함수 (선불/외주/후불)
+                    const getCategory = (status: string): string | null => {
+                      if (status.includes('(선불)')) return '선불';
+                      if (status.includes('(외주)')) return '외주';
+                      if (status.includes('(후불)')) return '후불';
+                      return null;
+                    };
+                    
+                    // 현재 상태의 카테고리와 단계
+                    const currentCategory = getCategory(customer.status_code || '');
+                    const getStage = (status: string): number => {
+                      if (status.includes('계약완료')) return 1;
+                      if (status.includes('서류취합완료')) return 2;
+                      if (status.includes('신청완료')) return 3;
+                      if (status.includes('집행완료')) return 4;
+                      return 0;
+                    };
+                    const currentStage = getStage(customer.status_code || '');
+                    
+                    // 상태 옵션 필터링 함수
+                    const canSelectStatus = (targetStatus: string): boolean => {
+                      if (isSuperAdmin) return true;
+                      
+                      const targetCategory = getCategory(targetStatus);
+                      const targetStage = getStage(targetStatus);
+                      
+                      // 계약완료 이상 단계에서 다른 카테고리의 같은 레벨 상태로 변경 제한
+                      if (currentCategory && targetCategory && currentStage >= 1 && targetStage >= 1) {
+                        if (targetCategory !== currentCategory) {
+                          return false;
+                        }
+                      }
+                      return true;
+                    };
+                    
                     return (
                       <Select
                         key={`status-select-${customer.id}-${customer.status_code}`}
@@ -629,35 +667,56 @@ export function CustomerTable({
                           {/* 계약완료 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">계약완료</SelectLabel>
-                            <SelectItem value="계약완료(선불)" className="text-emerald-600 dark:text-emerald-400 focus:bg-accent cursor-pointer pl-4">계약완료(선불)</SelectItem>
-                            <SelectItem value="계약완료(외주)" className="text-emerald-600 dark:text-emerald-400 focus:bg-accent cursor-pointer pl-4">계약완료(외주)</SelectItem>
-                            <SelectItem value="계약완료(후불)" className="text-emerald-600 dark:text-emerald-400 focus:bg-accent cursor-pointer pl-4">계약완료(후불)</SelectItem>
+                            {canSelectStatus('계약완료(선불)') && (
+                              <SelectItem value="계약완료(선불)" className="text-emerald-600 dark:text-emerald-400 focus:bg-accent cursor-pointer pl-4">계약완료(선불)</SelectItem>
+                            )}
+                            {canSelectStatus('계약완료(외주)') && (
+                              <SelectItem value="계약완료(외주)" className="text-emerald-600 dark:text-emerald-400 focus:bg-accent cursor-pointer pl-4">계약완료(외주)</SelectItem>
+                            )}
+                            {canSelectStatus('계약완료(후불)') && (
+                              <SelectItem value="계약완료(후불)" className="text-emerald-600 dark:text-emerald-400 focus:bg-accent cursor-pointer pl-4">계약완료(후불)</SelectItem>
+                            )}
                           </SelectGroup>
 
                           {/* 서류취합 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">서류취합</SelectLabel>
-                            <SelectItem value="서류취합완료(선불)" className="text-blue-600 dark:text-blue-400 focus:bg-accent cursor-pointer pl-4">서류취합완료(선불)</SelectItem>
-                            <SelectItem value="서류취합완료(외주)" className="text-blue-600 dark:text-blue-400 focus:bg-accent cursor-pointer pl-4">서류취합완료(외주)</SelectItem>
-                            <SelectItem value="서류취합완료(후불)" className="text-blue-600 dark:text-blue-400 focus:bg-accent cursor-pointer pl-4">서류취합완료(후불)</SelectItem>
+                            {canSelectStatus('서류취합완료(선불)') && (
+                              <SelectItem value="서류취합완료(선불)" className="text-blue-600 dark:text-blue-400 focus:bg-accent cursor-pointer pl-4">서류취합완료(선불)</SelectItem>
+                            )}
+                            {canSelectStatus('서류취합완료(외주)') && (
+                              <SelectItem value="서류취합완료(외주)" className="text-blue-600 dark:text-blue-400 focus:bg-accent cursor-pointer pl-4">서류취합완료(외주)</SelectItem>
+                            )}
+                            {canSelectStatus('서류취합완료(후불)') && (
+                              <SelectItem value="서류취합완료(후불)" className="text-blue-600 dark:text-blue-400 focus:bg-accent cursor-pointer pl-4">서류취합완료(후불)</SelectItem>
+                            )}
                           </SelectGroup>
 
                           {/* 신청완료 그룹 */}
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">신청완료</SelectLabel>
-                            <SelectItem value="신청완료(선불)" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">신청완료(선불)</SelectItem>
-                            <SelectItem value="신청완료(외주)" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">신청완료(외주)</SelectItem>
-                            <SelectItem value="신청완료(후불)" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">신청완료(후불)</SelectItem>
+                            {canSelectStatus('신청완료(선불)') && (
+                              <SelectItem value="신청완료(선불)" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">신청완료(선불)</SelectItem>
+                            )}
+                            {canSelectStatus('신청완료(외주)') && (
+                              <SelectItem value="신청완료(외주)" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">신청완료(외주)</SelectItem>
+                            )}
+                            {canSelectStatus('신청완료(후불)') && (
+                              <SelectItem value="신청완료(후불)" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">신청완료(후불)</SelectItem>
+                            )}
                           </SelectGroup>
 
-                          {/* 집행완료 그룹 - 집행완료/집행완료(외주)는 team_leader, super_admin만 선택 가능 */}
+                          {/* 집행완료 그룹 - team_leader, super_admin만 선택 가능 */}
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">집행완료</SelectLabel>
-                            {(userRole === 'team_leader' || userRole === 'super_admin') && (
-                              <>
-                                <SelectItem value="집행완료" className="text-green-600 dark:text-green-400 focus:bg-accent cursor-pointer pl-4">집행완료</SelectItem>
-                                <SelectItem value="집행완료(외주)" className="text-green-600 dark:text-green-400 focus:bg-accent cursor-pointer pl-4">집행완료(외주)</SelectItem>
-                              </>
+                            {canChangeToExecution && canSelectStatus('집행완료(선불)') && (
+                              <SelectItem value="집행완료(선불)" className="text-teal-600 dark:text-teal-400 focus:bg-accent cursor-pointer pl-4">집행완료(선불)</SelectItem>
+                            )}
+                            {canChangeToExecution && canSelectStatus('집행완료(외주)') && (
+                              <SelectItem value="집행완료(외주)" className="text-teal-600 dark:text-teal-400 focus:bg-accent cursor-pointer pl-4">집행완료(외주)</SelectItem>
+                            )}
+                            {canChangeToExecution && canSelectStatus('집행완료(후불)') && (
+                              <SelectItem value="집행완료(후불)" className="text-teal-600 dark:text-teal-400 focus:bg-accent cursor-pointer pl-4">집행완료(후불)</SelectItem>
                             )}
                             <SelectItem value="최종부결" className="text-red-600 dark:text-red-400 focus:bg-accent cursor-pointer pl-4">최종부결</SelectItem>
                           </SelectGroup>
