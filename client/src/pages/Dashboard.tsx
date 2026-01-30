@@ -733,11 +733,13 @@ export default function Dashboard() {
     const latestExecutionDate = executionDate;
     
     // 상태 자동 변경 로직: 신청완료 → 집행완료
-    // 신청완료(외주)만 집행완료(외주)로, 나머지는 집행완료로 이동
+    // 각 신청완료 유형에 맞는 집행완료 상태로 변경
     const executionStatusMap: Record<string, string> = {
+      '신청완료(선불)': '집행완료(선불)',
+      '신청완료(후불)': '집행완료(후불)',
       '신청완료(외주)': '집행완료(외주)',
     };
-    const newStatus = executionStatusMap[customer.status_code] || '집행완료';
+    const newStatus = executionStatusMap[customer.status_code] || '집행완료(선불)';
     
     try {
       // 고객 상태를 집행완료로 변경하고, 총 집행금액/최신 집행일 저장

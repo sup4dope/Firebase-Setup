@@ -45,7 +45,8 @@ export const ALL_STATUS_VALUES = [
   "신청완료(후불)",
   
   // 집행완료
-  "집행완료",
+  "집행완료(선불)",
+  "집행완료(후불)",
   "집행완료(외주)",
   "최종부결",
 ] as const;
@@ -96,7 +97,8 @@ export const STATUS_STYLES: Record<string, { bg: string; text: string; border?: 
   "신청완료(후불)": { bg: "bg-indigo-500/20", text: "text-indigo-700 dark:text-indigo-300", border: "border-indigo-500/30" },
   
   // 집행완료 - 청록색/티일
-  "집행완료": { bg: "bg-teal-500/20", text: "text-teal-700 dark:text-teal-300", border: "border-teal-500/30" },
+  "집행완료(선불)": { bg: "bg-teal-500/20", text: "text-teal-700 dark:text-teal-300", border: "border-teal-500/30" },
+  "집행완료(후불)": { bg: "bg-teal-400/20", text: "text-teal-600 dark:text-teal-400", border: "border-teal-400/30" },
   "집행완료(외주)": { bg: "bg-cyan-500/20", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-500/30" },
   
   // 최종부결 - 진한 빨간색

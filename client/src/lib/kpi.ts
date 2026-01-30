@@ -86,7 +86,7 @@ export const calculateKPI = (
     .filter(c => {
       if (!c.entry_date) return false;
       const entryDate = new Date(c.entry_date);
-      return isSameMonth(entryDate, date) && c.status_code === '집행완료';
+      return isSameMonth(entryDate, date) && c.status_code?.includes('집행완료');
     })
     .reduce((sum, c) => sum + (c.execution_amount || 0), 0);
   
