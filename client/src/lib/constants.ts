@@ -280,10 +280,28 @@ export const FUNNEL_CATEGORIES = [
     color: "indigo",
   },
   {
-    id: "집행완료_그룹",
-    label: "집행완료",
-    statuses: FUNNEL_GROUPS["집행완료_그룹"],
+    id: "집행완료(선불)",
+    label: "집행완료(선불)",
+    statuses: ["집행완료", "집행완료(선불)"],  // 레거시 포함
     color: "teal",
+  },
+  {
+    id: "집행완료(후불)",
+    label: "집행완료(후불)",
+    statuses: ["집행완료(후불)"],
+    color: "cyan",
+  },
+  {
+    id: "집행완료(외주)",
+    label: "집행완료(외주)",
+    statuses: ["집행완료(외주)"],
+    color: "sky",
+  },
+  {
+    id: "최종부결",
+    label: "최종부결",
+    statuses: ["최종부결"],
+    color: "rose",
   },
 ];
 
