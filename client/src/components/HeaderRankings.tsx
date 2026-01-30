@@ -52,6 +52,9 @@ const calculateContractScore = (
   } else if (statusCode === '집행완료(선불)') {
     // 선불 집행완료는 이미 계약 시점에 점수가 반영되었으므로 0점
     baseScore = 0;
+  } else if (statusCode === '집행완료') {
+    // 레거시 '집행완료' 상태: 선불로 간주하여 계약금 여부에 따라 점수 부여
+    baseScore = contractAmount > 0 ? 10 : 5;
   }
   // 계약완료(후불)은 점수 없음 (나중에 집행완료(후불)로 변경시 점수 부여)
   
