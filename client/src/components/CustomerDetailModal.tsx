@@ -3044,10 +3044,52 @@ export function CustomerDetailModal({
                   >
                     {(() => {
                       const canChangeToExecution = currentUser?.role === 'team_leader' || currentUser?.role === 'super_admin';
+                      const isSuperAdmin = currentUser?.role === 'super_admin';
+                      
+                      // 카테고리 추출 함수 (선불/외주/후불)
+                      const getCategory = (status: string): string | null => {
+                        if (status.includes('(선불)')) return '선불';
+                        if (status.includes('(외주)')) return '외주';
+                        if (status.includes('(후불)')) return '후불';
+                        return null;
+                      };
+                      
+                      // 현재 상태의 카테고리
+                      const currentCategory = getCategory(formData.status_code || '');
+                      
+                      // 현재 상태의 단계 (계약→서류→신청→집행)
+                      const getStage = (status: string): number => {
+                        if (status.includes('계약완료')) return 1;
+                        if (status.includes('서류취합완료')) return 2;
+                        if (status.includes('신청완료')) return 3;
+                        if (status.includes('집행완료')) return 4;
+                        return 0;
+                      };
+                      
+                      const currentStage = getStage(formData.status_code || '');
+                      
                       const filteredOptions = STATUS_OPTIONS.filter(option => {
                         if (option.value.includes('집행완료') && !canChangeToExecution) {
                           return false;
                         }
+                        
+                        // super_admin은 모든 상태 변경 가능
+                        if (isSuperAdmin) {
+                          return true;
+                        }
+                        
+                        // 현재 카테고리가 있고 (계약완료 이상 단계), 대상 옵션도 카테고리가 있는 경우
+                        const targetCategory = getCategory(option.value);
+                        const targetStage = getStage(option.value);
+                        
+                        // 계약완료 이상 단계에서 다른 카테고리로 변경 제한
+                        if (currentCategory && targetCategory && currentStage >= 1 && targetStage >= 1) {
+                          // 같은 카테고리의 다음 단계로만 이동 가능
+                          if (targetCategory !== currentCategory) {
+                            return false;
+                          }
+                        }
+                        
                         return true;
                       });
                       
