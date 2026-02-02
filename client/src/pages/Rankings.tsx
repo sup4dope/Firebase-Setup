@@ -311,29 +311,46 @@ export default function Rankings() {
     const scores: ContractScore[] = [];
 
     // 랭킹 기준:
-    // - 계약완료(선불): 계약 시점에 바로 점수 반영 (계약일 기준)
-    // - 계약완료(후불): 집행완료 상태에서만 점수 반영 (집행일 기준)
-    // - 집행완료: 모든 집행 완료 건에 점수 반영 (집행일 기준)
+    // - 선불 계열: 계약 시점부터 점수 반영 (계약일 기준) - 이후 단계로 진행해도 점수 유지
+    // - 후불 계열: 집행완료 상태에서만 점수 반영 (집행일 기준)
+    // - 외주 계열: 집행완료 상태에서만 반영되지만 계약 가점 없음
+    
+    // 선불 계열 상태 (계약완료 이후 모든 단계 포함)
+    const isPrepaidStatus = (status: string) => 
+      status === '계약완료(선불)' || 
+      status === '서류취합완료(선불)' || 
+      status === '신청완료(선불)' ||
+      status === '집행완료(선불)';
+    
     customers.forEach(customer => {
       let scoreDate: string | undefined;
       let executionAmount: number = 0;
+      let effectiveStatusForScore: string = customer.status_code || '';
 
-      // 집행완료 상태: 집행일 기준 (집행일 없으면 updated_at fallback)
-      if (customer.status_code?.includes('집행완료')) {
+      // 집행완료(후불/외주) 상태: 집행일 기준
+      if (customer.status_code === '집행완료(후불)' || customer.status_code === '집행완료(외주)') {
         scoreDate = customer.execution_date || customer.contract_completion_date ||
           (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
            customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
         executionAmount = customer.execution_amount || 0;
-      } 
-      // 계약완료(선불): 계약일 기준으로 바로 점수 반영
-      else if (customer.status_code === '계약완료(선불)') {
+      }
+      // 레거시 '집행완료' 상태
+      else if (customer.status_code === '집행완료') {
+        scoreDate = customer.execution_date || customer.contract_completion_date ||
+          (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
+           customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
+        executionAmount = customer.execution_amount || 0;
+      }
+      // 선불 계열: 계약일 기준으로 점수 반영 (계약완료 이후 모든 단계 포함)
+      else if (isPrepaidStatus(customer.status_code || '')) {
         scoreDate = customer.contract_completion_date ||
           (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
            customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
-        executionAmount = 0;
+        executionAmount = customer.status_code === '집행완료(선불)' ? (customer.execution_amount || 0) : 0;
+        // 선불은 모든 단계에서 계약완료(선불) 기준 점수 적용
+        effectiveStatusForScore = '계약완료(선불)';
       }
       // 계약완료(후불)은 집행완료 상태가 아니면 랭킹에서 제외
-      // (위의 집행완료 조건에서만 포함됨)
 
       if (!scoreDate) return;
 
@@ -342,12 +359,11 @@ export default function Rankings() {
 
       const processingOrg = customer.processing_org || '미등록';
       const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
-      const statusCode = customer.status_code || '';
       const { baseScore, categoryBonus, amountBonus, totalScore } = calculateContractScore(
         processingOrg,
         executionAmount,
         contractAmount,
-        statusCode
+        effectiveStatusForScore
       );
 
       scores.push({
