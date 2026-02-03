@@ -62,7 +62,7 @@ function DocumentSkeleton({ type }: { type: "pdf" | "image" }) {
 function PDFViewer({ url, fileName }: { url: string; fileName: string }) {
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1);
+  const [scale, setScale] = useState<number>(1.5);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [cachedUrl, setCachedUrl] = useState<string | null>(null);
@@ -70,7 +70,7 @@ function PDFViewer({ url, fileName }: { url: string; fileName: string }) {
   // 문서 변경 시 상태 리셋
   useEffect(() => {
     setCurrentPage(1);
-    setScale(1);
+    setScale(1.5);
     setNumPages(0);
     setError(null);
   }, [url]);
