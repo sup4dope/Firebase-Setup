@@ -599,10 +599,13 @@ export const getActiveStaffForAssignment = async (): Promise<User[]> => {
     uid: docSnap.data().uid || docSnap.id,
   } as User));
   
-  // 재직 상태인 직원만 필터 (status가 '재직'이거나 없는 경우 - 기존 데이터 호환)
   return allUsers
-    .filter(user => user.status !== '퇴사')
-    .sort((a, b) => a.name.localeCompare(b.name, 'ko')); // 이름순 정렬
+    .filter(user => {
+      if (user.status === '퇴사') return false;
+      if ((user as any).db_distribution_enabled === false) return false;
+      return true;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 };
 
 // 마지막 배정 인덱스 조회
@@ -625,7 +628,21 @@ export const updateLastAssignmentIndex = async (index: number): Promise<void> =>
   }, { merge: true });
 };
 
-// 다음 담당자 조회 및 배정 (라운드로빈 + 무작위 시작점)
+// 특정 직원의 오늘 배정된 DB 수 조회
+const getTodayAssignmentCount = async (managerId: string): Promise<number> => {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
+  const q = query(
+    collection(db, 'customers'),
+    where('manager_id', '==', managerId),
+    where('entry_date', '==', todayStr)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.size;
+};
+
+// 다음 담당자 조회 및 배정 (라운드로빈 + 분배설정 반영)
 export const getNextManagerForAssignment = async (): Promise<{ 
   managerId: string; 
   managerName: string; 
@@ -640,25 +657,36 @@ export const getNextManagerForAssignment = async (): Promise<{
     return null;
   }
   
-  // 현재 인덱스 조회
   let lastIndex = await getLastAssignmentIndex();
   
-  // 다음 인덱스 계산 (순환)
-  const nextIndex = (lastIndex + 1) % activeStaff.length;
-  const assignee = activeStaff[nextIndex];
+  // 일일 한도를 초과하지 않은 직원을 찾을 때까지 순환
+  for (let attempt = 0; attempt < activeStaff.length; attempt++) {
+    const nextIndex = (lastIndex + 1 + attempt) % activeStaff.length;
+    const candidate = activeStaff[nextIndex];
+    
+    const dailyLimit = (candidate as any).daily_db_limit || 0;
+    if (dailyLimit > 0) {
+      const todayCount = await getTodayAssignmentCount(candidate.uid);
+      if (todayCount >= dailyLimit) {
+        console.log(`⏭️ ${candidate.name}: 일일 한도 초과 (${todayCount}/${dailyLimit}), 건너뜀`);
+        continue;
+      }
+    }
+    
+    await updateLastAssignmentIndex(nextIndex);
+    console.log(`✅ 담당자 배정: ${candidate.name} (${nextIndex + 1}/${activeStaff.length}번째)`);
+    
+    return {
+      managerId: candidate.uid,
+      managerName: candidate.name,
+      managerPhone: candidate.phone_work || candidate.phone || '',
+      teamId: candidate.team_id || '',
+      teamName: candidate.team_name || '미배정',
+    };
+  }
   
-  // 인덱스 업데이트
-  await updateLastAssignmentIndex(nextIndex);
-  
-  console.log(`✅ 담당자 배정: ${assignee.name} (${nextIndex + 1}/${activeStaff.length}번째)`);
-  
-  return {
-    managerId: assignee.uid,
-    managerName: assignee.name,
-    managerPhone: assignee.phone_work || assignee.phone || '',
-    teamId: assignee.team_id || '',
-    teamName: assignee.team_name || '미배정',
-  };
+  console.log('⚠️ 모든 직원이 일일 한도를 초과했습니다.');
+  return null;
 };
 
 // ============================================
