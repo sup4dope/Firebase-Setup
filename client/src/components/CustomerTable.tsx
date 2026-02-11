@@ -805,13 +805,14 @@ export function CustomerTable({
                                 variant="outline"
                                 className={cn(
                                   "text-xs px-1.5 py-0.5 flex items-center gap-0.5",
-                                  colors.bg,
-                                  colors.text,
-                                  colors.border
+                                  org.is_re_execution
+                                    ? "bg-amber-100/80 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-400/60 dark:border-amber-500/40 border-dashed"
+                                    : cn(colors.bg, colors.text, colors.border)
                                 )}
                               >
-                                {org.status === '부결' && <XCircle className="w-3 h-3" />}
-                                {org.status === '승인' && <CheckCircle className="w-3 h-3" />}
+                                {org.is_re_execution && <RotateCcw className="w-2.5 h-2.5" />}
+                                {!org.is_re_execution && org.status === '부결' && <XCircle className="w-3 h-3" />}
+                                {!org.is_re_execution && org.status === '승인' && <CheckCircle className="w-3 h-3" />}
                                 {org.org}
                               </Badge>
                             );
