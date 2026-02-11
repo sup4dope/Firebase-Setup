@@ -49,7 +49,7 @@ export function CustomerInfoEditModal({
     if (customer && open) {
       setCommissionRate(String(customer.commission_rate || customer.contract_fee_rate || ''));
       setContractAmount(String(customer.contract_amount || customer.deposit_amount || ''));
-      setContractDate((customer as any).contract_date || '');
+      setContractDate((customer as any).contract_date || customer.contract_completion_date || '');
       
       const approvedOrgs = (customer.processing_orgs || []).filter(
         (org: ProcessingOrg) => org.status === '승인'
@@ -125,7 +125,7 @@ export function CustomerInfoEditModal({
         <ScrollArea className="max-h-[65vh]">
           <div className="space-y-4 py-4 pr-4">
             <div className="text-sm text-muted-foreground mb-4">
-              고객: <span className="font-medium text-foreground">{customer.company_name || customer.name}</span>
+              고객: <span className="font-medium text-foreground">{customer.name}{customer.company_name ? `(${customer.company_name})` : ''}</span>
             </div>
             
             <div className="space-y-2">

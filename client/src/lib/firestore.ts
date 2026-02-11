@@ -1068,11 +1068,38 @@ export const updateCustomerInfo = async (
   if (Object.keys(fieldsToUpdate).length > 0) {
     batch.update(customerRef, fieldsToUpdate);
     
-    // 변경 이력 추가
+    // 변경 이력 추가 (customer_info_logs)
     for (const log of logsToAdd) {
       const logRef = doc(collection(db, 'customer_info_logs'));
       batch.set(logRef, {
         ...log,
+        changed_at: Timestamp.now(),
+      });
+    }
+
+    // 상세페이지 변경이력에도 기록 (customer_history_logs)
+    if (logsToAdd.length > 0) {
+      const fieldLabels: Record<string, string> = {
+        commission_rate: '자문료율',
+        contract_amount: '계약금',
+        contract_date: '계약일',
+        execution_amount: '집행금액',
+        execution_date: '집행일',
+      };
+      const details = logsToAdd.map(log => {
+        const label = fieldLabels[log.field_name] || log.field_name;
+        return `${label}: ${log.old_value} → ${log.new_value}`;
+      }).join(', ');
+
+      const historyLogRef = doc(collection(db, 'customer_history_logs'));
+      batch.set(historyLogRef, {
+        customer_id: customerId,
+        action_type: 'info_edit',
+        description: `정보 수정: ${details}`,
+        old_value: logsToAdd.map(l => `${fieldLabels[l.field_name] || l.field_name}: ${l.old_value}`).join(', '),
+        new_value: logsToAdd.map(l => `${fieldLabels[l.field_name] || l.field_name}: ${l.new_value}`).join(', '),
+        changed_by_id: changedBy,
+        changed_by_name: changedByName,
         changed_at: Timestamp.now(),
       });
     }
