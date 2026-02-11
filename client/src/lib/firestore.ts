@@ -1094,7 +1094,7 @@ export const updateCustomerInfo = async (
       const historyLogRef = doc(collection(db, 'customer_history_logs'));
       batch.set(historyLogRef, {
         customer_id: customerId,
-        action_type: 'info_edit',
+        action_type: 'info_update',
         description: `정보 수정: ${details}`,
         old_value: logsToAdd.map(l => `${fieldLabels[l.field_name] || l.field_name}: ${l.old_value}`).join(', '),
         new_value: logsToAdd.map(l => `${fieldLabels[l.field_name] || l.field_name}: ${l.new_value}`).join(', '),

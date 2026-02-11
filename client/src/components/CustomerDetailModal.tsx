@@ -25,6 +25,7 @@ import {
   XCircle,
   Building,
   RotateCcw,
+  Pencil,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -676,7 +677,7 @@ export function CustomerDetailModal({
       }
     };
     loadHistoryLogs();
-  }, [activeBottomTab, customer?.id]);
+  }, [activeBottomTab, customer?.id, isOpen]);
 
   // Calculate 7-year status (D-2555 기준: 현재일로부터 2555일 초과 시 7년 초과)
   const handleFoundingDateChange = (date: string) => {
@@ -3828,13 +3829,17 @@ export function CustomerDetailModal({
                                     ? "bg-blue-600/20 text-blue-400"
                                     : log.action_type === "manager_change"
                                       ? "bg-green-600/20 text-green-400"
-                                      : "bg-gray-600/20 text-muted-foreground",
+                                      : log.action_type === "info_update"
+                                        ? "bg-orange-600/20 text-orange-400"
+                                        : "bg-gray-600/20 text-muted-foreground",
                                 )}
                               >
                                 {log.action_type === "status_change" ? (
                                   <ArrowRight className="w-3 h-3" />
                                 ) : log.action_type === "manager_change" ? (
                                   <UserCog className="w-3 h-3" />
+                                ) : log.action_type === "info_update" ? (
+                                  <Pencil className="w-3 h-3" />
                                 ) : (
                                   <Clock className="w-3 h-3" />
                                 )}
