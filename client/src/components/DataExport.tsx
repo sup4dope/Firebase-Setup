@@ -42,36 +42,72 @@ export function DataExport({ customers, users, teams, isSuperAdmin }: DataExport
     return team?.team_name || team?.name || '-';
   };
 
+  const getProcessingOrgs = (customer: Customer) => {
+    if (customer.processing_orgs && customer.processing_orgs.length > 0) {
+      return customer.processing_orgs;
+    }
+    if (customer.processing_org && customer.processing_org !== '미등록') {
+      return [{ org: customer.processing_org, status: '진행중' as const }];
+    }
+    return [];
+  };
+
   const prepareCustomerData = () => {
-    return customers.map(customer => {
-      const baseData: Record<string, string | number> = {
-        '고객ID': customer.readable_id,
-        '성함': customer.name,
-        '상호명': customer.company_name,
-        '연락처': customer.phone || '',
-        '상태': customer.status_code,
-        '담당자': customer.manager_name || getManagerName(customer.manager_id),
-        '소속팀': customer.team_name || getTeamName(customer.team_id),
-        '접수일자': customer.entry_date,
-        '진행기관': customer.processing_org || '',
-        '사업자등록번호': customer.business_registration_number || '',
-        '설립일': customer.founding_date || '',
-        '업종': customer.business_type || '',
-        '종목': customer.business_item || '',
-        '유입경로': customer.entry_source || '',
-        '사업장주소': customer.business_address || '',
-        '최근메모': customer.recent_memo || customer.latest_memo || '',
+    const rows: Record<string, string | number>[] = [];
+
+    customers.forEach(customer => {
+      const orgs = getProcessingOrgs(customer);
+
+      const buildRow = (orgInfo?: { org: string; status: string; execution_date?: string; execution_amount?: number; is_re_execution?: boolean; applied_at?: string; approved_at?: string; rejected_at?: string }) => {
+        const baseData: Record<string, string | number> = {
+          '고객ID': customer.readable_id,
+          '성함': customer.name,
+          '상호명': customer.company_name,
+          '연락처': customer.phone || '',
+          '상태': customer.status_code,
+          '담당자': customer.manager_name || getManagerName(customer.manager_id),
+          '소속팀': customer.team_name || getTeamName(customer.team_id),
+          '접수일자': customer.entry_date,
+          '진행기관': orgInfo ? orgInfo.org : (customer.processing_org || '미등록'),
+          '기관상태': orgInfo ? orgInfo.status : '',
+          '집행구분': orgInfo ? (orgInfo.is_re_execution ? '재집행' : '최초집행') : '',
+          '기관접수일': orgInfo?.applied_at || '',
+          '기관승인일': orgInfo?.approved_at || '',
+          '기관부결일': orgInfo?.rejected_at || '',
+          '기관집행일': orgInfo?.execution_date || '',
+          '기관집행금액(만원)': orgInfo?.execution_amount || '',
+          '사업자등록번호': customer.business_registration_number || '',
+          '설립일': customer.founding_date || '',
+          '업종': customer.business_type || '',
+          '종목': customer.business_item || '',
+          '유입경로': customer.entry_source || '',
+          '사업장주소': customer.business_address || '',
+          '신용점수': customer.credit_score || '',
+          '통신사': customer.carrier || '',
+          '자택주소': [customer.home_address, customer.home_address_detail].filter(Boolean).join(' ') || '',
+          '최근메모': customer.recent_memo || customer.latest_memo || '',
+        };
+
+        if (isSuperAdmin) {
+          baseData['수수료율(%)'] = customer.commission_rate || 0;
+          baseData['계약금(만원)'] = customer.contract_amount || 0;
+          baseData['집행금액(만원)'] = customer.execution_amount || 0;
+          baseData['승인금액(만원)'] = customer.approved_amount || 0;
+        }
+
+        return baseData;
       };
 
-      if (isSuperAdmin) {
-        baseData['수수료율(%)'] = customer.commission_rate || 0;
-        baseData['계약금(만원)'] = customer.contract_amount || 0;
-        baseData['집행금액(만원)'] = customer.execution_amount || 0;
-        baseData['승인금액(만원)'] = customer.approved_amount || 0;
+      if (orgs.length <= 1) {
+        rows.push(buildRow(orgs[0]));
+      } else {
+        orgs.forEach(org => {
+          rows.push(buildRow(org));
+        });
       }
-
-      return baseData;
     });
+
+    return rows;
   };
 
   const prepareStatisticsData = () => {
@@ -124,22 +160,32 @@ export function DataExport({ customers, users, teams, isSuperAdmin }: DataExport
         const ws = XLSX.utils.json_to_sheet(customerData);
         
         const colWidths = [
-          { wch: 12 },
-          { wch: 10 },
-          { wch: 20 },
-          { wch: 15 },
-          { wch: 12 },
-          { wch: 10 },
-          { wch: 12 },
-          { wch: 12 },
-          { wch: 10 },
-          { wch: 15 },
-          { wch: 12 },
-          { wch: 15 },
-          { wch: 15 },
-          { wch: 10 },
-          { wch: 30 },
-          { wch: 40 },
+          { wch: 12 },  // 고객ID
+          { wch: 10 },  // 성함
+          { wch: 20 },  // 상호명
+          { wch: 15 },  // 연락처
+          { wch: 12 },  // 상태
+          { wch: 10 },  // 담당자
+          { wch: 12 },  // 소속팀
+          { wch: 12 },  // 접수일자
+          { wch: 10 },  // 진행기관
+          { wch: 10 },  // 기관상태
+          { wch: 10 },  // 집행구분
+          { wch: 12 },  // 기관접수일
+          { wch: 12 },  // 기관승인일
+          { wch: 12 },  // 기관부결일
+          { wch: 12 },  // 기관집행일
+          { wch: 15 },  // 기관집행금액
+          { wch: 15 },  // 사업자등록번호
+          { wch: 12 },  // 설립일
+          { wch: 15 },  // 업종
+          { wch: 15 },  // 종목
+          { wch: 10 },  // 유입경로
+          { wch: 30 },  // 사업장주소
+          { wch: 10 },  // 신용점수
+          { wch: 10 },  // 통신사
+          { wch: 30 },  // 자택주소
+          { wch: 40 },  // 최근메모
         ];
         ws['!cols'] = colWidths;
         
