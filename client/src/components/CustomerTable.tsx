@@ -789,7 +789,11 @@ export function CustomerTable({
                       >
                         {(() => {
                           const orgs = getProcessingOrgsFromCustomer(customer);
+                          const isPostContract = customer.status_code?.includes('계약완료') || customer.status_code?.includes('서류취합완료') || customer.status_code?.includes('신청완료') || customer.status_code?.includes('집행완료');
                           if (orgs.length === 0) {
+                            if (!isPostContract) {
+                              return <span className="text-xs text-muted-foreground">-</span>;
+                            }
                             return (
                               <span className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Plus className="w-3 h-3" />
@@ -903,7 +907,8 @@ export function CustomerTable({
                           );
                         })()}
                         
-                        {/* 기관 추가 */}
+                        {/* 기관 추가 - 계약완료 이후 상태에서만 표시 */}
+                        {(customer.status_code?.includes('계약완료') || customer.status_code?.includes('서류취합완료') || customer.status_code?.includes('신청완료') || customer.status_code?.includes('집행완료')) && (
                         <div className="border-t pt-2">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-xs text-muted-foreground">기관 추가</p>
@@ -957,6 +962,7 @@ export function CustomerTable({
                             ))}
                           </div>
                         </div>
+                        )}
                       </div>
                     </PopoverContent>
                   </Popover>

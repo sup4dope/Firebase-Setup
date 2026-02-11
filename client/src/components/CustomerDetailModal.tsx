@@ -2810,8 +2810,8 @@ export function CustomerDetailModal({
                 )}
               </div>
 
-              {/* 진행기관 관리 섹션 */}
-              {formData.id && (
+              {/* 진행기관 관리 섹션 - 계약완료 이후 상태에서만 표시 */}
+              {formData.id && (formData.status_code?.includes('계약완료') || formData.status_code?.includes('서류취합완료') || formData.status_code?.includes('신청완료') || formData.status_code?.includes('집행완료')) && (
                 <div className="border rounded-lg p-3 space-y-2 mx-1.5 mt-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-purple-400 text-[14px] flex items-center gap-1.5">
