@@ -4344,10 +4344,23 @@ export function CustomerDetailModal({
                     }
                   }
 
+                  let logDescription = `상태 변경: ${oldStatus} → ${statusChangeModal.targetStatus}`;
+                  if (statusChangeModal.targetStatus.includes("계약완료")) {
+                    const details: string[] = [];
+                    if (statusChangeModal.contractDate) {
+                      details.push(`계약일: ${statusChangeModal.contractDate}`);
+                    }
+                    details.push(`계약금: ${statusChangeModal.contractAmount || 0}만원`);
+                    if (statusChangeModal.commissionRate > 0) {
+                      details.push(`자문료율: ${statusChangeModal.commissionRate}%`);
+                    }
+                    logDescription += ` (${details.join(', ')})`;
+                  }
+
                   await addDoc(collection(db, "customer_history_logs"), {
                     customer_id: formData.id,
                     action_type: "status_change",
-                    description: `상태 변경: ${oldStatus} → ${statusChangeModal.targetStatus}`,
+                    description: logDescription,
                     old_value: oldStatus,
                     new_value: statusChangeModal.targetStatus,
                     changed_by_id: currentUser?.uid || "",
