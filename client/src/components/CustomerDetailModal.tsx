@@ -3716,21 +3716,23 @@ export function CustomerDetailModal({
                   <UserIcon className="w-4 h-4 mr-1.5" />
                   상담 메모
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setActiveBottomTab("history")}
-                  className={cn(
-                    "h-8 px-3 text-sm",
-                    activeBottomTab === "history"
-                      ? "bg-orange-600/20 text-orange-400"
-                      : "text-muted-foreground",
-                  )}
-                  data-testid="tab-history"
-                >
-                  <History className="w-4 h-4 mr-1.5" />
-                  변경 이력
-                </Button>
+                {currentUser?.role !== "staff" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveBottomTab("history")}
+                    className={cn(
+                      "h-8 px-3 text-sm",
+                      activeBottomTab === "history"
+                        ? "bg-orange-600/20 text-orange-400"
+                        : "text-muted-foreground",
+                    )}
+                    data-testid="tab-history"
+                  >
+                    <History className="w-4 h-4 mr-1.5" />
+                    변경 이력
+                  </Button>
+                )}
                 {/* TO-DO+ 버튼 */}
                 {customer?.id && currentUser && (
                   <Button
@@ -3748,7 +3750,7 @@ export function CustomerDetailModal({
 
               {/* Tab Content */}
               <div className="flex-1 min-h-0 overflow-hidden">
-                {activeBottomTab === "memo" ? (
+                {activeBottomTab === "memo" || currentUser?.role === "staff" ? (
                   <div className="flex flex-col h-full">
                     {/* Memo Messages */}
                     <div
