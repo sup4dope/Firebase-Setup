@@ -34,9 +34,6 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
-  FunnelChart,
-  Funnel,
-  LabelList,
   Cell,
   PieChart,
   Pie,
@@ -428,28 +425,64 @@ export default function Stats() {
     };
   }, [filteredCustomers, customerIdsWithContractHistory]);
 
-  const funnelData = useMemo(() => {
-    const waitingCount = filteredCustomers.filter(c => c.status_code === '상담대기').length;
-    const contractedCount = filteredCustomers.filter(c => customerIdsWithContractHistory.has(c.id)).length;
-    const applicationCount = filteredCustomers.filter(c => 
-      c.status_code === '신청완료' || c.status_code === EXECUTION_STATUS
-    ).length;
-    const executedCount = filteredCustomers.filter(c => c.status_code === EXECUTION_STATUS).length;
+  const conversionRateData = useMemo(() => {
+    const calcRates = (custs: Customer[], contractIds: Set<string>) => {
+      const total = custs.length;
+      const contracted = custs.filter(c => contractIds.has(c.id)).length;
+      const applied = custs.filter(c => c.status_code === '신청완료' || c.status_code === EXECUTION_STATUS).length;
+      const executed = custs.filter(c => c.status_code === EXECUTION_STATUS).length;
+      return {
+        total,
+        contracted,
+        applied,
+        executed,
+        inflowToContract: total > 0 ? Math.round((contracted / total) * 1000) / 10 : 0,
+        contractToApply: contracted > 0 ? Math.round((applied / contracted) * 1000) / 10 : 0,
+        applyToExecute: applied > 0 ? Math.round((executed / applied) * 1000) / 10 : 0,
+        inflowToExecute: total > 0 ? Math.round((executed / total) * 1000) / 10 : 0,
+      };
+    };
 
-    // 평균 계산 (재직중 직원 수 기준)
-    const staffCount = activeStaffCount || 1;
-    const avgWaiting = Math.round((waitingCount / staffCount) * 10) / 10;
-    const avgContracted = Math.round((contractedCount / staffCount) * 10) / 10;
-    const avgApplication = Math.round((applicationCount / staffCount) * 10) / 10;
-    const avgExecuted = Math.round((executedCount / staffCount) * 10) / 10;
+    const allContractIds = new Set<string>();
+    statusLogs.forEach(log => {
+      if (CONTRACT_STATUSES.includes(log.new_status)) allContractIds.add(log.customer_id);
+    });
+    customers.forEach(c => {
+      if (CONTRACT_STATUSES.includes(c.status_code)) allContractIds.add(c.id);
+    });
+
+    const current = calcRates(filteredCustomers, customerIdsWithContractHistory);
+
+    const staffMembers = users.filter(u => u.uid && u.uid.trim() !== '' && u.role !== 'super_admin');
+    const staffRates = staffMembers.map(u => {
+      const staffCustomers = customers.filter(c => c.manager_id === u.uid);
+      const staffContractIds = new Set<string>();
+      statusLogs.forEach(log => {
+        if (CONTRACT_STATUSES.includes(log.new_status) && staffCustomers.some(c => c.id === log.customer_id)) {
+          staffContractIds.add(log.customer_id);
+        }
+      });
+      staffCustomers.forEach(c => {
+        if (CONTRACT_STATUSES.includes(c.status_code)) staffContractIds.add(c.id);
+      });
+      return calcRates(staffCustomers, staffContractIds);
+    }).filter(r => r.total > 0);
+
+    const avgCount = staffRates.length || 1;
+    const avg = {
+      inflowToContract: Math.round(staffRates.reduce((s, r) => s + r.inflowToContract, 0) / avgCount * 10) / 10,
+      contractToApply: Math.round(staffRates.reduce((s, r) => s + r.contractToApply, 0) / avgCount * 10) / 10,
+      applyToExecute: Math.round(staffRates.reduce((s, r) => s + r.applyToExecute, 0) / avgCount * 10) / 10,
+      inflowToExecute: Math.round(staffRates.reduce((s, r) => s + r.inflowToExecute, 0) / avgCount * 10) / 10,
+    };
 
     return [
-      { name: '상담대기', value: waitingCount, avgValue: avgWaiting, fill: '#6366f1' },
-      { name: '계약완료(이력)', value: contractedCount, avgValue: avgContracted, fill: '#8b5cf6' },
-      { name: '신청완료', value: applicationCount, avgValue: avgApplication, fill: '#a855f7' },
-      { name: '집행완료', value: executedCount, avgValue: avgExecuted, fill: '#22c55e' },
+      { name: '유입→계약', current: current.inflowToContract, average: avg.inflowToContract, currentCount: `${current.contracted}/${current.total}` },
+      { name: '계약→신청', current: current.contractToApply, average: avg.contractToApply, currentCount: `${current.applied}/${current.contracted}` },
+      { name: '신청→집행', current: current.applyToExecute, average: avg.applyToExecute, currentCount: `${current.executed}/${current.applied}` },
+      { name: '종합 전환율', current: current.inflowToExecute, average: avg.inflowToExecute, currentCount: `${current.executed}/${current.total}` },
     ];
-  }, [filteredCustomers, customerIdsWithContractHistory, activeStaffCount]);
+  }, [filteredCustomers, customers, users, statusLogs, customerIdsWithContractHistory]);
 
   const performanceData = useMemo(() => {
     const staffStats: { [key: string]: { name: string; contracts: number; amount: number } } = {};
@@ -744,20 +777,42 @@ export default function Stats() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">전환 퍼널</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                단계별 전환율
+                <ShadTooltip>
+                  <TooltipTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="button-conversion-help">
+                      <HelpCircle className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-sm">
+                    <div className="space-y-1">
+                      <p><strong>유입→계약:</strong> 유입 고객 중 계약 성사 비율</p>
+                      <p><strong>계약→신청:</strong> 계약 고객 중 기관 신청 비율</p>
+                      <p><strong>신청→집행:</strong> 신청 고객 중 집행 완료 비율</p>
+                      <p><strong>종합 전환율:</strong> 유입 대비 최종 집행 비율</p>
+                      <p className="text-muted-foreground pt-1">전체 직원 평균과 비교하여 성과를 확인할 수 있습니다.</p>
+                    </div>
+                  </TooltipContent>
+                </ShadTooltip>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={funnelData} layout="vertical">
+                  <BarChart data={conversionRateData} barGap={4}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis 
-                      type="category" 
+                    <XAxis 
                       dataKey="name" 
                       stroke="hsl(var(--muted-foreground))" 
+                      fontSize={11}
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      stroke="hsl(var(--muted-foreground))" 
                       fontSize={12}
-                      width={100}
+                      tickFormatter={(v) => `${v}%`}
+                      domain={[0, (dataMax: number) => Math.max(Math.ceil(dataMax * 1.2), 10)]}
                     />
                     <Tooltip 
                       contentStyle={{ 
@@ -766,21 +821,37 @@ export default function Stats() {
                         borderRadius: '8px',
                       }}
                       labelStyle={{ color: 'hsl(var(--card-foreground))' }}
-                      itemStyle={{ color: 'hsl(var(--card-foreground))' }}
-                      formatter={(value: number, name: string) => {
-                        if (name === 'value') return [`${value}건`, '실제'];
-                        return [`${value}건`, '인당 평균'];
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length > 0) {
+                          const data = payload[0].payload;
+                          const diff = data.current - data.average;
+                          const diffColor = diff > 0 ? '#22c55e' : diff < 0 ? '#ef4444' : 'hsl(var(--muted-foreground))';
+                          const diffSign = diff > 0 ? '+' : '';
+                          return (
+                            <div style={{
+                              backgroundColor: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                              padding: '10px 14px',
+                              color: 'hsl(var(--card-foreground))',
+                            }}>
+                              <p style={{ fontWeight: 'bold', marginBottom: '6px' }}>{label}</p>
+                              <p style={{ color: '#6366f1' }}>현재: {data.current}% ({data.currentCount}건)</p>
+                              <p style={{ color: '#94a3b8' }}>전체 평균: {data.average}%</p>
+                              <p style={{ color: diffColor, marginTop: '4px', fontWeight: 500 }}>
+                                차이: {diffSign}{Math.round(diff * 10) / 10}%p
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
                       }}
                     />
                     <Legend 
-                      formatter={(value) => value === 'value' ? '실제 건수' : '인당 평균'}
+                      formatter={(value) => value === 'current' ? '현재 선택' : '전체 평균'}
                     />
-                    <Bar dataKey="value" name="value" radius={[0, 4, 4, 0]} activeBar={false}>
-                      {funnelData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                    <Bar dataKey="avgValue" name="avgValue" fill="#94a3b8" radius={[0, 4, 4, 0]} activeBar={false} />
+                    <Bar dataKey="current" name="current" fill="#6366f1" radius={[4, 4, 0, 0]} activeBar={false} barSize={28} />
+                    <Bar dataKey="average" name="average" fill="#94a3b8" radius={[4, 4, 0, 0]} activeBar={false} barSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
