@@ -15,7 +15,7 @@ export async function registerRoutes(
     
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: "GEMINI_API_KEY 없음" });
+      return res.status(500).json({ error: "API 키가 설정되지 않았습니다." });
     }
     
     try {
@@ -30,13 +30,14 @@ export async function registerRoutes(
       if (data.models) {
         const modelNames = data.models.map((m: any) => m.name);
         console.log("✅ 사용 가능한 모델:", modelNames);
-        res.json({ success: true, models: modelNames, raw: data });
+        res.json({ success: true, models: modelNames });
       } else {
-        res.json({ success: false, error: data.error, raw: data });
+        console.error("모델 목록 조회 실패:", data.error);
+        res.json({ success: false, error: "모델 목록을 가져올 수 없습니다." });
       }
     } catch (error: any) {
       console.error("❌ 모델 목록 조회 실패:", error.message);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "모델 목록 조회 중 오류가 발생했습니다." });
     }
   });
 
@@ -65,9 +66,7 @@ export async function registerRoutes(
         console.log("⚠️ [라우터] OCR 실패 (에러 발생):", result._error);
         res.json({ 
           success: false, 
-          error: result._error, 
-          data: result,
-          details: "OCR 처리 중 에러 발생, 빈 데이터 반환됨" 
+          error: "OCR 인식에 실패했습니다. 다시 시도해주세요."
         });
       } else if (result) {
         console.log("✅ [라우터] OCR 성공:", Object.keys(result));
@@ -83,9 +82,7 @@ export async function registerRoutes(
       console.error("   - Stack:", errorStack);
       res.status(500).json({ 
         success: false, 
-        error: errorMessage,
-        stack: errorStack,
-        details: "서버에서 OCR 처리 중 예외 발생"
+        error: "OCR 처리 중 오류가 발생했습니다."
       });
     }
   });
@@ -122,8 +119,7 @@ export async function registerRoutes(
       console.error("❌ [라우터] 부가세 OCR API 예외:", errorMessage);
       res.status(500).json({ 
         success: false, 
-        error: errorMessage,
-        details: "서버에서 OCR 처리 중 예외 발생"
+        error: "OCR 처리 중 오류가 발생했습니다."
       });
     }
   });
@@ -160,8 +156,7 @@ export async function registerRoutes(
       console.error("❌ [라우터] 신용공여내역 OCR API 예외:", errorMessage);
       res.status(500).json({ 
         success: false, 
-        error: errorMessage,
-        details: "서버에서 OCR 처리 중 예외 발생"
+        error: "OCR 처리 중 오류가 발생했습니다."
       });
     }
   });
@@ -305,7 +300,7 @@ export async function registerRoutes(
       console.error("❌ [Solapi] 알림톡 발송 오류:", error.message);
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: "알림톡 발송 중 오류가 발생했습니다.",
       });
     }
   });
@@ -333,7 +328,7 @@ export async function registerRoutes(
       console.error("❌ [Solapi] 지연 알림톡 발송 오류:", error.message);
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: "지연 알림톡 발송 중 오류가 발생했습니다.",
       });
     }
   });
@@ -370,7 +365,7 @@ export async function registerRoutes(
       console.error("❌ [Solapi] 담당자 배정 알림톡 발송 오류:", error.message);
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: "담당자 배정 알림톡 발송 중 오류가 발생했습니다.",
       });
     }
   });
@@ -400,7 +395,7 @@ export async function registerRoutes(
       console.error("❌ [Solapi] 장기부재 알림 발송 오류:", error.message);
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: "장기부재 알림 발송 중 오류가 발생했습니다.",
       });
     }
   });
@@ -436,7 +431,7 @@ export async function registerRoutes(
       console.error("❌ [Solapi] 명함 발송 오류:", error.message);
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: "명함 발송 중 오류가 발생했습니다.",
       });
     }
   });

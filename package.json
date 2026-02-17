@@ -59,6 +59,7 @@
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
     "framer-motion": "^11.13.1",
+    "helmet": "^8.1.0",
     "input-otp": "^1.4.2",
     "kadvice": "^2.0.2",
     "lodash": "^4.17.21",
