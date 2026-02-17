@@ -2,15 +2,15 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
-import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims } from "./firebaseAdmin";
+import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin } from "./firebaseAdmin";
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // 디버그: 사용 가능한 Gemini 모델 목록 조회
-  app.get("/api/debug/gemini-models", async (req, res) => {
+  // 디버그: 사용 가능한 Gemini 모델 목록 조회 (인증 필요)
+  app.get("/api/debug/gemini-models", requireAuth, async (req, res) => {
     console.log("🔍 [디버그] Gemini 모델 목록 조회...");
     
     const apiKey = process.env.GEMINI_API_KEY;
@@ -40,8 +40,8 @@ export async function registerRoutes(
     }
   });
 
-  // OCR API endpoint for business registration extraction
-  app.post("/api/ocr/business-registration", async (req, res) => {
+  // OCR API endpoint for business registration extraction (인증 필요)
+  app.post("/api/ocr/business-registration", requireAuth, async (req, res) => {
     console.log("📥 [라우터] OCR API 요청 수신");
     
     try {
@@ -90,8 +90,8 @@ export async function registerRoutes(
     }
   });
 
-  // OCR API endpoint for VAT certificate (부가가치세 과세표준증명)
-  app.post("/api/ocr/vat-certificate", async (req, res) => {
+  // OCR API endpoint for VAT certificate (인증 필요)
+  app.post("/api/ocr/vat-certificate", requireAuth, async (req, res) => {
     console.log("📥 [라우터] 부가세 과세표준증명 OCR 요청 수신");
     
     try {
@@ -128,8 +128,8 @@ export async function registerRoutes(
     }
   });
 
-  // OCR API endpoint for credit report (사업자신용정보공여내역)
-  app.post("/api/ocr/credit-report", async (req, res) => {
+  // OCR API endpoint for credit report (인증 필요)
+  app.post("/api/ocr/credit-report", requireAuth, async (req, res) => {
     console.log("📥 [라우터] 신용공여내역 OCR 요청 수신");
     
     try {
@@ -168,8 +168,8 @@ export async function registerRoutes(
 
   // === Firebase Custom Claims API ===
   
-  // 단일 사용자 Custom Claims 설정
-  app.post("/api/admin/set-custom-claims", async (req, res) => {
+  // 단일 사용자 Custom Claims 설정 (super_admin 전용)
+  app.post("/api/admin/set-custom-claims", requireAuth, requireSuperAdmin, async (req, res) => {
     console.log("📥 [Admin] Custom Claims 설정 요청");
     
     try {
@@ -197,8 +197,8 @@ export async function registerRoutes(
     }
   });
 
-  // 다중 사용자 Custom Claims 일괄 설정 (마이그레이션용)
-  app.post("/api/admin/sync-all-claims", async (req, res) => {
+  // 다중 사용자 Custom Claims 일괄 설정 (super_admin 전용)
+  app.post("/api/admin/sync-all-claims", requireAuth, requireSuperAdmin, async (req, res) => {
     console.log("📥 [Admin] 전체 사용자 Custom Claims 동기화 요청");
     
     try {
@@ -228,8 +228,8 @@ export async function registerRoutes(
     }
   });
 
-  // 사용자 Custom Claims 조회
-  app.get("/api/admin/get-custom-claims/:uid", async (req, res) => {
+  // 사용자 Custom Claims 조회 (super_admin 전용)
+  app.get("/api/admin/get-custom-claims/:uid", requireAuth, requireSuperAdmin, async (req, res) => {
     console.log("📥 [Admin] Custom Claims 조회 요청");
     
     try {
@@ -259,7 +259,7 @@ export async function registerRoutes(
   });
 
   // Solapi 설정 상태 확인
-  app.get("/api/solapi/status", async (req, res) => {
+  app.get("/api/solapi/status", requireAuth, async (req, res) => {
     console.log("🔍 [Solapi] 설정 상태 조회");
     
     const config = checkSolapiConfig();
@@ -310,8 +310,8 @@ export async function registerRoutes(
     }
   });
 
-  // 지연 알림톡 일괄 발송 (미처리 상담 고객 대상)
-  app.post("/api/solapi/delay-notify", async (req, res) => {
+  // 지연 알림톡 일괄 발송 (인증 필요)
+  app.post("/api/solapi/delay-notify", requireAuth, async (req, res) => {
     console.log("📤 [Solapi] 지연 알림톡 일괄 발송 요청");
     
     try {
@@ -338,8 +338,8 @@ export async function registerRoutes(
     }
   });
 
-  // 담당자 배정 알림톡 발송
-  app.post("/api/solapi/assignment-notify", async (req, res) => {
+  // 담당자 배정 알림톡 발송 (인증 필요)
+  app.post("/api/solapi/assignment-notify", requireAuth, async (req, res) => {
     console.log("📤 [Solapi] 담당자 배정 알림톡 발송 요청");
     
     try {
@@ -375,8 +375,8 @@ export async function registerRoutes(
     }
   });
 
-  // 장기부재 알림 발송 API
-  app.post("/api/solapi/send-longabsence", async (req, res) => {
+  // 장기부재 알림 발송 API (인증 필요)
+  app.post("/api/solapi/send-longabsence", requireAuth, async (req, res) => {
     try {
       const { customerPhone, customerName, services } = req.body;
       
@@ -405,8 +405,8 @@ export async function registerRoutes(
     }
   });
 
-  // 명함 발송 API
-  app.post("/api/solapi/send-businesscard", async (req, res) => {
+  // 명함 발송 API (인증 필요)
+  app.post("/api/solapi/send-businesscard", requireAuth, async (req, res) => {
     try {
       const { customerPhone, customerName, managerName, managerPhone, managerEmail, businessAddress } = req.body;
       

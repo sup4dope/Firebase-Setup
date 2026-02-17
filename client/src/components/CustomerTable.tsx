@@ -248,7 +248,8 @@ export function CustomerTable({
           services = serviceMatch[1].split(', ').map((s: string) => s.trim());
         }
       }
-      const response = await fetch("/api/solapi/send-longabsence", {
+      const { authFetch } = await import("@/lib/firebase");
+      const response = await authFetch("/api/solapi/send-longabsence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

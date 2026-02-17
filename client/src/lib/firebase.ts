@@ -47,4 +47,15 @@ export async function getCustomerHistoryLogs(customerId: string): Promise<Custom
   });
 }
 
+export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('로그인이 필요합니다.');
+  }
+  const token = await currentUser.getIdToken();
+  const headers = new Headers(options.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  return fetch(url, { ...options, headers });
+}
+
 export default app;

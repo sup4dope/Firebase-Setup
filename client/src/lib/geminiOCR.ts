@@ -5,6 +5,7 @@
  */
 
 import { compressImageForOCR, formatFileSize } from './imageCompressor';
+import { authFetch } from './firebase';
 
 export interface BusinessRegistrationData {
   company_name?: string;
@@ -82,7 +83,7 @@ export async function extractBusinessRegistration(
     }
     
     console.log("📡 서버 OCR API 호출 중...");
-    const response = await fetch('/api/ocr/business-registration', {
+    const response = await authFetch('/api/ocr/business-registration', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -204,7 +205,7 @@ export async function extractVatCertificate(
     }
     
     console.log("📡 서버 부가세 OCR API 호출 중...");
-    const response = await fetch('/api/ocr/vat-certificate', {
+    const response = await authFetch('/api/ocr/vat-certificate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ base64Data, mimeType: imageMimeType })
@@ -293,7 +294,7 @@ export async function extractCreditReport(
     }
     
     console.log("📡 서버 신용공여내역 OCR API 호출 중...");
-    const response = await fetch('/api/ocr/credit-report', {
+    const response = await authFetch('/api/ocr/credit-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ base64Data, mimeType: imageMimeType })

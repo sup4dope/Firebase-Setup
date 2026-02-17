@@ -2207,7 +2207,8 @@ export const processConsultationToCustomer = async (
       // 담당자 배정 알림톡 발송 (담당자가 배정된 경우에만)
       if (assignedManager && phone) {
         try {
-          await fetch('/api/solapi/assignment-notify', {
+          const { authFetch } = await import('./firebase');
+          await authFetch('/api/solapi/assignment-notify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

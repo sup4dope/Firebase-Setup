@@ -93,7 +93,8 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
         return;
       }
       
-      const response = await fetch('/api/solapi/delay-notify', {
+      const { authFetch } = await import('@/lib/firebase');
+      const response = await authFetch('/api/solapi/delay-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customers }),

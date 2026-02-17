@@ -1,6 +1,41 @@
 import admin from 'firebase-admin';
+import type { Request, Response, NextFunction } from 'express';
 
 let adminApp: admin.app.App | null = null;
+
+export interface AuthenticatedRequest extends Request {
+  user?: admin.auth.DecodedIdToken;
+}
+
+export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, error: '인증 토큰이 필요합니다.' });
+  }
+
+  const idToken = authHeader.split('Bearer ')[1];
+  const app = getAdminApp();
+
+  app.auth().verifyIdToken(idToken)
+    .then(decodedToken => {
+      req.user = decodedToken;
+      next();
+    })
+    .catch(error => {
+      console.error('토큰 검증 실패:', error.message);
+      return res.status(401).json({ success: false, error: '유효하지 않은 인증 토큰입니다.' });
+    });
+}
+
+export function requireSuperAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: '인증이 필요합니다.' });
+  }
+  if (req.user.role !== 'super_admin') {
+    return res.status(403).json({ success: false, error: '관리자 권한이 필요합니다.' });
+  }
+  next();
+}
 
 export function getAdminApp(): admin.app.App {
   if (adminApp) {

@@ -61,7 +61,8 @@ export default function Migration() {
 
       addClaimsLog('info', '서버에 동기화 요청 중...');
 
-      const response = await fetch('/api/admin/sync-all-claims', {
+      const { authFetch } = await import('@/lib/firebase');
+      const response = await authFetch('/api/admin/sync-all-claims', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ users: usersToSync }),
