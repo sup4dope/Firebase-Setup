@@ -350,7 +350,17 @@ export default function CompanySettlement() {
           totalAdDb += dbCount;
         });
         
-        setExpenses([]);
+        const allExpenses = await Promise.all(months.map(m => getExpensesByMonth(m)));
+        const mergedExpenses: Expense[] = [];
+        const seenIds = new Set<string>();
+        allExpenses.flat().forEach(exp => {
+          if (!seenIds.has(exp.id)) {
+            seenIds.add(exp.id);
+            mergedExpenses.push(exp);
+          }
+        });
+
+        setExpenses(mergedExpenses);
         setRevenueData(aggregatedRevenue);
         setExpenseSummary(aggregatedExpense);
         setAdDbCount(totalAdDb);
@@ -974,12 +984,12 @@ export default function CompanySettlement() {
                 )}
               </CardHeader>
               <CardContent>
-                {!isPeriodSummary(selectedMonth) && (
-                  <ScrollArea className="h-[350px]">
-                    {expenses.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                        <Receipt className="w-12 h-12 mb-4 opacity-50" />
-                        <p>등록된 비용 항목이 없습니다.</p>
+                <ScrollArea className="h-[350px]">
+                  {expenses.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <Receipt className="w-12 h-12 mb-4 opacity-50" />
+                      <p>등록된 비용 항목이 없습니다.</p>
+                      {!isPeriodSummary(selectedMonth) && !dateRangeMode && (
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -989,50 +999,54 @@ export default function CompanySettlement() {
                           <Plus className="w-4 h-4 mr-1" />
                           첫 항목 추가
                         </Button>
-                      </div>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>카테고리</TableHead>
-                            <TableHead>항목명</TableHead>
-                            <TableHead className="text-right">금액</TableHead>
+                      )}
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>카테고리</TableHead>
+                          <TableHead>항목명</TableHead>
+                          <TableHead className="text-right">금액</TableHead>
+                          {!isPeriodSummary(selectedMonth) && !dateRangeMode && (
                             <TableHead className="w-[80px]"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {expenses.map(expense => {
-                            const CategoryIcon = EXPENSE_CATEGORIES.find(c => c.value === expense.category)?.icon || Receipt;
-                            const isFromPreviousMonth = expense.is_recurring && expense.month !== selectedMonth;
-                            return (
-                              <TableRow key={expense.id} data-testid={`row-expense-${expense.id}`} className={isFromPreviousMonth ? 'opacity-75' : ''}>
-                                <TableCell>
-                                  <Badge variant="outline" className="gap-1">
-                                    <CategoryIcon className="w-3 h-3" />
-                                    {expense.category}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{expense.name}</span>
-                                    {expense.description && (
-                                      <span className="text-xs text-muted-foreground">{expense.description}</span>
-                                    )}
-                                    {expense.is_recurring && (
-                                      <div className="flex gap-1 mt-1">
-                                        <Badge variant="secondary" className="text-[10px] w-fit">반복</Badge>
-                                        {isFromPreviousMonth && (
-                                          <Badge variant="outline" className="text-[10px] w-fit text-muted-foreground">
-                                            {expense.month}~
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right font-semibold tabular-nums">
-                                  {expense.amount.toLocaleString()}원
-                                </TableCell>
+                          )}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {expenses.map(expense => {
+                          const CategoryIcon = EXPENSE_CATEGORIES.find(c => c.value === expense.category)?.icon || Receipt;
+                          const isFromPreviousMonth = expense.is_recurring && expense.month !== selectedMonth;
+                          return (
+                            <TableRow key={expense.id} data-testid={`row-expense-${expense.id}`} className={isFromPreviousMonth ? 'opacity-75' : ''}>
+                              <TableCell>
+                                <Badge variant="outline" className="gap-1">
+                                  <CategoryIcon className="w-3 h-3" />
+                                  {expense.category}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{expense.name}</span>
+                                  {expense.description && (
+                                    <span className="text-xs text-muted-foreground">{expense.description}</span>
+                                  )}
+                                  {expense.is_recurring && (
+                                    <div className="flex gap-1 mt-1">
+                                      <Badge variant="secondary" className="text-[10px] w-fit">반복</Badge>
+                                      {isFromPreviousMonth && (
+                                        <Badge variant="outline" className="text-[10px] w-fit text-muted-foreground">
+                                          {expense.month}~
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold tabular-nums">
+                                {expense.amount.toLocaleString()}원
+                              </TableCell>
+                              {!isPeriodSummary(selectedMonth) && !dateRangeMode && (
                                 <TableCell>
                                   <div className="flex gap-1">
                                     <Button
@@ -1058,14 +1072,14 @@ export default function CompanySettlement() {
                                     </Button>
                                   </div>
                                 </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </ScrollArea>
-                )}
+                              )}
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </ScrollArea>
 
                 <div className="mt-4 pt-4 border-t space-y-2">
                   {EXPENSE_CATEGORIES.map(cat => {
