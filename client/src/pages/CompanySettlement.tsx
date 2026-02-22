@@ -529,7 +529,17 @@ export default function CompanySettlement() {
         totalAdDb += dbCount;
       });
 
-      setExpenses([]);
+      const allExpenses = await Promise.all(months.map(m => getExpensesByMonth(m)));
+      const mergedExpenses: Expense[] = [];
+      const seenIds = new Set<string>();
+      allExpenses.flat().forEach(exp => {
+        if (!seenIds.has(exp.id)) {
+          seenIds.add(exp.id);
+          mergedExpenses.push(exp);
+        }
+      });
+
+      setExpenses(mergedExpenses);
       setRevenueData(aggregatedRevenue);
       setExpenseSummary(aggregatedExpense);
       setAdDbCount(totalAdDb);
@@ -553,22 +563,32 @@ export default function CompanySettlement() {
 
   const handleExportExcel = useCallback(() => {
     const toWon = (manVal: number) => Math.round(manVal * 10000);
+    const periodLabel = dateRangeMode ? dateRangeLabel : getPeriodLabel(selectedMonth);
 
-    const summaryData = [
+    const summaryData: (string | number)[][] = [
       ['항목', '금액 (원)'],
-      ['총매출', toWon(revenueData.grossRevenue)],
+      ['조회 기간', periodLabel],
+      ['', ''],
+      ['[ 매출 상세 ]', ''],
       ['총 입금액', toWon(revenueData.totalDeposits)],
-      ['환수 손실', toWon(revenueData.clawbackLoss)],
+      ['환수 손실', -toWon(revenueData.clawbackLoss)],
+      ['총매출', toWon(revenueData.grossRevenue)],
       ['총 계약금', toWon(revenueData.totalContractAmount)],
       ['총 자문료', toWon(Math.round(revenueData.totalAdvisoryFee))],
-      ['직원 수수료', toWon(revenueData.employeeCommission)],
-      ['마케팅비', toWon(expenseSummary.marketing)],
-      ['고정비', toWon(expenseSummary.fixed)],
-      ['운영비', toWon(expenseSummary.operational)],
-      ['기타 비용', toWon(expenseSummary.other)],
-      ['총 비용', toWon(expenseSummary.total)],
-      ['영업이익', toWon(operatingProfit)],
+      ['직원 수수료', -toWon(revenueData.employeeCommission)],
       ['', ''],
+      ['[ 비용 요약 ]', ''],
+      ['마케팅비 소계', toWon(expenseSummary.marketing)],
+      ['고정비 소계', toWon(expenseSummary.fixed)],
+      ['운영비 소계', toWon(expenseSummary.operational)],
+      ['기타 비용 소계', toWon(expenseSummary.other)],
+      ['총 비용', toWon(expenseSummary.total)],
+      ['', ''],
+      ['[ 손익 ]', ''],
+      ['영업이익', toWon(operatingProfit)],
+      ['영업이익률', `${revenueData.grossRevenue > 0 ? ((operatingProfit / revenueData.grossRevenue) * 100).toFixed(1) : '0.0'}%`],
+      ['', ''],
+      ['[ 지표 ]', ''],
       ['계약 건수', revenueData.contractCount],
       ['집행 건수', revenueData.executionCount],
       ['광고 DB 수', adDbCount],
@@ -578,26 +598,50 @@ export default function CompanySettlement() {
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(summaryData);
-
-    ws['!cols'] = [{ wch: 20 }, { wch: 20 }];
-
+    ws['!cols'] = [{ wch: 22 }, { wch: 22 }];
     XLSX.utils.book_append_sheet(wb, ws, '정산 요약');
 
-    if (expenses.length > 0) {
-      const expenseRows = [
-        ['카테고리', '항목명', '금액 (원)', '설명', '반복 여부'],
-        ...expenses.map(e => [
-          e.category,
-          e.name,
-          e.amount,
-          e.description || '',
-          e.is_recurring ? 'Y' : 'N',
-        ]),
-      ];
-      const wsExpense = XLSX.utils.aoa_to_sheet(expenseRows);
-      wsExpense['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 30 }, { wch: 10 }];
-      XLSX.utils.book_append_sheet(wb, wsExpense, '비용 상세');
-    }
+    const categories: { key: ExpenseCategory; label: string }[] = [
+      { key: '마케팅비', label: '마케팅비' },
+      { key: '고정비', label: '고정비' },
+      { key: '운영비', label: '운영비' },
+      { key: '기타', label: '기타' },
+    ];
+
+    const expenseDetailRows: (string | number)[][] = [
+      ['카테고리', '항목명', '금액 (원)', '설명', '반복 여부', '등록 월'],
+    ];
+
+    categories.forEach(cat => {
+      const items = expenses.filter(e => e.category === cat.key);
+      const subtotal = items.reduce((sum, e) => sum + e.amount, 0);
+
+      expenseDetailRows.push([`[ ${cat.label} ]`, '', '', '', '', '']);
+
+      if (items.length === 0) {
+        expenseDetailRows.push(['', '(항목 없음)', 0, '', '', '']);
+      } else {
+        items.forEach(e => {
+          expenseDetailRows.push([
+            '',
+            e.name,
+            e.amount,
+            e.description || '',
+            e.is_recurring ? 'Y' : 'N',
+            e.month || '',
+          ]);
+        });
+      }
+      expenseDetailRows.push([`${cat.label} 소계`, '', subtotal, '', '', '']);
+      expenseDetailRows.push(['', '', '', '', '', '']);
+    });
+
+    const totalExpenseWon = expenses.reduce((sum, e) => sum + e.amount, 0);
+    expenseDetailRows.push(['총 비용 합계', '', totalExpenseWon, '', '', '']);
+
+    const wsExpense = XLSX.utils.aoa_to_sheet(expenseDetailRows);
+    wsExpense['!cols'] = [{ wch: 16 }, { wch: 28 }, { wch: 18 }, { wch: 30 }, { wch: 10 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, wsExpense, '비용 상세');
 
     const fileName = dateRangeMode
       ? `회사정산_${dateRangeStart}_${dateRangeEnd}.xlsx`
