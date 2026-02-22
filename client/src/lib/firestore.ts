@@ -2397,21 +2397,22 @@ export const getExpenseSummaryByMonth = async (month: string): Promise<{
   };
   
   expenses.forEach(expense => {
+    const amountInMan = expense.amount / 10000;
     switch (expense.category) {
       case '마케팅비':
-        summary.marketing += expense.amount;
+        summary.marketing += amountInMan;
         break;
       case '고정비':
-        summary.fixed += expense.amount;
+        summary.fixed += amountInMan;
         break;
       case '운영비':
-        summary.operational += expense.amount;
+        summary.operational += amountInMan;
         break;
       case '기타':
-        summary.other += expense.amount;
+        summary.other += amountInMan;
         break;
     }
-    summary.total += expense.amount;
+    summary.total += amountInMan;
   });
   
   return summary;

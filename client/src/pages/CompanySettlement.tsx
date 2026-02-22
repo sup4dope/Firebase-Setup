@@ -792,7 +792,7 @@ export default function CompanySettlement() {
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right font-semibold tabular-nums">
-                                  {expense.amount.toLocaleString()}만
+                                  {expense.amount.toLocaleString()}원
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
@@ -893,7 +893,7 @@ export default function CompanySettlement() {
               />
             </div>
             <div className="space-y-2">
-              <Label>금액 (만원)</Label>
+              <Label>금액 (원)</Label>
               <Input
                 type="number"
                 placeholder="0"
