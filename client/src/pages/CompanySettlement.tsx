@@ -89,11 +89,9 @@ const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string; icon: typeof 
   { value: '기타', label: '기타', icon: Receipt },
 ];
 
-const formatAmount = (amount: number): string => {
-  if (amount >= 10000) {
-    return `${(amount / 10000).toFixed(1)}억`;
-  }
-  return `${amount.toLocaleString()}만`;
+const formatAmount = (amountInMan: number): string => {
+  const won = Math.round(amountInMan * 10000);
+  return `${won.toLocaleString()}원`;
 };
 
 type PeriodType = 'month' | 'H1' | 'H2' | 'year';
@@ -518,7 +516,7 @@ export default function CompanySettlement() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -585,23 +583,6 @@ export default function CompanySettlement() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   영업이익률: {revenueData.grossRevenue > 0 ? ((operatingProfit / revenueData.grossRevenue) * 100).toFixed(1) : '0.0'}%
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <PieChart className="w-4 h-4" />
-                  세금 예비비 (15%)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                  {formatAmount(taxReserve)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  누적: {formatAmount(cumulativeTaxReserve)}
                 </p>
               </CardContent>
             </Card>
@@ -875,7 +856,7 @@ export default function CompanySettlement() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -948,6 +929,23 @@ export default function CompanySettlement() {
                   {cumulativeData.netProfitRate.toFixed(1)}%
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">순이익 / 매출 × 100</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <PieChart className="w-4 h-4" />
+                  세금 예비비 (15%)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {formatAmount(taxReserve)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  누적: {formatAmount(cumulativeTaxReserve)}
+                </p>
               </CardContent>
             </Card>
           </div>
