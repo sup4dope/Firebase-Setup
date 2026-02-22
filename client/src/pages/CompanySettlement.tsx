@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,6 +68,10 @@ import {
   Wallet,
   Users,
   BarChart3,
+  CalendarRange,
+  Download,
+  Search,
+  X,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -124,6 +129,19 @@ const getMonthsForPeriod = (period: string): string[] => {
   return [period];
 };
 
+const getMonthsBetweenDates = (startDate: string, endDate: string): string[] => {
+  const months: string[] = [];
+  const [sy, sm] = startDate.split('-').map(Number);
+  const [ey, em] = endDate.split('-').map(Number);
+  let y = sy, m = sm;
+  while (y < ey || (y === ey && m <= em)) {
+    months.push(`${y}-${String(m).padStart(2, '0')}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return months;
+};
+
 const getPeriodLabel = (period: string): string => {
   const { type, year, month } = parsePeriod(period);
   if (type === 'H1') return `${year}년 상반기`;
@@ -175,6 +193,13 @@ export default function CompanySettlement() {
     netProfit: 0,
     netProfitRate: 0,
   });
+
+  const [dateRangeMode, setDateRangeMode] = useState(false);
+  const [dateRangeDialogOpen, setDateRangeDialogOpen] = useState(false);
+  const [dateRangeStart, setDateRangeStart] = useState('');
+  const [dateRangeEnd, setDateRangeEnd] = useState('');
+  const [dateRangeLabel, setDateRangeLabel] = useState('');
+  const [dateRangeLoading, setDateRangeLoading] = useState(false);
 
   const [formData, setFormData] = useState<InsertExpense>({
     category: '마케팅비',
@@ -451,6 +476,137 @@ export default function CompanySettlement() {
     }
   };
 
+  const handleDateRangeQuery = async () => {
+    if (!dateRangeStart || !dateRangeEnd) {
+      toast({ title: '입력 오류', description: '시작일과 종료일을 모두 입력해주세요.', variant: 'destructive' });
+      return;
+    }
+    if (dateRangeStart > dateRangeEnd) {
+      toast({ title: '입력 오류', description: '시작일이 종료일보다 늦을 수 없습니다.', variant: 'destructive' });
+      return;
+    }
+
+    setDateRangeLoading(true);
+    setDateRangeDialogOpen(false);
+    setDateRangeMode(true);
+    setLoading(true);
+
+    const startMonth = dateRangeStart.substring(0, 7);
+    const endMonth = dateRangeEnd.substring(0, 7);
+    const months = getMonthsBetweenDates(startMonth, endMonth);
+    setDateRangeLabel(`${dateRangeStart} ~ ${dateRangeEnd}`);
+
+    try {
+      const results = await Promise.all(
+        months.map(m => Promise.all([
+          getRevenueDataByMonth(m),
+          getExpenseSummaryByMonth(m),
+          getAdDbCountByMonth(m),
+        ]))
+      );
+
+      const aggregatedRevenue = {
+        totalDeposits: 0, clawbackLoss: 0, grossRevenue: 0, employeeCommission: 0,
+        contractCount: 0, executionCount: 0, totalContractAmount: 0, totalAdvisoryFee: 0,
+      };
+      const aggregatedExpense = { marketing: 0, fixed: 0, operational: 0, other: 0, total: 0 };
+      let totalAdDb = 0;
+
+      results.forEach(([revenue, expense, dbCount]) => {
+        aggregatedRevenue.totalDeposits += revenue.totalDeposits;
+        aggregatedRevenue.clawbackLoss += revenue.clawbackLoss;
+        aggregatedRevenue.grossRevenue += revenue.grossRevenue;
+        aggregatedRevenue.employeeCommission += revenue.employeeCommission;
+        aggregatedRevenue.contractCount += revenue.contractCount;
+        aggregatedRevenue.executionCount += revenue.executionCount;
+        aggregatedRevenue.totalContractAmount += revenue.totalContractAmount;
+        aggregatedRevenue.totalAdvisoryFee += revenue.totalAdvisoryFee;
+        aggregatedExpense.marketing += expense.marketing;
+        aggregatedExpense.fixed += expense.fixed;
+        aggregatedExpense.operational += expense.operational;
+        aggregatedExpense.other += expense.other;
+        aggregatedExpense.total += expense.total;
+        totalAdDb += dbCount;
+      });
+
+      setExpenses([]);
+      setRevenueData(aggregatedRevenue);
+      setExpenseSummary(aggregatedExpense);
+      setAdDbCount(totalAdDb);
+    } catch (error) {
+      console.error('Error fetching date range data:', error);
+      toast({ title: '오류', description: '기간 데이터 로딩 중 오류가 발생했습니다.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+      setDateRangeLoading(false);
+    }
+  };
+
+  const handleExitDateRange = () => {
+    setDateRangeMode(false);
+    setDateRangeLabel('');
+    setDateRangeStart('');
+    setDateRangeEnd('');
+    fetchData();
+    fetchCumulativeData();
+  };
+
+  const handleExportExcel = useCallback(() => {
+    const toWon = (manVal: number) => Math.round(manVal * 10000);
+
+    const summaryData = [
+      ['항목', '금액 (원)'],
+      ['총매출', toWon(revenueData.grossRevenue)],
+      ['총 입금액', toWon(revenueData.totalDeposits)],
+      ['환수 손실', toWon(revenueData.clawbackLoss)],
+      ['총 계약금', toWon(revenueData.totalContractAmount)],
+      ['총 자문료', toWon(Math.round(revenueData.totalAdvisoryFee))],
+      ['직원 수수료', toWon(revenueData.employeeCommission)],
+      ['마케팅비', toWon(expenseSummary.marketing)],
+      ['고정비', toWon(expenseSummary.fixed)],
+      ['운영비', toWon(expenseSummary.operational)],
+      ['기타 비용', toWon(expenseSummary.other)],
+      ['총 비용', toWon(expenseSummary.total)],
+      ['영업이익', toWon(operatingProfit)],
+      ['', ''],
+      ['계약 건수', revenueData.contractCount],
+      ['집행 건수', revenueData.executionCount],
+      ['광고 DB 수', adDbCount],
+      ['DB 전환율 (CVR)', `${cvr.toFixed(1)}%`],
+      ['DB 효율성 (ROI)', `${roi.toFixed(0)}%`],
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(summaryData);
+
+    ws['!cols'] = [{ wch: 20 }, { wch: 20 }];
+
+    XLSX.utils.book_append_sheet(wb, ws, '정산 요약');
+
+    if (expenses.length > 0) {
+      const expenseRows = [
+        ['카테고리', '항목명', '금액 (원)', '설명', '반복 여부'],
+        ...expenses.map(e => [
+          e.category,
+          e.name,
+          e.amount,
+          e.description || '',
+          e.is_recurring ? 'Y' : 'N',
+        ]),
+      ];
+      const wsExpense = XLSX.utils.aoa_to_sheet(expenseRows);
+      wsExpense['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 30 }, { wch: 10 }];
+      XLSX.utils.book_append_sheet(wb, wsExpense, '비용 상세');
+    }
+
+    const fileName = dateRangeMode
+      ? `회사정산_${dateRangeStart}_${dateRangeEnd}.xlsx`
+      : `회사정산_${selectedMonth}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast({ title: '내보내기 완료', description: `${fileName} 파일이 다운로드되었습니다.` });
+  }, [revenueData, expenseSummary, operatingProfit, adDbCount, cvr, roi, expenses, selectedMonth, dateRangeMode, dateRangeLabel, dateRangeStart, dateRangeEnd]);
+
   if (!isSuperAdmin) {
     return (
       <div className="flex h-full items-center justify-center p-8">
@@ -472,38 +628,75 @@ export default function CompanySettlement() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">회사 정산 관리</h1>
           <p className="text-muted-foreground">실시간 매출 및 지출 통합 대시보드</p>
         </div>
-        <div className="flex items-center bg-muted/50 rounded-lg border">
+        <div className="flex items-center gap-2">
+          {dateRangeMode ? (
+            <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-lg px-4 py-2">
+              <CalendarRange className="w-4 h-4 text-primary" />
+              <span className="font-medium text-sm">{dateRangeLabel}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 ml-1"
+                onClick={handleExitDateRange}
+                data-testid="button-exit-date-range"
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center bg-muted/50 rounded-lg border">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handlePrevMonth}
+                disabled={isPrevMonthDisabled}
+                className="rounded-l-lg rounded-r-none border-r"
+                data-testid="button-prev-month"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <button
+                className="px-6 py-2 min-w-[180px] text-center font-medium cursor-pointer select-none"
+                onDoubleClick={() => setMonthPickerOpen(true)}
+                data-testid="button-month-display"
+              >
+                {getPeriodLabel(selectedMonth)} 정산
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNextMonth}
+                disabled={isNextMonthDisabled}
+                className="rounded-r-lg rounded-l-none border-l"
+                data-testid="button-next-month"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={handlePrevMonth}
-            disabled={isPrevMonthDisabled}
-            className="rounded-l-lg rounded-r-none border-r"
-            data-testid="button-prev-month"
+            variant="outline"
+            size="sm"
+            onClick={() => setDateRangeDialogOpen(true)}
+            data-testid="button-open-date-range"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <CalendarRange className="w-4 h-4 mr-1" />
+            기간 조회
           </Button>
-          <button
-            className="px-6 py-2 min-w-[180px] text-center font-medium cursor-pointer select-none"
-            onDoubleClick={() => setMonthPickerOpen(true)}
-            data-testid="button-month-display"
-          >
-            {getPeriodLabel(selectedMonth)} 정산
-          </button>
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleNextMonth}
-            disabled={isNextMonthDisabled}
-            className="rounded-r-lg rounded-l-none border-l"
-            data-testid="button-next-month"
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={loading}
+            data-testid="button-export-excel"
           >
-            <ChevronRight className="w-4 h-4" />
+            <Download className="w-4 h-4 mr-1" />
+            엑셀 내보내기
           </Button>
         </div>
       </div>
@@ -856,6 +1049,7 @@ export default function CompanySettlement() {
             </Card>
           </div>
 
+          {!dateRangeMode && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
               <CardHeader className="pb-2">
@@ -949,7 +1143,8 @@ export default function CompanySettlement() {
               </CardContent>
             </Card>
           </div>
-        </>
+          )}
+          </>
       )}
 
       <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
@@ -1084,6 +1279,46 @@ export default function CompanySettlement() {
               })}
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dateRangeDialogOpen} onOpenChange={setDateRangeDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>기간별 조회</DialogTitle>
+            <DialogDescription>조회할 시작일과 종료일을 선택하세요</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>시작일</Label>
+              <Input
+                type="date"
+                value={dateRangeStart}
+                onChange={e => setDateRangeStart(e.target.value)}
+                max={format(new Date(), 'yyyy-MM-dd')}
+                data-testid="input-date-range-start"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>종료일</Label>
+              <Input
+                type="date"
+                value={dateRangeEnd}
+                onChange={e => setDateRangeEnd(e.target.value)}
+                max={format(new Date(), 'yyyy-MM-dd')}
+                data-testid="input-date-range-end"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDateRangeDialogOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={handleDateRangeQuery} disabled={dateRangeLoading} data-testid="button-query-date-range">
+              <Search className="w-4 h-4 mr-1" />
+              {dateRangeLoading ? '조회 중...' : '조회'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
