@@ -2514,6 +2514,75 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
   };
 };
 
+export const getCumulativeSummary = async (): Promise<{
+  totalRevenue: number;
+  totalExpense: number;
+  totalEmployeeCommission: number;
+  netProfit: number;
+  netProfitRate: number;
+}> => {
+  const [settlementsSnapshot, expensesSnapshot] = await Promise.all([
+    getDocs(query(collection(db, 'settlements'))),
+    getDocs(query(collection(db, 'expenses'))),
+  ]);
+
+  let totalDeposits = 0;
+  let clawbackLoss = 0;
+  let totalEmployeeCommission = 0;
+
+  settlementsSnapshot.docs.forEach(doc => {
+    const data = doc.data() as SettlementItem;
+    if (data.is_clawback) {
+      clawbackLoss += Math.abs(data.total_revenue || 0);
+    } else {
+      totalDeposits += data.total_revenue || 0;
+      totalEmployeeCommission += data.gross_commission || 0;
+    }
+  });
+
+  const totalRevenue = totalDeposits - clawbackLoss;
+
+  let totalExpenseWon = 0;
+  const allMonths = new Set<string>();
+
+  settlementsSnapshot.docs.forEach(doc => {
+    const data = doc.data() as SettlementItem;
+    if (data.settlement_month) allMonths.add(data.settlement_month);
+  });
+  expensesSnapshot.docs.forEach(doc => {
+    const data = doc.data();
+    if (data.month) allMonths.add(data.month);
+  });
+
+  expensesSnapshot.docs.forEach(doc => {
+    const data = doc.data();
+    const amount = data.amount || 0;
+    if (data.is_recurring) {
+      const startMonth = data.month;
+      const sortedMonths = Array.from(allMonths).sort();
+      sortedMonths.forEach(m => {
+        if (m >= startMonth) {
+          totalExpenseWon += amount;
+        }
+      });
+    } else {
+      totalExpenseWon += amount;
+    }
+  });
+
+  const totalExpense = totalExpenseWon / 10000;
+  const netProfit = totalRevenue - totalEmployeeCommission - totalExpense;
+  const netProfitRate = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+  return {
+    totalRevenue,
+    totalExpense,
+    totalEmployeeCommission,
+    netProfit,
+    netProfitRate,
+  };
+};
+
 export const getCumulativeTaxReserve = async (upToMonth: string): Promise<number> => {
   const q = query(collection(db, 'settlements'));
   const snapshot = await getDocs(q);

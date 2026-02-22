@@ -64,6 +64,9 @@ import {
   HelpCircle,
   FileText,
   Calculator,
+  Wallet,
+  Users,
+  BarChart3,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -75,6 +78,7 @@ import {
   getAdDbCountByMonth,
   getRevenueDataByMonth,
   getCumulativeTaxReserve,
+  getCumulativeSummary,
 } from '@/lib/firestore';
 import type { Expense, ExpenseCategory, InsertExpense } from '@shared/types';
 
@@ -166,6 +170,13 @@ export default function CompanySettlement() {
   });
   const [adDbCount, setAdDbCount] = useState(0);
   const [cumulativeTaxReserve, setCumulativeTaxReserve] = useState(0);
+  const [cumulativeData, setCumulativeData] = useState({
+    totalRevenue: 0,
+    totalExpense: 0,
+    totalEmployeeCommission: 0,
+    netProfit: 0,
+    netProfitRate: 0,
+  });
 
   const [formData, setFormData] = useState<InsertExpense>({
     category: '마케팅비',
@@ -348,12 +359,20 @@ export default function CompanySettlement() {
     }
   };
 
+  const fetchCumulativeData = async () => {
+    try {
+      const cumData = await getCumulativeSummary();
+      setCumulativeData(cumData);
+    } catch (error) {
+      console.error('Error fetching cumulative data:', error);
+    }
+  };
+
   useEffect(() => {
-    // super_admin 권한이 확정된 후에만 데이터 로드
     if (isSuperAdmin) {
       fetchData();
+      fetchCumulativeData();
     } else {
-      // 권한 없으면 로딩 종료
       setLoading(false);
     }
   }, [selectedMonth, isSuperAdmin]);
@@ -403,6 +422,7 @@ export default function CompanySettlement() {
       }
       setExpenseDialogOpen(false);
       fetchData();
+      fetchCumulativeData();
     } catch (error) {
       console.error('Error saving expense:', error);
       toast({
@@ -422,6 +442,7 @@ export default function CompanySettlement() {
       setDeleteDialogOpen(false);
       setExpenseToDelete(null);
       fetchData();
+      fetchCumulativeData();
     } catch (error) {
       console.error('Error deleting expense:', error);
       toast({
@@ -850,6 +871,83 @@ export default function CompanySettlement() {
                     <span className="text-orange-600 dark:text-orange-400">{formatAmount(expenseSummary.total)}</span>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  누적 매출
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid="text-cumulative-revenue">
+                  {formatAmount(cumulativeData.totalRevenue)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">전체 기간 총매출</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Wallet className="w-4 h-4" />
+                  누적 지출
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400" data-testid="text-cumulative-expense">
+                  {formatAmount(cumulativeData.totalExpense)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">마케팅+고정+운영+기타</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  누적 직원 급여
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400" data-testid="text-cumulative-commission">
+                  {formatAmount(cumulativeData.totalEmployeeCommission)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">직원 수수료 합계</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  누적 순이익
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${cumulativeData.netProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} data-testid="text-cumulative-net-profit">
+                  {cumulativeData.netProfit < 0 ? '-' : ''}{formatAmount(Math.abs(cumulativeData.netProfit))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">매출 - 급여 - 지출</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border-cyan-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  누적 순이익률
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${cumulativeData.netProfitRate >= 0 ? 'text-cyan-600 dark:text-cyan-400' : 'text-red-600 dark:text-red-400'}`} data-testid="text-cumulative-net-profit-rate">
+                  {cumulativeData.netProfitRate.toFixed(1)}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">순이익 / 매출 × 100</p>
               </CardContent>
             </Card>
           </div>
