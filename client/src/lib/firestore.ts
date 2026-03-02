@@ -2103,9 +2103,19 @@ export const getPendingConsultations = async (): Promise<{ id: string; data: Con
 };
 
 // 상담 데이터를 고객으로 일괄 변환 (수동 유입)
+export const deleteConsultation = async (consultationId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'consultations', consultationId));
+  } catch (error) {
+    console.error('Error deleting consultation:', error);
+    throw error;
+  }
+};
+
 export const processConsultationToCustomer = async (
   consultationId: string,
-  consultation: Consultation
+  consultation: Consultation,
+  managerOverride?: { managerId: string; managerName: string; managerPhone: string; teamId: string; teamName: string } | null
 ): Promise<Customer | null> => {
   try {
     const phone = consultation.phone || '';
@@ -2165,8 +2175,9 @@ export const processConsultationToCustomer = async (
       // 신규 고객 생성
       console.log(`✨ 신규 고객 생성: ${name || companyName}`);
       
-      // 담당자 자동 배정 (라운드로빈)
-      const assignedManager = await getNextManagerForAssignment();
+      const assignedManager = managerOverride !== undefined 
+        ? managerOverride 
+        : await getNextManagerForAssignment();
       
       const customerData: InsertCustomer & { manager_name?: string; team_name?: string; memo_history?: any[]; services?: string[] } = {
         name: name,
