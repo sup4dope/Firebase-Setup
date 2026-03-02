@@ -17,6 +17,7 @@ declare module "http" {
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
 }));
 
 app.use(cors({
