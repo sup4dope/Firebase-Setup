@@ -14,7 +14,8 @@ import {
   importAllPendingConsultations, 
   processConsultationToCustomer, 
   deleteConsultation, 
-  getActiveStaffForAssignment 
+  getActiveStaffForAssignment,
+  mapUtmToEntrySource 
 } from '@/lib/firestore';
 import type { Consultation, User } from '@shared/types';
 
@@ -398,25 +399,18 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                           </div>
                         )}
 
-                        {data.utm_source && data.utm_source !== 'direct' && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="text-muted-foreground">광고 유입:</span>
-                            <Badge variant="secondary" className="text-xs font-normal">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-muted-foreground">유입경로:</span>
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            {mapUtmToEntrySource(data.utm_source)}
+                          </Badge>
+                          {data.utm_source && data.utm_source !== 'direct' && (
+                            <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
                               {data.utm_source}
                             </Badge>
-                            {data.utm_medium && data.utm_medium !== 'direct' && (
-                              <Badge variant="outline" className="text-xs font-normal">
-                                {data.utm_medium}
-                              </Badge>
-                            )}
-                            {data.utm_campaign && data.utm_campaign !== 'direct' && (
-                              <Badge variant="outline" className="text-xs font-normal">
-                                {data.utm_campaign}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
+                          )}
+                        </div>
 
                         <div className="flex items-center gap-2 pt-2 border-t">
                           <Button
