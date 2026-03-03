@@ -117,6 +117,9 @@ export interface Customer {
   
   // 사업자 정보
   entry_source?: string; // 유입경로
+  utm_source?: string; // UTM 소스 (google, cashnote 등)
+  utm_medium?: string; // UTM 매체 (demandgen, banner 등)
+  utm_campaign?: string; // UTM 캠페인 (policy_funds 등)
   business_type?: string; // 업종
   business_item?: string; // 종목
   retry_type?: string; // 재도전 유형
@@ -511,6 +514,9 @@ export interface Consultation {
   email?: string; // 이메일
   linked_customer_id?: string; // 연동된 CRM 고객 ID
   processed?: boolean; // CRM 자동 처리 완료 여부
+  utm_source?: string; // UTM 소스 (google, cashnote 등)
+  utm_medium?: string; // UTM 매체 (demandgen, banner 등)
+  utm_campaign?: string; // UTM 캠페인 (policy_funds 등)
 }
 
 // 레거시 Consultation 타입 (기존 호환용)

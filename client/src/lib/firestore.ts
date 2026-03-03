@@ -2196,7 +2196,10 @@ export const processConsultationToCustomer = async (
         team_name: assignedManager?.teamName || '미배정',
         approved_amount: 0,
         commission_rate: 0,
-        services: consultation.services || [], // 신청 서비스 저장 (알림톡용)
+        services: consultation.services || [],
+        utm_source: consultation.utm_source || 'direct',
+        utm_medium: consultation.utm_medium || 'direct',
+        utm_campaign: consultation.utm_campaign || 'direct',
       };
       
       const newCustomer = await createCustomer(customerData);

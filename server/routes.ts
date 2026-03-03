@@ -318,7 +318,11 @@ export async function registerRoutes(
     console.log("📤 [Solapi] 상담 접수 확인 알림톡 발송 요청");
     
     try {
-      const { customerPhone, customerName, services, createdAt } = req.body;
+      const { customerPhone, customerName, services, createdAt, utm_source, utm_medium, utm_campaign } = req.body;
+      
+      if (utm_source || utm_medium || utm_campaign) {
+        console.log(`📊 [UTM] source=${utm_source || 'direct'}, medium=${utm_medium || 'direct'}, campaign=${utm_campaign || 'direct'}`);
+      }
       
       if (!customerPhone) {
         return res.status(400).json({
