@@ -1722,9 +1722,9 @@ const UTM_SOURCE_MAP: Record<string, EntrySourceType> = {
 };
 
 export const mapUtmToEntrySource = (utmSource?: string): EntrySourceType => {
-  if (!utmSource || utmSource === 'direct' || utmSource === 'organic') return '광고';
+  if (!utmSource || utmSource === 'direct' || utmSource === 'organic') return '캐시노트 인앱광고';
   const mapped = UTM_SOURCE_MAP[utmSource.toLowerCase()];
-  return mapped || '광고';
+  return mapped || '캐시노트 인앱광고';
 };
 
 // 수당률 조회 (유입경로별)
