@@ -127,15 +127,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (fbUser) {
         // Custom Claims를 포함한 새 토큰 강제 발급
-        // Firebase는 토큰을 캐시하므로, 서버에서 설정한 custom claims를 받으려면 강제 갱신 필요
         try {
-          await fbUser.getIdToken(true); // true = forceRefresh
+          await fbUser.getIdToken(true);
           console.log('✅ Firebase 토큰 강제 갱신 완료');
           
-          // 토큰에 포함된 claims 확인 (디버그용)
           const tokenResult = await fbUser.getIdTokenResult();
           console.log('🔑 토큰 claims:', JSON.stringify(tokenResult.claims));
           console.log('🔑 role claim:', tokenResult.claims.role);
+          
+          // Custom Claims가 없으면 서버에서 자동 설정 (Firestore 접근 전에 수행)
+          if (!tokenResult.claims.role) {
+            console.log('🔧 Custom Claims 자동 설정 시도...');
+            try {
+              const response = await authFetch('/api/auth/init-claims', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                console.log('✅ Custom Claims 자동 설정 완료:', result);
+                await fbUser.getIdToken(true);
+                const newTokenResult = await fbUser.getIdTokenResult();
+                console.log('🔑 갱신된 role claim:', newTokenResult.claims.role);
+              } else {
+                const errText = await response.text();
+                console.error('❌ Custom Claims 설정 실패:', errText);
+                
+                if (response.status === 404) {
+                  window.alert("등록된 승인 사용자가 아닙니다. 관리자에게 문의하세요.");
+                  await firebaseSignOut(auth);
+                  setUser(null);
+                  setLoading(false);
+                  window.location.href = '/login';
+                  return;
+                }
+              }
+            } catch (claimsError) {
+              console.error('❌ Custom Claims 자동 설정 오류:', claimsError);
+            }
+          }
         } catch (e) {
           console.error('토큰 갱신 실패:', e);
         }
@@ -146,14 +177,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         // UID로 직접 사용자 문서 조회 (getDoc 사용)
         const userDocRef = doc(db, 'users', userDocId);
-        const userDocSnap = await getDoc(userDocRef);
+        let userDocSnap;
+        try {
+          userDocSnap = await getDoc(userDocRef);
+        } catch (docError) {
+          console.warn('⚠️ UID 기반 문서 조회 실패, 이메일로 fallback:', docError);
+          userDocSnap = null;
+        }
         
-        // 문서가 없으면 이메일로 fallback 조회 (마이그레이션 전 호환성)
+        // 문서가 없으면 이메일로 fallback 조회
         let userData: User | null = null;
         let actualDocId = userDocId;
         
-        if (!userDocSnap.exists()) {
-          // 이메일로 조회 시도 (마이그레이션 전 데이터 호환)
+        if (!userDocSnap || !userDocSnap.exists()) {
           const userEmail = fbUser.email;
           if (!userEmail) {
             window.alert("이메일 정보를 가져올 수 없습니다. 다시 로그인해 주세요.");
@@ -163,8 +199,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
             return;
           }
           
-          const emailQuery = query(collection(db, 'users'), where('email', '==', userEmail));
-          const emailSnapshot = await getDocs(emailQuery);
+          let emailSnapshot;
+          try {
+            const emailQuery = query(collection(db, 'users'), where('email', '==', userEmail));
+            emailSnapshot = await getDocs(emailQuery);
+          } catch (emailError) {
+            console.error('❌ 이메일 기반 조회도 실패:', emailError);
+            window.alert("권한 설정 중 오류가 발생했습니다. 다시 로그인해 주세요.");
+            await firebaseSignOut(auth);
+            setUser(null);
+            setLoading(false);
+            window.location.href = '/login';
+            return;
+          }
           
           if (emailSnapshot.empty) {
             window.alert("등록된 승인 사용자가 아닙니다. 관리자에게 문의하세요.");
@@ -182,46 +229,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
           userData = userDocSnap.data() as User;
         }
         
-        // 퇴직자 체크: status가 '퇴사'인 경우 접근 차단
+        // 퇴직자 체크
         if (userData.status === '퇴사') {
           await handleRetiredLogout();
           setLoading(false);
           return;
         }
         
-        // uid가 아직 설정되지 않았거나 다르면 업데이트
-        const needsUidBinding = !userData.uid || userData.uid !== fbUser.uid;
-        if (needsUidBinding) {
-          await updateDoc(doc(db, 'users', actualDocId), {
-            uid: fbUser.uid,
-            name: fbUser.displayName || userData.name,
-          });
-          userData.uid = fbUser.uid;
-          userData.name = fbUser.displayName || userData.name;
-        }
-        
-        // Custom Claims가 없거나 uid가 새로 바인딩된 경우 자동 설정
-        const tokenResult = await fbUser.getIdTokenResult();
-        const hasValidClaims = tokenResult.claims.role && tokenResult.claims.team_id;
-        
-        if (!hasValidClaims && userData.role && userData.uid) {
+        // uid 바인딩
+        if (!userData.uid || userData.uid !== fbUser.uid) {
           try {
-            console.log('🔧 Custom Claims 자동 설정 시도...');
-            const response = await authFetch('/api/auth/init-claims', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            await updateDoc(doc(db, 'users', actualDocId), {
+              uid: fbUser.uid,
+              name: fbUser.displayName || userData.name,
             });
-            
-            if (response.ok) {
-              console.log('✅ Custom Claims 자동 설정 완료, 토큰 재갱신...');
-              await fbUser.getIdToken(true);
-              const newTokenResult = await fbUser.getIdTokenResult();
-              console.log('🔑 갱신된 claims:', JSON.stringify(newTokenResult.claims));
-            } else {
-              console.error('❌ Custom Claims 설정 실패:', await response.text());
-            }
-          } catch (claimsError) {
-            console.error('❌ Custom Claims 자동 설정 오류:', claimsError);
+            userData.uid = fbUser.uid;
+            userData.name = fbUser.displayName || userData.name;
+          } catch (bindError) {
+            console.error('⚠️ UID 바인딩 실패 (서버에서 처리됨):', bindError);
           }
         }
         
