@@ -1912,7 +1912,7 @@ const mapFirestoreToConsultation = (docId: string, data: Record<string, unknown>
     email: (data.email as string) || '',
     linked_customer_id: (data.linked_customer_id as string) || undefined,
     processed: (data.processed as boolean) || false,
-    utm_source: (data.utm_source as string) || undefined,
+    utm_source: (data.utm_source as string) || (data['유입경로'] as string) || undefined,
     utm_medium: (data.utm_medium as string) || undefined,
     utm_campaign: (data.utm_campaign as string) || undefined,
   };
