@@ -181,7 +181,7 @@ function safeFormatDate(date: any, formatStr: string): string {
   }
 }
 
-const ENTRY_SOURCES = ["광고", "캐시노트 인앱광고", "구글애즈", "외주", "고객소개", "승인복제"];
+const ENTRY_SOURCES = ["캐시노트 인앱광고", "구글애즈", "외주", "고객소개"];
 const CARRIERS = ["SKT", "KT", "LG", "SKT알뜰폰", "KT알뜰폰", "LG알뜰폰"];
 const BUSINESS_TYPES = [
   "음식점",
