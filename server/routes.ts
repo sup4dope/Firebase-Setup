@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
-import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin } from "./firebaseAdmin";
+import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin, getAdminApp, type AuthenticatedRequest } from "./firebaseAdmin";
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
 
 export async function registerRoutes(
@@ -162,7 +162,55 @@ export async function registerRoutes(
   });
 
   // === Firebase Custom Claims API ===
-  
+
+  // 자기 자신의 Custom Claims 자동 설정 (첫 로그인 시)
+  app.post("/api/auth/init-claims", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const uid = req.user?.uid;
+      const email = req.user?.email;
+      if (!uid) {
+        return res.status(401).json({ success: false, error: '인증 정보가 없습니다.' });
+      }
+
+      const adminApp = getAdminApp();
+      const usersRef = adminApp.firestore().collection('users');
+      
+      // uid로 먼저 검색, 없으면 email로 fallback (Admin SDK는 Security Rules 우회)
+      let userDoc = await usersRef.where('uid', '==', uid).get();
+      
+      if (userDoc.empty && email) {
+        userDoc = await usersRef.where('email', '==', email).get();
+        
+        // email로 찾은 경우 uid 바인딩도 수행
+        if (!userDoc.empty) {
+          const docRef = userDoc.docs[0].ref;
+          await docRef.update({ uid });
+          console.log(`🔗 [Auth] uid 바인딩 완료: ${email} -> ${uid}`);
+        }
+      }
+      
+      if (userDoc.empty) {
+        return res.status(404).json({ success: false, error: '등록된 사용자를 찾을 수 없습니다.' });
+      }
+
+      const userData = userDoc.docs[0].data();
+      const role = userData.role;
+      const team_id = userData.team_id || '';
+
+      if (!role) {
+        return res.status(400).json({ success: false, error: '역할이 설정되지 않은 사용자입니다.' });
+      }
+
+      await setUserCustomClaims(uid, role, team_id);
+      console.log(`✅ [Auth] 자동 Claims 설정: ${uid} -> role: ${role}, team_id: ${team_id}`);
+
+      res.json({ success: true, role, team_id });
+    } catch (error: any) {
+      console.error("❌ 자동 Claims 설정 실패:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // 단일 사용자 Custom Claims 설정 (super_admin 전용)
   app.post("/api/admin/set-custom-claims", requireAuth, requireSuperAdmin, async (req, res) => {
     console.log("📥 [Admin] Custom Claims 설정 요청");

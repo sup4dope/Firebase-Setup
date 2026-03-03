@@ -6,7 +6,7 @@ import {
   type User as FirebaseUser 
 } from 'firebase/auth';
 import { collection, query, where, getDocs, getDoc, doc, updateDoc, onSnapshot, Timestamp } from 'firebase/firestore';
-import { auth, db, googleProvider } from '@/lib/firebase';
+import { auth, db, googleProvider, authFetch } from '@/lib/firebase';
 import { updateLoginHistory } from '@/lib/firestore';
 import type { User, UserRole, LoginHistory } from '@shared/types';
 
@@ -190,13 +190,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
         
         // uid가 아직 설정되지 않았거나 다르면 업데이트
-        if (!userData.uid || userData.uid !== fbUser.uid) {
+        const needsUidBinding = !userData.uid || userData.uid !== fbUser.uid;
+        if (needsUidBinding) {
           await updateDoc(doc(db, 'users', actualDocId), {
             uid: fbUser.uid,
             name: fbUser.displayName || userData.name,
           });
           userData.uid = fbUser.uid;
           userData.name = fbUser.displayName || userData.name;
+        }
+        
+        // Custom Claims가 없거나 uid가 새로 바인딩된 경우 자동 설정
+        const tokenResult = await fbUser.getIdTokenResult();
+        const hasValidClaims = tokenResult.claims.role && tokenResult.claims.team_id;
+        
+        if (!hasValidClaims && userData.role && userData.uid) {
+          try {
+            console.log('🔧 Custom Claims 자동 설정 시도...');
+            const response = await authFetch('/api/auth/init-claims', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            
+            if (response.ok) {
+              console.log('✅ Custom Claims 자동 설정 완료, 토큰 재갱신...');
+              await fbUser.getIdToken(true);
+              const newTokenResult = await fbUser.getIdTokenResult();
+              console.log('🔑 갱신된 claims:', JSON.stringify(newTokenResult.claims));
+            } else {
+              console.error('❌ Custom Claims 설정 실패:', await response.text());
+            }
+          } catch (claimsError) {
+            console.error('❌ Custom Claims 자동 설정 오류:', claimsError);
+          }
         }
         
         // 로그인 이력 기록 (실제 로그인 시에만 - 새로고침 제외)
