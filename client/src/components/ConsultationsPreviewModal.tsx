@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Download, X, Phone, Building2, Calendar, CreditCard, MapPin, FileText, AlertCircle, Clock, Trash2, UserPlus, Users } from 'lucide-react';
+import { Download, X, Phone, Building2, Calendar, CreditCard, MapPin, FileText, AlertCircle, Clock, Trash2, UserPlus, Users, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   getPendingConsultations, 
@@ -395,6 +395,26 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                                 </Badge>
                               ))}
                             </div>
+                          </div>
+                        )}
+
+                        {data.utm_source && data.utm_source !== 'direct' && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">광고 유입:</span>
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              {data.utm_source}
+                            </Badge>
+                            {data.utm_medium && data.utm_medium !== 'direct' && (
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {data.utm_medium}
+                              </Badge>
+                            )}
+                            {data.utm_campaign && data.utm_campaign !== 'direct' && (
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {data.utm_campaign}
+                              </Badge>
+                            )}
                           </div>
                         )}
 

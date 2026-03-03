@@ -1715,11 +1715,25 @@ export const deleteSettlementItem = async (id: string): Promise<void> => {
   await deleteDoc(doc(db, 'settlements', id));
 };
 
+// UTM 소스 → 유입경로 매핑
+const UTM_SOURCE_MAP: Record<string, EntrySourceType> = {
+  cashnote: '캐시노트 인앱광고',
+  google: '구글애즈',
+};
+
+export const mapUtmToEntrySource = (utmSource?: string): EntrySourceType => {
+  if (!utmSource || utmSource === 'direct' || utmSource === 'organic') return '광고';
+  const mapped = UTM_SOURCE_MAP[utmSource.toLowerCase()];
+  return mapped || '광고';
+};
+
 // 수당률 조회 (유입경로별)
 export const getCommissionRate = (rates: CommissionRates | undefined, entrySource: EntrySourceType): number => {
   if (!rates) return 0;
   switch (entrySource) {
     case '광고':
+    case '캐시노트 인앱광고':
+    case '구글애즈':
       return rates.ad || 0;
     case '고객소개':
       return rates.referral || 0;
@@ -1737,6 +1751,8 @@ export const getDepositCommissionRate = (rates: CommissionRates | undefined, ent
   if (!rates) return 0;
   switch (entrySource) {
     case '광고':
+    case '캐시노트 인앱광고':
+    case '구글애즈':
       return rates.adDeposit || rates.ad || 0;
     case '고객소개':
       return rates.referralDeposit || rates.referral || 0;
@@ -1896,6 +1912,9 @@ const mapFirestoreToConsultation = (docId: string, data: Record<string, unknown>
     email: (data.email as string) || '',
     linked_customer_id: (data.linked_customer_id as string) || undefined,
     processed: (data.processed as boolean) || false,
+    utm_source: (data.utm_source as string) || undefined,
+    utm_medium: (data.utm_medium as string) || undefined,
+    utm_campaign: (data.utm_campaign as string) || undefined,
   };
 };
 
@@ -2034,6 +2053,10 @@ export const generateConsultationMemoSummary = (consultation: Consultation): str
     return services.join(', ');
   };
 
+  const utmInfo = consultation.utm_source && consultation.utm_source !== 'direct'
+    ? `\n- 유입경로: ${mapUtmToEntrySource(consultation.utm_source)} (${consultation.utm_source}/${consultation.utm_medium || '-'}/${consultation.utm_campaign || '-'})`
+    : '';
+
   return `[상담 신청 요약]
 - 신청 일시: ${formatDate(consultation.createdAt)}
 - 대표자명: ${consultation.name || '-'}
@@ -2044,7 +2067,7 @@ export const generateConsultationMemoSummary = (consultation: Consultation): str
 - 개업일: ${consultation.businessAge || '-'}
 - 매출: ${consultation.revenue || '-'}
 - 세금체납: ${consultation.taxStatus || '-'}
-- 신청 서비스: ${formatServices(consultation.services)}`;
+- 신청 서비스: ${formatServices(consultation.services)}${utmInfo}`;
 };
 
 // 미처리 상담 신청 개수 조회
@@ -2184,8 +2207,8 @@ export const processConsultationToCustomer = async (
         company_name: companyName,
         phone: phone,
         business_registration_number: consultation.businessNumber || '',
-        credit_score: 0, // 신용점수는 구간(350~600점)으로 들어오므로 매핑하지 않음
-        entry_source: '광고' as EntrySourceType,
+        credit_score: 0,
+        entry_source: mapUtmToEntrySource(consultation.utm_source),
         entry_date: new Date().toISOString().split('T')[0],
         status_code: '상담대기' as StatusCode,
         recent_memo: memoSummary,

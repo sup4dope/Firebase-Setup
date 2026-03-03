@@ -354,7 +354,7 @@ export type InsertFinancialObligation = Omit<FinancialObligation, 'id' | 'create
 export type SettlementStatus = '정상' | '취소' | '환수';
 
 // 유입경로 (수당률 결정에 사용)
-export type EntrySourceType = '광고' | '고객소개' | '승인복제' | '외주' | '기타';
+export type EntrySourceType = '광고' | '캐시노트 인앱광고' | '구글애즈' | '고객소개' | '승인복제' | '외주' | '기타';
 
 // 정산 항목 (개별 계약/집행 건)
 export interface SettlementItem {
