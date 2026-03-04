@@ -3,8 +3,7 @@ import { format } from 'date-fns';
 import { Crown, Medal, Award } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getCustomers, getCustomersByTeam, getCustomersByManager, getUsers, getTeams } from '@/lib/firestore';
-import { useAuth } from '@/contexts/AuthContext';
+import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
 import type { Customer, User, Team } from '@shared/types';
 
 const CATEGORY_BONUS: Record<string, number> = {
@@ -76,7 +75,6 @@ interface RankingEntry {
 }
 
 export function HeaderRankings() {
-  const { user, isSuperAdmin, isTeamLeader } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,15 +83,9 @@ export function HeaderRankings() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
       try {
-        const fetchCustomersByRole = () => {
-          if (isSuperAdmin) return getCustomers();
-          if (isTeamLeader && user.team_id) return getCustomersByTeam(user.team_id);
-          return getCustomersByManager(user.uid);
-        };
         const [fetchedCustomers, fetchedUsers] = await Promise.all([
-          fetchCustomersByRole(),
+          getCustomers(),
           getUsers(),
         ]);
         setCustomers(fetchedCustomers);
@@ -105,7 +97,7 @@ export function HeaderRankings() {
       }
     };
     fetchData();
-  }, [user, isSuperAdmin, isTeamLeader]);
+  }, []);
 
   const top3Rankings = useMemo(() => {
     const userMap = new Map(users.map(u => [u.uid, u]));
