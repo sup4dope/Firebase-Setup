@@ -130,14 +130,8 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
 
     if (selectedCustomer) {
       const autoFields: FieldMapping[] = [
-        { id: 'company_name', value: selectedCustomer.company_name || '', label: '회사명/상호', autoFilled: true },
-        { id: 'name', value: selectedCustomer.name || '', label: '고객명/대표자명', autoFilled: true },
-        { id: 'business_number', value: selectedCustomer.business_registration_number || '', label: '사업자등록번호', autoFilled: true },
-        { id: 'phone', value: selectedCustomer.phone || '', label: '연락처', autoFilled: true },
-        { id: 'email', value: selectedCustomer.email || '', label: '이메일', autoFilled: true },
-        { id: 'address', value: selectedCustomer.business_address || '', label: '사업장주소', autoFilled: true },
-        { id: 'contract_amount', value: selectedCustomer.contract_amount ? String(selectedCustomer.contract_amount) : '', label: '계약금액(만원)', autoFilled: true },
-        { id: 'contract_fee_rate', value: selectedCustomer.contract_fee_rate ? String(selectedCustomer.contract_fee_rate) : '', label: '자문료율(%)', autoFilled: true },
+        { id: '계약금', value: selectedCustomer.approved_amount ? String(selectedCustomer.approved_amount) : '', label: '계약금', autoFilled: true },
+        { id: '자문료율', value: selectedCustomer.commission_rate ? String(selectedCustomer.commission_rate) : '', label: '자문료율(%)', autoFilled: true },
       ];
       setFields(autoFields);
       setDocumentName(`${selectedCustomer.company_name || selectedCustomer.name}_계약서`);
@@ -410,7 +404,10 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
 
               <div className="border rounded-lg p-3 space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">자동 기입 변수</Label>
+                  <div>
+                    <Label className="text-sm font-semibold">기입 변수 (발송 시 자동 입력)</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">나머지 항목은 고객이 카카오톡으로 계약서를 받아 직접 입력합니다.</p>
+                  </div>
                   <Button variant="outline" size="sm" onClick={addCustomField} data-testid="button-add-field">
                     + 변수 추가
                   </Button>
