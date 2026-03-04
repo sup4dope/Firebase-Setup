@@ -226,6 +226,7 @@ export function CustomerDetailModal({
   );
   const [customerContracts, setCustomerContracts] = useState<Contract[]>([]);
   const [isLoadingContracts, setIsLoadingContracts] = useState(false);
+  const [resendingContractId, setResendingContractId] = useState<string | null>(null);
   
   // Active tab state for center panel (document viewer, financial analysis, review summary)
   const [activeCenterTab, setActiveCenterTab] = useState<"documents" | "financial" | "summary">("documents");
@@ -3870,16 +3871,42 @@ export function CustomerDetailModal({
                               >
                                 {contract.status}
                               </Badge>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setContractSendModalOpen(true)}
-                                className="h-5 px-1.5 text-[10px] gap-0.5"
-                                data-testid={`button-resend-contract-${contract.id}`}
-                              >
-                                <RefreshCw className="w-2.5 h-2.5" />
-                                재발송
-                              </Button>
+                              {contract.document_id && contract.status !== '서명완료' && contract.status !== '거부' && contract.status !== '무효' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={resendingContractId === contract.id}
+                                  onClick={async () => {
+                                    setResendingContractId(contract.id);
+                                    try {
+                                      const { authFetch } = await import('@/lib/firebase');
+                                      const res = await authFetch(`/api/eformsign/documents/${contract.document_id}/resend`, {
+                                        method: 'POST',
+                                      });
+                                      const data = await res.json();
+                                      if (data.success) {
+                                        toast({ title: '재요청 완료', description: '계약서가 수신자에게 다시 전송되었습니다.' });
+                                      } else {
+                                        toast({ title: '재요청 실패', description: data.error || '재요청에 실패했습니다.', variant: 'destructive' });
+                                      }
+                                    } catch (error: any) {
+                                      console.error('Contract resend error:', error);
+                                      toast({ title: '오류', description: error.message || '재요청 중 오류가 발생했습니다.', variant: 'destructive' });
+                                    } finally {
+                                      setResendingContractId(null);
+                                    }
+                                  }}
+                                  className="h-5 px-1.5 text-[10px] gap-0.5"
+                                  data-testid={`button-resend-contract-${contract.id}`}
+                                >
+                                  {resendingContractId === contract.id ? (
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="w-2.5 h-2.5" />
+                                  )}
+                                  재요청
+                                </Button>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-3 text-[11px] text-muted-foreground">

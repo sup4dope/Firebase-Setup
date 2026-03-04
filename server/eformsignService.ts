@@ -212,6 +212,10 @@ export async function getDocuments(queryParams?: {
   return apiRequest('GET', path);
 }
 
+export async function resendDocument(documentId: string): Promise<any> {
+  return apiRequest('POST', `/documents/${documentId}/resend`);
+}
+
 export async function deleteDocument(documentId: string): Promise<any> {
   return apiRequest('DELETE', `/documents/${documentId}`);
 }

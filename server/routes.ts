@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin, getAdminApp, type AuthenticatedRequest } from "./firebaseAdmin";
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
-import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, checkEformsignConfig, mapEformsignStatus } from "./eformsignService";
+import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, resendDocument, checkEformsignConfig, mapEformsignStatus } from "./eformsignService";
 
 const FieldValue = admin.firestore.FieldValue;
 
@@ -686,6 +686,19 @@ export async function registerRoutes(
       res.json({ success: true, data: contracts });
     } catch (error: any) {
       console.error("[contracts] 조회 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/eformsign/documents/:documentId/resend", requireAuth, async (req, res) => {
+    try {
+      const { documentId } = req.params;
+      console.log(`[eformsign] 문서 재요청: ${documentId}`);
+      const result = await resendDocument(documentId);
+      console.log(`[eformsign] 문서 재요청 성공: ${documentId}`);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      console.error("[eformsign] 문서 재요청 오류:", error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });
