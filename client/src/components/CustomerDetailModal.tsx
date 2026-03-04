@@ -3871,7 +3871,7 @@ export function CustomerDetailModal({
                               >
                                 {contract.status}
                               </Badge>
-                              {contract.document_id && contract.status !== '서명완료' && contract.status !== '거부' && contract.status !== '무효' && (
+                              {contract.status !== '서명완료' && contract.status !== '거부' && contract.status !== '무효' && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -3880,18 +3880,25 @@ export function CustomerDetailModal({
                                     setResendingContractId(contract.id);
                                     try {
                                       const { authFetch } = await import('@/lib/firebase');
-                                      const res = await authFetch(`/api/eformsign/documents/${contract.document_id}/resend`, {
+                                      const res = await authFetch(`/api/eformsign/contracts/${contract.id}/resend`, {
                                         method: 'POST',
                                       });
                                       const data = await res.json();
                                       if (data.success) {
-                                        toast({ title: '재요청 완료', description: '계약서가 수신자에게 다시 전송되었습니다.' });
+                                        toast({ title: '재발송 완료', description: '동일한 내용으로 새 계약서가 발송되었습니다.' });
+                                        if (customer?.id) {
+                                          const contractsRes = await authFetch(`/api/contracts?customer_id=${customer.id}`);
+                                          const contractsData = await contractsRes.json();
+                                          if (contractsData.success) {
+                                            setCustomerContracts(contractsData.data);
+                                          }
+                                        }
                                       } else {
-                                        toast({ title: '재요청 실패', description: data.error || '재요청에 실패했습니다.', variant: 'destructive' });
+                                        toast({ title: '재발송 실패', description: data.error || '재발송에 실패했습니다.', variant: 'destructive' });
                                       }
                                     } catch (error: any) {
                                       console.error('Contract resend error:', error);
-                                      toast({ title: '오류', description: error.message || '재요청 중 오류가 발생했습니다.', variant: 'destructive' });
+                                      toast({ title: '오류', description: error.message || '재발송 중 오류가 발생했습니다.', variant: 'destructive' });
                                     } finally {
                                       setResendingContractId(null);
                                     }
@@ -3904,7 +3911,7 @@ export function CustomerDetailModal({
                                   ) : (
                                     <RefreshCw className="w-2.5 h-2.5" />
                                   )}
-                                  재요청
+                                  재발송
                                 </Button>
                               )}
                             </div>

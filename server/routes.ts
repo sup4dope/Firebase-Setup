@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin, getAdminApp, type AuthenticatedRequest } from "./firebaseAdmin";
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
-import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, resendDocument, checkEformsignConfig, mapEformsignStatus } from "./eformsignService";
+import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, checkEformsignConfig, mapEformsignStatus } from "./eformsignService";
 
 const FieldValue = admin.firestore.FieldValue;
 
@@ -690,15 +690,111 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/eformsign/documents/:documentId/resend", requireAuth, async (req, res) => {
+  app.post("/api/eformsign/contracts/:contractId/resend", requireAuth, async (req, res) => {
     try {
-      const { documentId } = req.params;
-      console.log(`[eformsign] 문서 재요청: ${documentId}`);
-      const result = await resendDocument(documentId);
-      console.log(`[eformsign] 문서 재요청 성공: ${documentId}`);
+      const { contractId } = req.params;
+      console.log(`[eformsign] 계약서 재발송 시작: contractId=${contractId}`);
+
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+
+      const contractDoc = await firestore.collection('contracts_eformsign').doc(contractId).get();
+      if (!contractDoc.exists) {
+        return res.status(404).json({ success: false, error: '계약 레코드를 찾을 수 없습니다.' });
+      }
+
+      const contractData = contractDoc.data()!;
+      const { template_id, customer_id, customer_name, fields: fieldsRecord, created_by } = contractData;
+
+      const customerDoc = await firestore.collection('customers').doc(customer_id).get();
+      const customerData = customerDoc.exists ? customerDoc.data() : null;
+      const phone = customerData?.phone?.replace(/-/g, '') || '';
+      const recipientName = customerData?.name || customer_name || '';
+
+      const fieldsArray = Object.entries(fieldsRecord || {}).map(([id, value]) => ({
+        id,
+        value: String(value),
+      }));
+
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const dateField = fieldsArray.find(f => f.id === '계약일자');
+      if (dateField) {
+        dateField.value = dateStr;
+      }
+
+      const recipients = [{
+        step_type: '05',
+        use_mail: false,
+        use_sms: true,
+        member: {
+          name: recipientName,
+          id: phone ? `${phone}@guest.eformsign.com` : `guest_${customer_id}@guest.eformsign.com`,
+          sms: { country_code: '+82', phone_number: phone },
+        },
+        auth: { valid: { day: 7, hour: 0 } },
+      }];
+
+      const documentName = `${customer_name || recipientName}_경영지원자문 계약서`;
+
+      console.log(`[eformsign] 재발송 - template: ${template_id}, fields: ${JSON.stringify(fieldsArray)}`);
+      const result = await createDocument(template_id, {
+        document_name: documentName,
+        fields: fieldsArray,
+        recipients,
+      });
+
+      const newDocumentId = result?.document?.id || '';
+      console.log(`[eformsign] 재발송 문서 생성 성공: ${newDocumentId}`);
+
+      if (newDocumentId) {
+        const contractAmountRaw = fieldsRecord?.['계약금'] || '';
+        const commissionRateRaw = fieldsRecord?.['자문료율'] || '';
+        const wonMatch = String(contractAmountRaw).replace(/,/g, '').match(/^(\d+)/);
+        const amountWon = wonMatch ? parseInt(wonMatch[1], 10) : 0;
+        const amountManWon = Math.round(amountWon / 10000);
+
+        await firestore.collection('contracts_eformsign').add({
+          customer_id,
+          customer_name: customer_name || '',
+          document_id: newDocumentId,
+          template_id,
+          template_name: contractData.template_name || '',
+          status: '발송완료',
+          sent_at: now.toISOString(),
+          fields: fieldsRecord || {},
+          amount_man_won: contractData.amount_man_won || amountManWon,
+          commission_rate: contractData.commission_rate || (parseFloat(commissionRateRaw) || 0),
+          created_by: created_by || req.user?.email || '',
+          created_at: now.toISOString(),
+        });
+        console.log(`[eformsign] 재발송 contracts_eformsign 레코드 생성 완료: ${newDocumentId}`);
+
+        const memoContent = `[계약서재발송] 발송일자: ${dateStr} | 계약금: ${contractAmountRaw} | 자문료율: ${commissionRateRaw}%`;
+        const memoEntry = {
+          content: memoContent,
+          author_id: req.user?.uid || 'system',
+          author_name: created_by || '시스템',
+          created_at: now.toISOString(),
+        };
+
+        try {
+          const customerRef = firestore.collection('customers').doc(customer_id);
+          await customerRef.update({
+            memo_history: FieldValue.arrayUnion(memoEntry),
+            recent_memo: memoContent,
+            latest_memo: memoContent,
+            updated_at: now.toISOString(),
+          });
+          console.log(`[eformsign] 재발송 고객 메모 추가 완료: ${customer_id}`);
+        } catch (memoErr: any) {
+          console.error(`[eformsign] 재발송 고객 메모 추가 실패: ${memoErr.message}`);
+        }
+      }
+
       res.json({ success: true, data: result });
     } catch (error: any) {
-      console.error("[eformsign] 문서 재요청 오류:", error.message);
+      console.error("[eformsign] 계약서 재발송 오류:", error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });
