@@ -72,4 +72,8 @@ match /settlements/{settlementId} {
 Firebase Console에서 다음 복합 인덱스를 생성해야 합니다:
 - **settlements**: `settlement_month` (ASC) + `manager_id` (ASC) - staff 사용자 정산 조회용
 - **settlements**: `settlement_month` (ASC) + `team_id` (ASC) - team_leader 사용자 정산 조회용
+- **customers**: `team_id` (ASC) + `updated_at` (DESC) - team_leader 고객 조회용
+- **customers**: `manager_id` (ASC) + `updated_at` (DESC) - staff 고객 조회용
 - **customer_history_logs**: `customer_id` (ASC) + `changed_at` (DESC)
+
+**참고**: `customers` 복합 인덱스가 미생성 상태에서도 코드 내 fallback 로직이 동작하여 클라이언트에서 정렬 처리합니다. 단, 성능 최적화를 위해 인덱스 생성을 권장합니다.

@@ -231,41 +231,95 @@ export const getCustomers = async (): Promise<Customer[]> => {
 };
 
 export const getCustomersByManager = async (managerId: string): Promise<Customer[]> => {
-  const q = query(
-    collection(db, 'customers'),
-    where('manager_id', '==', managerId),
-    orderBy('updated_at', 'desc')
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      ...data,
-      id: doc.id,
-      created_at: toDate(data.created_at),
-      updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
-      daily_no: data.daily_no || null,
-    } as Customer;
-  });
+  try {
+    const q = query(
+      collection(db, 'customers'),
+      where('manager_id', '==', managerId),
+      orderBy('updated_at', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id,
+        created_at: toDate(data.created_at),
+        updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
+        daily_no: data.daily_no || null,
+      } as Customer;
+    });
+  } catch (error: any) {
+    if (error?.message?.includes('requires an index')) {
+      console.warn('[Firestore] manager_id+updated_at 복합 인덱스 미생성 - orderBy 없이 조회 후 클라이언트 정렬');
+      const q = query(
+        collection(db, 'customers'),
+        where('manager_id', '==', managerId)
+      );
+      const snapshot = await getDocs(q);
+      const results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          created_at: toDate(data.created_at),
+          updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
+          daily_no: data.daily_no || null,
+        } as Customer;
+      });
+      return results.sort((a, b) => {
+        const aTime = a.updated_at instanceof Date ? a.updated_at.getTime() : 0;
+        const bTime = b.updated_at instanceof Date ? b.updated_at.getTime() : 0;
+        return bTime - aTime;
+      });
+    }
+    throw error;
+  }
 };
 
 export const getCustomersByTeam = async (teamId: string): Promise<Customer[]> => {
-  const q = query(
-    collection(db, 'customers'),
-    where('team_id', '==', teamId),
-    orderBy('updated_at', 'desc')
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      ...data,
-      id: doc.id,
-      created_at: toDate(data.created_at),
-      updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
-      daily_no: data.daily_no || null,
-    } as Customer;
-  });
+  try {
+    const q = query(
+      collection(db, 'customers'),
+      where('team_id', '==', teamId),
+      orderBy('updated_at', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id,
+        created_at: toDate(data.created_at),
+        updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
+        daily_no: data.daily_no || null,
+      } as Customer;
+    });
+  } catch (error: any) {
+    if (error?.message?.includes('requires an index')) {
+      console.warn('[Firestore] team_id+updated_at 복합 인덱스 미생성 - orderBy 없이 조회 후 클라이언트 정렬');
+      const q = query(
+        collection(db, 'customers'),
+        where('team_id', '==', teamId)
+      );
+      const snapshot = await getDocs(q);
+      const results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          created_at: toDate(data.created_at),
+          updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
+          daily_no: data.daily_no || null,
+        } as Customer;
+      });
+      return results.sort((a, b) => {
+        const aTime = a.updated_at instanceof Date ? a.updated_at.getTime() : 0;
+        const bTime = b.updated_at instanceof Date ? b.updated_at.getTime() : 0;
+        return bTime - aTime;
+      });
+    }
+    throw error;
+  }
 };
 
 // 당일 일련번호 채번 함수
