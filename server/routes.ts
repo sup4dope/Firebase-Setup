@@ -501,7 +501,7 @@ export async function registerRoutes(
   app.get("/api/eformsign/templates", requireAuth, async (req, res) => {
     try {
       const templates = await getTemplates();
-      console.log("[eformsign] 템플릿 목록 조회 성공");
+      console.log("[eformsign] 템플릿 목록 조회 성공, 응답:", JSON.stringify(templates).substring(0, 1000));
       res.json({ success: true, data: templates });
     } catch (error: any) {
       console.error("[eformsign] 템플릿 목록 조회 오류:", error.message);
@@ -528,6 +528,10 @@ export async function registerRoutes(
         return res.status(400).json({ success: false, error: "template_id가 필요합니다." });
       }
 
+      console.log(`[eformsign] 문서 생성 요청: template_id=${template_id}, document_name=${document_name}`);
+      console.log(`[eformsign] fields:`, JSON.stringify(fields));
+      console.log(`[eformsign] recipients:`, JSON.stringify(recipients));
+
       const result = await createDocument(template_id, {
         document_name,
         fields,
@@ -535,7 +539,7 @@ export async function registerRoutes(
         comment,
       });
 
-      console.log(`[eformsign] 문서 생성 성공: template=${template_id}`);
+      console.log(`[eformsign] 문서 생성 성공: template=${template_id}, result:`, JSON.stringify(result).substring(0, 500));
       res.json({ success: true, data: result });
     } catch (error: any) {
       console.error("[eformsign] 문서 생성 오류:", error.message);

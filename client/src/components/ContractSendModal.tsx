@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -54,7 +53,6 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
 
   const [fields, setFields] = useState<FieldMapping[]>([]);
   const [recipientName, setRecipientName] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [documentName, setDocumentName] = useState('');
   const [comment, setComment] = useState('');
@@ -63,7 +61,10 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
     if (open) {
       if (preselectedCustomer) {
         setSelectedCustomer(preselectedCustomer);
+        setRecipientName(preselectedCustomer.name || '');
+        setRecipientPhone(preselectedCustomer.phone || '');
         setStep('template');
+        fetchTemplates();
       } else {
         setStep('customer');
       }
@@ -119,7 +120,6 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
   const handleSelectCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
     setRecipientName(customer.name || '');
-    setRecipientEmail(customer.email || '');
     setRecipientPhone(customer.phone || '');
     setStep('template');
     fetchTemplates();
@@ -134,7 +134,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
         { id: '자문료율', value: selectedCustomer.commission_rate ? String(selectedCustomer.commission_rate) : '', label: '자문료율(%)', autoFilled: true },
       ];
       setFields(autoFields);
-      setDocumentName(`${selectedCustomer.company_name || selectedCustomer.name}_계약서`);
+      setDocumentName(`${selectedCustomer.company_name || selectedCustomer.name}_경영지원자문 계약서`);
     }
 
     setStep('fields');
@@ -163,32 +163,31 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
   const handleSend = async () => {
     if (!selectedCustomer || !selectedTemplate || !user) return;
 
+    if (!recipientPhone) {
+      toast({ title: '수신자 정보 필요', description: '수신자 휴대폰 번호를 입력해주세요.', variant: 'destructive' });
+      return;
+    }
+
     setSending(true);
     try {
       const apiFields = fields
         .filter(f => f.value.trim())
         .map(f => ({ id: f.id, value: f.value }));
 
-      const recipients: any[] = [];
-      if (recipientEmail || recipientPhone) {
-        const member: any = {
+      const phoneClean = recipientPhone.replace(/-/g, '');
+      const recipients: any[] = [{
+        step_type: '05',
+        use_mail: false,
+        use_sms: true,
+        member: {
           name: recipientName || selectedCustomer.name,
-          id: recipientEmail || `${recipientPhone.replace(/-/g, '')}@phone.eformsign`,
-        };
-        if (recipientPhone) {
-          member.sms = { country_code: '+82', phone_number: recipientPhone.replace(/-/g, '') };
-        }
-        const recipientObj: any = {
-          step_type: '05',
-          use_mail: !!recipientEmail,
-          use_sms: !!recipientPhone,
-          member,
-          auth: {
-            valid: { day: 7, hour: 0 },
-          },
-        };
-        recipients.push(recipientObj);
-      }
+          id: `${phoneClean}@guest.eformsign.com`,
+          sms: { country_code: '+82', phone_number: phoneClean },
+        },
+        auth: {
+          valid: { day: 7, hour: 0 },
+        },
+      }];
 
       const res = await authFetch('/api/eformsign/documents', {
         method: 'POST',
@@ -197,7 +196,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
         },
         body: JSON.stringify({
           template_id: selectedTemplate.id,
-          document_name: documentName || `${selectedCustomer.company_name}_계약서`,
+          document_name: documentName || `${selectedCustomer.company_name || selectedCustomer.name}_경영지원자문 계약서`,
           fields: apiFields,
           recipients,
           comment,
@@ -224,6 +223,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
 
         await createContract(contractData);
 
+        toast({ title: '발송 완료', description: '전자계약서가 성공적으로 발송되었습니다.' });
         onOpenChange(false);
         onSuccess?.();
       } else {
@@ -444,7 +444,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
 
               <div className="border rounded-lg p-3 space-y-3">
                 <Label className="text-sm font-semibold">수신자 정보</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-xs text-muted-foreground">이름</Label>
                     <Input
@@ -452,15 +452,6 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
                       onChange={(e) => setRecipientName(e.target.value)}
                       placeholder="수신자 이름"
                       data-testid="input-recipient-name"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">이메일</Label>
-                    <Input
-                      value={recipientEmail}
-                      onChange={(e) => setRecipientEmail(e.target.value)}
-                      placeholder="이메일 주소"
-                      data-testid="input-recipient-email"
                     />
                   </div>
                   <div>
@@ -494,7 +485,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
               </Button>
               <Button
                 onClick={handleSend}
-                disabled={sending || (!recipientEmail && !recipientPhone)}
+                disabled={sending || !recipientPhone}
                 data-testid="button-send-contract"
               >
                 {sending ? (

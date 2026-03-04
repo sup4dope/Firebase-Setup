@@ -157,7 +157,7 @@ export async function createDocument(templateId: string, documentData: {
     document.fields = documentData.fields;
   }
 
-  return apiRequest('POST', `/forms/${templateId}/documents`, { document });
+  return apiRequest('POST', `/documents?template_id=${encodeURIComponent(templateId)}`, { document });
 }
 
 export async function getDocument(documentId: string): Promise<any> {
