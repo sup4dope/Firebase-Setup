@@ -4,6 +4,7 @@ import jsrsasign from 'jsrsasign';
 const API_KEY = process.env.EFORMSIGN_API_KEY || '';
 const SECRET_KEY = process.env.EFORMSIGN_SECRET_KEY || '';
 const COMPANY_ID = process.env.EFORMSIGN_COMPANY_ID || '';
+const MEMBER_ID = 'yieumgroup@gmail.com';
 const AUTH_URL = 'https://service.eformsign.com/v2.0';
 
 let cachedToken: { token: string; apiUrl: string; expiresAt: number } | null = null;
@@ -44,7 +45,7 @@ export async function getAccessToken(): Promise<string> {
     },
     body: JSON.stringify({
       execution_time: executionTime,
-      member_id: '',
+      member_id: MEMBER_ID,
     }),
   });
 
@@ -68,7 +69,7 @@ export async function getAccessToken(): Promise<string> {
     throw new Error('eformsign Access Token이 응답에 없습니다.');
   }
 
-  const apiUrl = data.api_key?.company?.api_url || `https://kr-api.eformsign.com`;
+  const apiUrl = data.api_key?.company?.api_url || 'https://kr-api.eformsign.com';
   const expiresIn = data.oauth_token?.expires_in || data.expires_in || 3600;
   cachedToken = {
     token,
@@ -87,7 +88,7 @@ function getApiBaseUrl(): string {
 async function apiRequest(method: string, path: string, body?: any): Promise<any> {
   const token = await getAccessToken();
   const baseUrl = getApiBaseUrl();
-  const url = `${baseUrl}/v2.0/api/${COMPANY_ID}${path}`;
+  const url = `${baseUrl}/v2.0/api${path}`;
 
   console.log(`[eformsign] API 요청: ${method} ${url}`);
 
@@ -118,11 +119,11 @@ async function apiRequest(method: string, path: string, body?: any): Promise<any
 }
 
 export async function getTemplates(): Promise<any> {
-  return apiRequest('GET', '/api_forms');
+  return apiRequest('GET', '/forms');
 }
 
 export async function getTemplateDetail(templateId: string): Promise<any> {
-  return apiRequest('GET', `/api_forms/${templateId}`);
+  return apiRequest('GET', `/forms/${templateId}`);
 }
 
 export async function createDocument(templateId: string, documentData: {
@@ -159,11 +160,11 @@ export async function createDocument(templateId: string, documentData: {
     body.comment = documentData.comment;
   }
 
-  return apiRequest('POST', `/api_forms/${templateId}/api_documents`, body);
+  return apiRequest('POST', `/forms/${templateId}/api_documents`, body);
 }
 
 export async function getDocument(documentId: string): Promise<any> {
-  return apiRequest('GET', `/api_documents/${documentId}`);
+  return apiRequest('GET', `/documents/${documentId}`);
 }
 
 export async function getDocuments(queryParams?: {
@@ -174,7 +175,7 @@ export async function getDocuments(queryParams?: {
   limit?: number;
   offset?: number;
 }): Promise<any> {
-  let path = '/api_documents';
+  let path = '/documents';
   if (queryParams) {
     const params = new URLSearchParams();
     Object.entries(queryParams).forEach(([key, value]) => {
@@ -189,7 +190,7 @@ export async function getDocuments(queryParams?: {
 }
 
 export async function deleteDocument(documentId: string): Promise<any> {
-  return apiRequest('DELETE', `/api_documents/${documentId}`);
+  return apiRequest('DELETE', `/documents/${documentId}`);
 }
 
 export function checkEformsignConfig(): { configured: boolean; missing: string[] } {

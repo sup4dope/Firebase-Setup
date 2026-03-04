@@ -78,4 +78,28 @@ Firebase Console에서 다음 복합 인덱스를 생성해야 합니다:
 - **customers**: `manager_id` (ASC) + `updated_at` (DESC) - staff 고객 조회용
 - **customer_history_logs**: `customer_id` (ASC) + `changed_at` (DESC)
 
+- **contracts_eformsign**: `customer_id` (ASC) + `created_at` (DESC) - 고객별 계약 조회용
+
 **참고**: `customers` 복합 인덱스가 미생성 상태에서도 코드 내 fallback 로직이 동작하여 클라이언트에서 정렬 처리합니다. 단, 성능 최적화를 위해 인덱스 생성을 권장합니다.
+
+## contracts_eformsign 보안 규칙 (필수)
+Firebase Console에서 contracts_eformsign 컬렉션에 대해 다음 보안 규칙을 설정해야 합니다:
+
+```javascript
+match /contracts_eformsign/{contractId} {
+  allow read: if request.auth != null;
+  allow write: if request.auth != null && (
+    request.auth.token.role == 'super_admin' ||
+    request.auth.token.role == 'team_leader'
+  );
+}
+```
+
+## eformsign API 연동 참고사항
+- **인증 방식**: SHA256withECDSA (타원곡선 전자서명) — HMAC-SHA256이 아님
+- **Secret Key**: hex 인코딩된 PKCS#8 EC 비공개 키 → PEM 변환 후 jsrsasign 라이브러리 사용
+- **API Key**: Base64 인코딩하여 Authorization 헤더에 전송
+- **member_id**: eformsign 관리자 계정 이메일 (`yieumgroup@gmail.com`) 필수
+- **인증 서버**: `https://service.eformsign.com/v2.0/api_auth/access_token`
+- **한국 API 서버**: `https://kr-api.eformsign.com/v2.0/api/...` (인증 응답의 `api_key.company.api_url`에서 동적 취득)
+- **엔드포인트**: `/api/forms` (템플릿), `/api/documents` (문서) — company_id가 URL에 포함되지 않음
