@@ -2937,61 +2937,38 @@ export const createContract = async (contract: InsertContract): Promise<Contract
   };
 };
 
+const parseContractDate = (val: any): Date => {
+  if (!val) return new Date();
+  if (val instanceof Date) return val;
+  if (typeof val === 'string') return new Date(val);
+  if (val._seconds || val.seconds) return new Date((val._seconds || val.seconds) * 1000);
+  return new Date();
+};
+
 export const getContracts = async (): Promise<Contract[]> => {
-  const q = query(collection(db, 'contracts_eformsign'), orderBy('created_at', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(docSnap => {
-    const data = docSnap.data();
-    return {
-      ...data,
-      id: docSnap.id,
-      created_at: toDate(data.created_at),
-      sent_at: data.sent_at ? toDate(data.sent_at) : undefined,
-      completed_at: data.completed_at ? toDate(data.completed_at) : undefined,
-    } as Contract;
-  });
+  const { authFetch } = await import('@/lib/firebase');
+  const res = await authFetch('/api/contracts');
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || '계약 목록 조회 실패');
+  return (json.data || []).map((c: any) => ({
+    ...c,
+    created_at: parseContractDate(c.created_at),
+    sent_at: c.sent_at ? parseContractDate(c.sent_at) : undefined,
+    completed_at: c.completed_at ? parseContractDate(c.completed_at) : undefined,
+  }));
 };
 
 export const getContractsByCustomer = async (customerId: string): Promise<Contract[]> => {
-  try {
-    const q = query(
-      collection(db, 'contracts_eformsign'),
-      where('customer_id', '==', customerId),
-      orderBy('created_at', 'desc')
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(docSnap => {
-      const data = docSnap.data();
-      return {
-        ...data,
-        id: docSnap.id,
-        created_at: toDate(data.created_at),
-        sent_at: data.sent_at ? toDate(data.sent_at) : undefined,
-        completed_at: data.completed_at ? toDate(data.completed_at) : undefined,
-      } as Contract;
-    });
-  } catch (error: any) {
-    if (error?.message?.includes('requires an index')) {
-      console.warn('[Firestore] contracts_eformsign customer_id+created_at 복합 인덱스 미생성 - 클라이언트 정렬');
-      const q = query(
-        collection(db, 'contracts_eformsign'),
-        where('customer_id', '==', customerId)
-      );
-      const snapshot = await getDocs(q);
-      const results = snapshot.docs.map(docSnap => {
-        const data = docSnap.data();
-        return {
-          ...data,
-          id: docSnap.id,
-          created_at: toDate(data.created_at),
-          sent_at: data.sent_at ? toDate(data.sent_at) : undefined,
-          completed_at: data.completed_at ? toDate(data.completed_at) : undefined,
-        } as Contract;
-      });
-      return results.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
-    }
-    throw error;
-  }
+  const { authFetch } = await import('@/lib/firebase');
+  const res = await authFetch(`/api/contracts?customer_id=${encodeURIComponent(customerId)}`);
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || '고객 계약 조회 실패');
+  return (json.data || []).map((c: any) => ({
+    ...c,
+    created_at: parseContractDate(c.created_at),
+    sent_at: c.sent_at ? parseContractDate(c.sent_at) : undefined,
+    completed_at: c.completed_at ? parseContractDate(c.completed_at) : undefined,
+  }));
 };
 
 export const updateContractStatus = async (

@@ -638,6 +638,36 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/contracts", requireAuth, async (req, res) => {
+    try {
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const { customer_id } = req.query;
+
+      let snapshot;
+      if (customer_id) {
+        snapshot = await firestore.collection('contracts_eformsign')
+          .where('customer_id', '==', customer_id)
+          .orderBy('created_at', 'desc')
+          .get();
+      } else {
+        snapshot = await firestore.collection('contracts_eformsign')
+          .orderBy('created_at', 'desc')
+          .get();
+      }
+
+      const contracts = snapshot.docs.map((doc: any) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      res.json({ success: true, data: contracts });
+    } catch (error: any) {
+      console.error("[contracts] 조회 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Webhook - eformsign에서 호출 (인증 없음)
   app.post("/api/eformsign/webhook", async (req, res) => {
     try {
