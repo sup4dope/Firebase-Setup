@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/lib/firebase';
-import { getCustomers, createContract } from '@/lib/firestore';
+import { getCustomers } from '@/lib/firestore';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,44 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Send, FileText, User, Building2, Search, Loader2, AlertCircle } from 'lucide-react';
-import type { Customer, InsertContract, EformsignTemplate } from '@shared/types';
+import type { Customer, EformsignTemplate } from '@shared/types';
+
+function numberToKorean(num: number): string {
+  if (num === 0) return '영';
+  const units = ['', '만', '억', '조'];
+  const digits = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+  const subUnits = ['', '십', '백', '천'];
+
+  let result = '';
+  let unitIndex = 0;
+
+  while (num > 0) {
+    const chunk = num % 10000;
+    if (chunk > 0) {
+      let chunkStr = '';
+      let tempChunk = chunk;
+      for (let i = 0; i < 4 && tempChunk > 0; i++) {
+        const d = tempChunk % 10;
+        if (d > 0) {
+          const digitStr = (d === 1 && i > 0) ? '' : digits[d];
+          chunkStr = digitStr + subUnits[i] + chunkStr;
+        }
+        tempChunk = Math.floor(tempChunk / 10);
+      }
+      result = chunkStr + units[unitIndex] + result;
+    }
+    num = Math.floor(num / 10000);
+    unitIndex++;
+  }
+  return result;
+}
+
+function formatContractAmount(manWon: number): string {
+  const won = manWon * 10000;
+  const formatted = won.toLocaleString('ko-KR');
+  const korean = numberToKorean(won);
+  return `${formatted} (금 ${korean} 원)`;
+}
 
 interface ContractSendModalProps {
   open: boolean;
@@ -129,8 +166,15 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
     setSelectedTemplate(template);
 
     if (selectedCustomer) {
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      const amountManWon = selectedCustomer.approved_amount || 0;
+      const formattedAmount = amountManWon > 0 ? formatContractAmount(amountManWon) : '';
+
       const autoFields: FieldMapping[] = [
-        { id: '계약금', value: selectedCustomer.approved_amount ? String(selectedCustomer.approved_amount) : '', label: '계약금', autoFilled: true },
+        { id: '계약일자', value: todayStr, label: '계약일자', autoFilled: true },
+        { id: '계약금', value: formattedAmount, label: '계약금', autoFilled: true },
         { id: '자문료율', value: selectedCustomer.commission_rate ? String(selectedCustomer.commission_rate) : '', label: '자문료율(%)', autoFilled: true },
       ];
       setFields(autoFields);
@@ -196,33 +240,20 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
         },
         body: JSON.stringify({
           template_id: selectedTemplate.id,
+          template_name: selectedTemplate.name,
           document_name: documentName || `${selectedCustomer.company_name || selectedCustomer.name}_경영지원자문 계약서`,
           fields: apiFields,
           recipients,
           comment,
+          customer_id: selectedCustomer.id,
+          customer_name: selectedCustomer.company_name || selectedCustomer.name,
+          created_by: user.name || user.email || '',
         }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        const fieldsRecord: Record<string, string> = {};
-        apiFields.forEach(f => { fieldsRecord[f.id] = f.value; });
-
-        const contractData: InsertContract = {
-          customer_id: selectedCustomer.id,
-          customer_name: selectedCustomer.company_name || selectedCustomer.name,
-          document_id: data.data?.document_id || data.data?.id || '',
-          template_id: selectedTemplate.id,
-          template_name: selectedTemplate.name,
-          status: '발송완료',
-          sent_at: new Date(),
-          fields: fieldsRecord,
-          created_by: user.name || user.email || '',
-        };
-
-        await createContract(contractData);
-
         toast({ title: '발송 완료', description: '전자계약서가 성공적으로 발송되었습니다.' });
         onOpenChange(false);
         onSuccess?.();

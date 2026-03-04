@@ -103,3 +103,8 @@ match /contracts_eformsign/{contractId} {
 - **인증 서버**: `https://service.eformsign.com/v2.0/api_auth/access_token`
 - **한국 API 서버**: `https://kr-api.eformsign.com/v2.0/api/...` (인증 응답의 `api_key.company.api_url`에서 동적 취득)
 - **엔드포인트**: `/api/forms` (템플릿), `/api/documents` (문서) — company_id가 URL에 포함되지 않음
+- **계약 레코드 생성**: 서버 측(Admin SDK)에서 `contracts_eformsign` 컬렉션에 직접 저장 (클라이언트 Firestore 보안 규칙 우회)
+- **자동 기입 필드**: 계약일자(발송일 YYYY-MM-DD), 계약금(만원→원 변환 + 한글 금액), 자문료율(%)
+- **발송 시 자동 메모**: 고객 memo_history에 `[계약서발송완료]` 메모 추가 (FieldValue.arrayUnion 사용)
+- **Webhook 완료 처리**: `doc_complete` → 고객 status_code를 "계약완료(선불)"로 변경, approved_amount/commission_rate 동기화, status_logs 생성
+- **금액 저장**: contract 레코드에 `amount_man_won`(만원 단위 숫자)과 `commission_rate`(숫자)를 별도 저장하여 Webhook에서 안정적으로 사용
