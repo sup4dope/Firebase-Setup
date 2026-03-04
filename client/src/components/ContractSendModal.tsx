@@ -458,7 +458,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
                     + 변수 추가
                   </Button>
                 </div>
-                <ScrollArea className="max-h-[250px]">
+                <ScrollArea className="max-h-[350px]">
                   <div className="space-y-2">
                     {fields.map((field, idx) => {
                       const isKnownField = ['계약일자','상호명','사업자번호','대표자명','소재지','연락처','계약금','자문료율'].includes(field.id);

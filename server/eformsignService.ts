@@ -325,3 +325,28 @@ export function mapEformsignStatus(status: string): string {
   };
   return statusMap[status] || status;
 }
+
+export function extractEformsignStatus(docInfo: any): string {
+  const statusType = docInfo?.current_status?.status_type || '';
+
+  const statusTypeMap: Record<string, string> = {
+    '001': '서명대기',
+    '002': '서명대기',
+    '003': '서명완료',
+    '004': '거부',
+    '005': '무효',
+    '042': '무효',
+    '060': '거부',
+  };
+
+  if (statusType && statusTypeMap[statusType]) {
+    return statusTypeMap[statusType];
+  }
+
+  const eventStatus = docInfo?.document?.document_status || docInfo?.document_status || docInfo?.status || '';
+  if (eventStatus) {
+    return mapEformsignStatus(eventStatus);
+  }
+
+  return '';
+}

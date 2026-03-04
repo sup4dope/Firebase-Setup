@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin, getAdminApp, type AuthenticatedRequest } from "./firebaseAdmin";
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
-import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, checkEformsignConfig, mapEformsignStatus } from "./eformsignService";
+import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, checkEformsignConfig, mapEformsignStatus, extractEformsignStatus } from "./eformsignService";
 
 const FieldValue = admin.firestore.FieldValue;
 
@@ -881,10 +881,10 @@ export async function registerRoutes(
 
         try {
           const docInfo = await getDocument(documentId);
-          const eformsignStatus = docInfo?.document?.document_status || docInfo?.document_status || docInfo?.status || '';
-          const mappedStatus = mapEformsignStatus(eformsignStatus);
+          const mappedStatus = extractEformsignStatus(docInfo);
+          const rawStatusType = docInfo?.current_status?.status_type || '';
 
-          console.log(`[eformsign Sync] doc=${documentId}, eformsign_status=${eformsignStatus}, mapped=${mappedStatus}, current=${contractData.status}`);
+          console.log(`[eformsign Sync] doc=${documentId}, status_type=${rawStatusType}, mapped=${mappedStatus}, current=${contractData.status}`);
 
           if (mappedStatus && mappedStatus !== contractData.status) {
             const updateData: Record<string, any> = { status: mappedStatus };
@@ -982,14 +982,14 @@ export async function registerRoutes(
       }
 
       const docInfo = await getDocument(documentId);
-      console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, 응답:`, JSON.stringify(docInfo).substring(0, 500));
-      const eformsignStatus = docInfo?.document?.document_status || docInfo?.document_status || docInfo?.status || '';
-      const mappedStatus = mapEformsignStatus(eformsignStatus);
+      const rawStatusType = docInfo?.current_status?.status_type || '';
+      console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, status_type=${rawStatusType}, current_status:`, JSON.stringify(docInfo?.current_status || {}).substring(0, 200));
+      const mappedStatus = extractEformsignStatus(docInfo);
 
-      console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, eformsign_status=${eformsignStatus}, mapped=${mappedStatus}, current=${contractData.status}`);
+      console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, status_type=${rawStatusType}, mapped=${mappedStatus}, current=${contractData.status}`);
 
       if (!mappedStatus || mappedStatus === contractData.status) {
-        return res.json({ success: true, message: '변경 사항 없음', currentStatus: contractData.status, eformsignStatus });
+        return res.json({ success: true, message: '변경 사항 없음', currentStatus: contractData.status, eformsignStatus: rawStatusType, mappedStatus });
       }
 
       const updateData: Record<string, any> = { status: mappedStatus };
