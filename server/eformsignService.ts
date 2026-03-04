@@ -213,46 +213,88 @@ export async function getDocuments(queryParams?: {
 }
 
 export async function resendDocument(documentId: string): Promise<any> {
-  const docInfo = await getDocument(documentId);
-  console.log('[eformsign] 문서 조회 결과:', JSON.stringify(docInfo).substring(0, 2000));
+  const docInfo = await apiRequest('GET', `/documents/${documentId}?include_detail=true`);
+  console.log('[eformsign] 문서 상세 조회 결과:', JSON.stringify(docInfo).substring(0, 3000));
 
   const currentStatus = docInfo?.current_status;
   console.log('[eformsign] current_status:', JSON.stringify(currentStatus));
 
-  let stepType = currentStatus?.step_type || '05';
-  let stepSeq = String(currentStatus?.step_index || '2');
+  const stepType = currentStatus?.step_type || '05';
+  const stepGroup = currentStatus?.step_group;
+  const stepIndex = currentStatus?.step_index;
+  console.log('[eformsign] stepType:', stepType, 'stepGroup:', stepGroup, 'stepIndex:', stepIndex);
 
   const stepRecipients = currentStatus?.step_recipients || [];
   const recipientInfo = stepRecipients[0];
 
-  const nextStep: any = {
-    step_type: stepType,
-    step_seq: stepSeq,
-    comment: '계약서 재요청입니다.'
-  };
+  const tryBodies = [];
 
   if (recipientInfo) {
-    nextStep.recipients = [
-      {
-        member: {
-          name: recipientInfo.name,
-          id: recipientInfo.email,
-          ...(recipientInfo.sms ? { sms: recipientInfo.sms } : {})
-        },
-        use_mail: false,
-        use_sms: true
+    const recipientBlock = {
+      member: {
+        name: recipientInfo.name,
+        id: recipientInfo.email,
+        ...(recipientInfo.sms ? { sms: recipientInfo.sms } : {})
+      },
+      use_mail: false,
+      use_sms: true
+    };
+
+    tryBodies.push({
+      input: {
+        next_steps: [{
+          step_type: stepType,
+          step_seq: String(stepGroup),
+          recipients: [recipientBlock],
+          comment: '계약서 재요청입니다.'
+        }]
       }
-    ];
+    });
+
+    tryBodies.push({
+      input: {
+        next_steps: [{
+          step_type: stepType,
+          step_seq: String(stepIndex),
+          recipients: [recipientBlock],
+          comment: '계약서 재요청입니다.'
+        }]
+      }
+    });
+
+    tryBodies.push({
+      input: {
+        next_steps: [{
+          step_type: stepType,
+          recipients: [recipientBlock],
+          comment: '계약서 재요청입니다.'
+        }]
+      }
+    });
   }
 
-  const body: any = {
+  tryBodies.push({
     input: {
-      next_steps: [nextStep]
+      next_steps: [{
+        step_type: stepType,
+        comment: '계약서 재요청입니다.'
+      }]
     }
-  };
+  });
 
-  console.log('[eformsign] 재요청 body:', JSON.stringify(body));
-  return apiRequest('POST', `/documents/${documentId}/re_request_outsider`, body);
+  for (let i = 0; i < tryBodies.length; i++) {
+    try {
+      console.log(`[eformsign] 재요청 시도 ${i + 1}/${tryBodies.length}, body:`, JSON.stringify(tryBodies[i]));
+      const result = await apiRequest('POST', `/documents/${documentId}/re_request_outsider`, tryBodies[i]);
+      console.log(`[eformsign] 재요청 시도 ${i + 1} 성공!`);
+      return result;
+    } catch (error: any) {
+      console.log(`[eformsign] 재요청 시도 ${i + 1} 실패:`, error.message?.substring(0, 200));
+      if (i === tryBodies.length - 1) {
+        throw error;
+      }
+    }
+  }
 }
 
 export async function deleteDocument(documentId: string): Promise<any> {
