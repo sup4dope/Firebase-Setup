@@ -216,7 +216,15 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
     try {
       const apiFields = fields
         .filter(f => f.value.trim())
-        .map(f => ({ id: f.id, value: f.value }));
+        .map(f => {
+          if (f.id === '계약금') {
+            const numVal = parseFloat(f.value.replace(/,/g, ''));
+            if (!isNaN(numVal) && numVal > 0 && !/[가-힣()]/.test(f.value)) {
+              return { id: f.id, value: formatContractAmount(numVal) };
+            }
+          }
+          return { id: f.id, value: f.value };
+        });
 
       const phoneClean = recipientPhone.replace(/-/g, '');
       const recipients: any[] = [{

@@ -9,6 +9,41 @@ import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocume
 
 const FieldValue = admin.firestore.FieldValue;
 
+function numberToKorean(num: number): string {
+  const digits = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+  const smallUnits = ['', '십', '백', '천'];
+  const bigUnits = ['', '만', '억', '조'];
+  if (num === 0) return '영';
+  let result = '';
+  let unitIndex = 0;
+  while (num > 0) {
+    const chunk = num % 10000;
+    if (chunk > 0) {
+      let chunkStr = '';
+      let temp = chunk;
+      for (let i = 0; i < 4 && temp > 0; i++) {
+        const digit = temp % 10;
+        if (digit > 0) {
+          const digitStr = (i > 0 && digit === 1) ? '' : digits[digit];
+          chunkStr = digitStr + smallUnits[i] + chunkStr;
+        }
+        temp = Math.floor(temp / 10);
+      }
+      result = chunkStr + bigUnits[unitIndex] + result;
+    }
+    num = Math.floor(num / 10000);
+    unitIndex++;
+  }
+  return result;
+}
+
+function formatContractAmountServer(manWon: number): string {
+  const won = manWon * 10000;
+  const formatted = won.toLocaleString('ko-KR');
+  const korean = numberToKorean(won);
+  return `${formatted} (금 ${korean} 원)`;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -532,13 +567,24 @@ export async function registerRoutes(
         return res.status(400).json({ success: false, error: "template_id가 필요합니다." });
       }
 
+      const processedFields = (fields && Array.isArray(fields)) ? fields.map((f: any) => {
+        if (f.id === '계약금') {
+          const strVal = String(f.value).replace(/,/g, '');
+          const numVal = parseFloat(strVal);
+          if (!isNaN(numVal) && numVal > 0 && !/[가-힣()]/.test(String(f.value))) {
+            return { ...f, value: formatContractAmountServer(numVal) };
+          }
+        }
+        return f;
+      }) : fields;
+
       console.log(`[eformsign] 문서 생성 요청: template_id=${template_id}, document_name=${document_name}`);
-      console.log(`[eformsign] fields:`, JSON.stringify(fields));
+      console.log(`[eformsign] fields:`, JSON.stringify(processedFields));
       console.log(`[eformsign] recipients:`, JSON.stringify(recipients));
 
       const result = await createDocument(template_id, {
         document_name,
-        fields,
+        fields: processedFields,
         recipients: recipients || [],
         comment,
       });
@@ -552,8 +598,8 @@ export async function registerRoutes(
       if (customer_id && documentId) {
         const now = new Date();
         const fieldsRecord: Record<string, string> = {};
-        if (fields && Array.isArray(fields)) {
-          fields.forEach((f: any) => { fieldsRecord[f.id] = f.value; });
+        if (processedFields && Array.isArray(processedFields)) {
+          processedFields.forEach((f: any) => { fieldsRecord[f.id] = f.value; });
         }
 
         const contractAmountRaw = fieldsRecord['계약금'] || '';
@@ -711,16 +757,27 @@ export async function registerRoutes(
       const phone = customerData?.phone?.replace(/-/g, '') || '';
       const recipientName = customerData?.name || customer_name || '';
 
-      const fieldsArray = Object.entries(fieldsRecord || {}).map(([id, value]) => ({
-        id,
-        value: String(value),
-      }));
+      const formattedFieldsRecord: Record<string, string> = {};
+      const fieldsArray = Object.entries(fieldsRecord || {}).map(([id, value]) => {
+        if (id === '계약금') {
+          const strVal = String(value).replace(/,/g, '');
+          const numVal = parseFloat(strVal);
+          if (!isNaN(numVal) && numVal > 0 && !/[가-힣()]/.test(String(value))) {
+            const formatted = formatContractAmountServer(numVal);
+            formattedFieldsRecord[id] = formatted;
+            return { id, value: formatted };
+          }
+        }
+        formattedFieldsRecord[id] = String(value);
+        return { id, value: String(value) };
+      });
 
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const dateField = fieldsArray.find(f => f.id === '계약일자');
       if (dateField) {
         dateField.value = dateStr;
+        formattedFieldsRecord['계약일자'] = dateStr;
       }
 
       const recipients = [{
@@ -748,9 +805,9 @@ export async function registerRoutes(
       console.log(`[eformsign] 재발송 문서 생성 성공: ${newDocumentId}`);
 
       if (newDocumentId) {
-        const contractAmountRaw = fieldsRecord?.['계약금'] || '';
-        const commissionRateRaw = fieldsRecord?.['자문료율'] || '';
-        const wonMatch = String(contractAmountRaw).replace(/,/g, '').match(/^(\d+)/);
+        const contractAmountFormatted = formattedFieldsRecord['계약금'] || '';
+        const commissionRateRaw = formattedFieldsRecord['자문료율'] || fieldsRecord?.['자문료율'] || '';
+        const wonMatch = String(contractAmountFormatted).replace(/,/g, '').match(/^(\d+)/);
         const amountWon = wonMatch ? parseInt(wonMatch[1], 10) : 0;
         const amountManWon = Math.round(amountWon / 10000);
 
@@ -762,7 +819,7 @@ export async function registerRoutes(
           template_name: contractData.template_name || '',
           status: '발송완료',
           sent_at: now.toISOString(),
-          fields: fieldsRecord || {},
+          fields: formattedFieldsRecord,
           amount_man_won: contractData.amount_man_won || amountManWon,
           commission_rate: contractData.commission_rate || (parseFloat(commissionRateRaw) || 0),
           created_by: created_by || req.user?.email || '',
@@ -770,7 +827,7 @@ export async function registerRoutes(
         });
         console.log(`[eformsign] 재발송 contracts_eformsign 레코드 생성 완료: ${newDocumentId}`);
 
-        const memoContent = `[계약서재발송] 발송일자: ${dateStr} | 계약금: ${contractAmountRaw} | 자문료율: ${commissionRateRaw}%`;
+        const memoContent = `[계약서재발송] 발송일자: ${dateStr} | 계약금: ${contractAmountFormatted} | 자문료율: ${commissionRateRaw}%`;
         const memoEntry = {
           content: memoContent,
           author_id: req.user?.uid || 'system',
