@@ -106,7 +106,10 @@ match /contracts_eformsign/{contractId} {
 - **계약 레코드 생성**: 서버 측(Admin SDK)에서 `contracts_eformsign` 컬렉션에 직접 저장 (클라이언트 Firestore 보안 규칙 우회)
 - **자동 기입 필드**: 계약일자(발송일 YYYY-MM-DD), 상호명(company_name), 사업자번호(business_registration_number), 대표자명(name), 소재지(business_address + detail), 연락처(phone), 계약금(만원→원 변환 + 한글 금액), 자문료율(%)
 - **발송 시 자동 메모**: 고객 memo_history에 `[계약서발송완료]` 메모 추가 (FieldValue.arrayUnion 사용)
-- **Webhook 완료 처리**: `doc_complete` → 고객 status_code를 "계약완료(선불)"로 변경, 4개 필드 동기화(approved_amount+contract_amount, commission_rate+contract_fee_rate), status_logs 생성
+- **계약 유형별 처리**: 템플릿명 기반 자동 판별 — `(pre)`=선불계약→계약완료(선불), `(post)`=후불계약→계약완료(후불), `(out)`=외주계약→계약완료(외주). 서버 `detectContractType()` 함수 + 클라이언트 동일 로직
+  - 선불/후불: 계약금 + 자문료율 필드 모두 포함
+  - 외주: 자문료율만 포함 (계약금 필드 없음, `approved_amount`/`contract_amount` 미업데이트)
+- **Webhook 완료 처리**: 서명완료 시 템플릿명에 따라 적절한 status_code 자동 설정, 4개 필드 동기화(approved_amount+contract_amount, commission_rate+contract_fee_rate — 외주 시 계약금 제외), status_logs 생성
 - **금액 저장**: contract 레코드에 `amount_man_won`(만원 단위 숫자)과 `commission_rate`(숫자)를 별도 저장하여 Webhook에서 안정적으로 사용
 - **정산 필드 동기화**: 계약 발송/서명완료 시 `approved_amount`↔`contract_amount`, `commission_rate`↔`contract_fee_rate` 4개 필드 항상 동기화 (정산 시스템과 일관성 보장)
 - **상태 동기화 파싱**: eformsign API `current_status.status_type` 숫자코드 매핑 — `003`=서명완료, `042`=무효, `060`=거부 (`extractEformsignStatus` 함수)

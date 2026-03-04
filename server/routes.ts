@@ -9,6 +9,31 @@ import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocume
 
 const FieldValue = admin.firestore.FieldValue;
 
+type ContractType = 'pre' | 'post' | 'out';
+
+function detectContractType(templateName: string): ContractType {
+  const name = templateName.toLowerCase();
+  if (name.includes('(out)') || name.includes('(out)')) return 'out';
+  if (name.includes('(post)') || name.includes('(post)')) return 'post';
+  return 'pre';
+}
+
+function getContractStatusByType(contractType: ContractType): string {
+  switch (contractType) {
+    case 'post': return '계약완료(후불)';
+    case 'out': return '계약완료(외주)';
+    default: return '계약완료(선불)';
+  }
+}
+
+function getContractTypeLabel(contractType: ContractType): string {
+  switch (contractType) {
+    case 'post': return '후불계약';
+    case 'out': return '외주계약';
+    default: return '선불계약';
+  }
+}
+
 function numberToKorean(num: number): string {
   const digits = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
   const smallUnits = ['', '십', '백', '천'];
@@ -633,8 +658,11 @@ export async function registerRoutes(
         });
         console.log(`[eformsign] contracts_eformsign 레코드 생성 완료: ${documentId}, 계약금: ${amountManWon}만원, 자문료율: ${commissionRate}%`);
 
+        const contractType = detectContractType(template_name || '');
+
         const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        const memoContent = `[계약서발송완료] 발송일자: ${dateStr} | 계약금: ${contractAmountRaw} | 자문료율: ${commissionRateRaw}%`;
+        const amountPart = contractType !== 'out' ? ` | 계약금: ${contractAmountRaw}` : '';
+        const memoContent = `[계약서발송완료] 발송일자: ${dateStr}${amountPart} | 자문료율: ${commissionRateRaw}%`;
         const memoEntry = {
           content: memoContent,
           author_id: req.user?.uid || 'system',
@@ -650,7 +678,7 @@ export async function registerRoutes(
             latest_memo: memoContent,
             updated_at: now.toISOString(),
           };
-          if (amountManWon > 0) {
+          if (contractType !== 'out' && amountManWon > 0) {
             customerUpdate.approved_amount = amountManWon;
             customerUpdate.contract_amount = amountManWon;
           }
@@ -659,7 +687,7 @@ export async function registerRoutes(
             customerUpdate.contract_fee_rate = commissionRate;
           }
           await customerRef.update(customerUpdate);
-          console.log(`[eformsign] 고객 메모 + 계약금/자문료율 업데이트 완료: ${customer_id}`);
+          console.log(`[eformsign] 고객 메모 + 자문료율 업데이트 완료: ${customer_id} (${contractType})`);
         } catch (memoErr: any) {
           console.error(`[eformsign] 고객 업데이트 실패 (계약 발송은 성공): ${memoErr.message}`);
         }
@@ -858,7 +886,9 @@ export async function registerRoutes(
         });
         console.log(`[eformsign] 재발송 contracts_eformsign 레코드 생성 완료: ${newDocumentId}`);
 
-        const memoContent = `[계약서재발송] 발송일자: ${dateStr} | 계약금: ${contractAmountFormatted} | 자문료율: ${commissionRateRaw}%`;
+        const resendContractType = detectContractType(contractData.template_name || '');
+        const resendAmountPart = resendContractType !== 'out' ? ` | 계약금: ${contractAmountFormatted}` : '';
+        const memoContent = `[계약서재발송] 발송일자: ${dateStr}${resendAmountPart} | 자문료율: ${commissionRateRaw}%`;
         const memoEntry = {
           content: memoContent,
           author_id: req.user?.uid || 'system',
@@ -937,11 +967,16 @@ export async function registerRoutes(
                 const now = new Date();
                 const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+                const contractType = detectContractType(contractData.template_name || '');
+                const targetStatus = getContractStatusByType(contractType);
+                const typeLabel = getContractTypeLabel(contractType);
+
                 const contractAmountManWon = contractData.amount_man_won || 0;
                 const commissionRateNum = contractData.commission_rate || 0;
                 const previousStatus = customerSnap.data()?.status_code || '';
 
-                const memoContent = `[계약서작성완료] 완료일: ${dateStr} | 계약금: ${contractAmountManWon}만원 | 자문료율: ${commissionRateNum}% | 상태: 계약완료(선불)`;
+                const amountPart = contractType !== 'out' ? ` | 계약금: ${contractAmountManWon}만원` : '';
+                const memoContent = `[계약서작성완료] 완료일: ${dateStr}${amountPart} | 자문료율: ${commissionRateNum}% | 상태: ${targetStatus}`;
                 const memoEntry = {
                   content: memoContent,
                   author_id: 'system',
@@ -950,7 +985,7 @@ export async function registerRoutes(
                 };
 
                 const customerUpdateData: Record<string, any> = {
-                  status_code: '계약완료(선불)',
+                  status_code: targetStatus,
                   contract_completion_date: dateStr,
                   updated_at: now.toISOString(),
                   memo_history: FieldValue.arrayUnion(memoEntry),
@@ -958,7 +993,7 @@ export async function registerRoutes(
                   latest_memo: memoContent,
                 };
 
-                if (contractAmountManWon > 0) {
+                if (contractType !== 'out' && contractAmountManWon > 0) {
                   customerUpdateData.approved_amount = contractAmountManWon;
                   customerUpdateData.contract_amount = contractAmountManWon;
                 }
@@ -968,17 +1003,17 @@ export async function registerRoutes(
                 }
 
                 await customerRef.update(customerUpdateData);
-                console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → 계약완료(선불), 계약금: ${contractAmountManWon}만원, 자문료율: ${commissionRateNum}%`);
+                console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → ${targetStatus} (${typeLabel}), 계약금: ${contractAmountManWon}만원, 자문료율: ${commissionRateNum}%`);
 
                 await firestore.collection('status_logs').add({
                   customer_id: customerId,
                   customer_name: contractData.customer_name || '',
                   previous_status: previousStatus,
-                  new_status: '계약완료(선불)',
+                  new_status: targetStatus,
                   changed_by_id: 'system',
                   changed_by_name: '시스템(eformsign)',
                   changed_at: now.toISOString(),
-                  reason: '전자계약 서명 완료 (수동 동기화)',
+                  reason: `전자계약 서명 완료 - ${typeLabel} (수동 동기화)`,
                 });
               }
             }
@@ -1040,11 +1075,16 @@ export async function registerRoutes(
           const now = new Date();
           const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+          const contractType = detectContractType(contractData.template_name || '');
+          const targetStatus = getContractStatusByType(contractType);
+          const typeLabel = getContractTypeLabel(contractType);
+
           const contractAmountManWon = contractData.amount_man_won || 0;
           const commissionRateNum = contractData.commission_rate || 0;
           const previousStatus = customerSnap.data()?.status_code || '';
 
-          const memoContent = `[계약서작성완료] 완료일: ${dateStr} | 계약금: ${contractAmountManWon}만원 | 자문료율: ${commissionRateNum}% | 상태: 계약완료(선불)`;
+          const amountPart = contractType !== 'out' ? ` | 계약금: ${contractAmountManWon}만원` : '';
+          const memoContent = `[계약서작성완료] 완료일: ${dateStr}${amountPart} | 자문료율: ${commissionRateNum}% | 상태: ${targetStatus}`;
           const memoEntry = {
             content: memoContent,
             author_id: 'system',
@@ -1053,7 +1093,7 @@ export async function registerRoutes(
           };
 
           const customerUpdateData: Record<string, any> = {
-            status_code: '계약완료(선불)',
+            status_code: targetStatus,
             contract_completion_date: dateStr,
             updated_at: now.toISOString(),
             memo_history: FieldValue.arrayUnion(memoEntry),
@@ -1061,7 +1101,7 @@ export async function registerRoutes(
             latest_memo: memoContent,
           };
 
-          if (contractAmountManWon > 0) {
+          if (contractType !== 'out' && contractAmountManWon > 0) {
             customerUpdateData.approved_amount = contractAmountManWon;
             customerUpdateData.contract_amount = contractAmountManWon;
           }
@@ -1071,17 +1111,17 @@ export async function registerRoutes(
           }
 
           await customerRef.update(customerUpdateData);
-          console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → 계약완료(선불), 계약금: ${contractAmountManWon}만원, 자문료율: ${commissionRateNum}%`);
+          console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → ${targetStatus} (${typeLabel}), 계약금: ${contractAmountManWon}만원, 자문료율: ${commissionRateNum}%`);
 
           await firestore.collection('status_logs').add({
             customer_id: customerId,
             customer_name: contractData.customer_name || '',
             previous_status: previousStatus,
-            new_status: '계약완료(선불)',
+            new_status: targetStatus,
             changed_by_id: 'system',
             changed_by_name: '시스템(eformsign)',
             changed_at: now.toISOString(),
-            reason: '전자계약 서명 완료 (수동 동기화)',
+            reason: `전자계약 서명 완료 - ${typeLabel} (수동 동기화)`,
           });
         }
       }
@@ -1130,12 +1170,17 @@ export async function registerRoutes(
             const now = new Date();
             const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+            const contractType = detectContractType(contractData.template_name || '');
+            const targetStatus = getContractStatusByType(contractType);
+            const typeLabel = getContractTypeLabel(contractType);
+
             const contractAmountManWon = contractData.amount_man_won || 0;
             const commissionRateNum = contractData.commission_rate || 0;
 
             const previousStatus = customerSnap.data()?.status_code || '';
 
-            const memoContent = `[계약서작성완료] 완료일: ${dateStr} | 계약금: ${contractAmountManWon}만원 | 자문료율: ${commissionRateNum}% | 상태: 계약완료(선불)`;
+            const amountPart = contractType !== 'out' ? ` | 계약금: ${contractAmountManWon}만원` : '';
+            const memoContent = `[계약서작성완료] 완료일: ${dateStr}${amountPart} | 자문료율: ${commissionRateNum}% | 상태: ${targetStatus}`;
             const memoEntry = {
               content: memoContent,
               author_id: 'system',
@@ -1144,7 +1189,7 @@ export async function registerRoutes(
             };
 
             const customerUpdateData: Record<string, any> = {
-              status_code: '계약완료(선불)',
+              status_code: targetStatus,
               contract_completion_date: dateStr,
               updated_at: now.toISOString(),
               memo_history: FieldValue.arrayUnion(memoEntry),
@@ -1152,7 +1197,7 @@ export async function registerRoutes(
               latest_memo: memoContent,
             };
 
-            if (contractAmountManWon > 0) {
+            if (contractType !== 'out' && contractAmountManWon > 0) {
               customerUpdateData.approved_amount = contractAmountManWon;
               customerUpdateData.contract_amount = contractAmountManWon;
             }
@@ -1162,19 +1207,19 @@ export async function registerRoutes(
             }
 
             await customerRef.update(customerUpdateData);
-            console.log(`[eformsign Webhook] 고객 상태 변경: ${customerId} → 계약완료(선불), 계약금=${contractAmountManWon}만원, 자문료율=${commissionRateNum}%`);
+            console.log(`[eformsign Webhook] 고객 상태 변경: ${customerId} → ${targetStatus} (${typeLabel}), 계약금=${contractAmountManWon}만원, 자문료율=${commissionRateNum}%`);
 
             await firestore.collection('status_logs').add({
               customer_id: customerId,
               customer_name: contractData.customer_name || '',
               previous_status: previousStatus,
-              new_status: '계약완료(선불)',
+              new_status: targetStatus,
               changed_by_id: 'system',
               changed_by_name: '시스템(eformsign)',
               changed_at: now.toISOString(),
-              reason: '전자계약 서명 완료',
+              reason: `전자계약 서명 완료 - ${typeLabel}`,
             });
-            console.log(`[eformsign Webhook] 상태 로그 기록 완료: ${previousStatus} → 계약완료(선불)`);
+            console.log(`[eformsign Webhook] 상태 로그 기록 완료: ${previousStatus} → ${targetStatus}`);
           }
         }
       } else {

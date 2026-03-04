@@ -162,6 +162,21 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
     fetchTemplates();
   };
 
+  const detectContractType = (templateName: string): 'pre' | 'post' | 'out' => {
+    const name = templateName.toLowerCase();
+    if (name.includes('(out)') || name.includes('(out)')) return 'out';
+    if (name.includes('(post)') || name.includes('(post)')) return 'post';
+    return 'pre';
+  };
+
+  const getContractTypeLabel = (type: 'pre' | 'post' | 'out'): string => {
+    switch (type) {
+      case 'post': return '후불';
+      case 'out': return '외주';
+      default: return '선불';
+    }
+  };
+
   const handleSelectTemplate = (template: EformsignTemplate) => {
     setSelectedTemplate(template);
 
@@ -169,6 +184,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
       const now = new Date();
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+      const contractType = detectContractType(template.name);
       const amountManWon = selectedCustomer.approved_amount || 50;
       const commissionRate = selectedCustomer.commission_rate || 5;
 
@@ -181,11 +197,16 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
         { id: '대표자명', value: selectedCustomer.name || '', label: '대표자명', autoFilled: true },
         { id: '소재지', value: fullAddress, label: '소재지', autoFilled: true },
         { id: '연락처', value: selectedCustomer.phone || '', label: '연락처', autoFilled: true },
-        { id: '계약금', value: String(amountManWon), label: '계약금(만원)', autoFilled: false },
-        { id: '자문료율', value: String(commissionRate), label: '자문료율(%)', autoFilled: false },
       ];
+
+      if (contractType !== 'out') {
+        autoFields.push({ id: '계약금', value: String(amountManWon), label: '계약금(만원)', autoFilled: false });
+      }
+      autoFields.push({ id: '자문료율', value: String(commissionRate), label: '자문료율(%)', autoFilled: false });
+
       setFields(autoFields);
-      setDocumentName(`${selectedCustomer.company_name || selectedCustomer.name}_경영지원자문 계약서`);
+      const typeLabel = getContractTypeLabel(contractType);
+      setDocumentName(`${selectedCustomer.company_name || selectedCustomer.name}_경영지원자문 계약서 (${typeLabel})`);
     }
 
     setStep('fields');
