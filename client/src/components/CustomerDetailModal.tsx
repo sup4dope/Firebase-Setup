@@ -26,6 +26,7 @@ import {
   Building,
   RotateCcw,
   Pencil,
+  RefreshCw,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -3862,12 +3863,24 @@ export function CustomerDetailModal({
                             <span className="text-sm font-medium text-foreground truncate flex-1 mr-2">
                               {contract.template_name}
                             </span>
-                            <Badge
-                              variant="outline"
-                              className={cn("text-[10px] px-1.5 shrink-0", getContractStatusBadge(contract.status))}
-                            >
-                              {contract.status}
-                            </Badge>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Badge
+                                variant="outline"
+                                className={cn("text-[10px] px-1.5", getContractStatusBadge(contract.status))}
+                              >
+                                {contract.status}
+                              </Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setContractSendModalOpen(true)}
+                                className="h-5 px-1.5 text-[10px] gap-0.5"
+                                data-testid={`button-resend-contract-${contract.id}`}
+                              >
+                                <RefreshCw className="w-2.5 h-2.5" />
+                                재발송
+                              </Button>
+                            </div>
                           </div>
                           <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                             <span>발송: {safeContractDate(contract.sent_at || contract.created_at)}</span>
