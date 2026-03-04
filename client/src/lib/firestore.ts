@@ -1058,6 +1058,7 @@ export const updateCustomerInfo = async (
     const oldValue = currentCustomer.commission_rate || currentCustomer.contract_fee_rate || 0;
     if (Number(oldValue) !== updates.commission_rate) {
       fieldsToUpdate.commission_rate = updates.commission_rate;
+      fieldsToUpdate.contract_fee_rate = updates.commission_rate;
       logsToAdd.push({
         customer_id: customerId,
         field_name: 'commission_rate',
@@ -1073,6 +1074,7 @@ export const updateCustomerInfo = async (
     const oldValue = currentCustomer.contract_amount || currentCustomer.deposit_amount || 0;
     if (Number(oldValue) !== updates.contract_amount) {
       fieldsToUpdate.contract_amount = updates.contract_amount;
+      fieldsToUpdate.approved_amount = updates.contract_amount;
       logsToAdd.push({
         customer_id: customerId,
         field_name: 'contract_amount',

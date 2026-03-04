@@ -221,6 +221,11 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
 
     setSending(true);
     try {
+      const contractAmountField = fields.find(f => f.id === '계약금');
+      const commissionRateField = fields.find(f => f.id === '자문료율');
+      const rawAmountManWon = contractAmountField ? parseFloat(contractAmountField.value.replace(/,/g, '')) : 0;
+      const rawCommissionRate = commissionRateField ? parseFloat(commissionRateField.value.replace(/,/g, '')) : 0;
+
       const apiFields = fields
         .filter(f => f.value.trim())
         .map(f => {
@@ -263,6 +268,8 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
           customer_id: selectedCustomer.id,
           customer_name: selectedCustomer.company_name || selectedCustomer.name,
           created_by: user.name || user.email || '',
+          amount_man_won: rawAmountManWon || 0,
+          commission_rate_raw: rawCommissionRate || 0,
         }),
       });
 

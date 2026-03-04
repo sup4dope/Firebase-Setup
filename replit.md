@@ -106,8 +106,10 @@ match /contracts_eformsign/{contractId} {
 - **계약 레코드 생성**: 서버 측(Admin SDK)에서 `contracts_eformsign` 컬렉션에 직접 저장 (클라이언트 Firestore 보안 규칙 우회)
 - **자동 기입 필드**: 계약일자(발송일 YYYY-MM-DD), 상호명(company_name), 사업자번호(business_registration_number), 대표자명(name), 소재지(business_address + detail), 연락처(phone), 계약금(만원→원 변환 + 한글 금액), 자문료율(%)
 - **발송 시 자동 메모**: 고객 memo_history에 `[계약서발송완료]` 메모 추가 (FieldValue.arrayUnion 사용)
-- **Webhook 완료 처리**: `doc_complete` → 고객 status_code를 "계약완료(선불)"로 변경, approved_amount/commission_rate 동기화, status_logs 생성
+- **Webhook 완료 처리**: `doc_complete` → 고객 status_code를 "계약완료(선불)"로 변경, 4개 필드 동기화(approved_amount+contract_amount, commission_rate+contract_fee_rate), status_logs 생성
 - **금액 저장**: contract 레코드에 `amount_man_won`(만원 단위 숫자)과 `commission_rate`(숫자)를 별도 저장하여 Webhook에서 안정적으로 사용
+- **정산 필드 동기화**: 계약 발송/서명완료 시 `approved_amount`↔`contract_amount`, `commission_rate`↔`contract_fee_rate` 4개 필드 항상 동기화 (정산 시스템과 일관성 보장)
+- **상태 동기화 파싱**: eformsign API `current_status.status_type` 숫자코드 매핑 — `003`=서명완료, `042`=무효, `060`=거부 (`extractEformsignStatus` 함수)
 - **계약금 자동 포맷팅**: 만원 단위 숫자 입력(예: 50) → `"500,000 (금 오십만 원)"` 형태로 자동 변환 (클라이언트 + 서버 양쪽 적용)
 - **수동 상태 동기화**: Webhook 미수신 시 eformsign API에서 직접 문서 상태를 조회하여 Firestore 동기화
   - `POST /api/eformsign/contracts/sync` — 미완료 계약 전체 동기화

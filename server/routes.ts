@@ -561,7 +561,7 @@ export async function registerRoutes(
   app.post("/api/eformsign/documents", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { template_id, template_name, document_name, fields, recipients, comment,
-              customer_id, customer_name, created_by } = req.body;
+              customer_id, customer_name, created_by, amount_man_won: clientAmountManWon, commission_rate_raw: clientCommissionRate } = req.body;
 
       if (!template_id) {
         return res.status(400).json({ success: false, error: "template_id가 필요합니다." });
@@ -604,9 +604,18 @@ export async function registerRoutes(
 
         const contractAmountRaw = fieldsRecord['계약금'] || '';
         const commissionRateRaw = fieldsRecord['자문료율'] || '';
-        const wonMatch = contractAmountRaw.replace(/,/g, '').match(/^(\d+)/);
-        const amountWon = wonMatch ? parseInt(wonMatch[1], 10) : 0;
-        const amountManWon = Math.round(amountWon / 10000);
+
+        const amountManWon = (typeof clientAmountManWon === 'number' && clientAmountManWon > 0)
+          ? clientAmountManWon
+          : (() => {
+              const wonMatch = contractAmountRaw.replace(/,/g, '').match(/^(\d+)/);
+              const amountWon = wonMatch ? parseInt(wonMatch[1], 10) : 0;
+              return Math.round(amountWon / 10000);
+            })();
+
+        const commissionRate = (typeof clientCommissionRate === 'number' && clientCommissionRate > 0)
+          ? clientCommissionRate
+          : (parseFloat(commissionRateRaw) || 0);
 
         await firestore.collection('contracts_eformsign').add({
           customer_id,
@@ -618,11 +627,11 @@ export async function registerRoutes(
           sent_at: now.toISOString(),
           fields: fieldsRecord,
           amount_man_won: amountManWon,
-          commission_rate: parseFloat(commissionRateRaw) || 0,
+          commission_rate: commissionRate,
           created_by: created_by || req.user?.email || '',
           created_at: now.toISOString(),
         });
-        console.log(`[eformsign] contracts_eformsign 레코드 생성 완료: ${documentId}`);
+        console.log(`[eformsign] contracts_eformsign 레코드 생성 완료: ${documentId}, 계약금: ${amountManWon}만원, 자문료율: ${commissionRate}%`);
 
         const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const memoContent = `[계약서발송완료] 발송일자: ${dateStr} | 계약금: ${contractAmountRaw} | 자문료율: ${commissionRateRaw}%`;
@@ -635,15 +644,24 @@ export async function registerRoutes(
 
         try {
           const customerRef = firestore.collection('customers').doc(customer_id);
-          await customerRef.update({
+          const customerUpdate: Record<string, any> = {
             memo_history: FieldValue.arrayUnion(memoEntry),
             recent_memo: memoContent,
             latest_memo: memoContent,
             updated_at: now.toISOString(),
-          });
-          console.log(`[eformsign] 고객 메모 추가 완료: ${customer_id}`);
+          };
+          if (amountManWon > 0) {
+            customerUpdate.approved_amount = amountManWon;
+            customerUpdate.contract_amount = amountManWon;
+          }
+          if (commissionRate > 0) {
+            customerUpdate.commission_rate = commissionRate;
+            customerUpdate.contract_fee_rate = commissionRate;
+          }
+          await customerRef.update(customerUpdate);
+          console.log(`[eformsign] 고객 메모 + 계약금/자문료율 업데이트 완료: ${customer_id}`);
         } catch (memoErr: any) {
-          console.error(`[eformsign] 고객 메모 추가 실패 (계약 발송은 성공): ${memoErr.message}`);
+          console.error(`[eformsign] 고객 업데이트 실패 (계약 발송은 성공): ${memoErr.message}`);
         }
       }
 
@@ -929,13 +947,15 @@ export async function registerRoutes(
 
                 if (contractAmountManWon > 0) {
                   customerUpdateData.approved_amount = contractAmountManWon;
+                  customerUpdateData.contract_amount = contractAmountManWon;
                 }
                 if (commissionRateNum > 0) {
                   customerUpdateData.commission_rate = commissionRateNum;
+                  customerUpdateData.contract_fee_rate = commissionRateNum;
                 }
 
                 await customerRef.update(customerUpdateData);
-                console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → 계약완료(선불)`);
+                console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → 계약완료(선불), 계약금: ${contractAmountManWon}만원, 자문료율: ${commissionRateNum}%`);
 
                 await firestore.collection('status_logs').add({
                   customer_id: customerId,
@@ -1030,13 +1050,15 @@ export async function registerRoutes(
 
           if (contractAmountManWon > 0) {
             customerUpdateData.approved_amount = contractAmountManWon;
+            customerUpdateData.contract_amount = contractAmountManWon;
           }
           if (commissionRateNum > 0) {
             customerUpdateData.commission_rate = commissionRateNum;
+            customerUpdateData.contract_fee_rate = commissionRateNum;
           }
 
           await customerRef.update(customerUpdateData);
-          console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → 계약완료(선불)`);
+          console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → 계약완료(선불), 계약금: ${contractAmountManWon}만원, 자문료율: ${commissionRateNum}%`);
 
           await firestore.collection('status_logs').add({
             customer_id: customerId,
@@ -1051,7 +1073,7 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ success: true, oldStatus: contractData.status, newStatus: mappedStatus, eformsignStatus });
+      res.json({ success: true, oldStatus: contractData.status, newStatus: mappedStatus, eformsignStatusType: rawStatusType });
     } catch (error: any) {
       console.error("[eformsign Sync] 개별 동기화 오류:", error.message);
       res.status(500).json({ success: false, error: error.message });
@@ -1119,9 +1141,11 @@ export async function registerRoutes(
 
             if (contractAmountManWon > 0) {
               customerUpdateData.approved_amount = contractAmountManWon;
+              customerUpdateData.contract_amount = contractAmountManWon;
             }
             if (commissionRateNum > 0) {
               customerUpdateData.commission_rate = commissionRateNum;
+              customerUpdateData.contract_fee_rate = commissionRateNum;
             }
 
             await customerRef.update(customerUpdateData);
