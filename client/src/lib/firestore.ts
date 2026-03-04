@@ -1261,11 +1261,20 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
         status.includes('계약') || status.includes('집행');
       if (!isTargetStatus) return false;
+
+      const isPostContract = status === '계약완료(후불)';
+      const isOutContract = status === '계약완료(외주)';
       
       // 기관별 집행일 확인 (processing_orgs 내 승인된 기관의 execution_date)
       const approvedOrgs = (customer.processing_orgs || []).filter(
         (org: ProcessingOrg) => org.status === '승인' && org.execution_amount && org.execution_date
       );
+
+      const hasExecution = approvedOrgs.length > 0 || !!(customer.execution_date && customer.execution_amount);
+
+      if ((isPostContract || isOutContract) && !hasExecution) {
+        return false;
+      }
       
       // 기관별 정산월 중 해당 월과 일치하는 것이 있는지 확인
       const hasOrgInMonth = approvedOrgs.some(
@@ -1360,6 +1369,17 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     
     // 2. 정산 대상 상태인지 확인
     const status = customer.status_code || '';
+    const isPostContract = status === '계약완료(후불)';
+    const isOutContract = status === '계약완료(외주)';
+
+    const hasExecution = !!(customer.execution_date || customer.execution_amount ||
+      (customer.processing_orgs || []).some((org: ProcessingOrg) => org.status === '승인' && org.execution_amount && org.execution_date));
+
+    if ((isPostContract || isOutContract) && !hasExecution) {
+      console.log(`[Settlement Sync] ${isPostContract ? '후불' : '외주'}계약 - 집행 전이므로 정산 대상 제외: ${customer.company_name || customer.name}`);
+      return;
+    }
+
     const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
       status.includes('계약') || status.includes('집행');
     

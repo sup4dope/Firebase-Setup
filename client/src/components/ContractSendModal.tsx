@@ -205,8 +205,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
       autoFields.push({ id: '자문료율', value: String(commissionRate), label: '자문료율(%)', autoFilled: false });
 
       setFields(autoFields);
-      const typeLabel = getContractTypeLabel(contractType);
-      setDocumentName(`${selectedCustomer.company_name || selectedCustomer.name}_경영지원자문 계약서 (${typeLabel})`);
+      setDocumentName(`${selectedCustomer.company_name || selectedCustomer.name}_경영지원자문 계약서`);
     }
 
     setStep('fields');
