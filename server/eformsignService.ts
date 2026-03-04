@@ -190,6 +190,48 @@ export async function getDocument(documentId: string): Promise<any> {
   return apiRequest('GET', `/documents/${documentId}`);
 }
 
+export async function downloadDocument(documentId: string): Promise<{ buffer: Buffer; contentType: string; fileName: string }> {
+  const { token, apiUrl } = await getTokenAndUrl();
+  const url = `${apiUrl}/api/documents/${documentId}/download`;
+  console.log(`[eformsign] 문서 다운로드 요청: GET ${url}`);
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`eformsign 문서 다운로드 실패 (${response.status}): ${errorText}`);
+  }
+
+  const contentType = response.headers.get('content-type') || 'application/pdf';
+  const contentDisposition = response.headers.get('content-disposition') || '';
+  let fileName = `contract_${documentId}.pdf`;
+  const fileNameMatch = contentDisposition.match(/filename[*]?=(?:UTF-8''|"?)([^";]+)/i);
+  if (fileNameMatch) {
+    fileName = decodeURIComponent(fileNameMatch[1].replace(/"/g, ''));
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  console.log(`[eformsign] 문서 다운로드 성공: ${fileName}, 크기: ${buffer.length} bytes`);
+
+  return { buffer, contentType, fileName };
+}
+
+async function getTokenAndUrl(): Promise<{ token: string; apiUrl: string }> {
+  if (cachedToken && Date.now() < cachedToken.expiresAt - 60000) {
+    return { token: cachedToken.token, apiUrl: cachedToken.apiUrl };
+  }
+  await getAccessToken();
+  if (!cachedToken) throw new Error('토큰 발급 실패');
+  return { token: cachedToken.token, apiUrl: cachedToken.apiUrl };
+}
+
 export async function getDocuments(queryParams?: {
   type?: string;
   status?: string;

@@ -229,6 +229,7 @@ export function CustomerDetailModal({
   const [resendingContractId, setResendingContractId] = useState<string | null>(null);
   const [syncingContractId, setSyncingContractId] = useState<string | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [downloadingContractId, setDownloadingContractId] = useState<string | null>(null);
   
   // Active tab state for center panel (document viewer, financial analysis, review summary)
   const [activeCenterTab, setActiveCenterTab] = useState<"documents" | "financial" | "summary">("documents");
@@ -692,8 +693,10 @@ export function CustomerDetailModal({
 
   useEffect(() => {
     const loadContracts = async () => {
-      if (activeBottomTab === "contracts" && customer?.id) {
-        setIsLoadingContracts(true);
+      if (customer?.id && isOpen) {
+        if (activeBottomTab === "contracts") {
+          setIsLoadingContracts(true);
+        }
         try {
           const contracts = await getContractsByCustomer(customer.id);
           setCustomerContracts(contracts);
@@ -1990,18 +1993,63 @@ export function CustomerDetailModal({
                 명함발송
               </Button>
             )}
-            {customer?.id && !isNewCustomer && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setContractSendModalOpen(true)}
-                className="h-7 text-xs"
-                data-testid="button-send-contract"
-              >
-                <FileSignature className="w-3 h-3 mr-1" />
-                전자계약
-              </Button>
-            )}
+            {customer?.id && !isNewCustomer && (() => {
+              const completedContract = customerContracts.find(c => c.status === '서명완료');
+              if (completedContract && completedContract.document_id) {
+                return (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={downloadingContractId === 'header'}
+                    onClick={async () => {
+                      setDownloadingContractId('header');
+                      try {
+                        const { authFetch } = await import('@/lib/firebase');
+                        const res = await authFetch(`/api/eformsign/documents/${completedContract.document_id}/download`);
+                        if (!res.ok) {
+                          const errData = await res.json().catch(() => ({}));
+                          throw new Error(errData.error || '다운로드에 실패했습니다.');
+                        }
+                        const blob = await res.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${customer.company_name || customer.name}_계약서.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                      } catch (error: any) {
+                        toast({ title: '다운로드 실패', description: error.message, variant: 'destructive' });
+                      } finally {
+                        setDownloadingContractId(null);
+                      }
+                    }}
+                    className="h-7 text-xs"
+                    data-testid="button-download-contract"
+                  >
+                    {downloadingContractId === 'header' ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Download className="w-3 h-3 mr-1" />
+                    )}
+                    다운로드
+                  </Button>
+                );
+              }
+              return (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setContractSendModalOpen(true)}
+                  className="h-7 text-xs"
+                  data-testid="button-send-contract"
+                >
+                  <FileSignature className="w-3 h-3 mr-1" />
+                  전자계약
+                </Button>
+              );
+            })()}
             {/* Read-only indicator for staff users */}
             {isReadOnly && (
               <Badge
@@ -3918,6 +3966,46 @@ export function CustomerDetailModal({
                               >
                                 {contract.status}
                               </Badge>
+                              {contract.status === '서명완료' && contract.document_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={downloadingContractId === contract.id}
+                                  onClick={async () => {
+                                    setDownloadingContractId(contract.id);
+                                    try {
+                                      const { authFetch } = await import('@/lib/firebase');
+                                      const res = await authFetch(`/api/eformsign/documents/${contract.document_id}/download`);
+                                      if (!res.ok) {
+                                        const errData = await res.json().catch(() => ({}));
+                                        throw new Error(errData.error || '다운로드에 실패했습니다.');
+                                      }
+                                      const blob = await res.blob();
+                                      const url = window.URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = `${contract.customer_name || customer?.name || ''}_계약서.pdf`;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      window.URL.revokeObjectURL(url);
+                                      document.body.removeChild(a);
+                                    } catch (error: any) {
+                                      toast({ title: '다운로드 실패', description: error.message, variant: 'destructive' });
+                                    } finally {
+                                      setDownloadingContractId(null);
+                                    }
+                                  }}
+                                  className="h-5 px-1.5 text-[10px] gap-0.5"
+                                  data-testid={`button-download-contract-${contract.id}`}
+                                >
+                                  {downloadingContractId === contract.id ? (
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                  ) : (
+                                    <Download className="w-2.5 h-2.5" />
+                                  )}
+                                  다운로드
+                                </Button>
+                              )}
                               {contract.status !== '서명완료' && contract.status !== '거부' && contract.status !== '무효' && (
                                 <>
                                   <Button
