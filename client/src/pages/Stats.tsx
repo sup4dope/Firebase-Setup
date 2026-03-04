@@ -21,7 +21,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCustomers, getTeams, getUsers, getStatusLogs, getCounselingLogs } from '@/lib/firestore';
+import { getCustomers, getCustomersByTeam, getCustomersByManager, getTeams, getUsers, getStatusLogs, getCounselingLogs } from '@/lib/firestore';
 import type { Customer, Team, User, StatusLog, CounselingLog } from '@shared/types';
 import {
   BarChart,
@@ -92,10 +92,16 @@ export default function Stats() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user) return;
       setLoading(true);
       try {
+        const fetchCustomersByRole = () => {
+          if (isSuperAdmin) return getCustomers();
+          if (isTeamLeader && user.team_id) return getCustomersByTeam(user.team_id);
+          return getCustomersByManager(user.uid);
+        };
         const [fetchedCustomers, fetchedTeams, fetchedUsers, fetchedLogs, fetchedCounselingLogs] = await Promise.all([
-          getCustomers(),
+          fetchCustomersByRole(),
           getTeams(),
           getUsers(),
           getStatusLogs(),
@@ -113,7 +119,7 @@ export default function Stats() {
       }
     };
     fetchData();
-  }, []);
+  }, [user, isSuperAdmin, isTeamLeader]);
 
   // 유효한 팀 목록 (id가 존재하는 팀만)
   const validTeams = useMemo(() => {

@@ -42,7 +42,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
+import { getCustomers, getCustomersByTeam, getCustomersByManager, getUsers, getTeams } from '@/lib/firestore';
 import type { Customer, User as UserType, Team } from '@shared/types';
 
 type PeriodType = 'month' | 'H1' | 'H2' | 'year';
@@ -193,7 +193,7 @@ const getRankBadgeColor = (rank: number): string => {
 };
 
 export default function Rankings() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin, isTeamLeader } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -257,10 +257,16 @@ export default function Rankings() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user) return;
       setLoading(true);
       try {
+        const fetchCustomersByRole = () => {
+          if (isSuperAdmin) return getCustomers();
+          if (isTeamLeader && user.team_id) return getCustomersByTeam(user.team_id);
+          return getCustomersByManager(user.uid);
+        };
         const [fetchedCustomers, fetchedUsers, fetchedTeams] = await Promise.all([
-          getCustomers(),
+          fetchCustomersByRole(),
           getUsers(),
           getTeams(),
         ]);
@@ -274,7 +280,7 @@ export default function Rankings() {
       }
     };
     fetchData();
-  }, []);
+  }, [user, isSuperAdmin, isTeamLeader]);
 
   const periodDates = useMemo(() => {
     const { type, year, month } = parsePeriod(selectedPeriod);
