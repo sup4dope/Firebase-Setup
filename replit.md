@@ -103,7 +103,10 @@ match /contracts_eformsign/{contractId} {
 - **인증 서버**: `https://service.eformsign.com/v2.0/api_auth/access_token`
 - **한국 API 서버**: `https://kr-api.eformsign.com/v2.0/api/...` (인증 응답의 `api_key.company.api_url`에서 동적 취득)
 - **엔드포인트**: `/api/forms` (템플릿), `/api/documents` (문서) — company_id가 URL에 포함되지 않음
-- **계약 레코드 생성**: 서버 측(Admin SDK)에서 `contracts_eformsign` 컬렉션에 직접 저장 (클라이언트 Firestore 보안 규칙 우회)
+- **계약 레코드 생성**: 서버 측(Admin SDK)에서 `contracts_eformsign` 컬렉션에 직접 저장 (클라이언트 Firestore 보안 규칙 우회). 레코드에 `manager_id`, `team_id`, `created_by_uid` 필드 포함
+- **전자계약 권한 필터링**: staff→본인 고객 계약만, team_leader→팀 고객 계약만, super_admin→전체 조회. 레거시 레코드(manager_id/team_id 미저장)는 모든 사용자에게 노출
+- **전자계약 삭제**: super_admin 전용 (`DELETE /api/contracts/:contractId`)
+- **전자계약 상태 표시**: 발송완료→'미열람', 서명대기→'열람완료'(tooltip에 열람 시점), 서명완료→'서명완료'(tooltip에 완료일)
 - **자동 기입 필드**: 계약일자(발송일 YYYY-MM-DD), 상호명(company_name), 사업자번호(business_registration_number), 대표자명(name), 소재지(business_address + detail), 연락처(phone), 계약금(만원→원 변환 + 한글 금액), 자문료율(%)
 - **발송 시 자동 메모**: 고객 memo_history에 `[계약서발송완료]` 메모 추가 (FieldValue.arrayUnion 사용)
 - **계약 유형별 처리**: 템플릿명 기반 자동 판별 — `(pre)`=선불계약→계약완료(선불), `(post)`=후불계약→계약완료(후불), `(out)`=외주계약→계약완료(외주). 서버 `detectContractType()` 함수 + 클라이언트 동일 로직

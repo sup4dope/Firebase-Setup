@@ -2,16 +2,17 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/lib/firebase';
 import { getContracts } from '@/lib/firestore';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ContractSendModal } from '@/components/ContractSendModal';
 import { useToast } from '@/hooks/use-toast';
-import { FileSignature, Search, Plus, RefreshCw, Eye, Loader2 } from 'lucide-react';
+import { FileSignature, Search, Plus, RefreshCw, Trash2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Contract, ContractStatus } from '@shared/types';
 
@@ -32,9 +33,11 @@ export default function Contracts() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sendModalOpen, setSendModalOpen] = useState(false);
-  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const fetchContracts = async () => {
     try {
@@ -62,6 +65,26 @@ export default function Contracts() {
     fetchContracts();
   };
 
+  const handleDelete = async (contractId: string, contractName: string) => {
+    if (!confirm(`"${contractName}" 계약서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+
+    setDeletingId(contractId);
+    try {
+      const res = await authFetch(`/api/contracts/${contractId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: '삭제 완료', description: '계약서가 삭제되었습니다.' });
+        fetchContracts();
+      } else {
+        toast({ title: '삭제 실패', description: data.error || '삭제에 실패했습니다.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      toast({ title: '오류', description: error.message, variant: 'destructive' });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const filteredContracts = useMemo(() => {
     let result = contracts;
 
@@ -71,11 +94,13 @@ export default function Contracts() {
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(c =>
-        c.customer_name.toLowerCase().includes(q) ||
-        c.template_name.toLowerCase().includes(q) ||
-        (c.document_id && c.document_id.toLowerCase().includes(q))
-      );
+      result = result.filter(c => {
+        const representativeName = (c as any).fields?.['대표자명'] || (c as any).fields?.['성명'] || '';
+        return c.customer_name.toLowerCase().includes(q) ||
+          representativeName.toLowerCase().includes(q) ||
+          c.template_name.toLowerCase().includes(q) ||
+          (c.document_id && c.document_id.toLowerCase().includes(q));
+      });
     }
 
     return result;
@@ -99,28 +124,39 @@ export default function Contracts() {
     }
   };
 
-  const handleCheckStatus = async (contract: Contract) => {
-    if (!contract.document_id) {
-      toast({ title: '알림', description: '아직 eformsign에 발송되지 않은 계약서입니다.' });
-      return;
-    }
+  const getStatusDisplayInfo = (contract: Contract) => {
+    const status = contract.status;
+    const badgeInfo = STATUS_BADGE_MAP[status] || STATUS_BADGE_MAP['초안'];
 
-    try {
-      const res = await authFetch(`/api/eformsign/documents/${contract.document_id}`);
-      const data = await res.json();
-      if (data.success) {
-        toast({
-          title: '문서 상태',
-          description: `현재 상태: ${JSON.stringify(data.data?.document?.document_status || data.data?.status || '확인됨')}`,
-        });
-        fetchContracts();
-      } else {
-        toast({ title: '조회 실패', description: data.error, variant: 'destructive' });
-      }
-    } catch (error: any) {
-      toast({ title: '오류', description: error.message, variant: 'destructive' });
+    if (status === '발송완료') {
+      return {
+        label: '미열람',
+        className: badgeInfo.className,
+        tooltip: '상대방이 아직 계약서를 열람하지 않았습니다.',
+      };
     }
+    if (status === '서명대기') {
+      return {
+        label: '열람완료',
+        className: badgeInfo.className,
+        tooltip: contract.sent_at ? `열람 시점: ${formatDate(contract.sent_at)} 이후` : '상대방이 계약서를 열람했습니다.',
+      };
+    }
+    if (status === '서명완료') {
+      return {
+        label: '서명완료',
+        className: badgeInfo.className,
+        tooltip: contract.completed_at ? `서명완료: ${formatDate(contract.completed_at)}` : '서명이 완료되었습니다.',
+      };
+    }
+    return {
+      label: status,
+      className: badgeInfo.className,
+      tooltip: null,
+    };
   };
+
+  const colSpan = isSuperAdmin ? 9 : 8;
 
   if (loading) {
     return (
@@ -194,7 +230,7 @@ export default function Contracts() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="고객명, 계약서명 검색..."
+            placeholder="고객명, 상호명, 계약서명 검색..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -217,76 +253,109 @@ export default function Contracts() {
         </Select>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12 text-center">#</TableHead>
-                <TableHead>고객명</TableHead>
-                <TableHead>계약서명</TableHead>
-                <TableHead className="text-center">상태</TableHead>
-                <TableHead>발송일</TableHead>
-                <TableHead>완료일</TableHead>
-                <TableHead>작성자</TableHead>
-                <TableHead className="text-center w-20">상세</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredContracts.length === 0 ? (
+      <TooltipProvider>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                    {contracts.length === 0
-                      ? '등록된 전자계약이 없습니다. "계약서 발송" 버튼을 눌러 새 계약서를 보내세요.'
-                      : '검색 조건에 맞는 계약서가 없습니다.'}
-                  </TableCell>
+                  <TableHead className="w-12 text-center">No</TableHead>
+                  <TableHead>고객명</TableHead>
+                  <TableHead>상호명</TableHead>
+                  <TableHead>계약서명</TableHead>
+                  <TableHead className="text-center">상태</TableHead>
+                  <TableHead>발송일</TableHead>
+                  <TableHead>완료일</TableHead>
+                  <TableHead>작성자</TableHead>
+                  {isSuperAdmin && <TableHead className="text-center w-16">삭제</TableHead>}
                 </TableRow>
-              ) : (
-                filteredContracts.map((contract, idx) => (
-                  <TableRow key={contract.id} data-testid={`row-contract-${contract.id}`}>
-                    <TableCell className="text-center text-muted-foreground text-sm">
-                      {idx + 1}
-                    </TableCell>
-                    <TableCell className="font-medium" data-testid={`text-customer-name-${contract.id}`}>
-                      {contract.customer_name}
-                    </TableCell>
-                    <TableCell data-testid={`text-template-name-${contract.id}`}>
-                      {contract.template_name}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge
-                        className={STATUS_BADGE_MAP[contract.status]?.className || ''}
-                        data-testid={`badge-status-${contract.id}`}
-                      >
-                        {contract.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(contract.sent_at)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(contract.completed_at)}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {contract.created_by}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCheckStatus(contract)}
-                        data-testid={`button-check-status-${contract.id}`}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {filteredContracts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={colSpan} className="text-center py-12 text-muted-foreground">
+                      {contracts.length === 0
+                        ? '등록된 전자계약이 없습니다. "계약서 발송" 버튼을 눌러 새 계약서를 보내세요.'
+                        : '검색 조건에 맞는 계약서가 없습니다.'}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                ) : (
+                  filteredContracts.map((contract, idx) => {
+                    const statusInfo = getStatusDisplayInfo(contract);
+                    return (
+                      <TableRow key={contract.id} data-testid={`row-contract-${contract.id}`}>
+                        <TableCell className="text-center text-muted-foreground text-sm">
+                          {idx + 1}
+                        </TableCell>
+                        <TableCell className="font-medium" data-testid={`text-customer-name-${contract.id}`}>
+                          {(contract as any).fields?.['대표자명'] || (contract as any).fields?.['성명'] || '-'}
+                        </TableCell>
+                        <TableCell data-testid={`text-company-name-${contract.id}`}>
+                          {contract.customer_name}
+                        </TableCell>
+                        <TableCell data-testid={`text-template-name-${contract.id}`}>
+                          {contract.template_name}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {statusInfo.tooltip ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  className={`${statusInfo.className} cursor-help`}
+                                  data-testid={`badge-status-${contract.id}`}
+                                >
+                                  {statusInfo.label}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">{statusInfo.tooltip}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <Badge
+                              className={statusInfo.className}
+                              data-testid={`badge-status-${contract.id}`}
+                            >
+                              {statusInfo.label}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDate(contract.sent_at)}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDate(contract.completed_at)}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {contract.created_by}
+                        </TableCell>
+                        {isSuperAdmin && (
+                          <TableCell className="text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                              onClick={() => handleDelete(contract.id, contract.template_name)}
+                              disabled={deletingId === contract.id}
+                              data-testid={`button-delete-contract-${contract.id}`}
+                            >
+                              {deletingId === contract.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </TooltipProvider>
 
       <ContractSendModal
         open={sendModalOpen}

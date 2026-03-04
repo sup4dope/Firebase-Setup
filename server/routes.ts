@@ -642,6 +642,9 @@ export async function registerRoutes(
           ? clientCommissionRate
           : (parseFloat(commissionRateRaw) || 0);
 
+        const customerDoc = await firestore.collection('customers').doc(customer_id).get();
+        const customerData = customerDoc.exists ? customerDoc.data() : null;
+
         await firestore.collection('contracts_eformsign').add({
           customer_id,
           customer_name: customer_name || '',
@@ -654,6 +657,9 @@ export async function registerRoutes(
           amount_man_won: amountManWon,
           commission_rate: commissionRate,
           created_by: created_by || req.user?.email || '',
+          created_by_uid: req.user?.uid || '',
+          manager_id: customerData?.manager_id || req.user?.uid || '',
+          team_id: customerData?.team_id || '',
           created_at: now.toISOString(),
         });
         console.log(`[eformsign] contracts_eformsign 레코드 생성 완료: ${documentId}, 계약금: ${amountManWon}만원, 자문료율: ${commissionRate}%`);
@@ -743,11 +749,15 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/contracts", requireAuth, async (req, res) => {
+  app.get("/api/contracts", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const adminApp = getAdminApp();
       const firestore = adminApp.firestore();
       const { customer_id } = req.query;
+
+      const userRole = (req.user as any)?.role || '';
+      const userTeamId = (req.user as any)?.team_id || '';
+      const userUid = req.user?.uid || '';
 
       let snapshot;
       try {
@@ -777,10 +787,20 @@ export async function registerRoutes(
         }
       }
 
-      const contracts = snapshot.docs.map((doc: any) => ({
+      let contracts = snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data(),
       }));
+
+      if (userRole === 'staff') {
+        contracts = contracts.filter((c: any) =>
+          !c.manager_id || c.manager_id === userUid || c.created_by_uid === userUid
+        );
+      } else if (userRole === 'team_leader') {
+        contracts = contracts.filter((c: any) =>
+          !c.team_id || c.team_id === userTeamId || c.created_by_uid === userUid
+        );
+      }
 
       contracts.sort((a: any, b: any) => {
         const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -791,6 +811,32 @@ export async function registerRoutes(
       res.json({ success: true, data: contracts });
     } catch (error: any) {
       console.error("[contracts] 조회 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/contracts/:contractId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userRole = (req.user as any)?.role || '';
+      if (userRole !== 'super_admin') {
+        return res.status(403).json({ success: false, error: '삭제 권한이 없습니다.' });
+      }
+
+      const { contractId } = req.params;
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+
+      const contractDoc = await firestore.collection('contracts_eformsign').doc(contractId).get();
+      if (!contractDoc.exists) {
+        return res.status(404).json({ success: false, error: '계약 레코드를 찾을 수 없습니다.' });
+      }
+
+      await firestore.collection('contracts_eformsign').doc(contractId).delete();
+      console.log(`[contracts] 계약 삭제 완료: ${contractId}`);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[contracts] 삭제 오류:", error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -882,6 +928,9 @@ export async function registerRoutes(
           amount_man_won: contractData.amount_man_won || amountManWon,
           commission_rate: contractData.commission_rate || (parseFloat(commissionRateRaw) || 0),
           created_by: created_by || req.user?.email || '',
+          created_by_uid: req.user?.uid || contractData.created_by_uid || '',
+          manager_id: contractData.manager_id || req.user?.uid || '',
+          team_id: contractData.team_id || '',
           created_at: now.toISOString(),
         });
         console.log(`[eformsign] 재발송 contracts_eformsign 레코드 생성 완료: ${newDocumentId}`);
