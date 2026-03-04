@@ -227,6 +227,8 @@ export function CustomerDetailModal({
   const [customerContracts, setCustomerContracts] = useState<Contract[]>([]);
   const [isLoadingContracts, setIsLoadingContracts] = useState(false);
   const [resendingContractId, setResendingContractId] = useState<string | null>(null);
+  const [syncingContractId, setSyncingContractId] = useState<string | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
   
   // Active tab state for center panel (document viewer, financial analysis, review summary)
   const [activeCenterTab, setActiveCenterTab] = useState<"documents" | "financial" | "summary">("documents");
@@ -3838,7 +3840,52 @@ export function CustomerDetailModal({
                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                         <span className="ml-2 text-sm text-muted-foreground">계약 이력 로딩 중...</span>
                       </div>
-                    ) : customerContracts.length === 0 ? (
+                    ) : customerContracts.length > 0 && customerContracts.some(c => c.status === '발송완료' || c.status === '서명대기') ? (
+                      <div className="flex justify-end mb-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isSyncingAll}
+                          onClick={async () => {
+                            setIsSyncingAll(true);
+                            try {
+                              const { authFetch } = await import('@/lib/firebase');
+                              const res = await authFetch('/api/eformsign/contracts/sync', { method: 'POST' });
+                              const data = await res.json();
+                              if (data.success) {
+                                toast({ title: '동기화 완료', description: `${data.synced || 0}건의 계약 상태가 업데이트되었습니다.` });
+                                if (customer?.id) {
+                                  const contractsRes = await authFetch(`/api/contracts?customer_id=${customer.id}`);
+                                  const contractsData = await contractsRes.json();
+                                  if (contractsData.success) {
+                                    setCustomerContracts(contractsData.data);
+                                  }
+                                }
+                                if (data.synced > 0) {
+                                  window.location.reload();
+                                }
+                              } else {
+                                toast({ title: '동기화 실패', description: data.error || '상태 동기화에 실패했습니다.', variant: 'destructive' });
+                              }
+                            } catch (error: any) {
+                              toast({ title: '오류', description: error.message || '동기화 중 오류가 발생했습니다.', variant: 'destructive' });
+                            } finally {
+                              setIsSyncingAll(false);
+                            }
+                          }}
+                          className="h-6 px-2 text-[10px] gap-1"
+                          data-testid="button-sync-all-contracts"
+                        >
+                          {isSyncingAll ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3" />
+                          )}
+                          전체 상태 동기화
+                        </Button>
+                      </div>
+                    ) : null}
+                    {!isLoadingContracts && customerContracts.length === 0 ? (
                       <div className="text-center text-muted-foreground py-6">
                         <FileSignature className="w-7 h-7 mx-auto mb-1.5 opacity-40" />
                         <p className="text-sm">전자계약 이력이 없습니다</p>
@@ -3872,47 +3919,94 @@ export function CustomerDetailModal({
                                 {contract.status}
                               </Badge>
                               {contract.status !== '서명완료' && contract.status !== '거부' && contract.status !== '무효' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={resendingContractId === contract.id}
-                                  onClick={async () => {
-                                    setResendingContractId(contract.id);
-                                    try {
-                                      const { authFetch } = await import('@/lib/firebase');
-                                      const res = await authFetch(`/api/eformsign/contracts/${contract.id}/resend`, {
-                                        method: 'POST',
-                                      });
-                                      const data = await res.json();
-                                      if (data.success) {
-                                        toast({ title: '재발송 완료', description: '동일한 내용으로 새 계약서가 발송되었습니다.' });
-                                        if (customer?.id) {
-                                          const contractsRes = await authFetch(`/api/contracts?customer_id=${customer.id}`);
-                                          const contractsData = await contractsRes.json();
-                                          if (contractsData.success) {
-                                            setCustomerContracts(contractsData.data);
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={syncingContractId === contract.id}
+                                    onClick={async () => {
+                                      setSyncingContractId(contract.id);
+                                      try {
+                                        const { authFetch } = await import('@/lib/firebase');
+                                        const res = await authFetch(`/api/eformsign/contracts/${contract.id}/sync`, { method: 'POST' });
+                                        const data = await res.json();
+                                        if (data.success) {
+                                          if (data.newStatus && data.newStatus !== data.oldStatus) {
+                                            toast({ title: '상태 변경', description: `${data.oldStatus} → ${data.newStatus}` });
+                                          } else {
+                                            toast({ title: '확인 완료', description: `현재 상태: ${data.currentStatus || contract.status} (변경 없음)` });
                                           }
+                                          if (customer?.id) {
+                                            const contractsRes = await authFetch(`/api/contracts?customer_id=${customer.id}`);
+                                            const contractsData = await contractsRes.json();
+                                            if (contractsData.success) {
+                                              setCustomerContracts(contractsData.data);
+                                            }
+                                          }
+                                          if (data.newStatus === '서명완료') {
+                                            window.location.reload();
+                                          }
+                                        } else {
+                                          toast({ title: '동기화 실패', description: data.error || '상태 확인에 실패했습니다.', variant: 'destructive' });
                                         }
-                                      } else {
-                                        toast({ title: '재발송 실패', description: data.error || '재발송에 실패했습니다.', variant: 'destructive' });
+                                      } catch (error: any) {
+                                        toast({ title: '오류', description: error.message || '동기화 중 오류가 발생했습니다.', variant: 'destructive' });
+                                      } finally {
+                                        setSyncingContractId(null);
                                       }
-                                    } catch (error: any) {
-                                      console.error('Contract resend error:', error);
-                                      toast({ title: '오류', description: error.message || '재발송 중 오류가 발생했습니다.', variant: 'destructive' });
-                                    } finally {
-                                      setResendingContractId(null);
-                                    }
-                                  }}
-                                  className="h-5 px-1.5 text-[10px] gap-0.5"
-                                  data-testid={`button-resend-contract-${contract.id}`}
-                                >
-                                  {resendingContractId === contract.id ? (
-                                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                                  ) : (
-                                    <RefreshCw className="w-2.5 h-2.5" />
-                                  )}
-                                  재발송
-                                </Button>
+                                    }}
+                                    className="h-5 px-1.5 text-[10px] gap-0.5"
+                                    data-testid={`button-sync-contract-${contract.id}`}
+                                  >
+                                    {syncingContractId === contract.id ? (
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="w-2.5 h-2.5" />
+                                    )}
+                                    상태확인
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={resendingContractId === contract.id}
+                                    onClick={async () => {
+                                      setResendingContractId(contract.id);
+                                      try {
+                                        const { authFetch } = await import('@/lib/firebase');
+                                        const res = await authFetch(`/api/eformsign/contracts/${contract.id}/resend`, {
+                                          method: 'POST',
+                                        });
+                                        const data = await res.json();
+                                        if (data.success) {
+                                          toast({ title: '재발송 완료', description: '동일한 내용으로 새 계약서가 발송되었습니다.' });
+                                          if (customer?.id) {
+                                            const contractsRes = await authFetch(`/api/contracts?customer_id=${customer.id}`);
+                                            const contractsData = await contractsRes.json();
+                                            if (contractsData.success) {
+                                              setCustomerContracts(contractsData.data);
+                                            }
+                                          }
+                                        } else {
+                                          toast({ title: '재발송 실패', description: data.error || '재발송에 실패했습니다.', variant: 'destructive' });
+                                        }
+                                      } catch (error: any) {
+                                        console.error('Contract resend error:', error);
+                                        toast({ title: '오류', description: error.message || '재발송 중 오류가 발생했습니다.', variant: 'destructive' });
+                                      } finally {
+                                        setResendingContractId(null);
+                                      }
+                                    }}
+                                    className="h-5 px-1.5 text-[10px] gap-0.5"
+                                    data-testid={`button-resend-contract-${contract.id}`}
+                                  >
+                                    {resendingContractId === contract.id ? (
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                    ) : (
+                                      <Send className="w-2.5 h-2.5" />
+                                    )}
+                                    재발송
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </div>

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { ContractSendModal } from '@/components/ContractSendModal';
 import { useToast } from '@/hooks/use-toast';
-import { FileSignature, Search, Plus, RefreshCw, Eye } from 'lucide-react';
+import { FileSignature, Search, Plus, RefreshCw, Eye, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Contract, ContractStatus } from '@shared/types';
 
@@ -34,6 +34,7 @@ export default function Contracts() {
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const fetchContracts = async () => {
     try {
@@ -142,6 +143,32 @@ export default function Contracts() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={syncing}
+            onClick={async () => {
+              setSyncing(true);
+              try {
+                const res = await authFetch('/api/eformsign/contracts/sync', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                  toast({ title: '동기화 완료', description: `${data.synced || 0}건의 계약 상태가 업데이트되었습니다.` });
+                  fetchContracts();
+                } else {
+                  toast({ title: '동기화 실패', description: data.error || '상태 동기화에 실패했습니다.', variant: 'destructive' });
+                }
+              } catch (error: any) {
+                toast({ title: '오류', description: error.message, variant: 'destructive' });
+              } finally {
+                setSyncing(false);
+              }
+            }}
+            data-testid="button-sync-all-contracts"
+          >
+            {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            상태 동기화
+          </Button>
           <Button
             variant="outline"
             size="sm"

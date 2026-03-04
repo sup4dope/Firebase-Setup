@@ -856,6 +856,208 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/eformsign/contracts/sync", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const admin = getAdminApp();
+      const firestore = admin.firestore();
+
+      const contractsRef = firestore.collection('contracts_eformsign');
+      const pendingSnapshot = await contractsRef
+        .where('status', 'in', ['발송완료', '서명대기'])
+        .get();
+
+      if (pendingSnapshot.empty) {
+        return res.json({ success: true, message: '동기화할 계약이 없습니다.', synced: 0 });
+      }
+
+      let syncedCount = 0;
+      const results: Array<{ documentId: string; oldStatus: string; newStatus: string }> = [];
+
+      for (const contractDoc of pendingSnapshot.docs) {
+        const contractData = contractDoc.data();
+        const documentId = contractData.document_id;
+
+        if (!documentId) continue;
+
+        try {
+          const docInfo = await getDocument(documentId);
+          const eformsignStatus = docInfo?.document?.document_status || docInfo?.document_status || docInfo?.status || '';
+          const mappedStatus = mapEformsignStatus(eformsignStatus);
+
+          console.log(`[eformsign Sync] doc=${documentId}, eformsign_status=${eformsignStatus}, mapped=${mappedStatus}, current=${contractData.status}`);
+
+          if (mappedStatus && mappedStatus !== contractData.status) {
+            const updateData: Record<string, any> = { status: mappedStatus };
+
+            if (mappedStatus === '서명완료') {
+              updateData.completed_at = new Date().toISOString();
+            }
+
+            await contractDoc.ref.update(updateData);
+            syncedCount++;
+            results.push({ documentId, oldStatus: contractData.status, newStatus: mappedStatus });
+
+            if (mappedStatus === '서명완료' && contractData.customer_id) {
+              const customerId = contractData.customer_id;
+              const customerRef = firestore.collection('customers').doc(customerId);
+              const customerSnap = await customerRef.get();
+
+              if (customerSnap.exists) {
+                const now = new Date();
+                const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+                const contractAmountManWon = contractData.amount_man_won || 0;
+                const commissionRateNum = contractData.commission_rate || 0;
+                const previousStatus = customerSnap.data()?.status_code || '';
+
+                const memoContent = `[계약서작성완료] 완료일: ${dateStr} | 계약금: ${contractAmountManWon}만원 | 자문료율: ${commissionRateNum}% | 상태: 계약완료(선불)`;
+                const memoEntry = {
+                  content: memoContent,
+                  author_id: 'system',
+                  author_name: '시스템(eformsign)',
+                  created_at: now.toISOString(),
+                };
+
+                const customerUpdateData: Record<string, any> = {
+                  status_code: '계약완료(선불)',
+                  contract_completion_date: dateStr,
+                  updated_at: now.toISOString(),
+                  memo_history: FieldValue.arrayUnion(memoEntry),
+                  recent_memo: memoContent,
+                  latest_memo: memoContent,
+                };
+
+                if (contractAmountManWon > 0) {
+                  customerUpdateData.approved_amount = contractAmountManWon;
+                }
+                if (commissionRateNum > 0) {
+                  customerUpdateData.commission_rate = commissionRateNum;
+                }
+
+                await customerRef.update(customerUpdateData);
+                console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → 계약완료(선불)`);
+
+                await firestore.collection('status_logs').add({
+                  customer_id: customerId,
+                  customer_name: contractData.customer_name || '',
+                  previous_status: previousStatus,
+                  new_status: '계약완료(선불)',
+                  changed_by_id: 'system',
+                  changed_by_name: '시스템(eformsign)',
+                  changed_at: now.toISOString(),
+                  reason: '전자계약 서명 완료 (수동 동기화)',
+                });
+              }
+            }
+          }
+        } catch (docErr: any) {
+          console.error(`[eformsign Sync] 문서 ${documentId} 상태 조회 실패:`, docErr.message);
+        }
+      }
+
+      console.log(`[eformsign Sync] 동기화 완료: ${syncedCount}건 업데이트`);
+      res.json({ success: true, synced: syncedCount, results });
+    } catch (error: any) {
+      console.error("[eformsign Sync] 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/eformsign/contracts/:contractId/sync", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { contractId } = req.params;
+      const admin = getAdminApp();
+      const firestore = admin.firestore();
+
+      const contractDoc = await firestore.collection('contracts_eformsign').doc(contractId).get();
+      if (!contractDoc.exists) {
+        return res.status(404).json({ success: false, error: '계약 레코드를 찾을 수 없습니다.' });
+      }
+
+      const contractData = contractDoc.data()!;
+      const documentId = contractData.document_id;
+
+      if (!documentId) {
+        return res.status(400).json({ success: false, error: 'document_id가 없습니다.' });
+      }
+
+      const docInfo = await getDocument(documentId);
+      console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, 응답:`, JSON.stringify(docInfo).substring(0, 500));
+      const eformsignStatus = docInfo?.document?.document_status || docInfo?.document_status || docInfo?.status || '';
+      const mappedStatus = mapEformsignStatus(eformsignStatus);
+
+      console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, eformsign_status=${eformsignStatus}, mapped=${mappedStatus}, current=${contractData.status}`);
+
+      if (!mappedStatus || mappedStatus === contractData.status) {
+        return res.json({ success: true, message: '변경 사항 없음', currentStatus: contractData.status, eformsignStatus });
+      }
+
+      const updateData: Record<string, any> = { status: mappedStatus };
+      if (mappedStatus === '서명완료') {
+        updateData.completed_at = new Date().toISOString();
+      }
+      await contractDoc.ref.update(updateData);
+
+      if (mappedStatus === '서명완료' && contractData.customer_id) {
+        const customerId = contractData.customer_id;
+        const customerRef = firestore.collection('customers').doc(customerId);
+        const customerSnap = await customerRef.get();
+
+        if (customerSnap.exists) {
+          const now = new Date();
+          const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+          const contractAmountManWon = contractData.amount_man_won || 0;
+          const commissionRateNum = contractData.commission_rate || 0;
+          const previousStatus = customerSnap.data()?.status_code || '';
+
+          const memoContent = `[계약서작성완료] 완료일: ${dateStr} | 계약금: ${contractAmountManWon}만원 | 자문료율: ${commissionRateNum}% | 상태: 계약완료(선불)`;
+          const memoEntry = {
+            content: memoContent,
+            author_id: 'system',
+            author_name: '시스템(eformsign)',
+            created_at: now.toISOString(),
+          };
+
+          const customerUpdateData: Record<string, any> = {
+            status_code: '계약완료(선불)',
+            contract_completion_date: dateStr,
+            updated_at: now.toISOString(),
+            memo_history: FieldValue.arrayUnion(memoEntry),
+            recent_memo: memoContent,
+            latest_memo: memoContent,
+          };
+
+          if (contractAmountManWon > 0) {
+            customerUpdateData.approved_amount = contractAmountManWon;
+          }
+          if (commissionRateNum > 0) {
+            customerUpdateData.commission_rate = commissionRateNum;
+          }
+
+          await customerRef.update(customerUpdateData);
+          console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → 계약완료(선불)`);
+
+          await firestore.collection('status_logs').add({
+            customer_id: customerId,
+            customer_name: contractData.customer_name || '',
+            previous_status: previousStatus,
+            new_status: '계약완료(선불)',
+            changed_by_id: 'system',
+            changed_by_name: '시스템(eformsign)',
+            changed_at: now.toISOString(),
+            reason: '전자계약 서명 완료 (수동 동기화)',
+          });
+        }
+      }
+
+      res.json({ success: true, oldStatus: contractData.status, newStatus: mappedStatus, eformsignStatus });
+    } catch (error: any) {
+      console.error("[eformsign Sync] 개별 동기화 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Webhook - eformsign에서 호출 (인증 없음)
   app.post("/api/eformsign/webhook", async (req, res) => {
     try {

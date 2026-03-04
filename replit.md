@@ -108,3 +108,9 @@ match /contracts_eformsign/{contractId} {
 - **발송 시 자동 메모**: 고객 memo_history에 `[계약서발송완료]` 메모 추가 (FieldValue.arrayUnion 사용)
 - **Webhook 완료 처리**: `doc_complete` → 고객 status_code를 "계약완료(선불)"로 변경, approved_amount/commission_rate 동기화, status_logs 생성
 - **금액 저장**: contract 레코드에 `amount_man_won`(만원 단위 숫자)과 `commission_rate`(숫자)를 별도 저장하여 Webhook에서 안정적으로 사용
+- **계약금 자동 포맷팅**: 만원 단위 숫자 입력(예: 50) → `"500,000 (금 오십만 원)"` 형태로 자동 변환 (클라이언트 + 서버 양쪽 적용)
+- **수동 상태 동기화**: Webhook 미수신 시 eformsign API에서 직접 문서 상태를 조회하여 Firestore 동기화
+  - `POST /api/eformsign/contracts/sync` — 미완료 계약 전체 동기화
+  - `POST /api/eformsign/contracts/:contractId/sync` — 개별 계약 동기화
+  - 서명완료 감지 시 고객 상태 자동 변경(→ 계약완료(선불)), 메모/상태로그 생성
+- **재발송 기능**: `POST /api/eformsign/contracts/:contractId/resend` — Firestore 계약 데이터 기반 새 문서 자동 생성
