@@ -172,8 +172,15 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
       const amountManWon = selectedCustomer.approved_amount || 0;
       const formattedAmount = amountManWon > 0 ? formatContractAmount(amountManWon) : '';
 
+      const fullAddress = [selectedCustomer.business_address, selectedCustomer.business_address_detail].filter(Boolean).join(' ');
+
       const autoFields: FieldMapping[] = [
         { id: '계약일자', value: todayStr, label: '계약일자', autoFilled: true },
+        { id: '상호명', value: selectedCustomer.company_name || '', label: '상호명', autoFilled: true },
+        { id: '사업자번호', value: selectedCustomer.business_registration_number || '', label: '사업자번호', autoFilled: true },
+        { id: '대표자명', value: selectedCustomer.name || '', label: '대표자명', autoFilled: true },
+        { id: '소재지', value: fullAddress, label: '소재지', autoFilled: true },
+        { id: '연락처', value: selectedCustomer.phone || '', label: '연락처', autoFilled: true },
         { id: '계약금', value: formattedAmount, label: '계약금', autoFilled: true },
         { id: '자문료율', value: selectedCustomer.commission_rate ? String(selectedCustomer.commission_rate) : '', label: '자문료율(%)', autoFilled: true },
       ];
