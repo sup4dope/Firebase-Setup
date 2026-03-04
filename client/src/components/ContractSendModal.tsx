@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { authFetch } from '@/lib/firebase';
 import { getCustomers, createContract } from '@/lib/firestore';
 import {
   Dialog,
@@ -90,12 +91,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
   const fetchTemplates = async () => {
     setTemplatesLoading(true);
     try {
-      const token = await user?.getIdToken?.();
-      if (!token) throw new Error('인증 토큰이 없습니다.');
-
-      const res = await fetch('/api/eformsign/templates', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await authFetch('/api/eformsign/templates');
       const data = await res.json();
 
       if (data.success && data.data) {
@@ -175,9 +171,6 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
 
     setSending(true);
     try {
-      const token = await user.getIdToken?.();
-      if (!token) throw new Error('인증 토큰이 없습니다.');
-
       const apiFields = fields
         .filter(f => f.value.trim())
         .map(f => ({ id: f.id, value: f.value }));
@@ -200,11 +193,10 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
         recipients.push({ step_idx: 1, recipient });
       }
 
-      const res = await fetch('/api/eformsign/documents', {
+      const res = await authFetch('/api/eformsign/documents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           template_id: selectedTemplate.id,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { authFetch } from '@/lib/firebase';
 import { getContracts } from '@/lib/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -104,12 +105,7 @@ export default function Contracts() {
     }
 
     try {
-      const token = await user?.getIdToken?.();
-      if (!token) return;
-
-      const res = await fetch(`/api/eformsign/documents/${contract.document_id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await authFetch(`/api/eformsign/documents/${contract.document_id}`);
       const data = await res.json();
       if (data.success) {
         toast({
