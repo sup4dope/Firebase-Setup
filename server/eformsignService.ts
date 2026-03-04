@@ -1,16 +1,25 @@
 import crypto from 'crypto';
+import jsrsasign from 'jsrsasign';
 
 const API_KEY = process.env.EFORMSIGN_API_KEY || '';
 const SECRET_KEY = process.env.EFORMSIGN_SECRET_KEY || '';
 const COMPANY_ID = process.env.EFORMSIGN_COMPANY_ID || '';
-const BASE_URL = 'https://api.eformsign.com/v2.0';
+const AUTH_URL = 'https://service.eformsign.com/v2.0';
 
-let cachedToken: { token: string; expiresAt: number } | null = null;
+let cachedToken: { token: string; apiUrl: string; expiresAt: number } | null = null;
 
-function generateSignature(executionTime: string): string {
-  const hmac = crypto.createHmac('sha256', SECRET_KEY);
-  hmac.update(executionTime);
-  return hmac.digest('base64');
+function hexKeyToPem(hexKey: string): string {
+  const b64Key = Buffer.from(hexKey, 'hex').toString('base64');
+  const lines = b64Key.match(/.{1,64}/g) || [];
+  return `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`;
+}
+
+function generateEcdsaSignature(executionTime: string): string {
+  const pem = hexKeyToPem(SECRET_KEY);
+  const sig = new jsrsasign.KJUR.crypto.Signature({ alg: 'SHA256withECDSA' });
+  sig.init(pem);
+  sig.updateString(executionTime);
+  return sig.sign();
 }
 
 export async function getAccessToken(): Promise<string> {
@@ -19,14 +28,19 @@ export async function getAccessToken(): Promise<string> {
   }
 
   const executionTime = String(Date.now());
-  const signature = generateSignature(executionTime);
+  const signature = generateEcdsaSignature(executionTime);
+  const apiKeyBase64 = Buffer.from(API_KEY).toString('base64');
 
-  const response = await fetch(`${BASE_URL}/api_auth/access_token`, {
+  console.log('[eformsign] Access Token 요청 시작...');
+
+  const tokenUrl = `${AUTH_URL}/api_auth/access_token`;
+
+  const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'eformsign_signature': `Bearer ${signature}`,
-      'Authorization': `Bearer ${API_KEY}`,
+      'eformsign_signature': signature,
+      'Authorization': `Bearer ${apiKeyBase64}`,
     },
     body: JSON.stringify({
       execution_time: executionTime,
@@ -34,32 +48,48 @@ export async function getAccessToken(): Promise<string> {
     }),
   });
 
+  const responseText = await response.text();
+
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[eformsign] Access Token 발급 실패:', response.status, errorText);
-    throw new Error(`eformsign Access Token 발급 실패: ${response.status} ${errorText}`);
+    console.error('[eformsign] Access Token 발급 실패:', response.status, responseText);
+    throw new Error(`eformsign Access Token 발급 실패: ${response.status} ${responseText}`);
   }
 
-  const data = await response.json();
+  let data: any;
+  try {
+    data = JSON.parse(responseText);
+  } catch (e) {
+    throw new Error(`eformsign 토큰 응답 파싱 실패: ${responseText.substring(0, 200)}`);
+  }
+
   const token = data.oauth_token?.access_token || data.access_token;
   if (!token) {
     console.error('[eformsign] 토큰 응답 구조:', JSON.stringify(data));
     throw new Error('eformsign Access Token이 응답에 없습니다.');
   }
 
+  const apiUrl = data.api_key?.company?.api_url || `https://kr-api.eformsign.com`;
   const expiresIn = data.oauth_token?.expires_in || data.expires_in || 3600;
   cachedToken = {
     token,
+    apiUrl,
     expiresAt: Date.now() + expiresIn * 1000,
   };
 
-  console.log('[eformsign] Access Token 발급 성공, 만료:', new Date(cachedToken.expiresAt).toISOString());
+  console.log('[eformsign] Access Token 발급 성공, API URL:', apiUrl, ', 만료:', new Date(cachedToken.expiresAt).toISOString());
   return token;
+}
+
+function getApiBaseUrl(): string {
+  return cachedToken?.apiUrl || 'https://kr-api.eformsign.com';
 }
 
 async function apiRequest(method: string, path: string, body?: any): Promise<any> {
   const token = await getAccessToken();
-  const url = `${BASE_URL}/api/${COMPANY_ID}${path}`;
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/v2.0/api/${COMPANY_ID}${path}`;
+
+  console.log(`[eformsign] API 요청: ${method} ${url}`);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -72,18 +102,19 @@ async function apiRequest(method: string, path: string, body?: any): Promise<any
   }
 
   const response = await fetch(url, options);
+  const responseText = await response.text();
+  console.log(`[eformsign] API 응답: ${method} ${path} → status=${response.status}, body=${responseText.substring(0, 500)}`);
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[eformsign] API 오류 ${method} ${path}:`, response.status, errorText);
-    throw new Error(`eformsign API 오류: ${response.status} ${errorText}`);
+    console.error(`[eformsign] API 오류 ${method} ${path}:`, response.status, responseText);
+    throw new Error(`eformsign API 오류: ${response.status} ${responseText}`);
   }
 
-  const contentType = response.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
-    return response.json();
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return responseText;
   }
-  return response.text();
 }
 
 export async function getTemplates(): Promise<any> {
