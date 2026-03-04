@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import jsrsasign from 'jsrsasign';
 
 const API_KEY = process.env.EFORMSIGN_API_KEY || '';
@@ -9,18 +8,12 @@ const AUTH_URL = 'https://service.eformsign.com/v2.0';
 
 let cachedToken: { token: string; apiUrl: string; expiresAt: number } | null = null;
 
-function hexKeyToPem(hexKey: string): string {
-  const b64Key = Buffer.from(hexKey, 'hex').toString('base64');
-  const lines = b64Key.match(/.{1,64}/g) || [];
-  return `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`;
-}
-
 function generateEcdsaSignature(executionTime: string): string {
-  const pem = hexKeyToPem(SECRET_KEY);
-  const sig = new jsrsasign.KJUR.crypto.Signature({ alg: 'SHA256withECDSA' });
-  sig.init(pem);
-  sig.updateString(executionTime);
-  return sig.sign();
+  const privateKey = jsrsasign.KEYUTIL.getKeyFromPlainPrivatePKCS8Hex(SECRET_KEY);
+  const s_sig = new jsrsasign.KJUR.crypto.Signature({ alg: 'SHA256withECDSA' });
+  s_sig.init(privateKey);
+  s_sig.updateString(executionTime);
+  return s_sig.sign();
 }
 
 export async function getAccessToken(): Promise<string> {
@@ -130,37 +123,41 @@ export async function createDocument(templateId: string, documentData: {
   document_name?: string;
   fields?: Array<{ id: string; value: string }>;
   recipients?: {
-    step_idx: number;
-    recipient: {
-      id: string;
+    step_type?: string;
+    use_mail?: boolean;
+    use_sms?: boolean;
+    member?: {
       name: string;
-      email?: string;
+      id: string;
       sms?: { country_code: string; phone_number: string };
-      use_sms?: boolean;
-      use_email?: boolean;
+    };
+    auth?: {
+      password?: string;
+      password_hint?: string;
+      valid?: { day: number; hour: number };
     };
   }[];
   comment?: string;
 }): Promise<any> {
-  const body: any = {};
+  const document: any = {};
 
   if (documentData.document_name) {
-    body.document_name = documentData.document_name;
-  }
-
-  if (documentData.fields && documentData.fields.length > 0) {
-    body.fields = documentData.fields;
-  }
-
-  if (documentData.recipients && documentData.recipients.length > 0) {
-    body.recipients = documentData.recipients;
+    document.document_name = documentData.document_name;
   }
 
   if (documentData.comment) {
-    body.comment = documentData.comment;
+    document.comment = documentData.comment;
   }
 
-  return apiRequest('POST', `/forms/${templateId}/api_documents`, body);
+  if (documentData.recipients && documentData.recipients.length > 0) {
+    document.recipients = documentData.recipients;
+  }
+
+  if (documentData.fields && documentData.fields.length > 0) {
+    document.fields = documentData.fields;
+  }
+
+  return apiRequest('POST', `/forms/${templateId}/documents`, { document });
 }
 
 export async function getDocument(documentId: string): Promise<any> {

@@ -177,20 +177,23 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
 
       const recipients: any[] = [];
       if (recipientEmail || recipientPhone) {
-        const recipient: any = {
-          id: recipientEmail || recipientPhone,
+        const member: any = {
           name: recipientName || selectedCustomer.name,
+          id: recipientEmail || `${recipientPhone.replace(/-/g, '')}@phone.eformsign`,
         };
-        if (recipientEmail) {
-          recipient.email = recipientEmail;
-          recipient.use_email = true;
-        }
         if (recipientPhone) {
-          const cleanPhone = recipientPhone.replace(/-/g, '');
-          recipient.sms = { country_code: '+82', phone_number: cleanPhone };
-          recipient.use_sms = true;
+          member.sms = { country_code: '+82', phone_number: recipientPhone.replace(/-/g, '') };
         }
-        recipients.push({ step_idx: 1, recipient });
+        const recipientObj: any = {
+          step_type: '05',
+          use_mail: !!recipientEmail,
+          use_sms: !!recipientPhone,
+          member,
+          auth: {
+            valid: { day: 7, hour: 0 },
+          },
+        };
+        recipients.push(recipientObj);
       }
 
       const res = await authFetch('/api/eformsign/documents', {

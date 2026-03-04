@@ -531,7 +531,7 @@ export async function registerRoutes(
       const result = await createDocument(template_id, {
         document_name,
         fields,
-        recipients,
+        recipients: recipients || [],
         comment,
       });
 
