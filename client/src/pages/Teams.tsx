@@ -11,6 +11,7 @@ import {
   updateTeam,
   deleteTeam,
   updateUser,
+  updateCustomersTeamByManager,
 } from '@/lib/firestore';
 import { authFetch } from '@/lib/firebase';
 import type { Team, User, UserRole } from '@shared/types';
@@ -175,12 +176,13 @@ export default function Teams() {
       await updateUser(userId, { team_id: teamId || null, team_name: teamName || null });
       const targetUser = users.find(u => u.uid === userId);
       await syncCustomClaims(userId, targetUser?.role || 'staff', teamId || '');
+      const updatedCount = await updateCustomersTeamByManager(userId, teamId || '', teamName || '');
       setUsers(prev => prev.map(u => 
         u.uid === userId ? { ...u, team_id: teamId || null, team_name: teamName || null } : u
       ));
       toast({
         title: '성공',
-        description: '사용자 팀이 변경되었습니다. (Claims 동기화 완료)',
+        description: `사용자 팀이 변경되었습니다. (담당 고객 ${updatedCount}건 소급 적용)`,
       });
     } catch (error) {
       console.error('Error updating user team:', error);

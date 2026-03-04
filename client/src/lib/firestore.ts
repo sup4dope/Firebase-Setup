@@ -109,6 +109,27 @@ export const updateUser = async (uid: string, data: Partial<User>): Promise<void
   await updateDoc(doc(db, 'users', uid), data);
 };
 
+export const updateCustomersTeamByManager = async (
+  managerId: string,
+  newTeamId: string,
+  newTeamName: string
+): Promise<number> => {
+  const q = query(collection(db, 'customers'), where('manager_id', '==', managerId));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return 0;
+
+  const batch = writeBatch(db);
+  snapshot.docs.forEach(docSnap => {
+    batch.update(doc(db, 'customers', docSnap.id), {
+      team_id: newTeamId,
+      team_name: newTeamName,
+      updated_at: Timestamp.now(),
+    });
+  });
+  await batch.commit();
+  return snapshot.size;
+};
+
 // 로그인 이력 업데이트 (최근 5개 유지)
 export const updateLoginHistory = async (
   userDocId: string,
