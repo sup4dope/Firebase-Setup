@@ -192,14 +192,14 @@ export async function getDocument(documentId: string): Promise<any> {
 
 export async function downloadDocument(documentId: string): Promise<{ buffer: Buffer; contentType: string; fileName: string }> {
   const { token, apiUrl } = await getTokenAndUrl();
-  const url = `${apiUrl}/api/documents/${documentId}/download`;
+  const url = `${apiUrl}/v2.0/api/documents/${documentId}/download_files?file_type=document`;
   console.log(`[eformsign] 문서 다운로드 요청: GET ${url}`);
 
   const response = await fetch(url, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      'access_token': token,
     },
   });
 
