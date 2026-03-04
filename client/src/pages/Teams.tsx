@@ -12,7 +12,25 @@ import {
   deleteTeam,
   updateUser,
 } from '@/lib/firestore';
+import { authFetch } from '@/lib/firebase';
 import type { Team, User, UserRole } from '@shared/types';
+
+const syncCustomClaims = async (uid: string, role: string, team_id: string) => {
+  try {
+    const res = await authFetch('/api/admin/set-custom-claims', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, role, team_id }),
+    });
+    if (res.ok) {
+      console.log(`✅ Claims 동기화 완료: ${uid} -> role: ${role}, team_id: ${team_id}`);
+    } else {
+      console.error('❌ Claims 동기화 실패:', await res.text());
+    }
+  } catch (e) {
+    console.error('❌ Claims 동기화 오류:', e);
+  }
+};
 
 export default function Teams() {
   const { user, isSuperAdmin, isTeamLeader } = useAuth();
@@ -135,10 +153,12 @@ export default function Teams() {
   const handleUpdateUserRole = async (userId: string, role: UserRole) => {
     try {
       await updateUser(userId, { role });
+      const targetUser = users.find(u => u.uid === userId);
+      await syncCustomClaims(userId, role, targetUser?.team_id || '');
       setUsers(prev => prev.map(u => u.uid === userId ? { ...u, role } : u));
       toast({
         title: '성공',
-        description: '사용자 권한이 변경되었습니다.',
+        description: '사용자 권한이 변경되었습니다. (Claims 동기화 완료)',
       });
     } catch (error) {
       console.error('Error updating user role:', error);
@@ -153,12 +173,14 @@ export default function Teams() {
   const handleUpdateUserTeam = async (userId: string, teamId: string, teamName: string) => {
     try {
       await updateUser(userId, { team_id: teamId || null, team_name: teamName || null });
+      const targetUser = users.find(u => u.uid === userId);
+      await syncCustomClaims(userId, targetUser?.role || 'staff', teamId || '');
       setUsers(prev => prev.map(u => 
         u.uid === userId ? { ...u, team_id: teamId || null, team_name: teamName || null } : u
       ));
       toast({
         title: '성공',
-        description: '사용자 팀이 변경되었습니다.',
+        description: '사용자 팀이 변경되었습니다. (Claims 동기화 완료)',
       });
     } catch (error) {
       console.error('Error updating user team:', error);

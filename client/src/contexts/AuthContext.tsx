@@ -229,6 +229,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
           userData = userDocSnap.data() as User;
         }
         
+        // Claims와 Firestore 데이터 불일치 시 자동 갱신
+        const currentClaims = (await fbUser.getIdTokenResult()).claims;
+        if (userData.role && (currentClaims.role !== userData.role || currentClaims.team_id !== (userData.team_id || ''))) {
+          console.log(`🔄 Claims 불일치 감지 - Claims: role=${currentClaims.role}, team_id=${currentClaims.team_id} / Firestore: role=${userData.role}, team_id=${userData.team_id}`);
+          try {
+            const syncRes = await authFetch('/api/auth/init-claims', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            if (syncRes.ok) {
+              await fbUser.getIdToken(true);
+              console.log('✅ Claims 자동 동기화 완료');
+            }
+          } catch (syncErr) {
+            console.error('⚠️ Claims 자동 동기화 실패:', syncErr);
+          }
+        }
+
         // 퇴직자 체크
         if (userData.status === '퇴사') {
           await handleRetiredLogout();
