@@ -213,11 +213,46 @@ export async function getDocuments(queryParams?: {
 }
 
 export async function resendDocument(documentId: string): Promise<any> {
-  return apiRequest('POST', `/documents/${documentId}/re_request_outsider`, {
+  const docInfo = await getDocument(documentId);
+  console.log('[eformsign] 문서 조회 결과:', JSON.stringify(docInfo).substring(0, 2000));
+
+  const currentStatus = docInfo?.current_status;
+  console.log('[eformsign] current_status:', JSON.stringify(currentStatus));
+
+  let stepType = currentStatus?.step_type || '05';
+  let stepSeq = String(currentStatus?.step_index || '2');
+
+  const stepRecipients = currentStatus?.step_recipients || [];
+  const recipientInfo = stepRecipients[0];
+
+  const nextStep: any = {
+    step_type: stepType,
+    step_seq: stepSeq,
+    comment: '계약서 재요청입니다.'
+  };
+
+  if (recipientInfo) {
+    nextStep.recipients = [
+      {
+        member: {
+          name: recipientInfo.name,
+          id: recipientInfo.email,
+          ...(recipientInfo.sms ? { sms: recipientInfo.sms } : {})
+        },
+        use_mail: false,
+        use_sms: true
+      }
+    ];
+  }
+
+  const body: any = {
     input: {
-      next_steps: []
+      next_steps: [nextStep]
     }
-  });
+  };
+
+  console.log('[eformsign] 재요청 body:', JSON.stringify(body));
+  return apiRequest('POST', `/documents/${documentId}/re_request_outsider`, body);
 }
 
 export async function deleteDocument(documentId: string): Promise<any> {
