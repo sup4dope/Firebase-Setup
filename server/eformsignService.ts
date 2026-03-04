@@ -1,10 +1,28 @@
 import jsrsasign from 'jsrsasign';
+import fs from 'fs';
+import path from 'path';
 
 const API_KEY = process.env.EFORMSIGN_API_KEY || '';
 const SECRET_KEY = process.env.EFORMSIGN_SECRET_KEY || '';
 const COMPANY_ID = process.env.EFORMSIGN_COMPANY_ID || '';
 const MEMBER_ID = 'yieumgroup@gmail.com';
 const AUTH_URL = 'https://service.eformsign.com/v2.0';
+
+let cachedStampDataUri: string | null = null;
+
+function getCompanyStampDataUri(): string {
+  if (cachedStampDataUri) return cachedStampDataUri;
+  try {
+    const stampPath = path.join(process.cwd(), 'server', 'assets', 'company_stamp.png');
+    const stampBuffer = fs.readFileSync(stampPath);
+    cachedStampDataUri = `data:image/png;base64,${stampBuffer.toString('base64')}`;
+    console.log('[eformsign] 회사 도장 이미지 로드 성공');
+    return cachedStampDataUri;
+  } catch (error: any) {
+    console.error('[eformsign] 회사 도장 이미지 로드 실패:', error.message);
+    return '';
+  }
+}
 
 let cachedToken: { token: string; apiUrl: string; expiresAt: number } | null = null;
 
@@ -153,8 +171,16 @@ export async function createDocument(templateId: string, documentData: {
     document.recipients = documentData.recipients;
   }
 
-  if (documentData.fields && documentData.fields.length > 0) {
-    document.fields = documentData.fields;
+  const allFields = [...(documentData.fields || [])];
+
+  const stampDataUri = getCompanyStampDataUri();
+  if (stampDataUri) {
+    allFields.push({ id: '회사 도장 1', value: stampDataUri });
+    console.log('[eformsign] 회사 도장 필드 자동 추가됨');
+  }
+
+  if (allFields.length > 0) {
+    document.fields = allFields;
   }
 
   return apiRequest('POST', `/documents?template_id=${encodeURIComponent(templateId)}`, { document });
