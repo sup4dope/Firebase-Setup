@@ -169,8 +169,8 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
       const now = new Date();
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-      const amountManWon = selectedCustomer.approved_amount || 0;
-      const formattedAmount = amountManWon > 0 ? formatContractAmount(amountManWon) : '';
+      const amountManWon = selectedCustomer.approved_amount || 50;
+      const commissionRate = selectedCustomer.commission_rate || 5;
 
       const fullAddress = [selectedCustomer.business_address, selectedCustomer.business_address_detail].filter(Boolean).join(' ');
 
@@ -181,8 +181,8 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
         { id: '대표자명', value: selectedCustomer.name || '', label: '대표자명', autoFilled: true },
         { id: '소재지', value: fullAddress, label: '소재지', autoFilled: true },
         { id: '연락처', value: selectedCustomer.phone || '', label: '연락처', autoFilled: true },
-        { id: '계약금', value: formattedAmount, label: '계약금', autoFilled: true },
-        { id: '자문료율', value: selectedCustomer.commission_rate ? String(selectedCustomer.commission_rate) : '', label: '자문료율(%)', autoFilled: true },
+        { id: '계약금', value: String(amountManWon), label: '계약금(만원)', autoFilled: false },
+        { id: '자문료율', value: String(commissionRate), label: '자문료율(%)', autoFilled: false },
       ];
       setFields(autoFields);
       setDocumentName(`${selectedCustomer.company_name || selectedCustomer.name}_경영지원자문 계약서`);
@@ -460,30 +460,33 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
                 </div>
                 <ScrollArea className="max-h-[250px]">
                   <div className="space-y-2">
-                    {fields.map((field, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        {field.autoFilled ? (
-                          <Label className="w-32 text-xs text-muted-foreground flex items-center gap-1 shrink-0">
-                            {field.label}
-                            <Badge variant="outline" className="text-[10px] px-1 py-0">자동</Badge>
-                          </Label>
-                        ) : (
+                    {fields.map((field, idx) => {
+                      const isKnownField = ['계약일자','상호명','사업자번호','대표자명','소재지','연락처','계약금','자문료율'].includes(field.id);
+                      return (
+                        <div key={idx} className="flex items-center gap-2">
+                          {isKnownField ? (
+                            <Label className="w-32 text-xs text-muted-foreground flex items-center gap-1 shrink-0">
+                              {field.label}
+                              {field.autoFilled && <Badge variant="outline" className="text-[10px] px-1 py-0">자동</Badge>}
+                            </Label>
+                          ) : (
+                            <Input
+                              className="w-32 text-xs shrink-0"
+                              value={field.label}
+                              onChange={(e) => handleCustomFieldLabelChange(idx, e.target.value)}
+                              placeholder="변수명"
+                            />
+                          )}
                           <Input
-                            className="w-32 text-xs shrink-0"
-                            value={field.label}
-                            onChange={(e) => handleCustomFieldLabelChange(idx, e.target.value)}
-                            placeholder="변수명"
+                            className="flex-1"
+                            value={field.value}
+                            onChange={(e) => handleFieldChange(idx, e.target.value)}
+                            placeholder={field.label || '값 입력'}
+                            data-testid={`input-field-${field.id}`}
                           />
-                        )}
-                        <Input
-                          className="flex-1"
-                          value={field.value}
-                          onChange={(e) => handleFieldChange(idx, e.target.value)}
-                          placeholder={field.label || '값 입력'}
-                          data-testid={`input-field-${field.id}`}
-                        />
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               </div>
