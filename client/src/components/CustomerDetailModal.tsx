@@ -4575,9 +4575,13 @@ export function CustomerDetailModal({
           onSuccess={async () => {
             toast({ title: '성공', description: '전자계약이 발송되었습니다.' });
             if (customer?.id) {
-              const contracts = await getContractsByCustomer(customer.id);
-              setCustomerContracts(contracts);
-              setActiveBottomTab("contracts");
+              try {
+                const contracts = await getContractsByCustomer(customer.id);
+                setCustomerContracts(contracts);
+                setActiveBottomTab("contracts");
+              } catch (error) {
+                console.error("Error loading contracts after send:", error);
+              }
             }
           }}
         />

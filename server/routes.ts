@@ -645,21 +645,43 @@ export async function registerRoutes(
       const { customer_id } = req.query;
 
       let snapshot;
-      if (customer_id) {
-        snapshot = await firestore.collection('contracts_eformsign')
-          .where('customer_id', '==', customer_id)
-          .orderBy('created_at', 'desc')
-          .get();
-      } else {
-        snapshot = await firestore.collection('contracts_eformsign')
-          .orderBy('created_at', 'desc')
-          .get();
+      try {
+        if (customer_id) {
+          snapshot = await firestore.collection('contracts_eformsign')
+            .where('customer_id', '==', customer_id)
+            .orderBy('created_at', 'desc')
+            .get();
+        } else {
+          snapshot = await firestore.collection('contracts_eformsign')
+            .orderBy('created_at', 'desc')
+            .get();
+        }
+      } catch (indexError: any) {
+        if (indexError.code === 9 || indexError.message?.includes('index')) {
+          console.warn('[contracts] 복합 인덱스 미생성 - fallback 쿼리 사용');
+          if (customer_id) {
+            snapshot = await firestore.collection('contracts_eformsign')
+              .where('customer_id', '==', customer_id as string)
+              .get();
+          } else {
+            snapshot = await firestore.collection('contracts_eformsign')
+              .get();
+          }
+        } else {
+          throw indexError;
+        }
       }
 
       const contracts = snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data(),
       }));
+
+      contracts.sort((a: any, b: any) => {
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bTime - aTime;
+      });
 
       res.json({ success: true, data: contracts });
     } catch (error: any) {
