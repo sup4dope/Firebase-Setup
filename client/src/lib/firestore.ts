@@ -49,6 +49,9 @@ import type {
   LeaveStatus,
   LeaveSummary,
   ProcessingOrg,
+  Contract,
+  InsertContract,
+  ContractStatus,
 } from '@shared/types';
 // STATUS_LABELS removed - using Korean status names directly
 
@@ -2907,4 +2910,108 @@ export const updateUserLeaveQuota = async (userId: string, totalLeave: number): 
     totalLeave,
     updated_at: Timestamp.now(),
   });
+};
+
+// ============================================
+// 전자계약 (eformsign) CRUD
+// ============================================
+
+export const createContract = async (contract: InsertContract): Promise<Contract> => {
+  const now = Timestamp.now();
+  const docData: Record<string, any> = {
+    ...contract,
+    created_at: now,
+  };
+  if (contract.sent_at) {
+    docData.sent_at = Timestamp.fromDate(contract.sent_at instanceof Date ? contract.sent_at : new Date(contract.sent_at));
+  }
+  if (contract.completed_at) {
+    docData.completed_at = Timestamp.fromDate(contract.completed_at instanceof Date ? contract.completed_at : new Date(contract.completed_at));
+  }
+
+  const docRef = await addDoc(collection(db, 'contracts_eformsign'), docData);
+  return {
+    id: docRef.id,
+    ...contract,
+    created_at: now.toDate(),
+  };
+};
+
+export const getContracts = async (): Promise<Contract[]> => {
+  const q = query(collection(db, 'contracts_eformsign'), orderBy('created_at', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      ...data,
+      id: docSnap.id,
+      created_at: toDate(data.created_at),
+      sent_at: data.sent_at ? toDate(data.sent_at) : undefined,
+      completed_at: data.completed_at ? toDate(data.completed_at) : undefined,
+    } as Contract;
+  });
+};
+
+export const getContractsByCustomer = async (customerId: string): Promise<Contract[]> => {
+  try {
+    const q = query(
+      collection(db, 'contracts_eformsign'),
+      where('customer_id', '==', customerId),
+      orderBy('created_at', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      return {
+        ...data,
+        id: docSnap.id,
+        created_at: toDate(data.created_at),
+        sent_at: data.sent_at ? toDate(data.sent_at) : undefined,
+        completed_at: data.completed_at ? toDate(data.completed_at) : undefined,
+      } as Contract;
+    });
+  } catch (error: any) {
+    if (error?.message?.includes('requires an index')) {
+      console.warn('[Firestore] contracts_eformsign customer_id+created_at 복합 인덱스 미생성 - 클라이언트 정렬');
+      const q = query(
+        collection(db, 'contracts_eformsign'),
+        where('customer_id', '==', customerId)
+      );
+      const snapshot = await getDocs(q);
+      const results = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          created_at: toDate(data.created_at),
+          sent_at: data.sent_at ? toDate(data.sent_at) : undefined,
+          completed_at: data.completed_at ? toDate(data.completed_at) : undefined,
+        } as Contract;
+      });
+      return results.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+    }
+    throw error;
+  }
+};
+
+export const updateContractStatus = async (
+  contractId: string,
+  status: ContractStatus,
+  additionalData?: Partial<Contract>
+): Promise<void> => {
+  const updateData: Record<string, any> = { status };
+  if (additionalData?.completed_at) {
+    updateData.completed_at = Timestamp.fromDate(
+      additionalData.completed_at instanceof Date ? additionalData.completed_at : new Date(additionalData.completed_at as any)
+    );
+  }
+  if (additionalData?.sent_at) {
+    updateData.sent_at = Timestamp.fromDate(
+      additionalData.sent_at instanceof Date ? additionalData.sent_at : new Date(additionalData.sent_at as any)
+    );
+  }
+  if (additionalData?.document_id) {
+    updateData.document_id = additionalData.document_id;
+  }
+  await updateDoc(doc(db, 'contracts_eformsign', contractId), updateData);
 };

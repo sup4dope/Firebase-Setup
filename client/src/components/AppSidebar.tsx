@@ -38,6 +38,7 @@ import {
   Landmark,
   CalendarDays,
   Trophy,
+  FileSignature,
 } from 'lucide-react';
 import { SystemSettingsModal } from './SystemSettingsModal';
 import { TodoDetailModal } from './TodoDetailModal';
@@ -146,6 +147,7 @@ export function AppSidebar({
     { href: '/stats', label: '통계', icon: BarChart3, description: 'KPI 및 리포트', adminOnly: false },
     { href: '/rankings', label: '매출랭킹', icon: Trophy, description: '개인/팀 실적 순위', adminOnly: false },
     { href: '/annual-leave', label: '연차관리', icon: CalendarDays, description: '연차 신청 및 승인', adminOnly: false },
+    { href: '/contracts', label: '전자계약', icon: FileSignature, description: '계약서 발송 및 관리', adminOnly: false },
     { href: '/settlements', label: '정산관리', icon: Calculator, description: '수당 정산 및 환수', adminOnly: false },
     { href: '/company-settlement', label: '회사정산', icon: Landmark, description: '매출/비용 통합', adminOnly: true },
   ];

@@ -25,10 +25,11 @@
 - **연차 관리 시스템**: 2단계 승인 워크플로우(팀장 승인 → 총관리자 최종 승인)를 따르며, 전일/반차 유형을 지원합니다. 한국천문연구원 공휴일 API와 연동하여 정확한 잔여 연차를 계산하고, 달력 인터페이스를 통해 연차 신청 및 관리를 용이하게 합니다. `super_admin`은 승인된 연차를 취소할 수 있습니다.
 - **랜딩페이지 연동**: 랜딩페이지를 통한 상담 신청 데이터를 자동으로 CRM에 연동하여 고객 생성을 자동화하고 중복을 방지합니다. 현재는 수동 유입 방식으로 전환되어, `super_admin`이 미처리 상담을 일괄 처리할 수 있습니다.
 - **UTM 추적 시스템**: 랜딩페이지 유입 시 `utm_source`, `utm_medium`, `utm_campaign` 파라미터를 상담 및 고객 레코드에 저장합니다. `utm_source` 값에 따라 유입경로가 자동 매핑됩니다 (`cashnote` → 캐시노트 인앱광고, `google` → 구글애즈, 기타/없음 → 광고). UTM 기반 유입경로도 정산 시 '광고'와 동일한 수당률이 적용됩니다.
+- **eformsign 전자계약 시스템**: eformsign API v2.0 연동을 통해 전자계약 발송 및 상태 추적 기능을 구현합니다. 서버 측 프록시(`server/eformsignService.ts`)를 통해 HMAC-SHA256 서명 인증, Access Token 캐싱, 템플릿 조회, 문서 생성/발송, 상태 조회를 수행합니다. 고객 데이터 기반 계약서 필드 자동 기입, Webhook을 통한 실시간 상태 업데이트(`contracts_eformsign` Firestore 컬렉션), 고객 상세 모달 내 계약 이력 조회 기능을 제공합니다.
 
 **데이터 모델 및 저장소:**
 - **데이터베이스**: Firebase Firestore를 메인 데이터베이스로 사용합니다.
-- **컬렉션**: `users`, `teams`, `customers`, `status_logs`, `todos`, `holidays`, `meta`, `settlements`, `consultations`, `leave_requests` 등 명확하게 분리된 컬렉션을 통해 데이터를 저장하고 관리합니다.
+- **컬렉션**: `users`, `teams`, `customers`, `status_logs`, `todos`, `holidays`, `meta`, `settlements`, `consultations`, `leave_requests`, `contracts_eformsign` 등 명확하게 분리된 컬렉션을 통해 데이터를 저장하고 관리합니다.
 - **공유 타입**: `shared/types.ts`에서 시스템 전반에 걸쳐 사용되는 데이터 타입을 정의하여 일관성을 유지합니다.
 - **보안 규칙**: Firebase Security Rules를 통해 데이터 접근 권한을 세밀하게 제어하여 데이터 보안을 강화합니다.
 
@@ -42,6 +43,7 @@
 - **shadcn/ui**: React UI 컴포넌트 라이브러리
 - **Recharts**: 금융 분석 대시보드 내 차트 시각화 (파이차트, 스캐터 차트 등)
 - **한국천문연구원 공휴일 API**: 연차 관리 시스템에서 한국 공휴일 정보 연동
+- **eformsign API v2.0**: 전자계약 발송 및 상태 추적 (HMAC-SHA256 인증, 환경변수: `EFORMSIGN_API_KEY`, `EFORMSIGN_SECRET_KEY`, `EFORMSIGN_COMPANY_ID`)
 
 ## Firebase Security Rules (필수)
 Firebase Console에서 settlements 컬렉션에 대해 다음 보안 규칙을 설정해야 합니다:

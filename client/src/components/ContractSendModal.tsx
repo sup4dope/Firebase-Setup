@@ -1,0 +1,526 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { getCustomers, createContract } from '@/lib/firestore';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
+import { Send, FileText, User, Building2, Search, Loader2, AlertCircle } from 'lucide-react';
+import type { Customer, InsertContract, EformsignTemplate } from '@shared/types';
+
+interface ContractSendModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+  preselectedCustomer?: Customer;
+}
+
+interface FieldMapping {
+  id: string;
+  value: string;
+  label: string;
+  autoFilled: boolean;
+}
+
+export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCustomer }: ContractSendModalProps) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const [step, setStep] = useState<'customer' | 'template' | 'fields' | 'confirm'>('customer');
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(preselectedCustomer || null);
+
+  const [templates, setTemplates] = useState<EformsignTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<EformsignTemplate | null>(null);
+
+  const [fields, setFields] = useState<FieldMapping[]>([]);
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
+  const [documentName, setDocumentName] = useState('');
+  const [comment, setComment] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      if (preselectedCustomer) {
+        setSelectedCustomer(preselectedCustomer);
+        setStep('template');
+      } else {
+        setStep('customer');
+      }
+      setSelectedTemplate(null);
+      setFields([]);
+      setDocumentName('');
+      setComment('');
+    }
+  }, [open, preselectedCustomer]);
+
+  useEffect(() => {
+    if (open && step === 'customer' && customers.length === 0) {
+      const fetchCustomers = async () => {
+        try {
+          const data = await getCustomers();
+          setCustomers(data);
+        } catch (error) {
+          console.error('Error fetching customers:', error);
+        }
+      };
+      fetchCustomers();
+    }
+  }, [open, step]);
+
+  const fetchTemplates = async () => {
+    setTemplatesLoading(true);
+    try {
+      const token = await user?.getIdToken?.();
+      if (!token) throw new Error('인증 토큰이 없습니다.');
+
+      const res = await fetch('/api/eformsign/templates', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const templateList = Array.isArray(data.data) ? data.data :
+          data.data.forms ? data.data.forms :
+          data.data.templates ? data.data.templates : [];
+
+        const mapped: EformsignTemplate[] = templateList.map((t: any) => ({
+          id: t.template_id || t.id || t.form_id,
+          name: t.template_name || t.name || t.form_name || '이름없는 템플릿',
+          description: t.description || '',
+        }));
+        setTemplates(mapped);
+      } else {
+        toast({ title: '템플릿 조회 실패', description: data.error || '템플릿을 가져올 수 없습니다.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      console.error('Error fetching templates:', error);
+      toast({ title: '오류', description: error.message, variant: 'destructive' });
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setRecipientName(customer.name || '');
+    setRecipientEmail(customer.email || '');
+    setRecipientPhone(customer.phone || '');
+    setStep('template');
+    fetchTemplates();
+  };
+
+  const handleSelectTemplate = (template: EformsignTemplate) => {
+    setSelectedTemplate(template);
+
+    if (selectedCustomer) {
+      const autoFields: FieldMapping[] = [
+        { id: 'company_name', value: selectedCustomer.company_name || '', label: '회사명/상호', autoFilled: true },
+        { id: 'name', value: selectedCustomer.name || '', label: '고객명/대표자명', autoFilled: true },
+        { id: 'business_number', value: selectedCustomer.business_registration_number || '', label: '사업자등록번호', autoFilled: true },
+        { id: 'phone', value: selectedCustomer.phone || '', label: '연락처', autoFilled: true },
+        { id: 'email', value: selectedCustomer.email || '', label: '이메일', autoFilled: true },
+        { id: 'address', value: selectedCustomer.business_address || '', label: '사업장주소', autoFilled: true },
+        { id: 'contract_amount', value: selectedCustomer.contract_amount ? String(selectedCustomer.contract_amount) : '', label: '계약금액(만원)', autoFilled: true },
+        { id: 'contract_fee_rate', value: selectedCustomer.contract_fee_rate ? String(selectedCustomer.contract_fee_rate) : '', label: '자문료율(%)', autoFilled: true },
+      ];
+      setFields(autoFields);
+      setDocumentName(`${selectedCustomer.company_name || selectedCustomer.name}_계약서`);
+    }
+
+    setStep('fields');
+  };
+
+  const handleFieldChange = (index: number, value: string) => {
+    setFields(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], value, autoFilled: false };
+      return updated;
+    });
+  };
+
+  const addCustomField = () => {
+    setFields(prev => [...prev, { id: `custom_${Date.now()}`, value: '', label: '', autoFilled: false }]);
+  };
+
+  const handleCustomFieldLabelChange = (index: number, label: string) => {
+    setFields(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], label, id: label.replace(/\s/g, '_').toLowerCase() || `custom_${index}` };
+      return updated;
+    });
+  };
+
+  const handleSend = async () => {
+    if (!selectedCustomer || !selectedTemplate || !user) return;
+
+    setSending(true);
+    try {
+      const token = await user.getIdToken?.();
+      if (!token) throw new Error('인증 토큰이 없습니다.');
+
+      const apiFields = fields
+        .filter(f => f.value.trim())
+        .map(f => ({ id: f.id, value: f.value }));
+
+      const recipients: any[] = [];
+      if (recipientEmail || recipientPhone) {
+        const recipient: any = {
+          id: recipientEmail || recipientPhone,
+          name: recipientName || selectedCustomer.name,
+        };
+        if (recipientEmail) {
+          recipient.email = recipientEmail;
+          recipient.use_email = true;
+        }
+        if (recipientPhone) {
+          const cleanPhone = recipientPhone.replace(/-/g, '');
+          recipient.sms = { country_code: '+82', phone_number: cleanPhone };
+          recipient.use_sms = true;
+        }
+        recipients.push({ step_idx: 1, recipient });
+      }
+
+      const res = await fetch('/api/eformsign/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          template_id: selectedTemplate.id,
+          document_name: documentName || `${selectedCustomer.company_name}_계약서`,
+          fields: apiFields,
+          recipients,
+          comment,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        const fieldsRecord: Record<string, string> = {};
+        apiFields.forEach(f => { fieldsRecord[f.id] = f.value; });
+
+        const contractData: InsertContract = {
+          customer_id: selectedCustomer.id,
+          customer_name: selectedCustomer.company_name || selectedCustomer.name,
+          document_id: data.data?.document_id || data.data?.id || '',
+          template_id: selectedTemplate.id,
+          template_name: selectedTemplate.name,
+          status: '발송완료',
+          sent_at: new Date(),
+          fields: fieldsRecord,
+          created_by: user.name || user.email || '',
+        };
+
+        await createContract(contractData);
+
+        onOpenChange(false);
+        onSuccess?.();
+      } else {
+        toast({ title: '발송 실패', description: data.error || '계약서 발송에 실패했습니다.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      console.error('Error sending contract:', error);
+      toast({ title: '오류', description: error.message, variant: 'destructive' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const filteredCustomers = customerSearch.trim()
+    ? customers.filter(c =>
+        c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        c.company_name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        (c.phone && c.phone.includes(customerSearch))
+      )
+    : customers.slice(0, 20);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="contract-send-modal">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            전자계약 발송
+          </DialogTitle>
+          <DialogDescription>
+            {step === 'customer' && '계약서를 보낼 고객을 선택하세요.'}
+            {step === 'template' && '사용할 계약서 템플릿을 선택하세요.'}
+            {step === 'fields' && '계약서 변수를 확인하고 수정하세요.'}
+            {step === 'confirm' && '계약서 발송 정보를 확인하세요.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2 mb-4">
+          {['customer', 'template', 'fields', 'confirm'].map((s, i) => (
+            <div key={s} className="flex items-center gap-1">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                ${step === s ? 'bg-primary text-primary-foreground' :
+                  ['customer', 'template', 'fields', 'confirm'].indexOf(step) > i ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                {i + 1}
+              </div>
+              <span className={`text-xs ${step === s ? 'font-semibold' : 'text-muted-foreground'}`}>
+                {s === 'customer' ? '고객' : s === 'template' ? '템플릿' : s === 'fields' ? '변수' : '확인'}
+              </span>
+              {i < 3 && <span className="text-muted-foreground mx-1">→</span>}
+            </div>
+          ))}
+        </div>
+
+        {step === 'customer' && (
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="고객명, 상호명, 전화번호로 검색..."
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-customer"
+              />
+            </div>
+            <ScrollArea className="h-[400px]">
+              <div className="space-y-2">
+                {filteredCustomers.map(customer => (
+                  <Card
+                    key={customer.id}
+                    className="cursor-pointer hover:bg-accent transition-colors"
+                    onClick={() => handleSelectCustomer(customer)}
+                    data-testid={`card-customer-${customer.id}`}
+                  >
+                    <CardContent className="p-3 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">{customer.name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Building2 className="w-3 h-3" />
+                          {customer.company_name || '-'}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">{customer.phone || '-'}</div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {filteredCustomers.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    검색 결과가 없습니다.
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {step === 'template' && (
+          <div className="space-y-4">
+            {selectedCustomer && (
+              <Card className="bg-muted/50">
+                <CardContent className="p-3 flex items-center gap-2">
+                  <User className="w-4 h-4 text-primary" />
+                  <span className="font-medium text-sm">{selectedCustomer.name}</span>
+                  <span className="text-xs text-muted-foreground">({selectedCustomer.company_name})</span>
+                  <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={() => setStep('customer')}>
+                    변경
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {templatesLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-center py-12 space-y-3">
+                <AlertCircle className="w-10 h-10 text-muted-foreground mx-auto" />
+                <p className="text-muted-foreground text-sm">
+                  사용 가능한 템플릿이 없습니다.<br/>
+                  eformsign에서 템플릿을 먼저 생성해주세요.
+                </p>
+                <Button variant="outline" size="sm" onClick={fetchTemplates}>
+                  다시 불러오기
+                </Button>
+              </div>
+            ) : (
+              <ScrollArea className="h-[350px]">
+                <div className="space-y-2">
+                  {templates.map(template => (
+                    <Card
+                      key={template.id}
+                      className="cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => handleSelectTemplate(template)}
+                      data-testid={`card-template-${template.id}`}
+                    >
+                      <CardContent className="p-3 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-blue-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{template.name}</div>
+                          {template.description && (
+                            <div className="text-xs text-muted-foreground truncate">{template.description}</div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        )}
+
+        {step === 'fields' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>고객: <strong className="text-foreground">{selectedCustomer?.name}</strong></span>
+              <span>|</span>
+              <span>템플릿: <strong className="text-foreground">{selectedTemplate?.name}</strong></span>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="document-name">문서 이름</Label>
+                <Input
+                  id="document-name"
+                  value={documentName}
+                  onChange={(e) => setDocumentName(e.target.value)}
+                  placeholder="계약서 문서 이름"
+                  data-testid="input-document-name"
+                />
+              </div>
+
+              <div className="border rounded-lg p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">자동 기입 변수</Label>
+                  <Button variant="outline" size="sm" onClick={addCustomField} data-testid="button-add-field">
+                    + 변수 추가
+                  </Button>
+                </div>
+                <ScrollArea className="max-h-[250px]">
+                  <div className="space-y-2">
+                    {fields.map((field, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        {field.autoFilled ? (
+                          <Label className="w-32 text-xs text-muted-foreground flex items-center gap-1 shrink-0">
+                            {field.label}
+                            <Badge variant="outline" className="text-[10px] px-1 py-0">자동</Badge>
+                          </Label>
+                        ) : (
+                          <Input
+                            className="w-32 text-xs shrink-0"
+                            value={field.label}
+                            onChange={(e) => handleCustomFieldLabelChange(idx, e.target.value)}
+                            placeholder="변수명"
+                          />
+                        )}
+                        <Input
+                          className="flex-1"
+                          value={field.value}
+                          onChange={(e) => handleFieldChange(idx, e.target.value)}
+                          placeholder={field.label || '값 입력'}
+                          data-testid={`input-field-${field.id}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className="border rounded-lg p-3 space-y-3">
+                <Label className="text-sm font-semibold">수신자 정보</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">이름</Label>
+                    <Input
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                      placeholder="수신자 이름"
+                      data-testid="input-recipient-name"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">이메일</Label>
+                    <Input
+                      value={recipientEmail}
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      placeholder="이메일 주소"
+                      data-testid="input-recipient-email"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">휴대폰</Label>
+                    <Input
+                      value={recipientPhone}
+                      onChange={(e) => setRecipientPhone(e.target.value)}
+                      placeholder="010-0000-0000"
+                      data-testid="input-recipient-phone"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="comment">메모 (선택사항)</Label>
+                <Textarea
+                  id="comment"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="계약서에 대한 메모..."
+                  rows={2}
+                  data-testid="input-comment"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between pt-2">
+              <Button variant="outline" onClick={() => setStep('template')} data-testid="button-back-to-template">
+                이전
+              </Button>
+              <Button
+                onClick={handleSend}
+                disabled={sending || (!recipientEmail && !recipientPhone)}
+                data-testid="button-send-contract"
+              >
+                {sending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    발송 중...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-1" />
+                    계약서 발송
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

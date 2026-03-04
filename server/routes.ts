@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin, getAdminApp, type AuthenticatedRequest } from "./firebaseAdmin";
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
+import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, checkEformsignConfig, mapEformsignStatus } from "./eformsignService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -485,6 +486,127 @@ export async function registerRoutes(
         success: false,
         error: "명함 발송 중 오류가 발생했습니다.",
       });
+    }
+  });
+
+  // ============================================================
+  // eformsign 전자계약 API
+  // ============================================================
+
+  app.get("/api/eformsign/status", requireAuth, async (req, res) => {
+    const config = checkEformsignConfig();
+    res.json(config);
+  });
+
+  app.get("/api/eformsign/templates", requireAuth, async (req, res) => {
+    try {
+      const templates = await getTemplates();
+      console.log("[eformsign] 템플릿 목록 조회 성공");
+      res.json({ success: true, data: templates });
+    } catch (error: any) {
+      console.error("[eformsign] 템플릿 목록 조회 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/eformsign/templates/:templateId", requireAuth, async (req, res) => {
+    try {
+      const detail = await getTemplateDetail(req.params.templateId);
+      console.log(`[eformsign] 템플릿 상세 조회: ${req.params.templateId}`);
+      res.json({ success: true, data: detail });
+    } catch (error: any) {
+      console.error("[eformsign] 템플릿 상세 조회 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/eformsign/documents", requireAuth, async (req, res) => {
+    try {
+      const { template_id, document_name, fields, recipients, comment } = req.body;
+
+      if (!template_id) {
+        return res.status(400).json({ success: false, error: "template_id가 필요합니다." });
+      }
+
+      const result = await createDocument(template_id, {
+        document_name,
+        fields,
+        recipients,
+        comment,
+      });
+
+      console.log(`[eformsign] 문서 생성 성공: template=${template_id}`);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      console.error("[eformsign] 문서 생성 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/eformsign/documents/:documentId", requireAuth, async (req, res) => {
+    try {
+      const doc = await getDocument(req.params.documentId);
+      console.log(`[eformsign] 문서 상태 조회: ${req.params.documentId}`);
+      res.json({ success: true, data: doc });
+    } catch (error: any) {
+      console.error("[eformsign] 문서 상태 조회 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/eformsign/documents", requireAuth, async (req, res) => {
+    try {
+      const { type, status, from, to, limit: limitParam, offset } = req.query;
+      const docs = await getDocuments({
+        type: type as string,
+        status: status as string,
+        from: from as string,
+        to: to as string,
+        limit: limitParam ? Number(limitParam) : undefined,
+        offset: offset ? Number(offset) : undefined,
+      });
+      console.log("[eformsign] 문서 목록 조회 성공");
+      res.json({ success: true, data: docs });
+    } catch (error: any) {
+      console.error("[eformsign] 문서 목록 조회 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Webhook - eformsign에서 호출 (인증 없음)
+  app.post("/api/eformsign/webhook", async (req, res) => {
+    try {
+      const { event, document_id, document_name, template_id, status } = req.body;
+      console.log(`[eformsign Webhook] event=${event}, doc_id=${document_id}, status=${status}`);
+
+      const mappedStatus = mapEformsignStatus(event || status || '');
+
+      const admin = getAdminApp();
+      const firestore = admin.firestore();
+
+      const contractsRef = firestore.collection('contracts_eformsign');
+      const snapshot = await contractsRef.where('document_id', '==', document_id).limit(1).get();
+
+      if (!snapshot.empty) {
+        const contractDoc = snapshot.docs[0];
+        const updateData: Record<string, any> = {
+          status: mappedStatus,
+        };
+
+        if (mappedStatus === '서명완료') {
+          updateData.completed_at = new Date().toISOString();
+        }
+
+        await contractDoc.ref.update(updateData);
+        console.log(`[eformsign Webhook] 계약 상태 업데이트: ${contractDoc.id} → ${mappedStatus}`);
+      } else {
+        console.log(`[eformsign Webhook] document_id=${document_id}에 해당하는 계약을 찾지 못함`);
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[eformsign Webhook] 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

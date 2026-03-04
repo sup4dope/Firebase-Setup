@@ -496,6 +496,33 @@ export interface CompanySettlementSummary {
 // Insert 타입
 export type InsertExpense = Omit<Expense, 'id' | 'created_at' | 'updated_at'>;
 
+// ========== 전자계약 (eformsign) 관련 타입 ==========
+
+export type ContractStatus = '초안' | '발송완료' | '서명대기' | '서명완료' | '거부' | '무효';
+
+export interface Contract {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  document_id: string;
+  template_id: string;
+  template_name: string;
+  status: ContractStatus;
+  sent_at?: Date;
+  completed_at?: Date;
+  fields: Record<string, string>;
+  created_by: string;
+  created_at: Date;
+}
+
+export interface EformsignTemplate {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export type InsertContract = Omit<Contract, 'id' | 'created_at'>;
+
 // Consultation (Firestore: consultations collection) - 상담 신청 데이터 (랜딩페이지 유입)
 export interface Consultation {
   id: string;

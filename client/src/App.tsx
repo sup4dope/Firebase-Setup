@@ -26,6 +26,7 @@ import CompanySettlement from '@/pages/CompanySettlement';
 import AnnualLeave from '@/pages/AnnualLeave';
 import Migration from '@/pages/Migration';
 import Rankings from '@/pages/Rankings';
+import Contracts from '@/pages/Contracts';
 import NotFound from '@/pages/not-found';
 import {
   getTodos,
@@ -221,6 +222,7 @@ function AuthenticatedApp() {
               <Route path="/company-settlement" component={CompanySettlement} />
               <Route path="/annual-leave" component={AnnualLeave} />
               <Route path="/rankings" component={Rankings} />
+              <Route path="/contracts" component={Contracts} />
               <Route path="/migrate" component={Migration} />
               <Route component={NotFound} />
             </Switch>

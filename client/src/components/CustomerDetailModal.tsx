@@ -78,6 +78,8 @@ import {
   CustomerHistoryLog,
   FinancialObligation,
   ProcessingOrg,
+  Contract,
+  ContractStatus,
 } from "@shared/types";
 import { FinancialAnalysisTab } from "@/components/FinancialAnalysisTab";
 import { ReviewSummaryTab } from "@/components/ReviewSummaryTab";
@@ -85,8 +87,9 @@ import { ProposalModal, ProposalPreview, type ProposalFormData } from "@/compone
 import { format, differenceInDays, parseISO } from "date-fns";
 import DaumPostcodeEmbed from "react-daum-postcode";
 import { useToast } from "@/hooks/use-toast";
-import { CreditCard } from "lucide-react";
+import { CreditCard, FileSignature } from "lucide-react";
 import { TodoForm } from "@/components/TodoForm";
+import { ContractSendModal } from "@/components/ContractSendModal";
 import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
 import { 
   getConsultationByCustomerId, 
@@ -94,6 +97,7 @@ import {
   processClawbackForFinalRejection,
   syncSingleCustomerSettlement,
   getUsers,
+  getContractsByCustomer,
 } from "@/lib/firestore";
 import {
   ref,
@@ -154,7 +158,7 @@ interface CustomerDetailModalProps {
   customers?: Customer[]; // TO-DO 폼에서 사용
   onSave: (customer: Partial<Customer>) => Promise<string | undefined>;
   onDelete?: (customerId: string) => Promise<void>;
-  initialTab?: "memo" | "history";
+  initialTab?: "memo" | "history" | "contracts";
   onTodoCreated?: () => void; // TO-DO 생성 후 콜백
 }
 
@@ -216,9 +220,11 @@ export function CustomerDetailModal({
   const isReadOnly = currentUser?.role === "staff" && !isNewCustomer && customer?.manager_id !== currentUser?.uid;
 
   // Active tab state for bottom panel
-  const [activeBottomTab, setActiveBottomTab] = useState<"memo" | "history">(
+  const [activeBottomTab, setActiveBottomTab] = useState<"memo" | "history" | "contracts">(
     initialTab,
   );
+  const [customerContracts, setCustomerContracts] = useState<Contract[]>([]);
+  const [isLoadingContracts, setIsLoadingContracts] = useState(false);
   
   // Active tab state for center panel (document viewer, financial analysis, review summary)
   const [activeCenterTab, setActiveCenterTab] = useState<"documents" | "financial" | "summary">("documents");
@@ -238,6 +244,7 @@ export function CustomerDetailModal({
 
   // TO-DO form modal state
   const [todoModalOpen, setTodoModalOpen] = useState(false);
+  const [contractSendModalOpen, setContractSendModalOpen] = useState(false);
   const [proposalModalOpen, setProposalModalOpen] = useState(false);
   const [proposalPreviewOpen, setProposalPreviewOpen] = useState(false);
   const [proposalAgencies, setProposalAgencies] = useState<{
@@ -678,6 +685,48 @@ export function CustomerDetailModal({
     };
     loadHistoryLogs();
   }, [activeBottomTab, customer?.id, isOpen]);
+
+  useEffect(() => {
+    const loadContracts = async () => {
+      if (activeBottomTab === "contracts" && customer?.id) {
+        setIsLoadingContracts(true);
+        try {
+          const contracts = await getContractsByCustomer(customer.id);
+          setCustomerContracts(contracts);
+        } catch (error) {
+          console.error("Error loading contracts:", error);
+          setCustomerContracts([]);
+        } finally {
+          setIsLoadingContracts(false);
+        }
+      }
+    };
+    loadContracts();
+  }, [activeBottomTab, customer?.id, isOpen]);
+
+  const getContractStatusBadge = (status: ContractStatus) => {
+    const styles: Record<ContractStatus, string> = {
+      '초안': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+      '발송완료': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      '서명대기': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      '서명완료': 'bg-green-500/20 text-green-400 border-green-500/30',
+      '거부': 'bg-red-500/20 text-red-400 border-red-500/30',
+      '무효': 'bg-gray-500/20 text-gray-500 border-gray-500/30',
+    };
+    return styles[status] || styles['초안'];
+  };
+
+  const safeContractDate = (dateVal: any): string => {
+    if (!dateVal) return '-';
+    try {
+      if (dateVal?.toDate) return format(dateVal.toDate(), 'yyyy-MM-dd HH:mm');
+      if (dateVal instanceof Date) return format(dateVal, 'yyyy-MM-dd HH:mm');
+      if (typeof dateVal === 'string') return format(new Date(dateVal), 'yyyy-MM-dd HH:mm');
+      return '-';
+    } catch {
+      return '-';
+    }
+  };
 
   // Calculate 7-year status (D-2555 기준: 현재일로부터 2555일 초과 시 7년 초과)
   const handleFoundingDateChange = (date: string) => {
@@ -1935,6 +1984,18 @@ export function CustomerDetailModal({
                   <CreditCard className="w-3 h-3 mr-1" />
                 )}
                 명함발송
+              </Button>
+            )}
+            {customer?.id && !isNewCustomer && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setContractSendModalOpen(true)}
+                className="h-7 text-xs"
+                data-testid="button-send-contract"
+              >
+                <FileSignature className="w-3 h-3 mr-1" />
+                전자계약
               </Button>
             )}
             {/* Read-only indicator for staff users */}
@@ -3734,6 +3795,23 @@ export function CustomerDetailModal({
                     변경 이력
                   </Button>
                 )}
+                {customer?.id && !isNewCustomer && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveBottomTab("contracts")}
+                    className={cn(
+                      "h-8 px-3 text-sm",
+                      activeBottomTab === "contracts"
+                        ? "bg-indigo-600/20 text-indigo-400"
+                        : "text-muted-foreground",
+                    )}
+                    data-testid="tab-contracts"
+                  >
+                    <FileSignature className="w-4 h-4 mr-1.5" />
+                    계약
+                  </Button>
+                )}
                 {/* TO-DO+ 버튼 */}
                 {customer?.id && currentUser && (
                   <Button
@@ -3751,7 +3829,62 @@ export function CustomerDetailModal({
 
               {/* Tab Content */}
               <div className="flex-1 min-h-0 overflow-hidden">
-                {activeBottomTab === "memo" || currentUser?.role === "staff" ? (
+                {activeBottomTab === "contracts" ? (
+                  <div className="flex flex-col h-full overflow-y-auto p-2 space-y-2 bg-muted/30 dark:bg-gray-900/50">
+                    {isLoadingContracts ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">계약 이력 로딩 중...</span>
+                      </div>
+                    ) : customerContracts.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-6">
+                        <FileSignature className="w-7 h-7 mx-auto mb-1.5 opacity-40" />
+                        <p className="text-sm">전자계약 이력이 없습니다</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setContractSendModalOpen(true)}
+                          className="mt-3 h-7 text-xs"
+                          data-testid="button-send-contract-empty"
+                        >
+                          <FileSignature className="w-3 h-3 mr-1" />
+                          계약서 발송하기
+                        </Button>
+                      </div>
+                    ) : (
+                      customerContracts.map((contract) => (
+                        <div
+                          key={contract.id}
+                          className="rounded-lg border border-border/50 bg-card/50 p-2.5 space-y-1.5"
+                          data-testid={`contract-item-${contract.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-foreground truncate flex-1 mr-2">
+                              {contract.template_name}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={cn("text-[10px] px-1.5 shrink-0", getContractStatusBadge(contract.status))}
+                            >
+                              {contract.status}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                            <span>발송: {safeContractDate(contract.sent_at || contract.created_at)}</span>
+                            {contract.completed_at && (
+                              <span>완료: {safeContractDate(contract.completed_at)}</span>
+                            )}
+                          </div>
+                          {contract.document_id && (
+                            <div className="text-[10px] text-muted-foreground/70 truncate">
+                              문서ID: {contract.document_id}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : activeBottomTab === "memo" || currentUser?.role === "staff" ? (
                   <div className="flex flex-col h-full">
                     {/* Memo Messages */}
                     <div
@@ -4429,6 +4562,23 @@ export function CustomerDetailModal({
           onTodoCreated={() => {
             setTodoModalOpen(false);
             onTodoCreated?.();
+          }}
+        />
+      )}
+
+      {/* 전자계약 발송 모달 */}
+      {customer && (
+        <ContractSendModal
+          open={contractSendModalOpen}
+          onOpenChange={setContractSendModalOpen}
+          preselectedCustomer={customer}
+          onSuccess={async () => {
+            toast({ title: '성공', description: '전자계약이 발송되었습니다.' });
+            if (customer?.id) {
+              const contracts = await getContractsByCustomer(customer.id);
+              setCustomerContracts(contracts);
+              setActiveBottomTab("contracts");
+            }
           }}
         />
       )}
