@@ -10,6 +10,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { TodoForm } from '@/components/TodoForm';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { HeaderRankings } from '@/components/HeaderRankings';
+import { NotificationBell } from '@/components/NotificationBell';
 import { LandingPageListener } from '@/components/LandingPageListener';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -188,10 +189,7 @@ function AuthenticatedApp() {
         <AppSidebar
           user={user!}
           userRole={user!.role}
-          customers={customers}
-          onAddTodo={() => setTodoFormOpen(true)}
           onSignOut={signOut}
-          todoRefreshTrigger={todoRefreshTrigger}
         />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between gap-4 h-14 px-4 border-b bg-background sticky top-0 z-50">
@@ -200,6 +198,11 @@ function AuthenticatedApp() {
               <HeaderRankings />
             </div>
             <div className="flex items-center gap-2">
+              <NotificationBell
+                customers={customers}
+                onAddTodo={() => setTodoFormOpen(true)}
+                todoRefreshTrigger={todoRefreshTrigger}
+              />
               <Button
                 variant="ghost"
                 size="icon"
