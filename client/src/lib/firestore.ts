@@ -954,6 +954,63 @@ export const getTodoItemsByUser = async (email: string): Promise<TodoItem[]> => 
   });
 };
 
+export const getTodoItemsByScope = async (
+  userEmail: string,
+  userUid: string,
+  teamEmails?: string[],
+  teamUids?: string[]
+): Promise<TodoItem[]> => {
+  const colRef = collection(db, 'todo_list');
+  const seen = new Set<string>();
+  const results: TodoItem[] = [];
+
+  const mapDoc = (docSnap: any): TodoItem => {
+    const data = docSnap.data();
+    return {
+      ...data,
+      id: docSnap.id,
+      due_date: toDate(data.due_date),
+      created_at: toDate(data.created_at),
+    } as TodoItem;
+  };
+
+  const emails = teamEmails && teamEmails.length > 0 ? teamEmails : [userEmail];
+  const uids = teamUids && teamUids.length > 0 ? teamUids : [userUid];
+
+  const chunkSize = 30;
+  for (let i = 0; i < emails.length; i += chunkSize) {
+    const chunk = emails.slice(i, i + chunkSize);
+    const q = query(colRef, where('created_by', 'in', chunk));
+    const snapshot = await getDocs(q);
+    snapshot.docs.forEach(d => {
+      if (!seen.has(d.id)) {
+        seen.add(d.id);
+        results.push(mapDoc(d));
+      }
+    });
+  }
+
+  for (let i = 0; i < uids.length; i += chunkSize) {
+    const chunk = uids.slice(i, i + chunkSize);
+    const q = query(colRef, where('assigned_to', 'in', chunk));
+    const snapshot = await getDocs(q);
+    snapshot.docs.forEach(d => {
+      if (!seen.has(d.id)) {
+        seen.add(d.id);
+        results.push(mapDoc(d));
+      }
+    });
+  }
+
+  results.sort((a, b) => {
+    const dateA = a.created_at instanceof Date ? a.created_at : new Date(a.created_at);
+    const dateB = b.created_at instanceof Date ? b.created_at : new Date(b.created_at);
+    return dateB.getTime() - dateA.getTime();
+  });
+
+  return results;
+};
+
 // 할 일 등록
 export const createTodoItem = async (data: InsertTodoItem): Promise<TodoItem> => {
   // undefined 값 제거 (Firestore는 undefined를 지원하지 않음)

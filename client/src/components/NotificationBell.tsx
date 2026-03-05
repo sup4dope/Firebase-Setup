@@ -13,11 +13,13 @@ import {
 } from '@/components/ui/tooltip';
 import { TodoDetailModal } from './TodoDetailModal';
 import { cn } from '@/lib/utils';
-import { getTodoItems } from '@/lib/firestore';
-import type { Customer, TodoItem, TodoPriority } from '@shared/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { getTodoItems, getTodoItemsByScope } from '@/lib/firestore';
+import type { Customer, User, TodoItem, TodoPriority } from '@shared/types';
 
 interface NotificationBellProps {
   customers: Customer[];
+  users: User[];
   onAddTodo: () => void;
   todoRefreshTrigger?: number;
 }
@@ -28,7 +30,8 @@ const PRIORITY_ICONS: Record<TodoPriority, { icon: typeof AlertCircle; color: st
   low: { icon: Minus, color: 'text-gray-500' },
 };
 
-export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: NotificationBellProps) {
+export function NotificationBell({ customers, users, onAddTodo, todoRefreshTrigger }: NotificationBellProps) {
+  const { user, isSuperAdmin, isTeamLeader } = useAuth();
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTodo, setSelectedTodo] = useState<TodoItem | null>(null);
@@ -36,8 +39,19 @@ export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: N
   const [open, setOpen] = useState(false);
 
   const fetchTodoItems = async () => {
+    if (!user) return;
     try {
-      const items = await getTodoItems();
+      let items: TodoItem[];
+      if (isSuperAdmin) {
+        items = await getTodoItems();
+      } else if (isTeamLeader && user.team_id) {
+        const teamMembers = users.filter(u => u.team_id === user.team_id);
+        const teamEmails = teamMembers.map(u => u.email);
+        const teamUids = teamMembers.map(u => u.uid);
+        items = await getTodoItemsByScope(user.email, user.uid, teamEmails, teamUids);
+      } else {
+        items = await getTodoItemsByScope(user.email, user.uid);
+      }
       setTodoItems(items);
     } catch (error) {
       console.error('Error fetching todo items:', error);
@@ -48,7 +62,7 @@ export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: N
 
   useEffect(() => {
     fetchTodoItems();
-  }, [todoRefreshTrigger]);
+  }, [todoRefreshTrigger, user, users]);
 
   useEffect(() => {
     const handleTodoCreated = () => {
@@ -56,7 +70,7 @@ export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: N
     };
     window.addEventListener('todoCreated', handleTodoCreated);
     return () => window.removeEventListener('todoCreated', handleTodoCreated);
-  }, []);
+  }, [user, users]);
 
   const { upcomingTodos, overdueTodos } = useMemo(() => {
     const now = new Date();
@@ -101,6 +115,16 @@ export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: N
     };
   };
 
+  const getAssigneeName = (todo: TodoItem) => {
+    if (todo.assigned_to_name) return todo.assigned_to_name;
+    if (todo.assigned_to) {
+      const found = users.find(u => u.uid === todo.assigned_to);
+      if (found) return found.name;
+    }
+    if (todo.created_by_name) return todo.created_by_name;
+    return '-';
+  };
+
   const handleRowDoubleClick = (todo: TodoItem) => {
     setSelectedTodo(todo);
     setShowTodoDetail(true);
@@ -116,6 +140,7 @@ export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: N
     const customerInfo = getCustomerInfo(todo.customer_id);
     const PriorityIcon = PRIORITY_ICONS[todo.priority].icon;
     const priorityColor = PRIORITY_ICONS[todo.priority].color;
+    const assigneeName = getAssigneeName(todo);
 
     return (
       <Tooltip key={todo.id}>
@@ -125,19 +150,22 @@ export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: N
             onDoubleClick={() => handleRowDoubleClick(todo)}
             data-testid={`notification-todo-row-${todo.id}`}
           >
-            <td className="py-1.5 px-2 text-[11px] whitespace-nowrap text-muted-foreground">
-              {format(dueDate, 'MM-dd')}
+            <td className="py-1.5 px-1.5 text-[11px] text-foreground truncate max-w-[40px]">
+              {assigneeName}
             </td>
-            <td className="py-1.5 px-2 text-[12px] text-foreground truncate max-w-[60px]">
+            <td className="py-1.5 px-1.5 text-[10px] whitespace-nowrap text-muted-foreground">
+              {format(dueDate, 'MM-dd HH:mm')}
+            </td>
+            <td className="py-1.5 px-1.5 text-[11px] text-foreground truncate max-w-[50px]">
               {customerInfo.name}
             </td>
-            <td className="py-1.5 px-2 text-[11px] truncate max-w-[70px] text-muted-foreground">
+            <td className="py-1.5 px-1.5 text-[10px] truncate max-w-[60px] text-muted-foreground">
               {customerInfo.companyName}
             </td>
-            <td className="py-1.5 px-2">
+            <td className="py-1.5 px-1.5">
               <div className="flex items-center gap-1 min-w-0">
-                <PriorityIcon className={cn("w-3.5 h-3.5 flex-shrink-0", priorityColor)} />
-                <span className="text-[12px] text-foreground truncate">{todo.title}</span>
+                <PriorityIcon className={cn("w-3 h-3 flex-shrink-0", priorityColor)} />
+                <span className="text-[11px] text-foreground truncate">{todo.title}</span>
               </div>
             </td>
           </tr>
@@ -150,7 +178,7 @@ export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: N
   };
 
   const renderTable = (items: TodoItem[], emptyMessage: string) => (
-    <ScrollArea className="h-[240px]">
+    <ScrollArea className="h-[260px]">
       {isLoading ? (
         <div className="text-center py-8">
           <p className="text-xs text-muted-foreground">로딩 중...</p>
@@ -163,10 +191,11 @@ export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: N
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-border">
-              <th className="py-1.5 px-2 text-[10px] text-muted-foreground font-medium w-[44px]">날짜</th>
-              <th className="py-1.5 px-2 text-[10px] text-muted-foreground font-medium w-[60px]">성함</th>
-              <th className="py-1.5 px-2 text-[10px] text-muted-foreground font-medium w-[70px]">상호명</th>
-              <th className="py-1.5 px-2 text-[10px] text-muted-foreground font-medium">제목</th>
+              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[40px]">담당자</th>
+              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[62px]">날짜/시간</th>
+              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[50px]">성함</th>
+              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[60px]">상호명</th>
+              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium">제목</th>
             </tr>
           </thead>
           <tbody>
@@ -206,7 +235,7 @@ export function NotificationBell({ customers, onAddTodo, todoRefreshTrigger }: N
         </PopoverTrigger>
         <PopoverContent
           align="end"
-          className="w-[420px] p-0"
+          className="w-[480px] p-0"
           data-testid="notification-popover"
         >
           <Tabs defaultValue={hasOverdue ? "overdue" : "upcoming"} className="w-full">

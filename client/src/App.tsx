@@ -200,6 +200,7 @@ function AuthenticatedApp() {
             <div className="flex items-center gap-2">
               <NotificationBell
                 customers={customers}
+                users={users}
                 onAddTodo={() => setTodoFormOpen(true)}
                 todoRefreshTrigger={todoRefreshTrigger}
               />
