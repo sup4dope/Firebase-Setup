@@ -973,7 +973,7 @@ export async function registerRoutes(
 
       const contractsRef = firestore.collection('contracts_eformsign');
       const pendingSnapshot = await contractsRef
-        .where('status', 'in', ['발송완료', '서명대기'])
+        .where('status', 'in', ['발송완료', '서명대기', '거부'])
         .get();
 
       if (pendingSnapshot.empty) {
@@ -991,8 +991,10 @@ export async function registerRoutes(
 
         try {
           const docInfo = await getDocument(documentId);
+          const resolvedStatus = docInfo?.current_status || docInfo?.document?.current_status || {};
+          const rawStatusType = resolvedStatus?.status_type ?? '';
+          console.log(`[eformsign Sync] doc=${documentId}, current_status:`, JSON.stringify(resolvedStatus));
           const mappedStatus = extractEformsignStatus(docInfo);
-          const rawStatusType = docInfo?.current_status?.status_type || '';
 
           console.log(`[eformsign Sync] doc=${documentId}, status_type=${rawStatusType}, mapped=${mappedStatus}, current=${contractData.status}`);
 
@@ -1099,14 +1101,16 @@ export async function registerRoutes(
       }
 
       const docInfo = await getDocument(documentId);
-      const rawStatusType = docInfo?.current_status?.status_type || '';
-      console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, status_type=${rawStatusType}, current_status:`, JSON.stringify(docInfo?.current_status || {}).substring(0, 200));
+      const resolvedStatus = docInfo?.current_status || docInfo?.document?.current_status || {};
+      const rawStatusType = resolvedStatus?.status_type ?? '';
+      console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, raw response:`, JSON.stringify(docInfo).substring(0, 2000));
+      console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, current_status:`, JSON.stringify(resolvedStatus));
       const mappedStatus = extractEformsignStatus(docInfo);
 
       console.log(`[eformsign Sync] 개별 동기화 - doc=${documentId}, status_type=${rawStatusType}, mapped=${mappedStatus}, current=${contractData.status}`);
 
       if (!mappedStatus || mappedStatus === contractData.status) {
-        return res.json({ success: true, message: '변경 사항 없음', currentStatus: contractData.status, eformsignStatus: rawStatusType, mappedStatus });
+        return res.json({ success: true, message: '변경 사항 없음', currentStatus: contractData.status, eformsignStatus: rawStatusType, mappedStatus, eformsignRaw: docInfo?.current_status || {} });
       }
 
       const updateData: Record<string, any> = { status: mappedStatus };

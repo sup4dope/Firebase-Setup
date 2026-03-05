@@ -369,10 +369,11 @@ export function mapEformsignStatus(status: string): string {
 }
 
 export function extractEformsignStatus(docInfo: any): string {
-  const statusType = docInfo?.current_status?.status_type || '';
+  const currentStatus = docInfo?.current_status || docInfo?.document?.current_status || {};
+  const rawStatusType = currentStatus?.status_type;
 
   const statusTypeMap: Record<string, string> = {
-    '001': '서명대기',
+    '001': '발송완료',
     '002': '서명대기',
     '003': '서명완료',
     '004': '거부',
@@ -381,8 +382,23 @@ export function extractEformsignStatus(docInfo: any): string {
     '060': '거부',
   };
 
-  if (statusType && statusTypeMap[statusType]) {
-    return statusTypeMap[statusType];
+  if (rawStatusType !== undefined && rawStatusType !== null && rawStatusType !== '') {
+    const strType = String(rawStatusType);
+    if (statusTypeMap[strType]) {
+      return statusTypeMap[strType];
+    }
+    const paddedType = strType.padStart(3, '0');
+    if (statusTypeMap[paddedType]) {
+      return statusTypeMap[paddedType];
+    }
+    console.log(`[eformsign] 알 수 없는 status_type: "${rawStatusType}" (type: ${typeof rawStatusType})`);
+  }
+
+  const stepType = currentStatus?.step_type;
+  if (stepType !== undefined && stepType !== null) {
+    const strStep = String(stepType);
+    if (strStep === '05' || strStep === '5') return '서명대기';
+    if (strStep === '06' || strStep === '6') return '서명완료';
   }
 
   const eventStatus = docInfo?.document?.document_status || docInfo?.document_status || docInfo?.status || '';
