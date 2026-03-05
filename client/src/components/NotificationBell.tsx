@@ -150,7 +150,7 @@ export function NotificationBell({ customers, users, onAddTodo, todoRefreshTrigg
             onDoubleClick={() => handleRowDoubleClick(todo)}
             data-testid={`notification-todo-row-${todo.id}`}
           >
-            <td className="py-1.5 px-1.5 text-[11px] text-foreground truncate max-w-[36px]">
+            <td className="py-1.5 px-1.5 text-[11px] text-foreground truncate max-w-[60px]">
               {assigneeName}
             </td>
             <td className="py-1.5 px-1.5 text-[10px] whitespace-nowrap text-muted-foreground">
@@ -191,7 +191,7 @@ export function NotificationBell({ customers, users, onAddTodo, todoRefreshTrigg
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-border">
-              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[36px]">담당자</th>
+              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[60px]">담당자</th>
               <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[62px]">날짜/시간</th>
               <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[50px]">성함</th>
               <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[60px]">상호명</th>
@@ -235,7 +235,7 @@ export function NotificationBell({ customers, users, onAddTodo, todoRefreshTrigg
         </PopoverTrigger>
         <PopoverContent
           align="end"
-          className="w-[480px] p-0"
+          className="w-[504px] p-0"
           data-testid="notification-popover"
         >
           <Tabs defaultValue={hasOverdue ? "overdue" : "upcoming"} className="w-full">
