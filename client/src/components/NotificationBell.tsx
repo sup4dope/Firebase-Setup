@@ -150,7 +150,7 @@ export function NotificationBell({ customers, users, onAddTodo, todoRefreshTrigg
             onDoubleClick={() => handleRowDoubleClick(todo)}
             data-testid={`notification-todo-row-${todo.id}`}
           >
-            <td className="py-1.5 px-1.5 text-[11px] text-foreground truncate max-w-[40px]">
+            <td className="py-1.5 px-1.5 text-[11px] text-foreground whitespace-nowrap">
               {assigneeName}
             </td>
             <td className="py-1.5 px-1.5 text-[10px] whitespace-nowrap text-muted-foreground">
@@ -162,7 +162,7 @@ export function NotificationBell({ customers, users, onAddTodo, todoRefreshTrigg
             <td className="py-1.5 px-1.5 text-[10px] truncate max-w-[60px] text-muted-foreground">
               {customerInfo.companyName}
             </td>
-            <td className="py-1.5 px-1.5">
+            <td className="py-1.5 px-1.5 max-w-[120px]">
               <div className="flex items-center gap-1 min-w-0">
                 <PriorityIcon className={cn("w-3 h-3 flex-shrink-0", priorityColor)} />
                 <span className="text-[11px] text-foreground truncate">{todo.title}</span>
@@ -191,11 +191,11 @@ export function NotificationBell({ customers, users, onAddTodo, todoRefreshTrigg
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-border">
-              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[40px]">담당자</th>
+              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium whitespace-nowrap">담당자</th>
               <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[62px]">날짜/시간</th>
               <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[50px]">성함</th>
               <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[60px]">상호명</th>
-              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium">제목</th>
+              <th className="py-1.5 px-1.5 text-[10px] text-muted-foreground font-medium w-[120px]">제목</th>
             </tr>
           </thead>
           <tbody>
