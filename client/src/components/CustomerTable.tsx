@@ -50,7 +50,27 @@ import { cn } from '@/lib/utils';
 import type { Customer, UserRole, StatusCode, CustomerMemo, User, ProcessingOrg } from '@shared/types';
 import { STATUS_OPTIONS, STATUS_STYLES, getStatusStyle, FUNNEL_GROUPS, PROCESSING_ORGS, ORG_STATUS_COLORS, type ProcessingOrgStatus } from '@/lib/constants';
 
-// 쓰레기통 상세사유 (한글)
+const CLOSED_STATUSES = new Set([
+  '장기부재',
+  '거절사유 미파악',
+  '인증불가',
+  '정부기관 오인',
+  '기타자금 오인',
+  '불가업종',
+  '매출없음',
+  '신용점수 미달',
+  '차입금초과',
+  '업력미달',
+  '최근대출',
+  '인증미동의(국세청)',
+  '인증미동의(공여내역)',
+  '진행기간 미동의',
+  '자문료 미동의',
+  '계약금미동의(선불)',
+  '계약금미동의(후불)',
+  '최종부결',
+]);
+
 const TRASH_REASONS = [
   { id: '거절사유 미파악', label: '거절사유 미파악' },
   { id: '인증불가', label: '인증불가' },
@@ -476,10 +496,17 @@ export function CustomerTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedCustomers.map((customer, index) => (
+            {paginatedCustomers.map((customer, index) => {
+              const isClosed = CLOSED_STATUSES.has(customer.status_code);
+              return (
               <TableRow 
                 key={customer.id} 
-                className="group hover:bg-muted/30"
+                className={cn(
+                  "group",
+                  isClosed
+                    ? "opacity-40 bg-muted/40 dark:bg-gray-900/60 hover:opacity-70 hover:bg-muted/50"
+                    : "hover:bg-muted/30"
+                )}
                 data-testid={`row-customer-${customer.id}`}
               >
                 {/* 유입일자 */}
@@ -1081,7 +1108,8 @@ export function CustomerTable({
                   )}
                 </TableCell>
               </TableRow>
-            ))}
+            );
+            })}
           </TableBody>
         </Table>
       </div>
