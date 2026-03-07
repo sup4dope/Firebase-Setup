@@ -1345,6 +1345,19 @@ export async function registerRoutes(
       const docRef = await db.collection("consultations").add(consultationData);
       console.log(`[Webhook] 상담 저장 완료: ${docRef.id} (${name} / ${phone})`);
 
+      try {
+        const serviceList = Array.isArray(services) ? services : ["정책자금 (융자)"];
+        const alimtalkResult = await sendConsultationAlimtalk({
+          customerPhone: String(phone),
+          customerName: String(name),
+          services: serviceList,
+          createdAt: new Date(),
+        });
+        console.log(`[Webhook] 알림톡 발송: ${alimtalkResult.message}`);
+      } catch (alimtalkError: any) {
+        console.error(`[Webhook] 알림톡 발송 실패 (상담 저장은 완료): ${alimtalkError.message}`);
+      }
+
       res.status(201).json({ result: "success", id: docRef.id });
     } catch (error: any) {
       console.error("[Webhook] 상담 저장 오류:", error.message);
