@@ -1286,5 +1286,71 @@ export async function registerRoutes(
     }
   });
 
+  // =========================================================================
+  // 외부 스프레드시트 → consultations 컬렉션 Webhook
+  // =========================================================================
+  app.post("/api/webhook/consultation", async (req, res) => {
+    console.log("[Webhook] 외부 상담 데이터 수신");
+
+    try {
+      const {
+        name, phone, businessName, businessNumber,
+        revenue, services, source, note,
+        utm_source, utm_medium, utm_campaign
+      } = req.body;
+
+      if (!name || !phone) {
+        return res.status(400).json({
+          success: false,
+          error: "name(고객명)과 phone(연락처)은 필수입니다.",
+        });
+      }
+
+      const adminApp = getAdminApp();
+      const db = adminApp.firestore();
+
+      const existing = await db.collection("consultations")
+        .where("phone", "==", String(phone))
+        .where("processed", "==", false)
+        .limit(1)
+        .get();
+
+      if (!existing.empty) {
+        console.log(`[Webhook] 중복 미처리 상담 존재 (phone: ${phone}), 스킵`);
+        return res.status(200).json({ result: "duplicate", message: "이미 동일 연락처의 미처리 상담이 존재합니다." });
+      }
+
+      const consultationData = {
+        name: String(name),
+        phone: String(phone),
+        businessName: String(businessName || ""),
+        businessNumber: String(businessNumber || ""),
+        businessAge: "",
+        revenue: String(revenue || ""),
+        region: "",
+        creditScore: "",
+        taxStatus: "",
+        services: Array.isArray(services) ? services : ["정책자금 (융자)"],
+        source: String(source || "GoogleAds_Agency_Sheet"),
+        email: "",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        processed: false,
+        linked_customer_id: null,
+        note: String(note || ""),
+        utm_source: String(utm_source || ""),
+        utm_medium: String(utm_medium || ""),
+        utm_campaign: String(utm_campaign || ""),
+      };
+
+      const docRef = await db.collection("consultations").add(consultationData);
+      console.log(`[Webhook] 상담 저장 완료: ${docRef.id} (${name} / ${phone})`);
+
+      res.status(201).json({ result: "success", id: docRef.id });
+    } catch (error: any) {
+      console.error("[Webhook] 상담 저장 오류:", error.message);
+      res.status(500).json({ result: "error", error: error.message });
+    }
+  });
+
   return httpServer;
 }
