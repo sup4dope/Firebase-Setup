@@ -1,0 +1,131 @@
+var XLS_SHEET_NAME = '시트1'; // 사장님 시트 탭 이름 (이미지1 기준 '시트1'로 가정)
+var XLS_SCRIPT_PROP = PropertiesService.getScriptProperties(); 
+
+function doGet(e){
+  return handleResponse(e);
+}
+
+function doPost(e){
+  return handleResponse(e);
+}
+
+function handleResponse(e) {
+  var lock = LockService.getPublicLock();
+  lock.waitLock(30000);
+
+  try{
+    var doc = SpreadsheetApp.openById(XLS_SCRIPT_PROP.getProperty('key'));
+    var sheet = doc.getSheetByName(XLS_SHEET_NAME);
+
+    var headRow = e.parameter.header_row || 1;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var nextRow = sheet.getLastRow()+1;
+    var row = [];
+
+    for (i in headers){
+      if (headers[i] == 'Timestamp'){ 
+        row.push(new Date());
+      } else { 
+        row.push(e.parameter[headers[i]]);
+      }
+    }
+
+    // 시트에 데이터 기록
+    sheet.getRange(nextRow, 1, 1, row.length).setValues([row]);
+    
+    // [✅ 핵심 추가] 외부에서 데이터가 들어와 시트에 기록된 직후, 파이어베이스로 즉시 전송
+    sendRowToFirebase(sheet, nextRow);
+
+    return ContentService
+          .createTextOutput(JSON.stringify({'result':'success', 'row': nextRow}))
+          .setMimeType(ContentService.MimeType.JSON);
+  } catch(e){
+    return ContentService
+          .createTextOutput(JSON.stringify({'result':'error', 'error': e}))
+          .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function setup() {
+    var doc = SpreadsheetApp.getActiveSpreadsheet();
+    XLS_SCRIPT_PROP.setProperty('key', doc.getId());
+}
+
+// =========================================================================
+// [추가 기능] 대행사가 시트에 직접 타이핑할 때를 위한 트리거 함수
+// =========================================================================
+function onSheetEdit(e) {
+  if (!e || !e.range) return;
+  var sheet = e.source.getActiveSheet();
+  if (sheet.getName() !== XLS_SHEET_NAME) return;
+
+  var row = e.range.getRow();
+  if (row < 2) return; // 첫 번째 헤더 줄은 제외
+
+  sendRowToFirebase(sheet, row);
+}
+
+// =========================================================================
+// [파이어베이스 매핑 및 전송 핵심 함수]
+// =========================================================================
+function sendRowToFirebase(sheet, rowIdx) {
+  // B열(2)부터 J열(10)까지 데이터 한 번에 가져오기
+  var data = sheet.getRange(rowIdx, 2, 1, 9).getValues()[0];
+
+  var name      = data[2]; // D열: 대표자 성함
+  var phone     = data[3]; // E열: 연락처
+  var bizName   = data[4]; // F열: 사업장명
+  var bizNum    = data[5]; // G열: 사업자번호
+  var revenue   = data[6]; // H열: 연간 매출액
+  var note      = data[7]; // I열: 비고
+  var status    = data[8]; // J열: 전송상태
+
+  // 필수값이 없거나 이미 J열이 '완료'면 전송 안 함 (중복 방지)
+  if (status === "완료" || !name || !phone) return;
+
+  // 파이어베이스 기존 문서 필드 형태에 완벽히 매핑
+  var payload = {
+    "businessName": String(bizName || ""),
+    "businessNumber": String(bizNum || ""),
+    "createdAt": new Date().toISOString(), // Timestamp 형식으로 자동 생성
+    "name": String(name || ""),
+    "phone": String(phone || ""),
+    "processed": false, // ★ 전산상 '유입대기' 상태로 만들기 위해 강제 false 처리
+    "revenue": String(revenue || ""),
+    "services": ["정책자금 (융자)"], // Array 형식
+    "source": "GoogleAds_Agency_Sheet", // 대행사 시트에서 왔음을 구분
+    "note": String(note || ""), // 추가된 비고란 전송
+    "utm_campaign": "policy_funds",
+    "utm_medium": "demandgen",
+    "utm_source": "google"
+  };
+
+  // ★ 사장님의 백엔드 API/Webhook URL을 아래에 넣어주세요
+  var firebaseUrl = "여기에_파이어베이스_API_주소를_넣으세요"; 
+
+  // URL이 세팅 안 되어있으면 에러 방지용으로 중단
+  if (firebaseUrl.indexOf("여기에") > -1) return;
+
+  var options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(payload),
+    "muteHttpExceptions": true
+  };
+
+  var statusCell = sheet.getRange(rowIdx, 10); // J열 타겟
+
+  try {
+    var response = UrlFetchApp.fetch(firebaseUrl, options);
+    var code = response.getResponseCode();
+    if (code === 200 || code === 201) {
+      statusCell.setValue("완료").setBackground("#d9ead3"); // 성공 시 J열 연초록색 '완료'
+    } else {
+      statusCell.setValue("에러: " + code).setBackground("#f4cccc"); // 실패 시 연빨강색
+    }
+  } catch (err) {
+    statusCell.setValue("연결실패").setBackground("#f4cccc");
+  }
+}
