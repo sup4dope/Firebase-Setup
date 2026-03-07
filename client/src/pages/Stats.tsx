@@ -412,6 +412,7 @@ export default function Stats() {
       광고: filteredCustomers.filter(c => c.entry_source === '광고' || c.entry_source === '광고랜딩명').length,
       '캐시노트 인앱광고': filteredCustomers.filter(c => c.entry_source === '캐시노트 인앱광고').length,
       구글애즈: filteredCustomers.filter(c => c.entry_source === '구글애즈').length,
+      '구글애즈(QS)': filteredCustomers.filter(c => c.entry_source === '구글애즈(QS)').length,
       외주: filteredCustomers.filter(c => c.entry_source === '외주').length,
       고객소개: filteredCustomers.filter(c => c.entry_source === '고객소개').length,
       승인복제: filteredCustomers.filter(c => c.entry_source === '승인복제').length,

@@ -1878,7 +1878,8 @@ const UTM_SOURCE_MAP: Record<string, EntrySourceType> = {
   google: '구글애즈',
 };
 
-export const mapUtmToEntrySource = (utmSource?: string): EntrySourceType => {
+export const mapUtmToEntrySource = (utmSource?: string, source?: string): EntrySourceType => {
+  if (source === 'GoogleAds_Agency_Sheet') return '구글애즈(QS)';
   if (!utmSource || utmSource === 'direct' || utmSource === 'organic') return '캐시노트 인앱광고';
   const mapped = UTM_SOURCE_MAP[utmSource.toLowerCase()];
   return mapped || '캐시노트 인앱광고';
@@ -1891,6 +1892,7 @@ export const getCommissionRate = (rates: CommissionRates | undefined, entrySourc
     case '광고':
     case '캐시노트 인앱광고':
     case '구글애즈':
+    case '구글애즈(QS)':
       return rates.ad || 0;
     case '고객소개':
       return rates.referral || 0;
@@ -1910,6 +1912,7 @@ export const getDepositCommissionRate = (rates: CommissionRates | undefined, ent
     case '광고':
     case '캐시노트 인앱광고':
     case '구글애즈':
+    case '구글애즈(QS)':
       return rates.adDeposit || rates.ad || 0;
     case '고객소개':
       return rates.referralDeposit || rates.referral || 0;
@@ -2211,7 +2214,7 @@ export const generateConsultationMemoSummary = (consultation: Consultation): str
   };
 
   const utmInfo = consultation.utm_source && consultation.utm_source !== 'direct'
-    ? `\n- 유입경로: ${mapUtmToEntrySource(consultation.utm_source)} (${consultation.utm_source}/${consultation.utm_medium || '-'}/${consultation.utm_campaign || '-'})`
+    ? `\n- 유입경로: ${mapUtmToEntrySource(consultation.utm_source, consultation.source)} (${consultation.utm_source}/${consultation.utm_medium || '-'}/${consultation.utm_campaign || '-'})`
     : '';
 
   return `[상담 신청 요약]
@@ -2365,7 +2368,7 @@ export const processConsultationToCustomer = async (
         phone: phone,
         business_registration_number: consultation.businessNumber || '',
         credit_score: 0,
-        entry_source: mapUtmToEntrySource(consultation.utm_source),
+        entry_source: mapUtmToEntrySource(consultation.utm_source, consultation.source),
         entry_date: new Date().toISOString().split('T')[0],
         status_code: '상담대기' as StatusCode,
         recent_memo: memoSummary,

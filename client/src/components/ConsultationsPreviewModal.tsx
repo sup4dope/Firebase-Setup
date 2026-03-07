@@ -403,7 +403,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                           <Globe className="w-3.5 h-3.5 text-muted-foreground" />
                           <span className="text-muted-foreground">유입경로:</span>
                           <Badge variant="secondary" className="text-xs font-normal">
-                            {mapUtmToEntrySource(data.utm_source)}
+                            {mapUtmToEntrySource(data.utm_source, data.source)}
                           </Badge>
                           {data.utm_source && data.utm_source !== 'direct' && (
                             <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
