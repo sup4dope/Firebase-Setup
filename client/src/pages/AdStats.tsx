@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BarChart3, TrendingUp, AlertTriangle, Target, Trash2, FileCheck, Users, ChevronRight, Star, X } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { BarChart3, TrendingUp, AlertTriangle, Target, Trash2, FileCheck, Users, ChevronRight, Star, X, CalendarDays } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, CartesianGrid } from 'recharts';
 import { getCustomers } from '@/lib/firestore';
 import { useEffect } from 'react';
 import type { Customer } from '@shared/types';
@@ -33,6 +33,16 @@ const EXEC_STATUSES = ['집행완료', '집행완료(선불)', '집행완료(후
 const ABSENCE_STATUSES = ['단기부재', '장기부재'];
 
 const PIE_COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+
+const SOURCE_LINE_COLORS: Record<string, string> = {
+  '캐시노트 인앱광고': '#3b82f6',
+  '구글애즈': '#ef4444',
+  '구글애즈(QS)': '#f97316',
+  '광고': '#8b5cf6',
+  '외주': '#06b6d4',
+  '고객소개': '#10b981',
+  '승인복제': '#eab308',
+};
 
 type DbGrade = 'S' | 'A' | 'B' | 'C' | 'D';
 
@@ -85,6 +95,7 @@ export default function AdStats() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSource, setSelectedSource] = useState<string>('all');
+  const [daysRange, setDaysRange] = useState<string>('30');
   const [detailModal, setDetailModal] = useState<{ open: boolean; source: string; customers: Customer[] }>({ open: false, source: '', customers: [] });
 
   useEffect(() => {
@@ -159,6 +170,46 @@ export default function AdStats() {
 
     return { total, consulting, trash, target, contractAndBeyond, exec };
   }, [customers, selectedSource]);
+
+  const dailySourceData = useMemo(() => {
+    const days = parseInt(daysRange);
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days + 1);
+
+    const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
+    const relevantCustomers = customers.filter(c => sources.includes(c.entry_source as EntrySourceType));
+
+    const dateMap: Record<string, Record<string, number>> = {};
+    for (let i = 0; i < days; i++) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+      const key = `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}`;
+      dateMap[key] = {};
+      sources.forEach(s => { dateMap[key][s] = 0; });
+      dateMap[key]['합계'] = 0;
+    }
+
+    relevantCustomers.forEach(c => {
+      if (!c.created_at) return;
+      const raw = c.created_at as any;
+      const d = raw?.toDate ? raw.toDate() : (raw instanceof Date ? raw : new Date(raw));
+      if (isNaN(d.getTime()) || d < startDate) return;
+      const key = `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}`;
+      if (dateMap[key] && c.entry_source) {
+        if (dateMap[key][c.entry_source] !== undefined) {
+          dateMap[key][c.entry_source]++;
+        }
+        dateMap[key]['합계']++;
+      }
+    });
+
+    return Object.entries(dateMap).map(([date, counts]) => ({ date, ...counts }));
+  }, [customers, selectedSource, daysRange]);
+
+  const activeSources = useMemo(() => {
+    const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
+    return sources.filter(s => dailySourceData.some(d => (d as any)[s] > 0));
+  }, [dailySourceData, selectedSource]);
 
   const openDetailModal = (source: string) => {
     const filtered = customers.filter(c => c.entry_source === source);
@@ -249,6 +300,77 @@ export default function AdStats() {
           </Card>
         </div>
       )}
+
+      <Card data-testid="card-daily-inflow">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-blue-500" />
+              일자별 유입건수 현황
+            </CardTitle>
+            <Select value={daysRange} onValueChange={setDaysRange}>
+              <SelectTrigger className="w-[120px]" data-testid="select-days-range">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">최근 7일</SelectItem>
+                <SelectItem value="14">최근 14일</SelectItem>
+                <SelectItem value="30">최근 30일</SelectItem>
+                <SelectItem value="60">최근 60일</SelectItem>
+                <SelectItem value="90">최근 90일</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {dailySourceData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={dailySourceData}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10 }}
+                  interval={daysRange === '7' ? 0 : daysRange === '14' ? 1 : daysRange === '30' ? 2 : daysRange === '60' ? 5 : 8}
+                  angle={-45}
+                  textAnchor="end"
+                  height={50}
+                />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12 }}
+                  itemSorter={(item: any) => -(item.value || 0)}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {selectedSource === 'all' && (
+                  <Line
+                    type="monotone"
+                    dataKey="합계"
+                    name="합계"
+                    stroke="#374151"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                  />
+                )}
+                {activeSources.map(source => (
+                  <Line
+                    key={source}
+                    type="monotone"
+                    dataKey={source}
+                    name={source}
+                    stroke={SOURCE_LINE_COLORS[source] || '#6b7280'}
+                    strokeWidth={1.5}
+                    dot={false}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-center text-sm text-muted-foreground py-8">데이터가 없습니다.</p>
+          )}
+        </CardContent>
+      </Card>
 
       {sourceStats.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
