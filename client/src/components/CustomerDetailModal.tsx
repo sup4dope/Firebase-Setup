@@ -712,15 +712,19 @@ export function CustomerDetailModal({
   }, [activeBottomTab, customer?.id, isOpen]);
 
   const getContractStatusBadge = (status: ContractStatus) => {
-    const styles: Record<ContractStatus, string> = {
+    const displayStatus = (status === '서명대기' || status === '거부') ? '발송완료' : status;
+    const styles: Record<string, string> = {
       '초안': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
       '발송완료': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      '서명대기': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
       '서명완료': 'bg-green-500/20 text-green-400 border-green-500/30',
-      '거부': 'bg-red-500/20 text-red-400 border-red-500/30',
       '무효': 'bg-gray-500/20 text-gray-500 border-gray-500/30',
     };
-    return styles[status] || styles['초안'];
+    return styles[displayStatus] || styles['초안'];
+  };
+
+  const getContractDisplayStatus = (status: ContractStatus): string => {
+    if (status === '서명대기' || status === '거부') return '발송완료';
+    return status;
   };
 
   const safeContractDate = (dateVal: any): string => {
@@ -3888,7 +3892,7 @@ export function CustomerDetailModal({
                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                         <span className="ml-2 text-sm text-muted-foreground">계약 이력 로딩 중...</span>
                       </div>
-                    ) : customerContracts.length > 0 && customerContracts.some(c => c.status === '발송완료' || c.status === '서명대기') ? (
+                    ) : customerContracts.length > 0 && customerContracts.some(c => c.status === '발송완료' || c.status === '서명대기' || c.status === '거부') ? (
                       <div className="flex justify-end mb-1">
                         <Button
                           variant="outline"
@@ -3964,7 +3968,7 @@ export function CustomerDetailModal({
                                 variant="outline"
                                 className={cn("text-[10px] px-1.5", getContractStatusBadge(contract.status))}
                               >
-                                {contract.status}
+                                {getContractDisplayStatus(contract.status)}
                               </Badge>
                               {contract.status === '서명완료' && contract.document_id && (
                                 <Button
@@ -4006,7 +4010,7 @@ export function CustomerDetailModal({
                                   다운로드
                                 </Button>
                               )}
-                              {contract.status !== '서명완료' && contract.status !== '거부' && contract.status !== '무효' && (
+                              {contract.status !== '서명완료' && contract.status !== '무효' && (
                                 <>
                                   <Button
                                     variant="outline"

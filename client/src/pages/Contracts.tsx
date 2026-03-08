@@ -19,9 +19,9 @@ import type { Contract, ContractStatus } from '@shared/types';
 const STATUS_BADGE_MAP: Record<ContractStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
   '초안': { variant: 'secondary', className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
   '발송완료': { variant: 'default', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
-  '서명대기': { variant: 'default', className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' },
+  '서명대기': { variant: 'default', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
   '서명완료': { variant: 'default', className: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
-  '거부': { variant: 'destructive', className: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
+  '거부': { variant: 'secondary', className: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500' },
   '무효': { variant: 'secondary', className: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500' },
 };
 
@@ -89,7 +89,11 @@ export default function Contracts() {
     let result = contracts;
 
     if (statusFilter !== 'all') {
-      result = result.filter(c => c.status === statusFilter);
+      if (statusFilter === '발송완료') {
+        result = result.filter(c => c.status === '발송완료' || c.status === '서명대기' || c.status === '거부');
+      } else {
+        result = result.filter(c => c.status === statusFilter);
+      }
     }
 
     if (searchQuery.trim()) {
@@ -128,30 +132,19 @@ export default function Contracts() {
     const status = contract.status;
     const badgeInfo = STATUS_BADGE_MAP[status] || STATUS_BADGE_MAP['초안'];
 
-    if (status === '발송완료') {
-      return {
-        label: '미열람',
-        className: badgeInfo.className,
-        tooltip: '상대방이 아직 계약서를 열람하지 않았습니다.',
-      };
-    }
-    if (status === '서명대기') {
-      return {
-        label: '열람완료',
-        className: badgeInfo.className,
-        tooltip: contract.sent_at ? `열람 시점: ${formatDate(contract.sent_at)} 이후` : '상대방이 계약서를 열람했습니다.',
-      };
-    }
-    if (status === '서명완료') {
+    const displayStatus = (status === '서명대기' || status === '거부') ? '발송완료' : status;
+    const displayBadge = STATUS_BADGE_MAP[displayStatus] || badgeInfo;
+
+    if (displayStatus === '서명완료') {
       return {
         label: '서명완료',
-        className: badgeInfo.className,
+        className: displayBadge.className,
         tooltip: contract.completed_at ? `서명완료: ${formatDate(contract.completed_at)}` : '서명이 완료되었습니다.',
       };
     }
     return {
-      label: status,
-      className: badgeInfo.className,
+      label: displayStatus,
+      className: displayBadge.className,
       tooltip: null,
     };
   };
@@ -243,11 +236,8 @@ export default function Contracts() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">전체 ({statusCounts.all || 0})</SelectItem>
-            <SelectItem value="발송완료">발송완료 ({statusCounts['발송완료'] || 0})</SelectItem>
-            <SelectItem value="서명대기">서명대기 ({statusCounts['서명대기'] || 0})</SelectItem>
+            <SelectItem value="발송완료">발송완료 ({(statusCounts['발송완료'] || 0) + (statusCounts['서명대기'] || 0) + (statusCounts['거부'] || 0)})</SelectItem>
             <SelectItem value="서명완료">서명완료 ({statusCounts['서명완료'] || 0})</SelectItem>
-            <SelectItem value="거부">거부 ({statusCounts['거부'] || 0})</SelectItem>
-            <SelectItem value="초안">초안 ({statusCounts['초안'] || 0})</SelectItem>
             <SelectItem value="무효">무효 ({statusCounts['무효'] || 0})</SelectItem>
           </SelectContent>
         </Select>

@@ -108,7 +108,7 @@ match /contracts_eformsign/{contractId} {
 - **계약 레코드 생성**: 서버 측(Admin SDK)에서 `contracts_eformsign` 컬렉션에 직접 저장 (클라이언트 Firestore 보안 규칙 우회). 레코드에 `manager_id`, `team_id`, `created_by_uid` 필드 포함
 - **전자계약 권한 필터링**: staff→본인 고객 계약만, team_leader→팀 고객 계약만, super_admin→전체 조회. 레거시 레코드(manager_id/team_id 미저장)는 모든 사용자에게 노출
 - **전자계약 삭제**: super_admin 전용 (`DELETE /api/contracts/:contractId`)
-- **전자계약 상태 표시**: 발송완료→'미열람', 서명대기→'열람완료'(tooltip에 열람 시점), 서명완료→'서명완료'(tooltip에 완료일)
+- **전자계약 상태 표시**: 3가지 상태만 추적 — 발송완료(서명대기/거부도 발송완료로 통합 표시), 서명완료(tooltip에 완료일), 무효. 열람 추적 제거됨
 - **자동 기입 필드**: 계약일자(발송일 YYYY-MM-DD), 상호명(company_name), 사업자번호(business_registration_number), 대표자명(name), 소재지(business_address + detail), 연락처(phone), 계약금(만원→원 변환 + 한글 금액), 자문료율(%)
 - **발송 시 자동 메모**: 고객 memo_history에 `[계약서발송완료]` 메모 추가 (FieldValue.arrayUnion 사용)
 - **계약 유형별 처리**: 템플릿명 기반 자동 판별 — `(pre)`=선불계약→계약완료(선불), `(post)`=후불계약→계약완료(후불), `(out)`=외주계약→계약완료(외주). 서버 `detectContractType()` 함수 + 클라이언트 동일 로직

@@ -353,19 +353,19 @@ export function checkEformsignConfig(): { configured: boolean; missing: string[]
 
 export function mapEformsignStatus(status: string): string {
   const statusMap: Record<string, string> = {
-    'doc_create': '초안',
-    'doc_tempsave': '초안',
+    'doc_create': '발송완료',
+    'doc_tempsave': '발송완료',
     'doc_request_approval': '발송완료',
     'doc_accept_approval': '발송완료',
-    'doc_request_external': '서명대기',
-    'doc_request_participant': '서명대기',
-    'doc_accept_participant': '서명대기',
+    'doc_request_external': '발송완료',
+    'doc_request_participant': '발송완료',
+    'doc_accept_participant': '발송완료',
     'doc_complete': '서명완료',
-    'doc_decline': '거부',
+    'doc_decline': '발송완료',
     'doc_cancel': '무효',
     'doc_void': '무효',
   };
-  return statusMap[status] || status;
+  return statusMap[status] || '발송완료';
 }
 
 export function extractEformsignStatus(docInfo: any): string {
@@ -373,13 +373,11 @@ export function extractEformsignStatus(docInfo: any): string {
   const rawStatusType = currentStatus?.status_type;
 
   const statusTypeMap: Record<string, string> = {
-    '001': '발송완료',
-    '002': '서명대기',
     '003': '서명완료',
-    '004': '거부',
+    '004': '발송완료',
     '005': '무효',
     '042': '무효',
-    '060': '거부',
+    '060': '발송완료',
   };
 
   if (rawStatusType !== undefined && rawStatusType !== null && rawStatusType !== '') {
@@ -391,13 +389,11 @@ export function extractEformsignStatus(docInfo: any): string {
     if (statusTypeMap[paddedType]) {
       return statusTypeMap[paddedType];
     }
-    console.log(`[eformsign] 알 수 없는 status_type: "${rawStatusType}" (type: ${typeof rawStatusType})`);
   }
 
   const stepType = currentStatus?.step_type;
   if (stepType !== undefined && stepType !== null) {
     const strStep = String(stepType);
-    if (strStep === '05' || strStep === '5') return '서명대기';
     if (strStep === '06' || strStep === '6') return '서명완료';
   }
 
@@ -406,5 +402,5 @@ export function extractEformsignStatus(docInfo: any): string {
     return mapEformsignStatus(eventStatus);
   }
 
-  return '';
+  return '발송완료';
 }
