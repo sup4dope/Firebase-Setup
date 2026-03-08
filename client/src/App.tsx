@@ -28,6 +28,7 @@ import AnnualLeave from '@/pages/AnnualLeave';
 import Migration from '@/pages/Migration';
 import Rankings from '@/pages/Rankings';
 import Contracts from '@/pages/Contracts';
+import AdStats from '@/pages/AdStats';
 import NotFound from '@/pages/not-found';
 import {
   getTodos,
@@ -227,6 +228,7 @@ function AuthenticatedApp() {
               <Route path="/annual-leave" component={AnnualLeave} />
               <Route path="/rankings" component={Rankings} />
               <Route path="/contracts" component={Contracts} />
+              <Route path="/ad-stats" component={AdStats} />
               <Route path="/migrate" component={Migration} />
               <Route component={NotFound} />
             </Switch>

@@ -55,6 +55,7 @@ export function AppSidebar({
     { href: '/annual-leave', label: '연차관리', icon: CalendarDays, description: '연차 신청 및 승인', adminOnly: false },
     { href: '/contracts', label: '전자계약', icon: FileSignature, description: '계약서 발송 및 관리', adminOnly: false },
     { href: '/settlements', label: '정산관리', icon: Calculator, description: '수당 정산 및 환수', adminOnly: false },
+    { href: '/ad-stats', label: '광고통계', icon: BarChart3, description: '유입경로별 DB분석', adminOnly: true },
     { href: '/company-settlement', label: '회사정산', icon: Landmark, description: '매출/비용 통합', adminOnly: true },
   ];
 
