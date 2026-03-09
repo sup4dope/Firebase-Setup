@@ -497,3 +497,23 @@
     break-inside: avoid !important;
   }
 }
+
+@keyframes funnel-pulse {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(168, 85, 247, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.5), 0 0 28px rgba(168, 85, 247, 0.15);
+  }
+}
+
+.funnel-pulse-glow > button {
+  animation: funnel-pulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .funnel-pulse-glow > button {
+    animation: none;
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
+  }
+}

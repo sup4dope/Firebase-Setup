@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { FUNNEL_GROUPS } from '@/lib/constants';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Customer } from '@shared/types';
 
 interface FunnelChartProps {
@@ -139,6 +140,29 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
   // 테마 가져오기
   const getTheme = (themeKey: string) => STAGE_THEMES[themeKey as keyof typeof STAGE_THEMES] || STAGE_THEMES.all;
 
+  const PROGRESS_SEGMENTS = [
+    { id: '상담대기', label: '상담대기', color: 'bg-purple-500', hoverColor: 'hover:bg-purple-400' },
+    { id: '단기부재', label: '단기부재', color: 'bg-orange-500', hoverColor: 'hover:bg-orange-400' },
+    { id: '장기부재', label: '장기부재', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-400' },
+    { id: '쓰레기통', label: '쓰레기통', color: 'bg-rose-500', hoverColor: 'hover:bg-rose-400' },
+    { id: '희망타겟', label: '희망타겟', color: 'bg-yellow-500', hoverColor: 'hover:bg-yellow-400' },
+    { id: '계약서발송완료', label: '계약서발송', color: 'bg-lime-500', hoverColor: 'hover:bg-lime-400' },
+    { id: '계약완료', label: '계약완료', color: 'bg-emerald-500', hoverColor: 'hover:bg-emerald-400' },
+    { id: '서류취합', label: '서류취합', color: 'bg-blue-500', hoverColor: 'hover:bg-blue-400' },
+    { id: '신청완료', label: '신청완료', color: 'bg-indigo-500', hoverColor: 'hover:bg-indigo-400' },
+    { id: '집행완료_그룹', label: '집행완료', color: 'bg-teal-500', hoverColor: 'hover:bg-teal-400' },
+  ];
+
+  const progressData = useMemo(() => {
+    return PROGRESS_SEGMENTS.map(seg => ({
+      ...seg,
+      count: getStageCount(seg.id),
+      pct: totalCount > 0 ? (getStageCount(seg.id) / totalCount) * 100 : 0,
+    })).filter(seg => seg.count > 0);
+  }, [customers, totalCount]);
+
+  const consultationCount = getStageCount('상담대기');
+
   // 헤더 박스 렌더링
   const renderStageHeader = (
     id: string, 
@@ -237,6 +261,50 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
           전체 {customers.length}건
         </div>
       </div>
+
+      {totalCount > 0 && (
+        <div className="space-y-2">
+          <div className="flex w-full h-7 rounded-lg overflow-hidden bg-muted dark:bg-slate-800/50" data-testid="progress-bar-funnel">
+            {progressData.map((seg) => (
+              <Tooltip key={seg.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onStageClick(seg.id === '집행완료_그룹' ? '집행완료_그룹' : seg.id)}
+                    aria-label={`${seg.label} ${seg.count}건 ${seg.pct.toFixed(1)}%`}
+                    className={cn(
+                      seg.color,
+                      seg.hoverColor,
+                      "h-full transition-all duration-300 cursor-pointer relative",
+                      "flex items-center justify-center overflow-hidden",
+                      selectedStage === seg.id && "ring-2 ring-white ring-inset"
+                    )}
+                    style={{ width: `${Math.max(seg.pct, 1.5)}%` }}
+                    data-testid={`progress-segment-${seg.id}`}
+                  >
+                    {seg.pct >= 8 && (
+                      <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">
+                        {seg.count}
+                      </span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  <span className="font-semibold">{seg.label}</span> {seg.count}건 ({seg.pct.toFixed(1)}%)
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {progressData.map((seg) => (
+              <div key={seg.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className={cn("w-2.5 h-2.5 rounded-sm shrink-0", seg.color)} />
+                <span>{seg.label} {seg.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-row items-start w-full gap-0">
         {/* Column 1: 전체 */}
         <div className="flex-1 flex flex-col min-w-0">
@@ -250,15 +318,32 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
 
         {/* Column 2: 상담대기 + 부재중 + 쓰레기통 (세로 스택) */}
         <div className="flex-1 flex flex-col min-w-0 gap-2">
-          {/* 상담대기 헤더 */}
-          {renderStageHeader(
-            '상담대기', 
-            '상담대기', 
-            '상담대기', 
-            getStageCount('상담대기'), 
-            false, 
-            false
-          )}
+          {/* 상담대기 헤더 - 건수가 있으면 깜빡임 */}
+          <div className={cn("relative w-full group", consultationCount > 0 && "funnel-pulse-glow")}>
+            <button
+              onClick={() => onStageClick('상담대기')}
+              className={cn(
+                "w-full h-16 rounded-md border-2 transition-all duration-300",
+                "flex flex-col items-center justify-center",
+                "bg-card dark:bg-slate-900/50 backdrop-blur-sm text-foreground dark:text-white",
+                STAGE_THEMES.상담대기.border,
+                "hover:shadow-lg hover:bg-accent dark:hover:bg-slate-800/70",
+                selectedStage === '상담대기' && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                consultationCount > 0 && "border-purple-500 shadow-[0_0_12px_rgba(168,85,247,0.4)]"
+              )}
+              data-testid="button-funnel-상담대기"
+            >
+              <div className="font-bold text-sm">상담대기</div>
+              <div className={cn(
+                "text-xs",
+                consultationCount > 0
+                  ? "font-semibold text-purple-600 dark:text-purple-300"
+                  : "text-muted-foreground dark:text-gray-300"
+              )}>
+                {consultationCount}건 ({getPercentage(consultationCount)})
+              </div>
+            </button>
+          </div>
 
           {/* 부재중 그룹 - 항상 노출 */}
           <div className="flex flex-col gap-1">
