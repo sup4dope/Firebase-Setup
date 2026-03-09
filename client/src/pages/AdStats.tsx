@@ -150,9 +150,8 @@ export default function AdStats() {
     }
 
     relevantCustomers.forEach(c => {
-      if (!c.created_at) return;
-      const raw = c.created_at as any;
-      const d = raw?.toDate ? raw.toDate() : (raw instanceof Date ? raw : new Date(raw));
+      if (!c.entry_date) return;
+      const d = new Date(c.entry_date + 'T00:00:00');
       if (isNaN(d.getTime()) || d < chartStartDate || d > chartEndDate) return;
       const key = `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}`;
       if (dateMap[key] && c.entry_source) {
@@ -168,9 +167,8 @@ export default function AdStats() {
 
   const dateFilteredCustomers = useMemo(() => {
     return customers.filter(c => {
-      if (!c.created_at) return false;
-      const raw = c.created_at as any;
-      const d = raw?.toDate ? raw.toDate() : (raw instanceof Date ? raw : new Date(raw));
+      if (!c.entry_date) return false;
+      const d = new Date(c.entry_date + 'T00:00:00');
       if (isNaN(d.getTime())) return false;
       return d >= chartStartDate && d <= chartEndDate;
     });
