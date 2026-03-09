@@ -214,6 +214,21 @@ export default function AdStats() {
     return sources.filter(s => dailySourceData.some(d => (d as any)[s] > 0));
   }, [dailySourceData, selectedSource]);
 
+  const dailySourceTotals = useMemo(() => {
+    const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
+    const totals: Record<string, number> = {};
+    sources.forEach(s => { totals[s] = 0; });
+    let grandTotal = 0;
+    dailySourceData.forEach(d => {
+      sources.forEach(s => {
+        const val = (d as any)[s] || 0;
+        totals[s] += val;
+      });
+      grandTotal += (d as any)['합계'] || 0;
+    });
+    return { totals, grandTotal, sources };
+  }, [dailySourceData, selectedSource]);
+
   const openDetailModal = (source: string) => {
     const filtered = customers.filter(c => c.entry_source === source);
     setDetailModal({ open: true, source, customers: filtered });
@@ -371,6 +386,42 @@ export default function AdStats() {
             </ResponsiveContainer>
           ) : (
             <p className="text-center text-sm text-muted-foreground py-8">데이터가 없습니다.</p>
+          )}
+
+          {dailySourceData.length > 0 && (
+            <div className="mt-4 border rounded-lg overflow-hidden">
+              <table className="w-full text-sm" data-testid="table-daily-totals">
+                <thead>
+                  <tr className="bg-muted/50 border-b border-border">
+                    <th className="py-2 px-3 text-left font-medium text-muted-foreground">유입경로</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">접수 건수</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">비율</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailySourceTotals.sources
+                    .filter(s => dailySourceTotals.totals[s] > 0)
+                    .sort((a, b) => dailySourceTotals.totals[b] - dailySourceTotals.totals[a])
+                    .map(source => (
+                      <tr key={source} className="border-b border-border/50 hover:bg-muted/30">
+                        <td className="py-2 px-3 font-medium flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: SOURCE_LINE_COLORS[source as EntrySourceType] || '#6b7280' }} />
+                          {source}
+                        </td>
+                        <td className="py-2 px-3 text-right font-semibold">{dailySourceTotals.totals[source]}건</td>
+                        <td className="py-2 px-3 text-right text-muted-foreground">
+                          {dailySourceTotals.grandTotal > 0 ? ((dailySourceTotals.totals[source] / dailySourceTotals.grandTotal) * 100).toFixed(1) : '0.0'}%
+                        </td>
+                      </tr>
+                    ))}
+                  <tr className="bg-muted/30 font-semibold">
+                    <td className="py-2 px-3">합계</td>
+                    <td className="py-2 px-3 text-right">{dailySourceTotals.grandTotal}건</td>
+                    <td className="py-2 px-3 text-right">100%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
