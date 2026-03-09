@@ -904,13 +904,12 @@ export const updateTeamAdmin = async (teamId: string, newName: string): Promise<
     });
   });
   
-  // 해당 팀 고객들의 team_name도 업데이트
+  // 해당 팀 고객들의 team_name도 업데이트 (관리성 변경이므로 updated_at 미갱신)
   const customersQuery = query(collection(db, 'customers'), where('team_id', '==', teamId));
   const customersSnapshot = await getDocs(customersQuery);
   customersSnapshot.docs.forEach(customerDoc => {
     batch.update(doc(db, 'customers', customerDoc.id), {
       team_name: newName,
-      updated_at: Timestamp.now(),
     });
   });
   
