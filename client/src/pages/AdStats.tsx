@@ -116,68 +116,6 @@ export default function AdStats() {
     load();
   }, [isSuperAdmin]);
 
-  const sourceStats = useMemo(() => {
-    const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
-
-    return sources.map(source => {
-      const filtered = customers.filter(c => c.entry_source === source);
-      const total = filtered.length;
-      if (total === 0) return { source, total: 0, consulting: 0, trash: 0, target: 0, contractSent: 0, contract: 0, docs: 0, apply: 0, exec: 0, absence: 0, finalReject: 0, trashDetails: {} as Record<string, number>, targetDetails: {} as Record<string, number>, grades: {} as Record<DbGrade, number> };
-
-      const consulting = filtered.filter(c => c.status_code === '상담대기').length;
-      const trash = filtered.filter(c => TRASH_STATUSES.includes(c.status_code)).length;
-      const target = filtered.filter(c => TARGET_STATUSES.includes(c.status_code)).length;
-      const contractSent = filtered.filter(c => CONTRACT_SENT_STATUSES.includes(c.status_code)).length;
-      const contract = filtered.filter(c => CONTRACT_STATUSES.includes(c.status_code)).length;
-      const docs = filtered.filter(c => DOCS_STATUSES.includes(c.status_code)).length;
-      const apply = filtered.filter(c => APPLY_STATUSES.includes(c.status_code)).length;
-      const exec = filtered.filter(c => EXEC_STATUSES.includes(c.status_code)).length;
-      const absence = filtered.filter(c => ABSENCE_STATUSES.includes(c.status_code)).length;
-      const finalReject = filtered.filter(c => c.status_code === '최종부결').length;
-
-      const trashDetails: Record<string, number> = {};
-      TRASH_STATUSES.forEach(s => {
-        const count = filtered.filter(c => c.status_code === s).length;
-        if (count > 0) trashDetails[s] = count;
-      });
-
-      const targetDetails: Record<string, number> = {};
-      TARGET_STATUSES.forEach(s => {
-        const count = filtered.filter(c => c.status_code === s).length;
-        if (count > 0) targetDetails[s] = count;
-      });
-
-      const grades: Record<DbGrade, number> = { S: 0, A: 0, B: 0, C: 0, D: 0 };
-      filtered.forEach(c => {
-        grades[gradeCustomer(c)]++;
-      });
-
-      return { source, total, consulting, trash, target, contractSent, contract, docs, apply, exec, absence, finalReject, trashDetails, targetDetails, grades };
-    }).filter(s => s.total > 0);
-  }, [customers, selectedSource]);
-
-  const totalStats = useMemo(() => {
-    const allFiltered = selectedSource === 'all'
-      ? customers.filter(c => ENTRY_SOURCES.includes(c.entry_source as EntrySourceType))
-      : customers.filter(c => c.entry_source === selectedSource);
-    const total = allFiltered.length;
-    if (total === 0) return null;
-
-    const consulting = allFiltered.filter(c => c.status_code === '상담대기').length;
-    const trash = allFiltered.filter(c => TRASH_STATUSES.includes(c.status_code)).length;
-    const target = allFiltered.filter(c => TARGET_STATUSES.includes(c.status_code)).length;
-    const contractAndBeyond = allFiltered.filter(c =>
-      CONTRACT_SENT_STATUSES.includes(c.status_code) ||
-      CONTRACT_STATUSES.includes(c.status_code) ||
-      DOCS_STATUSES.includes(c.status_code) ||
-      APPLY_STATUSES.includes(c.status_code) ||
-      EXEC_STATUSES.includes(c.status_code)
-    ).length;
-    const exec = allFiltered.filter(c => EXEC_STATUSES.includes(c.status_code)).length;
-
-    return { total, consulting, trash, target, contractAndBeyond, exec };
-  }, [customers, selectedSource]);
-
   const { chartStartDate, chartEndDate, chartDays } = useMemo(() => {
     const now = new Date();
     if (dateRangeMode === 'custom' && customStartDate && customEndDate) {
@@ -224,6 +162,16 @@ export default function AdStats() {
     return Object.entries(dateMap).map(([date, counts]) => ({ date, ...counts }));
   }, [customers, selectedSource, chartStartDate, chartEndDate, chartDays]);
 
+  const dateFilteredCustomers = useMemo(() => {
+    return customers.filter(c => {
+      if (!c.created_at) return false;
+      const raw = c.created_at as any;
+      const d = raw?.toDate ? raw.toDate() : (raw instanceof Date ? raw : new Date(raw));
+      if (isNaN(d.getTime())) return false;
+      return d >= chartStartDate && d <= chartEndDate;
+    });
+  }, [customers, chartStartDate, chartEndDate]);
+
   const activeSources = useMemo(() => {
     const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
     return sources.filter(s => dailySourceData.some(d => (d as any)[s] > 0));
@@ -244,8 +192,70 @@ export default function AdStats() {
     return { totals, grandTotal, sources };
   }, [dailySourceData, selectedSource]);
 
+  const sourceStats = useMemo(() => {
+    const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
+
+    return sources.map(source => {
+      const filtered = dateFilteredCustomers.filter(c => c.entry_source === source);
+      const total = filtered.length;
+      if (total === 0) return { source, total: 0, consulting: 0, trash: 0, target: 0, contractSent: 0, contract: 0, docs: 0, apply: 0, exec: 0, absence: 0, finalReject: 0, trashDetails: {} as Record<string, number>, targetDetails: {} as Record<string, number>, grades: {} as Record<DbGrade, number> };
+
+      const consulting = filtered.filter(c => c.status_code === '상담대기').length;
+      const trash = filtered.filter(c => TRASH_STATUSES.includes(c.status_code)).length;
+      const target = filtered.filter(c => TARGET_STATUSES.includes(c.status_code)).length;
+      const contractSent = filtered.filter(c => CONTRACT_SENT_STATUSES.includes(c.status_code)).length;
+      const contract = filtered.filter(c => CONTRACT_STATUSES.includes(c.status_code)).length;
+      const docs = filtered.filter(c => DOCS_STATUSES.includes(c.status_code)).length;
+      const apply = filtered.filter(c => APPLY_STATUSES.includes(c.status_code)).length;
+      const exec = filtered.filter(c => EXEC_STATUSES.includes(c.status_code)).length;
+      const absence = filtered.filter(c => ABSENCE_STATUSES.includes(c.status_code)).length;
+      const finalReject = filtered.filter(c => c.status_code === '최종부결').length;
+
+      const trashDetails: Record<string, number> = {};
+      TRASH_STATUSES.forEach(s => {
+        const count = filtered.filter(c => c.status_code === s).length;
+        if (count > 0) trashDetails[s] = count;
+      });
+
+      const targetDetails: Record<string, number> = {};
+      TARGET_STATUSES.forEach(s => {
+        const count = filtered.filter(c => c.status_code === s).length;
+        if (count > 0) targetDetails[s] = count;
+      });
+
+      const grades: Record<DbGrade, number> = { S: 0, A: 0, B: 0, C: 0, D: 0 };
+      filtered.forEach(c => {
+        grades[gradeCustomer(c)]++;
+      });
+
+      return { source, total, consulting, trash, target, contractSent, contract, docs, apply, exec, absence, finalReject, trashDetails, targetDetails, grades };
+    }).filter(s => s.total > 0);
+  }, [dateFilteredCustomers, selectedSource]);
+
+  const totalStats = useMemo(() => {
+    const allFiltered = selectedSource === 'all'
+      ? dateFilteredCustomers.filter(c => ENTRY_SOURCES.includes(c.entry_source as EntrySourceType))
+      : dateFilteredCustomers.filter(c => c.entry_source === selectedSource);
+    const total = allFiltered.length;
+    if (total === 0) return null;
+
+    const consulting = allFiltered.filter(c => c.status_code === '상담대기').length;
+    const trash = allFiltered.filter(c => TRASH_STATUSES.includes(c.status_code)).length;
+    const target = allFiltered.filter(c => TARGET_STATUSES.includes(c.status_code)).length;
+    const contractAndBeyond = allFiltered.filter(c =>
+      CONTRACT_SENT_STATUSES.includes(c.status_code) ||
+      CONTRACT_STATUSES.includes(c.status_code) ||
+      DOCS_STATUSES.includes(c.status_code) ||
+      APPLY_STATUSES.includes(c.status_code) ||
+      EXEC_STATUSES.includes(c.status_code)
+    ).length;
+    const exec = allFiltered.filter(c => EXEC_STATUSES.includes(c.status_code)).length;
+
+    return { total, consulting, trash, target, contractAndBeyond, exec };
+  }, [dateFilteredCustomers, selectedSource]);
+
   const openDetailModal = (source: string) => {
-    const filtered = customers.filter(c => c.entry_source === source);
+    const filtered = dateFilteredCustomers.filter(c => c.entry_source === source);
     setDetailModal({ open: true, source, customers: filtered });
   };
 
@@ -269,22 +279,85 @@ export default function AdStats() {
 
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto" data-testid="ad-stats-page">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">광고통계</h1>
           <p className="text-sm text-muted-foreground mt-1">유입경로별 DB 분석 및 전환율 통계</p>
         </div>
-        <Select value={selectedSource} onValueChange={setSelectedSource} data-testid="select-source-filter">
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="유입경로 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 유입경로</SelectItem>
-            {ENTRY_SOURCES.map(s => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 border rounded-lg p-0.5">
+            <Button
+              variant={dateRangeMode === 'preset' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 text-xs px-2.5"
+              onClick={() => setDateRangeMode('preset')}
+              data-testid="button-preset-mode"
+            >
+              프리셋
+            </Button>
+            <Button
+              variant={dateRangeMode === 'custom' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 text-xs px-2.5"
+              onClick={() => {
+                setDateRangeMode('custom');
+                if (!customStartDate || !customEndDate) {
+                  const now = new Date();
+                  const end = now.toISOString().split('T')[0];
+                  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29).toISOString().split('T')[0];
+                  setCustomStartDate(start);
+                  setCustomEndDate(end);
+                }
+              }}
+              data-testid="button-custom-mode"
+            >
+              기간설정
+            </Button>
+          </div>
+          {dateRangeMode === 'preset' ? (
+            <Select value={daysRange} onValueChange={setDaysRange}>
+              <SelectTrigger className="w-[120px] h-8" data-testid="select-days-range">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">최근 7일</SelectItem>
+                <SelectItem value="14">최근 14일</SelectItem>
+                <SelectItem value="30">최근 30일</SelectItem>
+                <SelectItem value="60">최근 60일</SelectItem>
+                <SelectItem value="90">최근 90일</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-[140px] h-8 text-xs"
+                data-testid="input-start-date"
+              />
+              <span className="text-xs text-muted-foreground">~</span>
+              <Input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-[140px] h-8 text-xs"
+                data-testid="input-end-date"
+              />
+            </div>
+          )}
+          <Select value={selectedSource} onValueChange={setSelectedSource} data-testid="select-source-filter">
+            <SelectTrigger className="w-[160px] h-8">
+              <SelectValue placeholder="유입경로 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 유입경로</SelectItem>
+              {ENTRY_SOURCES.map(s => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {totalStats && (
@@ -336,75 +409,10 @@ export default function AdStats() {
 
       <Card data-testid="card-daily-inflow">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-blue-500" />
-              일자별 유입건수 현황
-            </CardTitle>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1 border rounded-lg p-0.5">
-                <Button
-                  variant={dateRangeMode === 'preset' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-7 text-xs px-2.5"
-                  onClick={() => setDateRangeMode('preset')}
-                  data-testid="button-preset-mode"
-                >
-                  프리셋
-                </Button>
-                <Button
-                  variant={dateRangeMode === 'custom' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-7 text-xs px-2.5"
-                  onClick={() => {
-                    setDateRangeMode('custom');
-                    if (!customStartDate || !customEndDate) {
-                      const now = new Date();
-                      const end = now.toISOString().split('T')[0];
-                      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29).toISOString().split('T')[0];
-                      setCustomStartDate(start);
-                      setCustomEndDate(end);
-                    }
-                  }}
-                  data-testid="button-custom-mode"
-                >
-                  기간설정
-                </Button>
-              </div>
-              {dateRangeMode === 'preset' ? (
-                <Select value={daysRange} onValueChange={setDaysRange}>
-                  <SelectTrigger className="w-[120px] h-8" data-testid="select-days-range">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7">최근 7일</SelectItem>
-                    <SelectItem value="14">최근 14일</SelectItem>
-                    <SelectItem value="30">최근 30일</SelectItem>
-                    <SelectItem value="60">최근 60일</SelectItem>
-                    <SelectItem value="90">최근 90일</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-[140px] h-8 text-xs"
-                    data-testid="input-start-date"
-                  />
-                  <span className="text-xs text-muted-foreground">~</span>
-                  <Input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-[140px] h-8 text-xs"
-                    data-testid="input-end-date"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-blue-500" />
+            일자별 유입건수 현황
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {dailySourceData.length > 0 ? (
