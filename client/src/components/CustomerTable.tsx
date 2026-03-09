@@ -88,6 +88,7 @@ const GROUP_COLORS: Record<string, { bg: string; text: string }> = {
   '부재': { bg: 'bg-orange-500/20', text: 'text-orange-700 dark:text-orange-300' },
   '거절': { bg: 'bg-rose-500/20', text: 'text-rose-700 dark:text-rose-300' },
   '희망타겟': { bg: 'bg-yellow-500/20', text: 'text-amber-700 dark:text-yellow-300' },
+  '계약서발송': { bg: 'bg-lime-500/20', text: 'text-lime-700 dark:text-lime-300' },
   '계약': { bg: 'bg-emerald-500/20', text: 'text-emerald-700 dark:text-emerald-300' },
   '서류': { bg: 'bg-blue-500/20', text: 'text-blue-700 dark:text-blue-300' },
   '신청': { bg: 'bg-indigo-500/20', text: 'text-indigo-700 dark:text-indigo-300' },
@@ -112,6 +113,7 @@ const getStatusBadgeInfo = (statusCode: string): { label: string; colorClass: st
   else if (FUNNEL_GROUPS['쓰레기통']?.includes(statusCode)) category = '거절';
   else if (statusCode === '단기부재' || statusCode === '장기부재') category = '부재';
   else if (FUNNEL_GROUPS['희망타겟']?.includes(statusCode)) category = '희망타겟';
+  else if (FUNNEL_GROUPS['계약서발송완료']?.includes(statusCode)) category = '계약서발송';
   else if (FUNNEL_GROUPS['계약완료']?.includes(statusCode)) category = '계약';
   else if (FUNNEL_GROUPS['서류취합']?.includes(statusCode)) category = '서류';
   else if (FUNNEL_GROUPS['신청완료']?.includes(statusCode)) category = '신청';
@@ -690,6 +692,14 @@ export function CustomerTable({
                             <SelectItem value="자문료 미동의" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">자문료 미동의</SelectItem>
                             <SelectItem value="계약금미동의(선불)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">계약금미동의(선불)</SelectItem>
                             <SelectItem value="계약금미동의(후불)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">계약금미동의(후불)</SelectItem>
+                          </SelectGroup>
+
+                          {/* 계약서발송완료 그룹 */}
+                          <SelectGroup>
+                            <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">계약서발송완료</SelectLabel>
+                            <SelectItem value="계약서발송완료(선불)" className="text-lime-600 dark:text-lime-400 focus:bg-accent cursor-pointer pl-4">계약서발송완료(선불)</SelectItem>
+                            <SelectItem value="계약서발송완료(후불)" className="text-lime-600 dark:text-lime-400 focus:bg-accent cursor-pointer pl-4">계약서발송완료(후불)</SelectItem>
+                            <SelectItem value="계약서발송완료(외주)" className="text-lime-600 dark:text-lime-400 focus:bg-accent cursor-pointer pl-4">계약서발송완료(외주)</SelectItem>
                           </SelectGroup>
 
                           {/* 계약완료 그룹 */}

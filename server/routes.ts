@@ -26,6 +26,14 @@ function getContractStatusByType(contractType: ContractType): string {
   }
 }
 
+function getContractSentStatusByType(contractType: ContractType): string {
+  switch (contractType) {
+    case 'post': return '계약서발송완료(후불)';
+    case 'out': return '계약서발송완료(외주)';
+    default: return '계약서발송완료(선불)';
+  }
+}
+
 function getContractTypeLabel(contractType: ContractType): string {
   switch (contractType) {
     case 'post': return '후불계약';
@@ -678,11 +686,15 @@ export async function registerRoutes(
 
         try {
           const customerRef = firestore.collection('customers').doc(customer_id);
+          const prevDoc = await customerRef.get();
+          const prevStatus = prevDoc.data()?.status_code || '';
+          const sentStatus = getContractSentStatusByType(contractType);
           const customerUpdate: Record<string, any> = {
             memo_history: FieldValue.arrayUnion(memoEntry),
             recent_memo: memoContent,
             latest_memo: memoContent,
             updated_at: now.toISOString(),
+            status_code: sentStatus,
           };
           if (contractType !== 'out' && amountManWon > 0) {
             customerUpdate.approved_amount = amountManWon;
@@ -693,7 +705,20 @@ export async function registerRoutes(
             customerUpdate.contract_fee_rate = commissionRate;
           }
           await customerRef.update(customerUpdate);
-          console.log(`[eformsign] 고객 메모 + 자문료율 업데이트 완료: ${customer_id} (${contractType})`);
+          try {
+            await firestore.collection('status_logs').add({
+              customer_id,
+              previous_status: prevStatus,
+              new_status: sentStatus,
+              changed_by_user_id: req.user?.uid || 'system',
+              changed_by_user_name: created_by || '시스템',
+              changed_at: now.toISOString(),
+            });
+          } catch (logErr: any) {
+            console.error(`[eformsign] 상태 로그 생성 실패: ${logErr.message}`);
+          }
+
+          console.log(`[eformsign] 고객 상태 → ${sentStatus} + 메모 업데이트 완료: ${customer_id} (${contractType})`);
         } catch (memoErr: any) {
           console.error(`[eformsign] 고객 업데이트 실패 (계약 발송은 성공): ${memoErr.message}`);
         }
@@ -946,14 +971,32 @@ export async function registerRoutes(
         };
 
         try {
+          const resendSentStatus = getContractSentStatusByType(resendContractType);
           const customerRef = firestore.collection('customers').doc(customer_id);
+          const prevResendDoc = await customerRef.get();
+          const prevResendStatus = prevResendDoc.data()?.status_code || '';
           await customerRef.update({
             memo_history: FieldValue.arrayUnion(memoEntry),
             recent_memo: memoContent,
             latest_memo: memoContent,
             updated_at: now.toISOString(),
+            status_code: resendSentStatus,
           });
-          console.log(`[eformsign] 재발송 고객 메모 추가 완료: ${customer_id}`);
+
+          try {
+            await firestore.collection('status_logs').add({
+              customer_id,
+              previous_status: prevResendStatus,
+              new_status: resendSentStatus,
+              changed_by_user_id: req.user?.uid || 'system',
+              changed_by_user_name: created_by || '시스템',
+              changed_at: now.toISOString(),
+            });
+          } catch (logErr: any) {
+            console.error(`[eformsign] 재발송 상태 로그 생성 실패: ${logErr.message}`);
+          }
+
+          console.log(`[eformsign] 재발송 고객 상태 → ${resendSentStatus} + 메모 추가 완료: ${customer_id}`);
         } catch (memoErr: any) {
           console.error(`[eformsign] 재발송 고객 메모 추가 실패: ${memoErr.message}`);
         }

@@ -26,6 +26,7 @@ const TARGET_STATUSES = [
   '진행기간 미동의', '자문료 미동의', '계약금미동의(선불)', '계약금미동의(후불)'
 ];
 
+const CONTRACT_SENT_STATUSES = ['계약서발송완료(선불)', '계약서발송완료(후불)', '계약서발송완료(외주)'];
 const CONTRACT_STATUSES = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
 const DOCS_STATUSES = ['서류취합완료(선불)', '서류취합완료(외주)', '서류취합완료(후불)'];
 const APPLY_STATUSES = ['신청완료(선불)', '신청완료(외주)', '신청완료(후불)'];
@@ -117,11 +118,12 @@ export default function AdStats() {
     return sources.map(source => {
       const filtered = customers.filter(c => c.entry_source === source);
       const total = filtered.length;
-      if (total === 0) return { source, total: 0, consulting: 0, trash: 0, target: 0, contract: 0, docs: 0, apply: 0, exec: 0, absence: 0, finalReject: 0, trashDetails: {} as Record<string, number>, targetDetails: {} as Record<string, number>, grades: {} as Record<DbGrade, number> };
+      if (total === 0) return { source, total: 0, consulting: 0, trash: 0, target: 0, contractSent: 0, contract: 0, docs: 0, apply: 0, exec: 0, absence: 0, finalReject: 0, trashDetails: {} as Record<string, number>, targetDetails: {} as Record<string, number>, grades: {} as Record<DbGrade, number> };
 
       const consulting = filtered.filter(c => c.status_code === '상담대기').length;
       const trash = filtered.filter(c => TRASH_STATUSES.includes(c.status_code)).length;
       const target = filtered.filter(c => TARGET_STATUSES.includes(c.status_code)).length;
+      const contractSent = filtered.filter(c => CONTRACT_SENT_STATUSES.includes(c.status_code)).length;
       const contract = filtered.filter(c => CONTRACT_STATUSES.includes(c.status_code)).length;
       const docs = filtered.filter(c => DOCS_STATUSES.includes(c.status_code)).length;
       const apply = filtered.filter(c => APPLY_STATUSES.includes(c.status_code)).length;
@@ -146,7 +148,7 @@ export default function AdStats() {
         grades[gradeCustomer(c)]++;
       });
 
-      return { source, total, consulting, trash, target, contract, docs, apply, exec, absence, finalReject, trashDetails, targetDetails, grades };
+      return { source, total, consulting, trash, target, contractSent, contract, docs, apply, exec, absence, finalReject, trashDetails, targetDetails, grades };
     }).filter(s => s.total > 0);
   }, [customers, selectedSource]);
 
@@ -161,6 +163,7 @@ export default function AdStats() {
     const trash = allFiltered.filter(c => TRASH_STATUSES.includes(c.status_code)).length;
     const target = allFiltered.filter(c => TARGET_STATUSES.includes(c.status_code)).length;
     const contractAndBeyond = allFiltered.filter(c =>
+      CONTRACT_SENT_STATUSES.includes(c.status_code) ||
       CONTRACT_STATUSES.includes(c.status_code) ||
       DOCS_STATUSES.includes(c.status_code) ||
       APPLY_STATUSES.includes(c.status_code) ||
@@ -389,6 +392,7 @@ export default function AdStats() {
                   <Bar dataKey="absence" name="부재" fill="#f97316" stackId="a" />
                   <Bar dataKey="trash" name="쓰레기통" fill="#ef4444" stackId="a" />
                   <Bar dataKey="target" name="희망타겟" fill="#eab308" stackId="a" />
+                  <Bar dataKey="contractSent" name="계약서발송" fill="#84cc16" stackId="a" />
                   <Bar dataKey="contract" name="계약완료" fill="#3b82f6" stackId="a" />
                   <Bar dataKey="docs" name="서류취합" fill="#06b6d4" stackId="a" />
                   <Bar dataKey="apply" name="신청완료" fill="#8b5cf6" stackId="a" />
@@ -447,6 +451,7 @@ export default function AdStats() {
                     <FlowRow label="부재" count={stat.absence} total={stat.total} color="text-orange-600 dark:text-orange-400" />
                     <FlowRow label="쓰레기통" count={stat.trash} total={stat.total} color="text-red-600 dark:text-red-400" />
                     <FlowRow label="희망타겟" count={stat.target} total={stat.total} color="text-yellow-600 dark:text-yellow-400" />
+                    <FlowRow label="계약서발송" count={stat.contractSent} total={stat.total} color="text-lime-600 dark:text-lime-400" />
                     <FlowRow label="계약완료" count={stat.contract} total={stat.total} color="text-blue-600 dark:text-blue-400" />
                     <FlowRow label="서류취합" count={stat.docs} total={stat.total} color="text-cyan-600 dark:text-cyan-400" />
                     <FlowRow label="신청완료" count={stat.apply} total={stat.total} color="text-violet-600 dark:text-violet-400" />

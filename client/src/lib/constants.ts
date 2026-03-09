@@ -29,6 +29,11 @@ export const ALL_STATUS_VALUES = [
   "계약금미동의(선불)",
   "계약금미동의(후불)",
   
+  // 계약서발송완료
+  "계약서발송완료(선불)",
+  "계약서발송완료(후불)",
+  "계약서발송완료(외주)",
+  
   // 계약완료
   "계약완료(선불)",
   "계약완료(외주)",
@@ -81,6 +86,11 @@ export const STATUS_STYLES: Record<string, { bg: string; text: string; border?: 
   "자문료 미동의": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
   "계약금미동의(선불)": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
   "계약금미동의(후불)": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
+  
+  // 계약서발송완료 - 라임색
+  "계약서발송완료(선불)": { bg: "bg-lime-500/20", text: "text-lime-700 dark:text-lime-300", border: "border-lime-500/30" },
+  "계약서발송완료(후불)": { bg: "bg-lime-500/20", text: "text-lime-700 dark:text-lime-300", border: "border-lime-500/30" },
+  "계약서발송완료(외주)": { bg: "bg-lime-400/20", text: "text-lime-600 dark:text-lime-400", border: "border-lime-400/30" },
   
   // 계약완료 - 초록색/에메랄드
   "계약완료(선불)": { bg: "bg-emerald-500/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-500/30" },
@@ -135,6 +145,11 @@ export const STATUS_OPTIONS: { value: string; label: string; group?: string }[] 
   { value: "자문료 미동의", label: "자문료 미동의", group: "희망타겟" },
   { value: "계약금미동의(선불)", label: "계약금미동의(선불)", group: "희망타겟" },
   { value: "계약금미동의(후불)", label: "계약금미동의(후불)", group: "희망타겟" },
+  
+  // 계약서발송완료
+  { value: "계약서발송완료(선불)", label: "계약서발송완료(선불)", group: "계약서발송" },
+  { value: "계약서발송완료(후불)", label: "계약서발송완료(후불)", group: "계약서발송" },
+  { value: "계약서발송완료(외주)", label: "계약서발송완료(외주)", group: "계약서발송" },
   
   // 계약완료
   { value: "계약완료(선불)", label: "계약완료(선불)", group: "계약" },
@@ -192,6 +207,12 @@ export const FUNNEL_GROUPS: Record<string, string[]> = {
   "계약금미동의(선불)": ["계약금미동의(선불)"],
   "계약금미동의(후불)": ["계약금미동의(후불)"],
   
+  // 계약서발송완료 (상위 그룹 및 개별)
+  "계약서발송완료": ["계약서발송완료(선불)", "계약서발송완료(후불)", "계약서발송완료(외주)"],
+  "계약서발송완료(선불)": ["계약서발송완료(선불)"],
+  "계약서발송완료(후불)": ["계약서발송완료(후불)"],
+  "계약서발송완료(외주)": ["계약서발송완료(외주)"],
+
   // 15~18. 계약완료 (상위 그룹 및 개별)
   "계약완료": ["계약완료(선불)", "계약완료(외주)", "계약완료(후불)"],
   "계약완료(선불)": ["계약완료(선불)"],
@@ -260,6 +281,12 @@ export const FUNNEL_CATEGORIES = [
     label: "희망타겟",
     statuses: FUNNEL_GROUPS["희망타겟"],
     color: "yellow",
+  },
+  {
+    id: "계약서발송완료",
+    label: "계약서발송완료",
+    statuses: FUNNEL_GROUPS["계약서발송완료"],
+    color: "lime",
   },
   {
     id: "계약완료",

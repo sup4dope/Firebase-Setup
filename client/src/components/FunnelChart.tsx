@@ -17,6 +17,7 @@ const STAGE_THEMES = {
   부재중: { border: 'border-orange-500', accent: 'border-l-orange-500', bg: 'bg-orange-500/20', glow: 'shadow-orange-500/50', text: 'text-orange-300' },
   쓰레기통: { border: 'border-rose-500', accent: 'border-l-rose-500', bg: 'bg-rose-500/20', glow: 'shadow-rose-500/50', text: 'text-rose-300' },
   희망타겟: { border: 'border-yellow-500', accent: 'border-l-yellow-500', bg: 'bg-yellow-500/20', glow: 'shadow-yellow-500/50', text: 'text-yellow-300' },
+  계약서발송완료: { border: 'border-lime-500', accent: 'border-l-lime-500', bg: 'bg-lime-500/20', glow: 'shadow-lime-500/50', text: 'text-lime-300' },
   계약완료: { border: 'border-emerald-500', accent: 'border-l-emerald-500', bg: 'bg-emerald-500/20', glow: 'shadow-emerald-500/50', text: 'text-emerald-300' },
   서류취합: { border: 'border-blue-500', accent: 'border-l-blue-500', bg: 'bg-blue-500/20', glow: 'shadow-blue-500/50', text: 'text-blue-300' },
   신청완료: { border: 'border-indigo-500', accent: 'border-l-indigo-500', bg: 'bg-indigo-500/20', glow: 'shadow-indigo-500/50', text: 'text-indigo-300' },
@@ -27,6 +28,7 @@ const STAGE_THEMES = {
 const MAIN_STAGES = [
   { id: 'all', label: '전체', theme: 'all' },
   { id: '희망타겟', label: '희망타겟', theme: '희망타겟' },
+  { id: '계약서발송완료', label: '계약서발송완료', theme: '계약서발송완료' },
   { id: '계약완료', label: '계약완료', theme: '계약완료' },
   { id: '서류취합', label: '서류취합', theme: '서류취합' },
   { id: '신청완료', label: '신청완료', theme: '신청완료' },
@@ -44,6 +46,11 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '자문료 미동의', label: '자문료 미동의' },
     { id: '계약금미동의(선불)', label: '계약금미동의(선불)' },
     { id: '계약금미동의(후불)', label: '계약금미동의(후불)' },
+  ],
+  '계약서발송완료': [
+    { id: '계약서발송완료(선불)', label: '계약서발송완료(선불)' },
+    { id: '계약서발송완료(후불)', label: '계약서발송완료(후불)' },
+    { id: '계약서발송완료(외주)', label: '계약서발송완료(외주)' },
   ],
   '계약완료': [
     { id: '계약완료(선불)', label: '계약완료(선불)' },
