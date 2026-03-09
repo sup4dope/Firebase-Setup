@@ -500,20 +500,25 @@
 
 @keyframes funnel-pulse {
   0%, 100% {
-    box-shadow: 0 0 6px rgba(168, 85, 247, 0.25);
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+    background-color: rgba(168, 85, 247, 0.08);
+    border-color: rgba(168, 85, 247, 0.6);
   }
   50% {
-    box-shadow: 0 0 16px rgba(168, 85, 247, 0.5), 0 0 28px rgba(168, 85, 247, 0.15);
+    box-shadow: 0 0 24px rgba(168, 85, 247, 0.7), 0 0 48px rgba(168, 85, 247, 0.3);
+    background-color: rgba(168, 85, 247, 0.18);
+    border-color: rgba(168, 85, 247, 1);
   }
 }
 
 .funnel-pulse-glow > button {
-  animation: funnel-pulse 3s ease-in-out infinite;
+  animation: funnel-pulse 1.8s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .funnel-pulse-glow > button {
     animation: none;
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.5);
+    background-color: rgba(168, 85, 247, 0.12);
   }
 }
