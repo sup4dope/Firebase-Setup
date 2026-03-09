@@ -117,6 +117,7 @@ import {
   orderBy,
   onSnapshot,
   arrayUnion,
+  Timestamp,
 } from "firebase/firestore";
 
 interface MemoItem {
@@ -653,6 +654,7 @@ export function CustomerDetailModal({
           await updateDoc(customerRef, {
             memo_history: [...existingMemoHistory, memoEntry],
             recent_memo: memoSummary,
+            updated_at: Timestamp.now(),
           });
         }
 
@@ -1620,6 +1622,7 @@ export function CustomerDetailModal({
           latest_memo: content,
           last_memo_date: now,
           memo_history: safeHistory, // DB에도 저장하고
+          updated_at: Timestamp.now(),
         });
 
         // (3) 로컬 formData 동기화

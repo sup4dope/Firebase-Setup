@@ -416,6 +416,7 @@ export const updateCustomerStatus = async (
   const contractStatuses = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
   batch.update(doc(db, 'customers', customerId), { 
     status_code: newStatus,
+    updated_at: Timestamp.now(),
     // If reaching contract completion for the first time (한글 상태명)
     ...(contractStatuses.includes(newStatus) && { contract_completion_date: new Date().toISOString().split('T')[0] })
   });
