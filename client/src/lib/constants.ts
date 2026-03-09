@@ -8,6 +8,7 @@ export const ALL_STATUS_VALUES = [
   // 부재
   "단기부재",
   "장기부재",
+  "예약",
   
   // 거절류
   "거절사유 미파악",
@@ -20,6 +21,7 @@ export const ALL_STATUS_VALUES = [
   "차입금초과",
   "본인아님",
   "사업자아님",
+  "이중계약",
   
   // 희망타겟
   "업력미달",
@@ -67,6 +69,7 @@ export const STATUS_STYLES: Record<string, { bg: string; text: string; border?: 
   // 부재 - 주황색/노란색
   "단기부재": { bg: "bg-orange-500/20", text: "text-orange-700 dark:text-orange-300", border: "border-orange-500/30" },
   "장기부재": { bg: "bg-amber-500/20", text: "text-amber-700 dark:text-amber-300", border: "border-amber-500/30" },
+  "예약": { bg: "bg-orange-600/20", text: "text-orange-700 dark:text-orange-300", border: "border-orange-600/30" },
   
   // 쓰레기통/거절류 - 빨간색/로즈
   "쓰레기통": { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
@@ -80,6 +83,7 @@ export const STATUS_STYLES: Record<string, { bg: string; text: string; border?: 
   "차입금초과": { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
   "본인아님": { bg: "bg-rose-500/20", text: "text-rose-700 dark:text-rose-300", border: "border-rose-500/30" },
   "사업자아님": { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
+  "이중계약": { bg: "bg-rose-600/20", text: "text-rose-700 dark:text-rose-300", border: "border-rose-600/30" },
   
   // 희망타겟 - 노란색
   "업력미달": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
@@ -129,6 +133,7 @@ export const STATUS_OPTIONS: { value: string; label: string; group?: string }[] 
   // 부재
   { value: "단기부재", label: "단기부재", group: "부재" },
   { value: "장기부재", label: "장기부재", group: "부재" },
+  { value: "예약", label: "예약", group: "부재" },
   
   // 거절
   { value: "거절사유 미파악", label: "거절사유 미파악", group: "거절" },
@@ -141,6 +146,7 @@ export const STATUS_OPTIONS: { value: string; label: string; group?: string }[] 
   { value: "차입금초과", label: "차입금초과", group: "거절" },
   { value: "본인아님", label: "본인아님", group: "거절" },
   { value: "사업자아님", label: "사업자아님", group: "거절" },
+  { value: "이중계약", label: "이중계약", group: "거절" },
   
   // 희망타겟
   { value: "업력미달", label: "업력미달", group: "희망타겟" },
@@ -190,17 +196,19 @@ export const FUNNEL_GROUPS: Record<string, string[]> = {
   // 3. 쓰레기통 (상위 그룹) - 하위 항목들 포함
   "쓰레기통": [
     "쓰레기통", "거절사유 미파악", "인증불가", "정부기관 오인", "기타자금 오인",
-    "불가업종", "매출없음", "신용점수 미달", "차입금초과", "본인아님", "사업자아님"
+    "불가업종", "매출없음", "신용점수 미달", "차입금초과", "본인아님", "사업자아님", "이중계약"
   ],
   
   // 4, 5. 부재중
   "단기부재": ["단기부재"],
   "장기부재": ["장기부재"],
+  "예약": ["예약"],
   
   // 6. 희망타겟 (상위 그룹)
   "희망타겟": [
     "업력미달", "최근대출", "인증미동의(국세청)", "인증미동의(공여내역)",
-    "진행기간 미동의", "자문료 미동의", "계약금미동의(선불)", "계약금미동의(후불)"
+    "진행기간 미동의", "자문료 미동의", "계약금미동의(선불)", "계약금미동의(후불)",
+    "장기부재"
   ],
   
   // 7~14. 희망타겟 하위 개별 항목
@@ -256,6 +264,7 @@ export const FUNNEL_GROUPS: Record<string, string[]> = {
   "차입금초과": ["차입금초과"],
   "본인아님": ["본인아님"],
   "사업자아님": ["사업자아님"],
+  "이중계약": ["이중계약"],
 };
 
 // 퍼널 차트 카테고리 정의 (상단 헤더용)
@@ -279,10 +288,10 @@ export const FUNNEL_CATEGORIES = [
     color: "orange",
   },
   {
-    id: "장기부재",
-    label: "장기부재",
-    statuses: ["장기부재"],
-    color: "amber",
+    id: "예약",
+    label: "예약",
+    statuses: ["예약"],
+    color: "orange",
   },
   {
     id: "희망타겟",

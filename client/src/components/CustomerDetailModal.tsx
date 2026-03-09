@@ -250,6 +250,7 @@ export function CustomerDetailModal({
 
   // TO-DO form modal state
   const [todoModalOpen, setTodoModalOpen] = useState(false);
+  const [reservationTodoOpen, setReservationTodoOpen] = useState(false);
   const [contractSendModalOpen, setContractSendModalOpen] = useState(false);
   const [proposalModalOpen, setProposalModalOpen] = useState(false);
   const [proposalPreviewOpen, setProposalPreviewOpen] = useState(false);
@@ -3467,6 +3468,11 @@ export function CustomerDetailModal({
                                         (formData.execution_amount && formData.execution_amount > 0) &&
                                         ((formData as any).execution_date);
 
+                                      if (option.value === "예약") {
+                                        setReservationTodoOpen(true);
+                                        return;
+                                      }
+
                                       const requiresModal =
                                         (option.value.includes("계약완료") && !hasContractInfo) ||
                                         (option.value.includes("신청완료") && !hasProcessingOrg) ||
@@ -4797,6 +4803,47 @@ export function CustomerDetailModal({
           defaultCustomerId={customer?.id}
           onTodoCreated={() => {
             setTodoModalOpen(false);
+            onTodoCreated?.();
+          }}
+        />
+      )}
+      {currentUser && (
+        <TodoForm
+          open={reservationTodoOpen}
+          onOpenChange={(open) => {
+            if (!open) setReservationTodoOpen(false);
+          }}
+          users={users}
+          customers={customers}
+          currentUser={currentUser}
+          userRole={currentUser.role}
+          defaultCustomerId={customer?.id}
+          onTodoCreated={async () => {
+            setReservationTodoOpen(false);
+            if (customer?.id) {
+              const oldStatus = formData.status_code;
+              setFormData((prev) => ({ ...prev, status_code: "예약" }));
+              try {
+                const customerRef = doc(db, "customers", customer.id);
+                await updateDoc(customerRef, {
+                  status_code: "예약",
+                  updated_at: new Date(),
+                });
+                await addDoc(collection(db, "counseling_logs"), {
+                  customer_id: customer.id,
+                  action_type: "status_change",
+                  description: `상태 변경: ${oldStatus} → 예약`,
+                  old_value: oldStatus,
+                  new_value: "예약",
+                  changed_by_name: currentUser?.name || "관리자",
+                  changed_at: new Date(),
+                  type: "log",
+                });
+                onSave?.({ id: customer.id, status_code: "예약" } as any);
+              } catch (error) {
+                console.error("예약 상태 변경 오류:", error);
+              }
+            }
             onTodoCreated?.();
           }}
         />

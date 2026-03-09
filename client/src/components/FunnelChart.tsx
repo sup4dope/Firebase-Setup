@@ -46,6 +46,7 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '자문료 미동의', label: '자문료 미동의' },
     { id: '계약금미동의(선불)', label: '계약금미동의(선불)' },
     { id: '계약금미동의(후불)', label: '계약금미동의(후불)' },
+    { id: '장기부재', label: '장기부재' },
   ],
   '계약서발송완료': [
     { id: '계약서발송완료(선불)', label: '계약서발송완료(선불)' },
@@ -84,13 +85,14 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '차입금초과', label: '차입금초과' },
     { id: '본인아님', label: '본인아님' },
     { id: '사업자아님', label: '사업자아님' },
+    { id: '이중계약', label: '이중계약' },
   ],
 };
 
 // 부재중 상태
 const ABSENCE_STATUSES = [
   { id: '단기부재', label: '단기부재' },
-  { id: '장기부재', label: '장기부재' },
+  { id: '예약', label: '예약' },
 ];
 
 export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelChartProps) {

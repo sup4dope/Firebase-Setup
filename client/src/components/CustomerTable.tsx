@@ -39,6 +39,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MemoModal } from './MemoModal';
+import { TodoForm } from './TodoForm';
 import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users, Plus, XCircle, CheckCircle, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -62,6 +63,7 @@ const CLOSED_STATUSES = new Set([
   '차입금초과',
   '본인아님',
   '사업자아님',
+  '이중계약',
   '업력미달',
   '최근대출',
   '인증미동의(국세청)',
@@ -84,6 +86,7 @@ const TRASH_REASONS = [
   { id: '차입금초과', label: '차입금초과' },
   { id: '본인아님', label: '본인아님' },
   { id: '사업자아님', label: '사업자아님' },
+  { id: '이중계약', label: '이중계약' },
 ];
 
 // 그룹별 통일된 색상 (대시보드 영업 퍼널과 동일) - 라이트/다크 모드 지원
@@ -115,7 +118,7 @@ const getStatusBadgeInfo = (statusCode: string): { label: string; colorClass: st
   let category = '기타';
   if (statusCode === '상담대기') category = '상담';
   else if (FUNNEL_GROUPS['쓰레기통']?.includes(statusCode)) category = '거절';
-  else if (statusCode === '단기부재' || statusCode === '장기부재') category = '부재';
+  else if (statusCode === '단기부재' || statusCode === '장기부재' || statusCode === '예약') category = '부재';
   else if (FUNNEL_GROUPS['희망타겟']?.includes(statusCode)) category = '희망타겟';
   else if (FUNNEL_GROUPS['계약서발송완료']?.includes(statusCode)) category = '계약서발송';
   else if (FUNNEL_GROUPS['계약완료']?.includes(statusCode)) category = '계약';
@@ -150,6 +153,7 @@ interface CustomerTableProps {
   onManagerChange?: (customerId: string, newManagerId: string, newManagerName: string, newTeamId: string, newTeamName: string) => void;
   onAddProcessingOrgWithAutoStatus?: (customerId: string, customer: Customer, orgName: string, isReExecution?: boolean) => void;
   onApproveOrg?: (customerId: string, customer: Customer, orgName: string, executionDate: string, executionAmount: number) => void;
+  currentUser?: User;
 }
 
 // 스테이지 이름 가져오기 (한글 상태명 기반)
@@ -180,6 +184,7 @@ export function CustomerTable({
   onManagerChange,
   onAddProcessingOrgWithAutoStatus,
   onApproveOrg,
+  currentUser,
 }: CustomerTableProps) {
   const canDelete = userRole === 'super_admin';
   const canApproveOrg = userRole === 'super_admin'; // 승인은 super_admin만 가능
@@ -221,6 +226,14 @@ export function CustomerTable({
     isOpen: false,
     customer: null,
     isLoading: false,
+  });
+
+  const [reservationPending, setReservationPending] = useState<{
+    isOpen: boolean;
+    customer: Customer | null;
+  }>({
+    isOpen: false,
+    customer: null,
   });
 
   // 재집행으로 추가 토글 state
@@ -627,6 +640,13 @@ export function CustomerTable({
                               });
                               return;
                             }
+                            if (newStatus === "예약") {
+                              setReservationPending({
+                                isOpen: true,
+                                customer: customer,
+                              });
+                              return;
+                            }
                             onStatusChange(customer.id, customer.status_code, newStatus as StatusCode);
                           }
                         }}
@@ -669,6 +689,7 @@ export function CustomerTable({
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">부재</SelectLabel>
                             <SelectItem value="단기부재" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">단기부재</SelectItem>
                             <SelectItem value="장기부재" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">장기부재</SelectItem>
+                            <SelectItem value="예약" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">예약</SelectItem>
                           </SelectGroup>
 
                           {/* 거절 그룹 (쓰레기통) */}
@@ -1330,6 +1351,32 @@ export function CustomerTable({
           </div>
         </DialogContent>
       </Dialog>
+
+      {currentUser && (
+        <TodoForm
+          open={reservationPending.isOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setReservationPending({ isOpen: false, customer: null });
+            }
+          }}
+          users={users}
+          customers={customers}
+          currentUser={currentUser}
+          userRole={userRole}
+          defaultCustomerId={reservationPending.customer?.id}
+          onTodoCreated={() => {
+            if (reservationPending.customer) {
+              onStatusChange(
+                reservationPending.customer.id,
+                reservationPending.customer.status_code,
+                "예약" as StatusCode
+              );
+            }
+            setReservationPending({ isOpen: false, customer: null });
+          }}
+        />
+      )}
     </div>
   );
 }

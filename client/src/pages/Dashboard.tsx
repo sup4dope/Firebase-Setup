@@ -1324,6 +1324,7 @@ export default function Dashboard() {
             selectedStage={selectedStage}
             users={users}
             currentUserTeamId={user?.team_id || undefined}
+            currentUser={user || undefined}
             onStatusChange={handleStatusChange}
             onEdit={handleEdit}
             onDelete={handleDeleteCustomer}
