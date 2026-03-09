@@ -3,15 +3,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { BarChart3, TrendingUp, AlertTriangle, Target, Trash2, FileCheck, Users, ChevronRight, Star, X, CalendarDays } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, CartesianGrid } from 'recharts';
 import { getCustomers } from '@/lib/firestore';
 import { useEffect } from 'react';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import type { DateRange } from 'react-day-picker';
 import type { Customer } from '@shared/types';
 import type { EntrySourceType } from '@shared/types';
 
@@ -99,8 +103,8 @@ export default function AdStats() {
   const [selectedSource, setSelectedSource] = useState<string>('all');
   const [daysRange, setDaysRange] = useState<string>('30');
   const [dateRangeMode, setDateRangeMode] = useState<'preset' | 'custom'>('preset');
-  const [customStartDate, setCustomStartDate] = useState<string>('');
-  const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [detailModal, setDetailModal] = useState<{ open: boolean; source: string; customers: Customer[] }>({ open: false, source: '', customers: [] });
 
   useEffect(() => {
@@ -118,18 +122,18 @@ export default function AdStats() {
 
   const { chartStartDate, chartEndDate, chartDays } = useMemo(() => {
     const now = new Date();
-    if (dateRangeMode === 'custom' && customStartDate && customEndDate) {
-      const s = new Date(customStartDate + 'T00:00:00');
-      const e = new Date(customEndDate + 'T23:59:59');
-      if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && s <= e) {
-        const diff = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        return { chartStartDate: s, chartEndDate: e, chartDays: diff };
-      }
+    if (dateRangeMode === 'custom' && dateRange?.from) {
+      const s = new Date(dateRange.from.getFullYear(), dateRange.from.getMonth(), dateRange.from.getDate());
+      const e = dateRange.to
+        ? new Date(dateRange.to.getFullYear(), dateRange.to.getMonth(), dateRange.to.getDate(), 23, 59, 59)
+        : new Date(s.getFullYear(), s.getMonth(), s.getDate(), 23, 59, 59);
+      const diff = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      return { chartStartDate: s, chartEndDate: e, chartDays: Math.max(diff, 1) };
     }
     const days = parseInt(daysRange);
     const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days + 1);
     return { chartStartDate: startDate, chartEndDate: now, chartDays: days };
-  }, [dateRangeMode, customStartDate, customEndDate, daysRange]);
+  }, [dateRangeMode, dateRange, daysRange]);
 
   const dailySourceData = useMemo(() => {
     const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
@@ -285,67 +289,95 @@ export default function AdStats() {
           <p className="text-sm text-muted-foreground mt-1">유입경로별 DB 분석 및 전환율 통계</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1 border rounded-lg p-0.5">
-            <Button
-              variant={dateRangeMode === 'preset' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 text-xs px-2.5"
-              onClick={() => setDateRangeMode('preset')}
-              data-testid="button-preset-mode"
-            >
-              프리셋
-            </Button>
-            <Button
-              variant={dateRangeMode === 'custom' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 text-xs px-2.5"
-              onClick={() => {
-                setDateRangeMode('custom');
-                if (!customStartDate || !customEndDate) {
-                  const now = new Date();
-                  const end = now.toISOString().split('T')[0];
-                  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29).toISOString().split('T')[0];
-                  setCustomStartDate(start);
-                  setCustomEndDate(end);
-                }
-              }}
-              data-testid="button-custom-mode"
-            >
-              기간설정
-            </Button>
-          </div>
-          {dateRangeMode === 'preset' ? (
-            <Select value={daysRange} onValueChange={setDaysRange}>
-              <SelectTrigger className="w-[120px] h-8" data-testid="select-days-range">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">최근 7일</SelectItem>
-                <SelectItem value="14">최근 14일</SelectItem>
-                <SelectItem value="30">최근 30일</SelectItem>
-                <SelectItem value="60">최근 60일</SelectItem>
-                <SelectItem value="90">최근 90일</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="flex items-center gap-1.5">
-              <Input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-                className="w-[140px] h-8 text-xs"
-                data-testid="input-start-date"
-              />
-              <span className="text-xs text-muted-foreground">~</span>
-              <Input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-                className="w-[140px] h-8 text-xs"
-                data-testid="input-end-date"
-              />
-            </div>
-          )}
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs px-3 gap-1.5"
+                data-testid="button-date-picker"
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                {dateRangeMode === 'preset' ? (
+                  <span>최근 {daysRange}일</span>
+                ) : dateRange?.from ? (
+                  <span>
+                    {format(dateRange.from, 'yy.MM.dd')}
+                    {dateRange.to ? ` ~ ${format(dateRange.to, 'yy.MM.dd')}` : ''}
+                  </span>
+                ) : (
+                  <span>기간 선택</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="flex border-b">
+                <button
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${dateRangeMode === 'preset' ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setDateRangeMode('preset')}
+                  data-testid="button-preset-mode"
+                >
+                  접수일자
+                </button>
+                <button
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${dateRangeMode === 'custom' ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => {
+                    setDateRangeMode('custom');
+                    if (!dateRange?.from) {
+                      const now = new Date();
+                      setDateRange({
+                        from: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29),
+                        to: now,
+                      });
+                    }
+                  }}
+                  data-testid="button-custom-mode"
+                >
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  전체 기간
+                </button>
+              </div>
+              {dateRangeMode === 'preset' ? (
+                <div className="p-3 space-y-1">
+                  {[
+                    { value: '7', label: '최근 7일' },
+                    { value: '14', label: '최근 14일' },
+                    { value: '30', label: '최근 30일' },
+                    { value: '60', label: '최근 60일' },
+                    { value: '90', label: '최근 90일' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${daysRange === opt.value ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
+                      onClick={() => {
+                        setDaysRange(opt.value);
+                        setCalendarOpen(false);
+                      }}
+                      data-testid={`button-days-${opt.value}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-2">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={(range) => {
+                      setDateRange(range);
+                      if (range?.from && range?.to) {
+                        setCalendarOpen(false);
+                      }
+                    }}
+                    numberOfMonths={2}
+                    locale={ko}
+                    data-testid="calendar-range"
+                  />
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
           <Select value={selectedSource} onValueChange={setSelectedSource} data-testid="select-source-filter">
             <SelectTrigger className="w-[160px] h-8">
               <SelectValue placeholder="유입경로 선택" />
