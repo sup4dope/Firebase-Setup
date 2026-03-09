@@ -82,6 +82,8 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '매출없음', label: '매출없음' },
     { id: '신용점수 미달', label: '신용점수 미달' },
     { id: '차입금초과', label: '차입금초과' },
+    { id: '본인아님', label: '본인아님' },
+    { id: '사업자아님', label: '사업자아님' },
   ],
 };
 

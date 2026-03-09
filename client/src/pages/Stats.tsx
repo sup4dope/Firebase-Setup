@@ -51,7 +51,7 @@ const NEGATIVE_GROUPS = {
   A: { name: '스킬부족', reasons: ['거절사유 미파악', '정부기관 오인'] },
   B: { name: '설득실패', reasons: ['인증미동의(국세청/공여내역)', '진행기간미동의', '자문료미동의', '계약금미동의(선/후불)'] },
   C: { name: '관리누수', reasons: ['단기부재', '장기부재'] },
-  D: { name: '불가피', reasons: ['인증불가', '불가업종', '매출없음', '신용점수미달', '차입금초과', '업력미달', '최근대출'] },
+  D: { name: '불가피', reasons: ['인증불가', '불가업종', '매출없음', '신용점수미달', '차입금초과', '업력미달', '최근대출', '본인아님', '사업자아님'] },
 };
 
 const GROUP_COLORS = {
@@ -177,7 +177,7 @@ export default function Stats() {
     const GROUP_A_STATUSES = ['거절사유 미파악', '정부기관 오인'];
     const GROUP_B_STATUSES = ['인증미동의(국세청)', '인증미동의(공여내역)', '진행기간 미동의', '진행기간미동의', '자문료 미동의', '자문료미동의', '계약금미동의(선불)', '계약금미동의(후불)'];
     const GROUP_C_STATUSES = ['단기부재', '장기부재'];
-    const GROUP_D_STATUSES = ['인증불가', '불가업종', '매출없음', '신용점수 미달', '신용점수미달', '차입금초과', '업력미달', '최근대출', '기타자금 오인'];
+    const GROUP_D_STATUSES = ['인증불가', '불가업종', '매출없음', '신용점수 미달', '신용점수미달', '차입금초과', '업력미달', '최근대출', '기타자금 오인', '본인아님', '사업자아님'];
     
     // 모든 부정 상태 목록
     const ALL_NEGATIVE_STATUSES = [...GROUP_A_STATUSES, ...GROUP_B_STATUSES, ...GROUP_C_STATUSES, ...GROUP_D_STATUSES];
