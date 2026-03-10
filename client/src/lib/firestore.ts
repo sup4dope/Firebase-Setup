@@ -218,8 +218,8 @@ export const deleteTeam = async (id: string): Promise<void> => {
 
 // Customers
 export const getCustomers = async (): Promise<Customer[]> => {
-  // updated_at 기준 내림차순 정렬 (최근 수정순)
-  const q = query(collection(db, 'customers'), orderBy('updated_at', 'desc'));
+  // created_at 기준 내림차순 정렬 (최근 생성순 - 관리적 변경 시 순서 유지)
+  const q = query(collection(db, 'customers'), orderBy('created_at', 'desc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => {
     const data = doc.data();
@@ -238,7 +238,7 @@ export const getCustomersByManager = async (managerId: string): Promise<Customer
     const q = query(
       collection(db, 'customers'),
       where('manager_id', '==', managerId),
-      orderBy('updated_at', 'desc')
+      orderBy('created_at', 'desc')
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => {
@@ -253,7 +253,7 @@ export const getCustomersByManager = async (managerId: string): Promise<Customer
     });
   } catch (error: any) {
     if (error?.message?.includes('requires an index')) {
-      console.warn('[Firestore] manager_id+updated_at 복합 인덱스 미생성 - orderBy 없이 조회 후 클라이언트 정렬');
+      console.warn('[Firestore] manager_id+created_at 복합 인덱스 미생성 - orderBy 없이 조회 후 클라이언트 정렬');
       const q = query(
         collection(db, 'customers'),
         where('manager_id', '==', managerId)
@@ -270,8 +270,8 @@ export const getCustomersByManager = async (managerId: string): Promise<Customer
         } as Customer;
       });
       return results.sort((a, b) => {
-        const aTime = a.updated_at instanceof Date ? a.updated_at.getTime() : 0;
-        const bTime = b.updated_at instanceof Date ? b.updated_at.getTime() : 0;
+        const aTime = a.created_at instanceof Date ? a.created_at.getTime() : 0;
+        const bTime = b.created_at instanceof Date ? b.created_at.getTime() : 0;
         return bTime - aTime;
       });
     }
@@ -284,7 +284,7 @@ export const getCustomersByTeam = async (teamId: string): Promise<Customer[]> =>
     const q = query(
       collection(db, 'customers'),
       where('team_id', '==', teamId),
-      orderBy('updated_at', 'desc')
+      orderBy('created_at', 'desc')
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => {
@@ -299,7 +299,7 @@ export const getCustomersByTeam = async (teamId: string): Promise<Customer[]> =>
     });
   } catch (error: any) {
     if (error?.message?.includes('requires an index')) {
-      console.warn('[Firestore] team_id+updated_at 복합 인덱스 미생성 - orderBy 없이 조회 후 클라이언트 정렬');
+      console.warn('[Firestore] team_id+created_at 복합 인덱스 미생성 - orderBy 없이 조회 후 클라이언트 정렬');
       const q = query(
         collection(db, 'customers'),
         where('team_id', '==', teamId)
@@ -316,8 +316,8 @@ export const getCustomersByTeam = async (teamId: string): Promise<Customer[]> =>
         } as Customer;
       });
       return results.sort((a, b) => {
-        const aTime = a.updated_at instanceof Date ? a.updated_at.getTime() : 0;
-        const bTime = b.updated_at instanceof Date ? b.updated_at.getTime() : 0;
+        const aTime = a.created_at instanceof Date ? a.created_at.getTime() : 0;
+        const bTime = b.created_at instanceof Date ? b.created_at.getTime() : 0;
         return bTime - aTime;
       });
     }
@@ -1316,7 +1316,7 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
     const targetCustomers = customers.filter(customer => {
       const status = customer.status_code || '';
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
-        status.includes('계약') || status.includes('집행');
+        (status.includes('계약완료') || status.includes('집행'));
       if (!isTargetStatus) return false;
 
       const isPostContract = status === '계약완료(후불)';
@@ -1374,7 +1374,7 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       // 고객 데이터와 정산 데이터 동기화 확인 (정산 항목이 있지만 고객이 더 이상 정산 대상이 아닌 경우)
       const status = customer.status_code || '';
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
-        status.includes('계약') || status.includes('집행');
+        (status.includes('계약완료') || status.includes('집행'));
       
       // 정산 대상 상태가 아니거나 정산월이 다른 경우에는 활성 정산만 삭제 (환수/취소 항목은 유지)
       if (settlement.status === '정상' && !settlement.is_clawback) {
@@ -1399,6 +1399,45 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
     }
   } catch (error) {
     console.error('Error syncing customer settlements:', error);
+  }
+};
+
+export const cleanupInvalidSettlements = async (): Promise<{ deleted: number; details: string[] }> => {
+  const details: string[] = [];
+  let deleted = 0;
+  
+  try {
+    const settlementsSnapshot = await getDocs(collection(db, 'settlements'));
+    
+    for (const settlementDoc of settlementsSnapshot.docs) {
+      const settlement = settlementDoc.data();
+      
+      if (settlement.is_clawback || settlement.status === '취소') continue;
+      
+      const customerId = settlement.customer_id;
+      if (!customerId) continue;
+      
+      const customerDoc = await getDoc(doc(db, 'customers', customerId));
+      if (!customerDoc.exists()) continue;
+      
+      const customerData = customerDoc.data();
+      const status = customerData.status_code || '';
+      
+      const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
+        (status.includes('계약완료') || status.includes('집행'));
+      
+      if (!isTargetStatus) {
+        details.push(`삭제: ${customerData.name || customerData.company_name} (${status}) - 정산ID: ${settlementDoc.id}`);
+        await deleteDoc(doc(db, 'settlements', settlementDoc.id));
+        deleted++;
+      }
+    }
+    
+    console.log(`[Settlement Cleanup] 소급 정리 완료: ${deleted}건 삭제`);
+    return { deleted, details };
+  } catch (error) {
+    console.error('Settlement cleanup error:', error);
+    throw error;
   }
 };
 
@@ -1438,7 +1477,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     }
 
     const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
-      status.includes('계약') || status.includes('집행');
+      (status.includes('계약완료') || status.includes('집행'));
     
     // 3. 해당 고객의 기존 정산 항목 가져오기
     const existingSettlementsQuery = query(
