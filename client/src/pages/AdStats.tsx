@@ -182,8 +182,10 @@ export default function AdStats() {
   const dailySourceTotals = useMemo(() => {
     const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
     const totals: Record<string, number> = {};
-    sources.forEach(s => { totals[s] = 0; });
+    const revenue: Record<string, number> = {};
+    sources.forEach(s => { totals[s] = 0; revenue[s] = 0; });
     let grandTotal = 0;
+    let grandRevenue = 0;
     dailySourceData.forEach(d => {
       sources.forEach(s => {
         const val = (d as any)[s] || 0;
@@ -191,8 +193,19 @@ export default function AdStats() {
       });
       grandTotal += (d as any)['합계'] || 0;
     });
-    return { totals, grandTotal, sources };
-  }, [dailySourceData, selectedSource]);
+    dateFilteredCustomers.forEach(c => {
+      const src = c.entry_source;
+      if (src && revenue[src] !== undefined) {
+        const contractAmt = c.contract_amount || 0;
+        const commissionRate = c.commission_rate || 0;
+        const execAmt = c.execution_amount || 0;
+        const commissionAmt = execAmt > 0 ? Math.round(execAmt * commissionRate / 100) : 0;
+        revenue[src] += contractAmt + commissionAmt;
+        grandRevenue += contractAmt + commissionAmt;
+      }
+    });
+    return { totals, grandTotal, sources, revenue, grandRevenue };
+  }, [dailySourceData, selectedSource, dateFilteredCustomers]);
 
   const sourceStats = useMemo(() => {
     const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
@@ -500,6 +513,8 @@ export default function AdStats() {
                     <th className="py-2 px-3 text-left font-medium text-muted-foreground">유입경로</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">접수 건수</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">비율</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">총매출</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">건당 잠재가치</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -516,12 +531,26 @@ export default function AdStats() {
                         <td className="py-2 px-3 text-right text-muted-foreground">
                           {dailySourceTotals.grandTotal > 0 ? ((dailySourceTotals.totals[source] / dailySourceTotals.grandTotal) * 100).toFixed(1) : '0.0'}%
                         </td>
+                        <td className="py-2 px-3 text-right text-muted-foreground">
+                          {dailySourceTotals.revenue[source] > 0 ? `${dailySourceTotals.revenue[source].toLocaleString()}만원` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">
+                          {dailySourceTotals.totals[source] > 0 && dailySourceTotals.revenue[source] > 0
+                            ? `${Math.round(dailySourceTotals.revenue[source] / dailySourceTotals.totals[source]).toLocaleString()}만원`
+                            : '-'}
+                        </td>
                       </tr>
                     ))}
                   <tr className="bg-muted/30 font-semibold">
                     <td className="py-2 px-3">합계</td>
                     <td className="py-2 px-3 text-right">{dailySourceTotals.grandTotal}건</td>
                     <td className="py-2 px-3 text-right">100%</td>
+                    <td className="py-2 px-3 text-right">{dailySourceTotals.grandRevenue > 0 ? `${dailySourceTotals.grandRevenue.toLocaleString()}만원` : '-'}</td>
+                    <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">
+                      {dailySourceTotals.grandTotal > 0 && dailySourceTotals.grandRevenue > 0
+                        ? `${Math.round(dailySourceTotals.grandRevenue / dailySourceTotals.grandTotal).toLocaleString()}만원`
+                        : '-'}
+                    </td>
                   </tr>
                 </tbody>
               </table>
