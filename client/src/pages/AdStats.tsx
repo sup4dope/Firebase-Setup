@@ -767,21 +767,51 @@ export default function AdStats() {
                 <tbody>
                   {detailModal.customers
                     .sort((a, b) => {
+                      const STATUS_ORDER = [
+                        '상담대기', '단기부재', '장기부재', '쓰레기통', '희망타겟',
+                        '수납대기',
+                        '계약서발송완료', '계약서발송완료(선불)', '계약서발송완료(후불)', '계약서발송완료(외주)',
+                        '계약완료', '계약완료(선불)', '계약완료(후불)', '계약완료(외주)',
+                        '서류취합완료', '서류취합완료(선불)', '서류취합완료(후불)', '서류취합완료(외주)',
+                        '신청완료', '신청완료(선불)', '신청완료(후불)', '신청완료(외주)',
+                        '집행완료', '집행완료(선불)', '집행완료(후불)', '집행완료(외주)',
+                      ];
+                      const idxA = STATUS_ORDER.indexOf(a.status_code);
+                      const idxB = STATUS_ORDER.indexOf(b.status_code);
+                      const sA = idxA === -1 ? 999 : idxA;
+                      const sB = idxB === -1 ? 999 : idxB;
+                      if (sA !== sB) return sA - sB;
                       const grades: DbGrade[] = ['S', 'A', 'B', 'C', 'D'];
                       return grades.indexOf(gradeCustomer(a)) - grades.indexOf(gradeCustomer(b));
                     })
                     .map(c => {
                       const grade = gradeCustomer(c);
                       const rev = c.recent_sales || c.avg_revenue_3y || 0;
+                      const REVENUE_STATUSES = [
+                        '계약완료', '계약완료(선불)', '계약완료(후불)', '계약완료(외주)',
+                        '서류취합완료', '서류취합완료(선불)', '서류취합완료(후불)', '서류취합완료(외주)',
+                        '신청완료', '신청완료(선불)', '신청완료(후불)', '신청완료(외주)',
+                        '집행완료', '집행완료(선불)', '집행완료(후불)', '집행완료(외주)',
+                      ];
+                      const isRevenue = REVENUE_STATUSES.includes(c.status_code);
                       return (
-                        <tr key={c.id} className="border-b border-border/50 hover:bg-muted/30" data-testid={`row-customer-${c.id}`}>
+                        <tr
+                          key={c.id}
+                          className={`border-b border-border/50 hover:bg-muted/30 ${isRevenue ? 'bg-emerald-50 dark:bg-emerald-950/30' : ''}`}
+                          data-testid={`row-customer-${c.id}`}
+                        >
                           <td className="py-2 px-2">
                             <Badge className={`${GRADE_COLORS[grade]} text-xs w-6 h-5 flex items-center justify-center`}>{grade}</Badge>
                           </td>
-                          <td className="py-2 px-2 font-medium">{c.name}</td>
+                          <td className={`py-2 px-2 font-medium ${isRevenue ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>{c.name}</td>
                           <td className="py-2 px-2 text-muted-foreground">{c.company_name || '-'}</td>
                           <td className="py-2 px-2">
-                            <Badge variant="outline" className="text-xs">{c.status_code}</Badge>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${isRevenue ? 'border-emerald-500 bg-emerald-100 text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300' : ''}`}
+                            >
+                              {c.status_code}
+                            </Badge>
                           </td>
                           <td className="py-2 px-2 text-right">{rev > 0 ? `${rev}억` : '-'}</td>
                           <td className="py-2 px-2 text-right">{c.credit_score || '-'}</td>
