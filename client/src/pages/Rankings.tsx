@@ -318,41 +318,38 @@ export default function Rankings() {
       status === '신청완료(후불)' ||
       status === '집행완료(후불)';
     
-    customers.forEach(customer => {
-      let scoreDate: string | undefined;
-      let executionAmount: number = 0;
-      let effectiveStatusForScore: string = customer.status_code || '';
+    const getDateFallback = (customer: Customer): string | undefined => {
+      if (customer.updated_at instanceof Date) return customer.updated_at.toISOString().split('T')[0];
+      if (customer.updated_at) return String(customer.updated_at).split('T')[0];
+      return customer.entry_date;
+    };
 
-      if (customer.status_code === '집행완료(외주)') {
-        scoreDate = customer.execution_date || customer.contract_completion_date ||
-          (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
-           customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
-        executionAmount = customer.execution_amount || 0;
+    customers.forEach(customer => {
+      const statusCode = customer.status_code || '';
+      let scoreDate: string | undefined;
+      let effectiveStatusForScore: string = statusCode;
+      let isExecuted = false;
+
+      if (statusCode === '집행완료(외주)') {
+        scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
+        isExecuted = true;
       }
-      else if (customer.status_code === '집행완료') {
-        scoreDate = customer.execution_date || customer.contract_completion_date ||
-          (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
-           customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
-        executionAmount = customer.execution_amount || 0;
+      else if (statusCode === '집행완료') {
+        scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
+        isExecuted = true;
       }
-      else if (isPrepaidStatus(customer.status_code || '')) {
-        scoreDate = customer.contract_completion_date ||
-          (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
-           customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
-        executionAmount = customer.status_code === '집행완료(선불)' ? (customer.execution_amount || 0) : 0;
+      else if (isPrepaidStatus(statusCode)) {
+        scoreDate = customer.contract_completion_date || getDateFallback(customer);
+        isExecuted = statusCode === '집행완료(선불)';
         effectiveStatusForScore = '계약완료(선불)';
       }
-      else if (isPostpaidStatus(customer.status_code || '')) {
-        if (customer.status_code === '집행완료(후불)') {
-          scoreDate = customer.execution_date || customer.contract_completion_date ||
-            (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
-             customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
-          executionAmount = customer.execution_amount || 0;
+      else if (isPostpaidStatus(statusCode)) {
+        if (statusCode === '집행완료(후불)') {
+          scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
+          isExecuted = true;
         } else {
-          scoreDate = customer.contract_completion_date ||
-            (customer.updated_at instanceof Date ? customer.updated_at.toISOString().split('T')[0] : 
-             customer.updated_at ? String(customer.updated_at).split('T')[0] : customer.entry_date);
-          executionAmount = 0;
+          scoreDate = customer.contract_completion_date || getDateFallback(customer);
+          isExecuted = false;
           effectiveStatusForScore = '계약완료(후불)';
         }
       }
@@ -362,32 +359,69 @@ export default function Rankings() {
       const sDate = new Date(scoreDate);
       if (sDate < startDate || sDate > endDate) return;
 
-      const processingOrg = customer.processing_org || '미등록';
       const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
-      const { baseScore, categoryBonus, amountBonus, totalScore } = calculateContractScore(
-        processingOrg,
-        executionAmount,
-        contractAmount,
-        effectiveStatusForScore
-      );
+      const approvedOrgs = (customer.processing_orgs || []).filter(o => o.status === '승인');
 
-      scores.push({
-        customerId: customer.id,
-        customerName: customer.name,
-        companyName: customer.company_name,
-        managerId: customer.manager_id,
-        managerName: customer.manager_name || '',
-        teamId: customer.team_id,
-        teamName: customer.team_name || '',
-        processingOrg,
-        executionAmount: executionAmount,
-        contractAmount,
-        executionDate: scoreDate,
-        baseScore,
-        categoryBonus,
-        amountBonus,
-        totalScore,
-      });
+      if (approvedOrgs.length > 0) {
+        let isFirstOrg = true;
+        for (const org of approvedOrgs) {
+          const orgName = org.org || '미등록';
+          const orgExecutionAmount = isExecuted ? (org.execution_amount || customer.execution_amount || 0) : 0;
+          const orgContractAmount = isFirstOrg ? contractAmount : 0;
+          const { baseScore, categoryBonus, amountBonus, totalScore } = calculateContractScore(
+            orgName,
+            orgExecutionAmount,
+            orgContractAmount,
+            effectiveStatusForScore
+          );
+
+          scores.push({
+            customerId: customer.id,
+            customerName: customer.name,
+            companyName: customer.company_name,
+            managerId: customer.manager_id,
+            managerName: customer.manager_name || '',
+            teamId: customer.team_id,
+            teamName: customer.team_name || '',
+            processingOrg: orgName,
+            executionAmount: orgExecutionAmount,
+            contractAmount: orgContractAmount,
+            executionDate: scoreDate,
+            baseScore,
+            categoryBonus,
+            amountBonus,
+            totalScore,
+          });
+          isFirstOrg = false;
+        }
+      } else {
+        const processingOrg = customer.processing_org || '미등록';
+        const executionAmount = isExecuted ? (customer.execution_amount || 0) : 0;
+        const { baseScore, categoryBonus, amountBonus, totalScore } = calculateContractScore(
+          processingOrg,
+          executionAmount,
+          contractAmount,
+          effectiveStatusForScore
+        );
+
+        scores.push({
+          customerId: customer.id,
+          customerName: customer.name,
+          companyName: customer.company_name,
+          managerId: customer.manager_id,
+          managerName: customer.manager_name || '',
+          teamId: customer.team_id,
+          teamName: customer.team_name || '',
+          processingOrg,
+          executionAmount,
+          contractAmount,
+          executionDate: scoreDate,
+          baseScore,
+          categoryBonus,
+          amountBonus,
+          totalScore,
+        });
+      }
     });
 
     return scores;
