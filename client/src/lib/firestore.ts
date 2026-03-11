@@ -133,6 +133,26 @@ export const updateCustomersTeamByManager = async (
   return snapshot.size;
 };
 
+export const updateSettlementsTeamByManager = async (
+  managerId: string,
+  newTeamId: string,
+  newTeamName: string
+): Promise<number> => {
+  const q = query(collection(db, 'settlements'), where('manager_id', '==', managerId));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return 0;
+
+  const batch = writeBatch(db);
+  snapshot.docs.forEach(docSnap => {
+    batch.update(doc(db, 'settlements', docSnap.id), {
+      team_id: newTeamId,
+      team_name: newTeamName,
+    });
+  });
+  await batch.commit();
+  return snapshot.size;
+};
+
 // 로그인 이력 업데이트 (최근 5개 유지)
 export const updateLoginHistory = async (
   userDocId: string,

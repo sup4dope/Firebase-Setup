@@ -49,7 +49,11 @@ import {
   createTeamAdmin,
   deleteTeamAdmin,
   updateTeamAdmin,
+  updateCustomersTeamByManager,
+  updateSettlementsTeamByManager,
 } from '@/lib/firestore';
+import { authFetch } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
 import type { User, Team, UserRole, UserStatus } from '@shared/types';
 
 interface SystemSettingsModalProps {
@@ -68,7 +72,25 @@ const STATUS_LABELS: Record<UserStatus, string> = {
   '퇴사': '퇴사',
 };
 
+const syncCustomClaims = async (uid: string, role: string, team_id: string) => {
+  try {
+    const res = await authFetch('/api/admin/set-custom-claims', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, role, team_id }),
+    });
+    if (res.ok) {
+      console.log(`✅ Claims 동기화 완료: ${uid} -> role: ${role}, team_id: ${team_id}`);
+    } else {
+      console.error('❌ Claims 동기화 실패:', await res.text());
+    }
+  } catch (error) {
+    console.error('❌ Claims 동기화 에러:', error);
+  }
+};
+
 export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProps) {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('employees');
   const [users, setUsers] = useState<(User & { docId?: string })[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -237,10 +259,19 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     if (!user.docId) return;
     try {
       await updateUserInfo(user.docId, { role: newRole });
+      await syncCustomClaims(user.uid, newRole, user.team_id || '');
+      toast({
+        title: '성공',
+        description: `${user.name}님의 직급이 ${ROLE_LABELS[newRole]}(으)로 변경되었습니다.`,
+      });
       await loadData();
     } catch (error) {
       console.error('Error updating role:', error);
-      alert('직급 변경 중 오류가 발생했습니다.');
+      toast({
+        title: '오류',
+        description: '직급 변경 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -258,15 +289,31 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   const handleTeamChange = async (user: User & { docId?: string }, newTeamId: string) => {
     if (!user.docId) return;
     try {
+      const effectiveTeamId = newTeamId === 'none' ? '' : newTeamId;
       const team = teams.find((t) => t.id === newTeamId);
+      const effectiveTeamName = newTeamId === 'none' ? '' : (team?.team_name || team?.name || '');
+
       await updateUserInfo(user.docId, { 
-        team_id: newTeamId === 'none' ? null : newTeamId,
-        team_name: newTeamId === 'none' ? null : (team?.team_name || team?.name || null),
+        team_id: effectiveTeamId || null,
+        team_name: effectiveTeamName || null,
+      });
+
+      const customerCount = await updateCustomersTeamByManager(user.uid, effectiveTeamId, effectiveTeamName);
+      const settlementCount = await updateSettlementsTeamByManager(user.uid, effectiveTeamId, effectiveTeamName);
+      await syncCustomClaims(user.uid, user.role || 'staff', effectiveTeamId);
+
+      toast({
+        title: '성공',
+        description: `${user.name}님의 소속팀이 변경되었습니다. (고객 ${customerCount}건, 정산 ${settlementCount}건 소급 적용)`,
       });
       await loadData();
     } catch (error) {
       console.error('Error updating team:', error);
-      alert('소속팀 변경 중 오류가 발생했습니다.');
+      toast({
+        title: '오류',
+        description: '소속팀 변경 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -318,6 +365,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     
     try {
       const team = teams.find((t) => t.id === editEmployee.team_id);
+      const newTeamName = team?.team_name || team?.name || null;
       await updateUserInfo(editTargetUser.docId, {
         name: editEmployee.name,
         phone: editEmployee.phone_work || undefined,
@@ -331,9 +379,31 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         hire_date: editEmployee.hire_date || undefined,
         role: editEmployee.role,
         team_id: editEmployee.team_id || null,
-        team_name: team?.team_name || team?.name || null,
+        team_name: newTeamName,
         totalLeave: editEmployee.totalLeave,
         commissionRates: editEmployee.commissionRates,
+      });
+
+      const roleChanged = editEmployee.role !== editTargetUser.role;
+      const teamChanged = (editEmployee.team_id || '') !== (editTargetUser.team_id || '');
+      const messages: string[] = [];
+
+      if (teamChanged) {
+        const effectiveTeamId = editEmployee.team_id || '';
+        const effectiveTeamName = newTeamName || '';
+        const customerCount = await updateCustomersTeamByManager(editTargetUser.uid, effectiveTeamId, effectiveTeamName);
+        const settlementCount = await updateSettlementsTeamByManager(editTargetUser.uid, effectiveTeamId, effectiveTeamName);
+        messages.push(`고객 ${customerCount}건, 정산 ${settlementCount}건 소급 적용`);
+      }
+
+      if (roleChanged || teamChanged) {
+        await syncCustomClaims(editTargetUser.uid, editEmployee.role, editEmployee.team_id || '');
+        if (roleChanged) messages.push(`직급 ${ROLE_LABELS[editEmployee.role as UserRole]}(으)로 변경`);
+      }
+
+      toast({
+        title: '성공',
+        description: `${editEmployee.name}님의 정보가 수정되었습니다.${messages.length > 0 ? ` (${messages.join(', ')})` : ''}`,
       });
 
       setShowEditEmployee(false);
@@ -341,7 +411,11 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       await loadData();
     } catch (error) {
       console.error('Error updating employee:', error);
-      alert('직원 정보 수정 중 오류가 발생했습니다.');
+      toast({
+        title: '오류',
+        description: '직원 정보 수정 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
     }
   };
 
