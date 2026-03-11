@@ -31,6 +31,7 @@ import {
   getPendingConsultationsCount,
   processClawbackForFinalRejection,
   updateCustomerManager,
+  deleteOverdueTodosForCustomer,
 } from '@/lib/firestore';
 import { Plus, Search, RefreshCw, CalendarIcon, Download, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -46,7 +47,7 @@ import { FUNNEL_GROUPS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Customer, User, Team, StatusLog, StatusCode, InsertCustomer, ProcessingOrg } from '@shared/types';
+import type { Customer, User, Team, StatusLog, StatusCode, InsertCustomer, ProcessingOrg, TodoItem } from '@shared/types';
 
 const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
@@ -75,6 +76,9 @@ export default function Dashboard() {
   // 미처리 상담 유입 관련 상태 (super_admin 전용)
   const [pendingConsultationsCount, setPendingConsultationsCount] = useState(0);
   const [consultationsPreviewOpen, setConsultationsPreviewOpen] = useState(false);
+
+  // 경과 TODO 고객 ID 추적
+  const [overdueTodoCustomerIds, setOverdueTodoCustomerIds] = useState<Set<string>>(new Set());
 
   // Form states
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
@@ -201,6 +205,64 @@ export default function Dashboard() {
     fetchPendingCount();
   }, [isSuperAdmin]);
 
+  // 경과 TODO 실시간 추적
+  useEffect(() => {
+    if (!user) return;
+
+    const loadOverdueTodos = async () => {
+      try {
+        const { getTodoItemsByScope } = await import('@/lib/firestore');
+        const teamEmails = isSuperAdmin ? users.map(u => u.email) : 
+          isTeamLeader ? users.filter(u => u.team_id === user.team_id).map(u => u.email) : 
+          undefined;
+        const teamUids = isSuperAdmin ? users.map(u => u.uid) :
+          isTeamLeader ? users.filter(u => u.team_id === user.team_id).map(u => u.uid) :
+          undefined;
+        
+        const todos = await getTodoItemsByScope(
+          user.email || '',
+          user.uid,
+          teamEmails,
+          teamUids
+        );
+        
+        const now = new Date();
+        const overdueCustomerIds = new Set<string>();
+        for (const todo of todos) {
+          if (todo.customer_id && todo.status === '진행중') {
+            const dueDate = todo.due_date instanceof Date ? todo.due_date : new Date(todo.due_date);
+            if (dueDate <= now) {
+              overdueCustomerIds.add(todo.customer_id);
+            }
+          }
+        }
+        setOverdueTodoCustomerIds(overdueCustomerIds);
+      } catch (error) {
+        console.error('Error loading overdue todos:', error);
+      }
+    };
+
+    loadOverdueTodos();
+    const interval = setInterval(loadOverdueTodos, 30000);
+    return () => clearInterval(interval);
+  }, [user, users, isSuperAdmin, isTeamLeader]);
+
+  // 경과 TODO 고객 액션 후 갱신 헬퍼
+  const handleOverdueTodoAction = async (customerId: string) => {
+    try {
+      const deleted = await deleteOverdueTodosForCustomer(customerId, user?.uid);
+      if (deleted > 0) {
+        setOverdueTodoCustomerIds(prev => {
+          const next = new Set(prev);
+          next.delete(customerId);
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting overdue todos:', error);
+    }
+  };
+
   // 상담 유입 완료 콜백
   const handleImportComplete = async (result: { success: number; failed: number; newCustomers: number; existingCustomers: number }) => {
     toast({
@@ -295,8 +357,17 @@ export default function Dashboard() {
       );
     }
 
+    // 경과 TODO가 있는 고객을 최상단에 배치
+    if (overdueTodoCustomerIds.size > 0) {
+      result = [...result].sort((a, b) => {
+        const aOverdue = overdueTodoCustomerIds.has(a.id) ? 1 : 0;
+        const bOverdue = overdueTodoCustomerIds.has(b.id) ? 1 : 0;
+        return bOverdue - aOverdue;
+      });
+    }
+
     return result;
-  }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader]);
+  }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader, overdueTodoCustomerIds]);
 
   // 퍼널 차트용 필터 (날짜/팀/담당자만 적용, 상태/검색어 제외)
   const funnelFilteredCustomers = useMemo(() => {
@@ -424,6 +495,7 @@ export default function Dashboard() {
       const now = new Date();
       const logs = await getContractLogsForMonth(now.getFullYear(), now.getMonth() + 1);
       setStatusLogs(logs);
+      handleOverdueTodoAction(customerId);
       toast({
         title: '성공',
         description: '상태가 변경되었습니다.',
@@ -532,6 +604,7 @@ export default function Dashboard() {
       const logs = await getContractLogsForMonth(now.getFullYear(), now.getMonth() + 1);
       setStatusLogs(logs);
 
+      handleOverdueTodoAction(statusChangeModal.customerId);
       setStatusChangeModal(prev => ({ ...prev, isOpen: false }));
       toast({
         title: '성공',
@@ -881,6 +954,7 @@ export default function Dashboard() {
         } : c)
       );
       
+      handleOverdueTodoAction(customerId);
       toast({
         title: '성공',
         description: '메모가 저장되었습니다.',
@@ -1095,7 +1169,6 @@ export default function Dashboard() {
       );
       
       if (isMemoOnlyUpdate) {
-        // 메모 전용: 이미 CustomerDetailModal에서 updateDoc으로 저장했으므로 로컬만 업데이트
         console.log("📝 메모 전용 업데이트 -> 로컬 상태만 갱신 (Firestore 중복 저장 방지)");
         setCustomers(prev =>
           prev.map(c => {
@@ -1105,6 +1178,7 @@ export default function Dashboard() {
             return c;
           })
         );
+        handleOverdueTodoAction(data.id);
         return data.id;
       }
       
@@ -1123,7 +1197,7 @@ export default function Dashboard() {
         );
         // ★수정: fetchData 대신 로컬 상태만 업데이트 (모달 깜빡임 방지)
         console.log("🔄 상세페이지 변경 감지 -> 로컬 상태 업데이트 완료");
-        // Silent update - no toast for auto-save
+        handleOverdueTodoAction(data.id);
         return data.id;
       } catch (error: any) {
         console.error('Error updating customer:', error?.message || error?.code || error);
@@ -1422,6 +1496,7 @@ export default function Dashboard() {
             onManagerChange={handleManagerChange}
             onAddProcessingOrgWithAutoStatus={handleAddProcessingOrgWithAutoStatus}
             onApproveOrg={handleApproveOrg}
+            overdueTodoCustomerIds={overdueTodoCustomerIds}
           />
         </div>
       </div>

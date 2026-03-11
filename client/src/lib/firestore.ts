@@ -1072,6 +1072,30 @@ export const deleteTodoItem = async (id: string): Promise<void> => {
   await deleteDoc(doc(db, 'todo_list', id));
 };
 
+// 특정 고객의 경과된 TODO 자동 삭제 (고객 액션 시 호출)
+export const deleteOverdueTodosForCustomer = async (customerId: string, actorUid?: string): Promise<number> => {
+  const now = new Date();
+  const constraints: any[] = [
+    where('customer_id', '==', customerId),
+    where('status', '==', '진행중'),
+  ];
+  if (actorUid) {
+    constraints.push(where('assigned_to_uid', '==', actorUid));
+  }
+  const q = query(collection(db, 'todo_list'), ...constraints);
+  const snapshot = await getDocs(q);
+  let deletedCount = 0;
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data();
+    const dueDate = data.due_date?.toDate?.() || new Date(data.due_date);
+    if (dueDate <= now) {
+      await deleteDoc(docSnap.ref);
+      deletedCount++;
+    }
+  }
+  return deletedCount;
+};
+
 // ============ Customer Info Logs (자문료율, 계약금, 집행금액 변경 이력) ============
 
 export interface CustomerInfoLog {

@@ -522,3 +522,42 @@
     background-color: rgba(168, 85, 247, 0.12);
   }
 }
+
+@keyframes overdue-blink {
+  0%, 100% {
+    background-color: rgba(239, 68, 68, 0.08);
+  }
+  50% {
+    background-color: rgba(239, 68, 68, 0.2);
+  }
+}
+
+.overdue-todo-row {
+  animation: overdue-blink 1.5s ease-in-out infinite;
+  border-left: 3px solid rgb(239, 68, 68) !important;
+}
+
+.dark .overdue-todo-row {
+  animation: overdue-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes overdue-blink-dark {
+  0%, 100% {
+    background-color: rgba(239, 68, 68, 0.1);
+  }
+  50% {
+    background-color: rgba(239, 68, 68, 0.25);
+  }
+}
+
+.dark .overdue-todo-row {
+  animation: overdue-blink-dark 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overdue-todo-row {
+    animation: none;
+    background-color: rgba(239, 68, 68, 0.12);
+    border-left: 3px solid rgb(239, 68, 68) !important;
+  }
+}

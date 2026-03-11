@@ -155,6 +155,7 @@ interface CustomerTableProps {
   onAddProcessingOrgWithAutoStatus?: (customerId: string, customer: Customer, orgName: string, isReExecution?: boolean) => void;
   onApproveOrg?: (customerId: string, customer: Customer, orgName: string, executionDate: string, executionAmount: number) => void;
   currentUser?: User;
+  overdueTodoCustomerIds?: Set<string>;
 }
 
 // 스테이지 이름 가져오기 (한글 상태명 기반)
@@ -187,6 +188,7 @@ export function CustomerTable({
   onAddProcessingOrgWithAutoStatus,
   onApproveOrg,
   currentUser,
+  overdueTodoCustomerIds = new Set(),
 }: CustomerTableProps) {
   const canDelete = userRole === 'super_admin';
   const canApproveOrg = userRole === 'super_admin'; // 승인은 super_admin만 가능
@@ -526,7 +528,8 @@ export function CustomerTable({
                   "group",
                   isClosed
                     ? "opacity-40 bg-muted/40 dark:bg-gray-900/60 hover:opacity-70 hover:bg-muted/50"
-                    : "hover:bg-muted/30"
+                    : "hover:bg-muted/30",
+                  overdueTodoCustomerIds.has(customer.id) && !isClosed && "overdue-todo-row"
                 )}
                 data-testid={`row-customer-${customer.id}`}
               >
