@@ -619,10 +619,11 @@ export function CustomerTable({
                     const canSelectStatus = (targetStatus: string): boolean => {
                       if (isSuperAdmin) return true;
                       
+                      if (targetStatus.includes('계약완료')) return false;
+                      
                       const targetCategory = getCategory(targetStatus);
                       const targetStage = getStage(targetStatus);
                       
-                      // 계약완료 이상 단계에서 다른 카테고리의 같은 레벨 상태로 변경 제한
                       if (currentCategory && targetCategory && currentStage >= 1 && targetStage >= 1) {
                         if (targetCategory !== currentCategory) {
                           return false;
