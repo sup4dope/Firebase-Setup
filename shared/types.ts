@@ -174,6 +174,10 @@ export interface CustomerMemo {
   author_id: string;
   author_name: string;
   created_at: Date;
+  is_deleted?: boolean;
+  deleted_by?: string;
+  deleted_by_name?: string;
+  deleted_at?: Date;
 }
 
 // Customer Document (Firebase Storage)

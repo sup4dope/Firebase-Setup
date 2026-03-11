@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send } from 'lucide-react';
+import { Send, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { CustomerMemo } from '@shared/types';
 
@@ -41,6 +41,9 @@ interface MemoModalProps {
   customerName: string;
   memoHistory: CustomerMemo[];
   onAddMemo: (content: string) => void;
+  onDeleteMemo?: (index: number) => void;
+  isSuperAdmin?: boolean;
+  currentUserId?: string;
 }
 
 export function MemoModal({
@@ -49,6 +52,9 @@ export function MemoModal({
   customerName,
   memoHistory,
   onAddMemo,
+  onDeleteMemo,
+  isSuperAdmin,
+  currentUserId,
 }: MemoModalProps) {
   const [newMemo, setNewMemo] = useState('');
 
@@ -81,21 +87,50 @@ export function MemoModal({
                   메모 이력이 없습니다
                 </div>
               ) : (
-                [...memoHistory].reverse().map((memo, index) => (
-                  <div
-                    key={index}
-                    className="bg-muted/50 rounded-lg p-3 space-y-1"
-                    data-testid={`memo-entry-${index}`}
-                  >
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{safeFormatDate(memo.created_at, 'yyyy-MM-dd HH:mm')}</span>
-                      {memo.author_name && <span>- {memo.author_name}</span>}
+                [...memoHistory].reverse().map((memo, index) => {
+                  const originalIndex = memoHistory.length - 1 - index;
+                  return (
+                    <div
+                      key={index}
+                      className="bg-muted/50 rounded-lg p-3 space-y-1 group"
+                      data-testid={`memo-entry-${index}`}
+                    >
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{safeFormatDate(memo.created_at, 'yyyy-MM-dd HH:mm')}</span>
+                        {memo.author_name && <span>- {memo.author_name}</span>}
+                        {!memo.is_deleted && onDeleteMemo && (isSuperAdmin || currentUserId === memo.author_id) && (
+                          <button
+                            onClick={() => onDeleteMemo(originalIndex)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 ml-auto"
+                            data-testid={`button-delete-memo-${index}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                      {memo.is_deleted ? (
+                        isSuperAdmin ? (
+                          <div>
+                            <div className="text-sm whitespace-pre-wrap text-muted-foreground line-through">
+                              {memo.content}
+                            </div>
+                            <p className="text-xs text-red-400 mt-1">
+                              삭제: {memo.deleted_by_name} ({safeFormatDate(memo.deleted_at, 'yyyy-MM-dd HH:mm')})
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground italic">
+                            [삭제된 메세지 입니다.]
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-sm whitespace-pre-wrap">
+                          {memo.content}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-sm whitespace-pre-wrap">
-                      {memo.content}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </ScrollArea>

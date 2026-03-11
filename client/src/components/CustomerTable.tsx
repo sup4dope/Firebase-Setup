@@ -150,6 +150,7 @@ interface CustomerTableProps {
   onProcessingOrgChange?: (customerId: string, newOrg: string) => void;
   onProcessingOrgsChange?: (customerId: string, processingOrgs: ProcessingOrg[]) => void;
   onAddMemo?: (customerId: string, content: string) => void;
+  onDeleteMemo?: (customerId: string, memoIndex: number) => void;
   onManagerChange?: (customerId: string, newManagerId: string, newManagerName: string, newTeamId: string, newTeamName: string) => void;
   onAddProcessingOrgWithAutoStatus?: (customerId: string, customer: Customer, orgName: string, isReExecution?: boolean) => void;
   onApproveOrg?: (customerId: string, customer: Customer, orgName: string, executionDate: string, executionAmount: number) => void;
@@ -181,6 +182,7 @@ export function CustomerTable({
   onProcessingOrgChange,
   onProcessingOrgsChange,
   onAddMemo,
+  onDeleteMemo,
   onManagerChange,
   onAddProcessingOrgWithAutoStatus,
   onApproveOrg,
@@ -1037,21 +1039,66 @@ export function CustomerTable({
                   className="cursor-pointer"
                   data-testid={`cell-memo-${customer.id}`}
                 >
-                  {customer.latest_memo ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="text-sm text-muted-foreground truncate block max-w-[140px]">
-                          {customer.latest_memo}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-sm">{customer.latest_memo}</p>
-                        <p className="text-xs text-muted-foreground mt-1">더블클릭하여 메모 추가</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">-</span>
-                  )}
+                  {(() => {
+                    const memoHistory = customer.memo_history || [];
+                    const lastMemo = memoHistory.length > 0 ? memoHistory[memoHistory.length - 1] : null;
+                    const latestActiveMemo = [...memoHistory].reverse().find(m => !m.is_deleted);
+
+                    if (!lastMemo && !customer.latest_memo) {
+                      return <span className="text-muted-foreground text-sm">-</span>;
+                    }
+
+                    if (lastMemo?.is_deleted) {
+                      if (currentUser?.role === 'super_admin') {
+                        return (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-sm text-muted-foreground truncate block max-w-[140px] line-through">
+                                {lastMemo.content}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p className="text-sm line-through">{lastMemo.content}</p>
+                              <p className="text-xs text-red-400">삭제: {lastMemo.deleted_by_name}</p>
+                              <p className="text-xs text-muted-foreground mt-1">더블클릭하여 메모 추가</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-sm text-muted-foreground italic truncate block max-w-[140px]">
+                              [삭제된 메세지 입니다.]
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <p className="text-sm italic">[삭제된 메세지 입니다.]</p>
+                            <p className="text-xs text-muted-foreground mt-1">더블클릭하여 메모 추가</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+
+                    const displayMemo = latestActiveMemo?.content || customer.latest_memo;
+                    if (!displayMemo) {
+                      return <span className="text-muted-foreground text-sm">-</span>;
+                    }
+
+                    return (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-sm text-muted-foreground truncate block max-w-[140px]">
+                            {displayMemo}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <p className="text-sm">{displayMemo}</p>
+                          <p className="text-xs text-muted-foreground mt-1">더블클릭하여 메모 추가</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })()}
                 </TableCell>
                 
                 {/* 담당자 - dropdown for manager assignment (권한 기반) */}
@@ -1216,6 +1263,23 @@ export function CustomerTable({
         customerName={selectedCustomerForMemo?.name || ''}
         memoHistory={selectedCustomerForMemo?.memo_history || []}
         onAddMemo={handleAddMemo}
+        onDeleteMemo={(memoIndex) => {
+          if (selectedCustomerForMemo?.id) {
+            onDeleteMemo?.(selectedCustomerForMemo.id, memoIndex);
+            setSelectedCustomerForMemo(prev => {
+              if (!prev || !prev.memo_history) return prev;
+              const updated = prev.memo_history.map((m, idx) =>
+                idx === memoIndex
+                  ? { ...m, is_deleted: true, deleted_by: currentUser?.uid || '', deleted_by_name: currentUser?.name || '', deleted_at: new Date() }
+                  : m
+              );
+              const latestActive = [...updated].reverse().find(m => !m.is_deleted);
+              return { ...prev, memo_history: updated, latest_memo: latestActive?.content || '', recent_memo: latestActive?.content || '' };
+            });
+          }
+        }}
+        isSuperAdmin={currentUser?.role === 'super_admin'}
+        currentUserId={currentUser?.uid}
       />
 
       {/* 장기부재 확인 모달 */}

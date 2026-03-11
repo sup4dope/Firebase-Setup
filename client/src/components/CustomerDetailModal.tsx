@@ -109,6 +109,7 @@ import {
 import {
   doc,
   getDoc,
+  getDocs,
   updateDoc,
   addDoc,
   collection,
@@ -126,6 +127,10 @@ interface MemoItem {
   author_id: string;
   author_name: string;
   created_at: Date;
+  is_deleted?: boolean;
+  deleted_by?: string;
+  deleted_by_name?: string;
+  deleted_at?: Date;
 }
 
 interface AIMessage {
@@ -428,6 +433,12 @@ export function CustomerDetailModal({
             m.created_at instanceof Date
               ? m.created_at
               : new Date(m.created_at),
+          ...(m.is_deleted ? {
+            is_deleted: true,
+            deleted_by: m.deleted_by,
+            deleted_by_name: m.deleted_by_name,
+            deleted_at: m.deleted_at instanceof Date ? m.deleted_at : m.deleted_at ? new Date(m.deleted_at as any) : undefined,
+          } : {}),
         })) || [],
       );
       setDocuments(customer.documents || []);
@@ -557,13 +568,22 @@ export function CustomerDetailModal({
       q,
       (snapshot) => {
         console.log(`✅ 메모 로드 성공: ${snapshot.size}개`);
-        const logs = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          content: doc.data().content || "",
-          author_id: doc.data().author_id || "",
-          author_name: doc.data().author_name || "",
-          created_at: doc.data().created_at?.toDate?.() || new Date(),
-        })) as MemoItem[];
+        const logs = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            content: data.content || "",
+            author_id: data.author_id || "",
+            author_name: data.author_name || "",
+            created_at: data.created_at?.toDate?.() || new Date(),
+            ...(data.is_deleted ? {
+              is_deleted: true,
+              deleted_by: data.deleted_by,
+              deleted_by_name: data.deleted_by_name,
+              deleted_at: data.deleted_at?.toDate?.() || undefined,
+            } : {}),
+          };
+        }) as MemoItem[];
         setMemos(logs);
         setMemosLoaded(true); // 메모 로딩 완료
       },
@@ -1652,6 +1672,91 @@ export function CustomerDetailModal({
       console.error("🔥 메모 저장 실패:", error);
     }
   };
+  const handleDeleteMemo = async (memoId: string) => {
+    if (!currentUser || !formData.id) return;
+
+    const updatedMemos = memos.map((m) =>
+      m.id === memoId
+        ? {
+            ...m,
+            is_deleted: true,
+            deleted_by: currentUser.uid,
+            deleted_by_name: currentUser.name || "관리자",
+            deleted_at: new Date(),
+          }
+        : m
+    );
+
+    setMemos(updatedMemos);
+
+    try {
+      const historyForDB = updatedMemos.map((m) => ({
+        content: m.content,
+        author_id: m.author_id,
+        author_name: m.author_name,
+        created_at: m.created_at,
+        ...(m.is_deleted
+          ? {
+              is_deleted: true,
+              deleted_by: m.deleted_by,
+              deleted_by_name: m.deleted_by_name,
+              deleted_at: m.deleted_at,
+            }
+          : {}),
+      }));
+      const safeHistory = cleanData(historyForDB);
+
+      const latestActiveMemo = [...updatedMemos]
+        .reverse()
+        .find((m) => !m.is_deleted);
+
+      await updateDoc(doc(db, "customers", formData.id), {
+        memo_history: safeHistory,
+        recent_memo: latestActiveMemo?.content || "",
+        latest_memo: latestActiveMemo?.content || "",
+        last_memo_date: latestActiveMemo?.created_at || null,
+        updated_at: Timestamp.now(),
+      });
+
+      const targetMemo = memos.find((m) => m.id === memoId);
+      if (targetMemo) {
+        const logsQuery = query(
+          collection(db, "counseling_logs"),
+          where("customer_id", "==", formData.id),
+          where("content", "==", targetMemo.content),
+          where("author_name", "==", targetMemo.author_name)
+        );
+        const logsSnapshot = await getDocs(logsQuery);
+        for (const logDoc of logsSnapshot.docs) {
+          await updateDoc(logDoc.ref, {
+            is_deleted: true,
+            deleted_by: currentUser.uid,
+            deleted_by_name: currentUser.name || "관리자",
+            deleted_at: new Date(),
+          });
+        }
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        recent_memo: latestActiveMemo?.content || "",
+        latest_memo: latestActiveMemo?.content || "",
+        memo_history: updatedMemos,
+      }));
+
+      if (onSave) {
+        onSave({
+          id: formData.id,
+          recent_memo: latestActiveMemo?.content || "",
+          latest_memo: latestActiveMemo?.content || "",
+          memo_history: updatedMemos,
+        });
+      }
+    } catch (error) {
+      console.error("메모 삭제 실패:", error);
+    }
+  };
+
   // Handle AI query submit
   const handleAISubmit = () => {
     if (!aiInput.trim()) return;
@@ -4139,7 +4244,7 @@ export function CustomerDetailModal({
                         </div>
                       ) : (
                         [...memos].reverse().map((memo) => (
-                          <div key={memo.id} className="flex flex-col">
+                          <div key={memo.id} className="flex flex-col group">
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className="text-xs font-medium text-blue-400">
                                 {memo.author_name}
@@ -4147,12 +4252,40 @@ export function CustomerDetailModal({
                               <span className="text-xs text-muted-foreground">
                                 {safeFormatDate(memo.created_at, "MM/dd HH:mm")}
                               </span>
+                              {!memo.is_deleted && currentUser && (currentUser.role === 'super_admin' || currentUser.uid === memo.author_id) && (
+                                <button
+                                  onClick={() => handleDeleteMemo(memo.id)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 ml-auto"
+                                  data-testid={`button-delete-memo-${memo.id}`}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
-                            <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
-                              <p className="text-sm text-foreground whitespace-pre-wrap">
-                                {memo.content}
-                              </p>
-                            </div>
+                            {memo.is_deleted ? (
+                              currentUser?.role === 'super_admin' ? (
+                                <div className="bg-red-600/10 border border-red-600/20 rounded-lg px-2 py-1.5 max-w-[90%]">
+                                  <p className="text-sm text-muted-foreground line-through whitespace-pre-wrap">
+                                    {memo.content}
+                                  </p>
+                                  <p className="text-xs text-red-400 mt-1">
+                                    삭제: {memo.deleted_by_name} ({safeFormatDate(memo.deleted_at, "MM/dd HH:mm")})
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="bg-muted/30 border border-muted rounded-lg px-2 py-1.5 max-w-[90%]">
+                                  <p className="text-sm text-muted-foreground italic">
+                                    [삭제된 메세지 입니다.]
+                                  </p>
+                                </div>
+                              )
+                            ) : (
+                              <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
+                                <p className="text-sm text-foreground whitespace-pre-wrap">
+                                  {memo.content}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         ))
                       )}

@@ -41,7 +41,7 @@ import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-f
 import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { db, addCustomerHistoryLog } from '@/lib/firebase';
-import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 import { FUNNEL_GROUPS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -895,6 +895,74 @@ export default function Dashboard() {
     }
   };
 
+  const handleDeleteMemo = async (customerId: string, memoIndex: number) => {
+    if (!user) return;
+
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer || !customer.memo_history) return;
+
+    const updatedMemoHistory = customer.memo_history.map((memo, idx) =>
+      idx === memoIndex
+        ? {
+            ...memo,
+            is_deleted: true,
+            deleted_by: user.uid,
+            deleted_by_name: user.name,
+            deleted_at: new Date(),
+          }
+        : memo
+    );
+
+    const latestActiveMemo = [...updatedMemoHistory]
+      .reverse()
+      .find(m => !m.is_deleted);
+
+    try {
+      await updateCustomer(customerId, {
+        memo_history: updatedMemoHistory,
+        recent_memo: latestActiveMemo?.content || '',
+        latest_memo: latestActiveMemo?.content || '',
+        last_memo_date: latestActiveMemo?.created_at || null,
+        updated_at: new Date(),
+      });
+
+      const targetMemo = customer.memo_history[memoIndex];
+      if (targetMemo) {
+        const logsQuery = query(
+          collection(db, "counseling_logs"),
+          where("customer_id", "==", customerId),
+          where("content", "==", targetMemo.content),
+          where("author_name", "==", targetMemo.author_name)
+        );
+        const logsSnapshot = await getDocs(logsQuery);
+        for (const logDoc of logsSnapshot.docs) {
+          await updateDoc(logDoc.ref, {
+            is_deleted: true,
+            deleted_by: user.uid,
+            deleted_by_name: user.name,
+            deleted_at: new Date(),
+          });
+        }
+      }
+
+      setCustomers(prev =>
+        prev.map(c => c.id === customerId ? {
+          ...c,
+          memo_history: updatedMemoHistory,
+          recent_memo: latestActiveMemo?.content || '',
+          latest_memo: latestActiveMemo?.content || '',
+        } : c)
+      );
+    } catch (error) {
+      console.error('Error deleting memo:', error);
+      toast({
+        title: '오류',
+        description: '메모 삭제 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleManagerChange = async (
     customerId: string,
     newManagerId: string,
@@ -1350,6 +1418,7 @@ export default function Dashboard() {
             onProcessingOrgChange={handleProcessingOrgChange}
             onProcessingOrgsChange={handleProcessingOrgsChange}
             onAddMemo={handleAddMemo}
+            onDeleteMemo={handleDeleteMemo}
             onManagerChange={handleManagerChange}
             onAddProcessingOrgWithAutoStatus={handleAddProcessingOrgWithAutoStatus}
             onApproveOrg={handleApproveOrg}
