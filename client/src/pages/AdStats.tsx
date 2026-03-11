@@ -197,11 +197,12 @@ export default function AdStats() {
       const src = c.entry_source;
       if (src && revenue[src] !== undefined) {
         const contractAmt = c.contract_amount || 0;
-        const commissionRate = c.commission_rate || 0;
+        const feeRate = c.contract_fee_rate || 0;
         const execAmt = c.execution_amount || 0;
-        const commissionAmt = execAmt > 0 ? Math.round(execAmt * commissionRate / 100) : 0;
-        revenue[src] += contractAmt + commissionAmt;
-        grandRevenue += contractAmt + commissionAmt;
+        const advisoryFee = execAmt > 0 ? Math.round(execAmt * feeRate / 100) : 0;
+        const customerRevenue = contractAmt + advisoryFee;
+        revenue[src] += customerRevenue;
+        grandRevenue += customerRevenue;
       }
     });
     return { totals, grandTotal, sources, revenue, grandRevenue };
