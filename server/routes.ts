@@ -22,7 +22,7 @@ function getContractStatusByType(contractType: ContractType): string {
   switch (contractType) {
     case 'post': return '계약완료(후불)';
     case 'out': return '계약완료(외주)';
-    default: return '계약완료(선불)';
+    default: return '수납대기';
   }
 }
 

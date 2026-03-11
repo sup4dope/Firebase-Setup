@@ -1338,6 +1338,7 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
         (status.includes('계약완료') || status.includes('집행'));
       if (!isTargetStatus) return false;
+      if (status === '수납대기') return false;
 
       const isPostContract = status === '계약완료(후불)';
       const isOutContract = status === '계약완료(외주)';
@@ -1445,8 +1446,9 @@ export const cleanupInvalidSettlements = async (): Promise<{ deleted: number; de
       
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
         (status.includes('계약완료') || status.includes('집행'));
+      const isPaymentPending = status === '수납대기';
       
-      if (!isTargetStatus) {
+      if (!isTargetStatus || isPaymentPending) {
         details.push(`삭제: ${customerData.name || customerData.company_name} (${status}) - 정산ID: ${settlementDoc.id}`);
         await deleteDoc(doc(db, 'settlements', settlementDoc.id));
         deleted++;
@@ -1498,6 +1500,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
 
     const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
       (status.includes('계약완료') || status.includes('집행'));
+    const isPaymentPending = status === '수납대기';
     
     // 3. 해당 고객의 기존 정산 항목 가져오기
     const existingSettlementsQuery = query(
@@ -1510,9 +1513,16 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       ...docSnap.data(),
     } as SettlementItem));
     
-    // 정산 대상이 아닌 경우
-    if (!isTargetStatus) {
-      console.log(`[Settlement Sync] 정산 대상 아님 - 기존 정산 유지: ${customer.company_name || customer.name}, 상태: ${status}`);
+    // 정산 대상이 아닌 경우 (수납대기 상태 포함) - 기존 정산 항목 삭제
+    if (!isTargetStatus || isPaymentPending) {
+      if (existingSettlements.length > 0) {
+        for (const settlement of existingSettlements) {
+          await deleteDoc(doc(db, 'settlements', settlement.id));
+        }
+        console.log(`[Settlement Sync] 정산 대상 아님 - 기존 정산 ${existingSettlements.length}건 삭제: ${customer.company_name || customer.name}, 상태: ${status}`);
+      } else {
+        console.log(`[Settlement Sync] 정산 대상 아님: ${customer.company_name || customer.name}, 상태: ${status}`);
+      }
       return;
     }
     

@@ -38,6 +38,9 @@ export const ALL_STATUS_VALUES = [
   "계약서발송완료(후불)",
   "계약서발송완료(외주)",
   
+  // 수납대기 (선불 계약금 수납 확인 전)
+  "수납대기",
+  
   // 계약완료
   "계약완료(선불)",
   "계약완료(외주)",
@@ -99,6 +102,9 @@ export const STATUS_STYLES: Record<string, { bg: string; text: string; border?: 
   "계약서발송완료(선불)": { bg: "bg-lime-500/20", text: "text-lime-700 dark:text-lime-300", border: "border-lime-500/30" },
   "계약서발송완료(후불)": { bg: "bg-lime-500/20", text: "text-lime-700 dark:text-lime-300", border: "border-lime-500/30" },
   "계약서발송완료(외주)": { bg: "bg-lime-400/20", text: "text-lime-600 dark:text-lime-400", border: "border-lime-400/30" },
+  
+  // 수납대기 - 청록/시안
+  "수납대기": { bg: "bg-cyan-500/20", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-500/30" },
   
   // 계약완료 - 초록색/에메랄드
   "계약완료(선불)": { bg: "bg-emerald-500/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-500/30" },
@@ -162,6 +168,9 @@ export const STATUS_OPTIONS: { value: string; label: string; group?: string }[] 
   { value: "계약서발송완료(선불)", label: "계약서발송완료(선불)", group: "계약서발송" },
   { value: "계약서발송완료(후불)", label: "계약서발송완료(후불)", group: "계약서발송" },
   { value: "계약서발송완료(외주)", label: "계약서발송완료(외주)", group: "계약서발송" },
+  
+  // 수납대기
+  { value: "수납대기", label: "수납대기", group: "수납대기" },
   
   // 계약완료
   { value: "계약완료(선불)", label: "계약완료(선불)", group: "계약" },
@@ -227,8 +236,11 @@ export const FUNNEL_GROUPS: Record<string, string[]> = {
   "계약서발송완료(후불)": ["계약서발송완료(후불)"],
   "계약서발송완료(외주)": ["계약서발송완료(외주)"],
 
+  // 수납대기 (계약완료 그룹에 포함)
+  "수납대기": ["수납대기"],
+  
   // 15~18. 계약완료 (상위 그룹 및 개별)
-  "계약완료": ["계약완료(선불)", "계약완료(외주)", "계약완료(후불)"],
+  "계약완료": ["수납대기", "계약완료(선불)", "계약완료(외주)", "계약완료(후불)"],
   "계약완료(선불)": ["계약완료(선불)"],
   "계약완료(외주)": ["계약완료(외주)"],
   "계약완료(후불)": ["계약완료(후불)"],
@@ -310,6 +322,9 @@ export const FUNNEL_CATEGORIES = [
     label: "계약완료",
     statuses: FUNNEL_GROUPS["계약완료"],
     color: "emerald",
+    subGroups: [
+      { id: "수납대기", label: "수납대기", statuses: ["수납대기"] },
+    ],
   },
   {
     id: "서류취합",

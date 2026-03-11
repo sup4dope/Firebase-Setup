@@ -54,6 +54,7 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '계약서발송완료(외주)', label: '계약서발송완료(외주)' },
   ],
   '계약완료': [
+    { id: '수납대기', label: '수납대기' },
     { id: '계약완료(선불)', label: '계약완료(선불)' },
     { id: '계약완료(외주)', label: '계약완료(외주)' },
     { id: '계약완료(후불)', label: '계약완료(후불)' },

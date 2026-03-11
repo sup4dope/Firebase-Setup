@@ -3481,6 +3481,7 @@ export function CustomerDetailModal({
                       
                       // 현재 상태의 단계 (계약→서류→신청→집행)
                       const getStage = (status: string): number => {
+                        if (status === '수납대기') return 1;
                         if (status.includes('계약완료')) return 1;
                         if (status.includes('서류취합완료')) return 2;
                         if (status.includes('신청완료')) return 3;
@@ -3530,7 +3531,9 @@ export function CustomerDetailModal({
                         부재: "text-orange-300",
                         거절: "text-rose-300",
                         희망타겟: "text-yellow-300",
+                        수납대기: "text-cyan-300",
                         계약: "text-emerald-300",
+                        계약서발송: "text-lime-300",
                         서류: "text-blue-300",
                         신청: "text-indigo-300",
                         집행: "text-teal-300",
@@ -3659,6 +3662,79 @@ export function CustomerDetailModal({
                     })()}
                   </DropdownMenuContent>
                 </DropdownMenu>
+              )}
+
+              {/* 수납완료 버튼 - super_admin만, 수납대기 상태일 때만 노출 */}
+              {!isReadOnly && formData.id && currentUser?.role === 'super_admin' && formData.status_code === '수납대기' && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-8 px-3 text-sm gap-1.5 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  data-testid="button-payment-complete"
+                  onClick={async () => {
+                    if (!customer?.id || !formData.status_code) return;
+                    const targetStatus = '계약완료(선불)';
+                    const oldStatus = formData.status_code;
+                    
+                    try {
+                      const customerRef = doc(db, "customers", customer.id);
+                      await updateDoc(customerRef, {
+                        status_code: targetStatus,
+                        updated_at: new Date(),
+                      });
+
+                      await addDoc(collection(db, "status_logs"), {
+                        customer_id: customer.id,
+                        customer_name: formData.name || formData.company_name || '',
+                        previous_status: oldStatus,
+                        new_status: targetStatus,
+                        changed_by_id: currentUser?.uid || 'system',
+                        changed_by_name: currentUser?.name || '관리자',
+                        changed_at: new Date().toISOString(),
+                        reason: '수납완료 확인 - 선불 계약금',
+                      });
+
+                      await addDoc(collection(db, "counseling_logs"), {
+                        customer_id: customer.id,
+                        action_type: "status_change",
+                        description: `수납완료: ${oldStatus} → ${targetStatus}`,
+                        old_value: oldStatus,
+                        new_value: targetStatus,
+                        changed_by_name: currentUser?.name || "관리자",
+                        changed_at: new Date(),
+                        type: "log",
+                      });
+
+                      setFormData((prev) => ({
+                        ...prev,
+                        status_code: targetStatus,
+                      }));
+
+                      onSave?.({
+                        id: customer.id,
+                        status_code: targetStatus,
+                      });
+
+                      const allUsers = await getUsers();
+                      await syncSingleCustomerSettlement(customer.id, allUsers);
+
+                      toast({
+                        title: '수납완료',
+                        description: `${formData.name || formData.company_name} 고객이 ${targetStatus} 상태로 전환되었습니다.`,
+                      });
+                    } catch (error) {
+                      console.error("수납완료 처리 실패:", error);
+                      toast({
+                        title: '오류',
+                        description: '수납완료 처리 중 오류가 발생했습니다.',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  수납완료
+                </Button>
               )}
             </div>
 
