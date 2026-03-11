@@ -138,17 +138,19 @@ const calculateContractScore = (
   let baseScore = 0;
   
   if (statusCode === '계약완료(선불)') {
-    baseScore = contractAmount > 0 ? 10 : 5;
+    baseScore = 10;
   } else if (statusCode === '계약완료(후불)') {
-    baseScore = contractAmount > 0 ? 10 : 5;
-  } else if (statusCode === '집행완료(후불)') {
     baseScore = 5;
+  } else if (statusCode === '계약완료(외주)') {
+    baseScore = 5;
+  } else if (statusCode === '집행완료(후불)') {
+    baseScore = 0;
   } else if (statusCode === '집행완료(외주)') {
     baseScore = 0;
   } else if (statusCode === '집행완료(선불)') {
     baseScore = 0;
   } else if (statusCode === '집행완료') {
-    baseScore = contractAmount > 0 ? 10 : 5;
+    baseScore = 10;
   }
   
   const categoryBonus = CATEGORY_BONUS[processingOrg] ?? 0;
@@ -302,9 +304,9 @@ export default function Rankings() {
     const scores: ContractScore[] = [];
 
     // 랭킹 기준:
-    // - 선불 계열: 계약 시점부터 점수 반영 (계약일 기준) - 이후 단계로 진행해도 점수 유지
-    // - 후불 계열: 집행완료 상태에서만 점수 반영 (집행일 기준)
-    // - 외주 계열: 집행완료 상태에서만 반영되지만 계약 가점 없음
+    // - 선불 계열: 계약 시점부터 점수 반영 (계약일 기준) - 고정 10점
+    // - 후불 계열: 계약 시점부터 점수 반영 (계약일 기준) - 고정 5점
+    // - 외주 계열: 계약 시점부터 점수 반영 (계약일 기준) - 고정 5점
     
     const isPrepaidStatus = (status: string) => 
       status === '계약완료(선불)' || 
@@ -318,6 +320,12 @@ export default function Rankings() {
       status === '신청완료(후불)' ||
       status === '집행완료(후불)';
     
+    const isOutsourceStatus = (status: string) =>
+      status === '계약완료(외주)' ||
+      status === '서류취합완료(외주)' ||
+      status === '신청완료(외주)' ||
+      status === '집행완료(외주)';
+    
     const getDateFallback = (customer: Customer): string | undefined => {
       if (customer.updated_at instanceof Date) return customer.updated_at.toISOString().split('T')[0];
       if (customer.updated_at) return String(customer.updated_at).split('T')[0];
@@ -330,11 +338,7 @@ export default function Rankings() {
       let effectiveStatusForScore: string = statusCode;
       let isExecuted = false;
 
-      if (statusCode === '집행완료(외주)') {
-        scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
-        isExecuted = true;
-      }
-      else if (statusCode === '집행완료') {
+      if (statusCode === '집행완료') {
         scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
         isExecuted = true;
       }
@@ -350,8 +354,18 @@ export default function Rankings() {
         } else {
           scoreDate = customer.contract_completion_date || getDateFallback(customer);
           isExecuted = false;
-          effectiveStatusForScore = '계약완료(후불)';
         }
+        effectiveStatusForScore = '계약완료(후불)';
+      }
+      else if (isOutsourceStatus(statusCode)) {
+        if (statusCode === '집행완료(외주)') {
+          scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
+          isExecuted = true;
+        } else {
+          scoreDate = customer.contract_completion_date || getDateFallback(customer);
+          isExecuted = false;
+        }
+        effectiveStatusForScore = '계약완료(외주)';
       }
 
       if (!scoreDate) return;
@@ -654,9 +668,9 @@ export default function Rankings() {
                   <div>
                     <p className="font-semibold mb-1">계약 점수</p>
                     <div className="space-y-0.5 text-muted-foreground">
-                      <p>+10점: 선불 계약 (계약금 있음)</p>
-                      <p>+5점: 후불 계약 집행완료</p>
-                      <p>+5점: 선불 계약 (계약금 없음, 자문료만)</p>
+                      <p>+10점: 선불 계약</p>
+                      <p>+5점: 후불 계약</p>
+                      <p>+5점: 외주 계약</p>
                     </div>
                   </div>
                   <div>

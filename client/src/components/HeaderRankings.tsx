@@ -40,17 +40,19 @@ const calculateContractScore = (
   let baseScore = 0;
   
   if (statusCode === '계약완료(선불)') {
-    baseScore = contractAmount > 0 ? 10 : 5;
+    baseScore = 10;
   } else if (statusCode === '계약완료(후불)') {
-    baseScore = contractAmount > 0 ? 10 : 5;
-  } else if (statusCode === '집행완료(후불)') {
     baseScore = 5;
+  } else if (statusCode === '계약완료(외주)') {
+    baseScore = 5;
+  } else if (statusCode === '집행완료(후불)') {
+    baseScore = 0;
   } else if (statusCode === '집행완료(외주)') {
     baseScore = 0;
   } else if (statusCode === '집행완료(선불)') {
     baseScore = 0;
   } else if (statusCode === '집행완료') {
-    baseScore = contractAmount > 0 ? 10 : 5;
+    baseScore = 10;
   }
   
   const categoryBonus = CATEGORY_BONUS[processingOrg] ?? 0;
@@ -108,6 +110,12 @@ export function HeaderRankings() {
       status === '신청완료(후불)' ||
       status === '집행완료(후불)';
     
+    const isOutsourceStatus = (status: string) =>
+      status === '계약완료(외주)' ||
+      status === '서류취합완료(외주)' ||
+      status === '신청완료(외주)' ||
+      status === '집행완료(외주)';
+    
     const getDateFallback = (c: Customer): string | undefined => {
       if (c.updated_at instanceof Date) return c.updated_at.toISOString().split('T')[0];
       if (c.updated_at) return String(c.updated_at).split('T')[0];
@@ -122,11 +130,7 @@ export function HeaderRankings() {
       let effectiveStatus: string = statusCode;
       let isExecuted = false;
 
-      if (statusCode === '집행완료(외주)') {
-        scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
-        isExecuted = true;
-      }
-      else if (statusCode === '집행완료') {
+      if (statusCode === '집행완료') {
         scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
         isExecuted = true;
       }
@@ -142,8 +146,18 @@ export function HeaderRankings() {
         } else {
           scoreDate = customer.contract_completion_date || getDateFallback(customer);
           isExecuted = false;
-          effectiveStatus = '계약완료(후불)';
         }
+        effectiveStatus = '계약완료(후불)';
+      }
+      else if (isOutsourceStatus(statusCode)) {
+        if (statusCode === '집행완료(외주)') {
+          scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
+          isExecuted = true;
+        } else {
+          scoreDate = customer.contract_completion_date || getDateFallback(customer);
+          isExecuted = false;
+        }
+        effectiveStatus = '계약완료(외주)';
       }
 
       if (!scoreDate) return;
