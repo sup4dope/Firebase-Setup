@@ -26,6 +26,8 @@ import {
 
 type PeriodType = 'month' | 'H1' | 'H2' | 'year';
 
+const toWon = (manwon: number) => Math.round(manwon * 10000);
+
 const parsePeriod = (period: string): { type: PeriodType; year: number; month?: number } => {
   if (period.endsWith('-H1')) {
     return { type: 'H1', year: parseInt(period.slice(0, 4)) };
@@ -256,20 +258,18 @@ export default function Settlements() {
         // 계약 건수: 고유 고객 수로 계산 (같은 고객의 중복 승인/재집행은 1건으로 처리)
         const uniqueCustomerIds = new Set(originalItems.map(item => item.customer_id));
         const totalContracts = uniqueCustomerIds.size;
-        // 계약금 수당: 계약금 * 계약금 수당율 적용 (deposit_commission_rate 우선, 없으면 commission_rate 사용)
-        const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
-        // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
         const executedItems = originalItems.filter(item => item.execution_amount > 0);
         const executionCount = executedItems.length;
-        const totalExecutionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
+        const totalContractAmount = originalItems.reduce((sum, item) => sum + Math.round(toWon(item.contract_amount) * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
+        const totalExecutionAmount = originalItems.reduce((sum, item) => sum + toWon(item.execution_amount), 0);
         const totalExecutionFee = originalItems.reduce((sum, item) => {
-          return sum + (item.execution_amount * (item.fee_rate / 100) * (item.commission_rate / 100));
+          return sum + Math.round(toWon(item.execution_amount) * (item.fee_rate / 100) * (item.commission_rate / 100));
         }, 0);
-        const totalGrossCommission = originalItems.reduce((sum, item) => sum + item.gross_commission, 0);
-        const totalTax = originalItems.reduce((sum, item) => sum + item.tax_amount, 0);
-        const totalNetCommission = originalItems.reduce((sum, item) => sum + item.net_commission, 0);
+        const totalGrossCommission = originalItems.reduce((sum, item) => sum + toWon(item.gross_commission), 0);
+        const totalTax = originalItems.reduce((sum, item) => sum + toWon(item.tax_amount), 0);
+        const totalNetCommission = originalItems.reduce((sum, item) => sum + toWon(item.net_commission), 0);
         const clawbackCount = clawbackItems.length;
-        const clawbackAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(item.net_commission), 0);
+        const clawbackAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(toWon(item.net_commission)), 0);
         
         return {
           manager_id: managerId,
@@ -280,7 +280,7 @@ export default function Settlements() {
           execution_count: executionCount,
           total_execution_amount: totalExecutionAmount,
           total_execution_fee: totalExecutionFee,
-          total_revenue: originalItems.reduce((sum, item) => sum + item.total_revenue, 0),
+          total_revenue: toWon(originalItems.reduce((sum, item) => sum + item.total_revenue, 0)),
           total_gross_commission: totalGrossCommission,
           total_tax: totalTax,
           total_net_commission: totalNetCommission,
@@ -290,12 +290,24 @@ export default function Settlements() {
         };
       }
       
-      return calculateMonthlySettlementSummary(
+      const raw = calculateMonthlySettlementSummary(
         items,
         managerId,
         manager?.name || '알 수 없음',
         selectedMonth
       );
+      return {
+        ...raw,
+        total_contract_amount: toWon(raw.total_contract_amount),
+        total_execution_amount: toWon(raw.total_execution_amount),
+        total_execution_fee: toWon(raw.total_execution_fee),
+        total_revenue: toWon(raw.total_revenue),
+        total_gross_commission: toWon(raw.total_gross_commission),
+        total_tax: toWon(raw.total_tax),
+        total_net_commission: toWon(raw.total_net_commission),
+        clawback_amount: toWon(raw.clawback_amount),
+        final_payment: toWon(raw.final_payment),
+      };
     });
   }, [items, users, selectedMonth, user]);
 
@@ -305,19 +317,15 @@ export default function Settlements() {
     const originalItems = items.filter(item => !item.is_clawback);
     const clawbackItems = items.filter(item => item.is_clawback);
     
-    // 계약금 수당: 계약금 * 계약금 수당율 적용 (deposit_commission_rate 우선, 없으면 commission_rate 사용)
-    const contractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
-    // 고유 고객 수 (같은 고객의 중복 승인/재집행은 1건으로 처리)
+    const contractAmount = originalItems.reduce((sum, item) => sum + Math.round(toWon(item.contract_amount) * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
     const uniqueCustomerIds = new Set(originalItems.map(item => item.customer_id));
     const uniqueCustomerCount = uniqueCustomerIds.size;
-    // 평균 계약금액: 수당율 적용 없이 원본 계약금의 평균 (고객 단위 계약금 평균)
-    const rawContractAmount = originalItems.reduce((sum, item) => sum + item.contract_amount, 0);
-    const avgContractAmount = uniqueCustomerCount > 0 ? rawContractAmount / uniqueCustomerCount : 0;
+    const rawContractAmount = originalItems.reduce((sum, item) => sum + toWon(item.contract_amount), 0);
+    const avgContractAmount = uniqueCustomerCount > 0 ? Math.round(rawContractAmount / uniqueCustomerCount) : 0;
     const executedItems = originalItems.filter(item => item.execution_amount > 0);
-    // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
     const executionCount = executedItems.length;
-    const executionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
-    const clawbackContractAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(item.contract_amount), 0);
+    const executionAmount = originalItems.reduce((sum, item) => sum + toWon(item.execution_amount), 0);
+    const clawbackContractAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(toWon(item.contract_amount)), 0);
     
     // 평균 자문료율: 집행된 항목들의 fee_rate 평균 (계약정보 입력 모달에서 입력된 자문료율)
     const avgFeeRate = executedItems.length > 0 
@@ -407,27 +415,27 @@ export default function Settlements() {
       고유번호: string;
       고객명: string;
       수당구분: string;
-      '계약금(만원)': number | string;
+      '계약금(원)': number | string;
       '자문료율(%)': number | string;
-      '집행금액(만원)': number | string;
-      '자문료액(만원)': number | string;
-      '세전수당(만원)': number;
-      '실지급액(만원)': number;
+      '집행금액(원)': number | string;
+      '자문료액(원)': number | string;
+      '세전수당(원)': number;
+      '실지급액(원)': number;
     };
     const excelData: ExcelRow[] = [];
 
     detailModalItems.forEach((item) => {
       const customer = customers.find(c => c.id === item.customer_id);
       const customerName = customer?.name || item.customer_name;
-      const advisoryFee = Math.round(item.execution_amount * (item.fee_rate || 0) / 100 * 100) / 100;
-      // 계약금 수당률: deposit_commission_rate 우선 사용, 없으면 commission_rate 사용
+      const contractAmtWon = toWon(item.contract_amount);
+      const execAmtWon = toWon(item.execution_amount);
+      const advisoryFee = Math.round(execAmtWon * (item.fee_rate || 0) / 100);
       const depositRate = item.deposit_commission_rate ?? item.commission_rate;
-      const contractCommission = item.contract_amount * (depositRate / 100);
-      const advisoryCommission = advisoryFee * (item.commission_rate / 100);
-      const contractNet = Math.round(contractCommission * 0.967 * 100) / 100;
-      const advisoryNet = Math.round(advisoryCommission * 0.967 * 100) / 100;
+      const contractCommission = Math.round(contractAmtWon * (depositRate / 100));
+      const advisoryCommission = Math.round(advisoryFee * (item.commission_rate / 100));
+      const contractNet = Math.round(contractCommission * 0.967);
+      const advisoryNet = Math.round(advisoryCommission * 0.967);
 
-      // 환수 항목 (별도 처리)
       if (item.is_clawback) {
         excelData.push({
           수당일자: item.clawback_applied_at || item.contract_date || '',
@@ -435,15 +443,14 @@ export default function Settlements() {
           고유번호: customer?.readable_id || '-',
           고객명: customerName,
           수당구분: '환수',
-          '계약금(만원)': item.contract_amount,
+          '계약금(원)': contractAmtWon,
           '자문료율(%)': '-',
-          '집행금액(만원)': '-',
-          '자문료액(만원)': '-',
-          '세전수당(만원)': contractCommission,
-          '실지급액(만원)': contractNet,
+          '집행금액(원)': '-',
+          '자문료액(원)': '-',
+          '세전수당(원)': contractCommission,
+          '실지급액(원)': contractNet,
         });
       } else {
-        // 계약금 행 (집행 완료 건 상세에서는 포함하지 않음)
         if (item.contract_amount > 0 && detailModalTitle !== '집행 완료 건') {
           excelData.push({
             수당일자: item.contract_date || '',
@@ -451,16 +458,15 @@ export default function Settlements() {
             고유번호: customer?.readable_id || '-',
             고객명: customerName,
             수당구분: '계약금',
-            '계약금(만원)': item.contract_amount,
+            '계약금(원)': contractAmtWon,
             '자문료율(%)': '-',
-            '집행금액(만원)': '-',
-            '자문료액(만원)': '-',
-            '세전수당(만원)': contractCommission,
-            '실지급액(만원)': contractNet,
+            '집행금액(원)': '-',
+            '자문료액(원)': '-',
+            '세전수당(원)': contractCommission,
+            '실지급액(원)': contractNet,
           });
         }
 
-        // 자문료 행 (계약 건수 상세에서는 포함하지 않음)
         if (item.execution_amount > 0 && detailModalTitle !== '전체 계약 건') {
           const advisoryDate = item.execution_date || item.contract_date || '';
           excelData.push({
@@ -469,12 +475,12 @@ export default function Settlements() {
             고유번호: customer?.readable_id || '-',
             고객명: customerName,
             수당구분: '자문료',
-            '계약금(만원)': '-',
+            '계약금(원)': '-',
             '자문료율(%)': item.fee_rate || 0,
-            '집행금액(만원)': item.execution_amount,
-            '자문료액(만원)': advisoryFee,
-            '세전수당(만원)': advisoryCommission,
-            '실지급액(만원)': advisoryNet,
+            '집행금액(원)': execAmtWon,
+            '자문료액(원)': advisoryFee,
+            '세전수당(원)': advisoryCommission,
+            '실지급액(원)': advisoryNet,
           });
         }
       }
@@ -510,9 +516,9 @@ export default function Settlements() {
     managerItems.forEach(item => {
       // 계약금 수당률: deposit_commission_rate 우선 사용, 없으면 commission_rate 사용
       const depositRate = item.deposit_commission_rate ?? item.commission_rate;
-      totalContractPayment += item.contract_amount * (depositRate / 100);
-      const advisoryFee = item.execution_amount * (item.fee_rate || 0) / 100;
-      totalConsultingFee += advisoryFee * (item.commission_rate / 100);
+      totalContractPayment += Math.round(toWon(item.contract_amount) * (depositRate / 100));
+      const advisoryFee = Math.round(toWon(item.execution_amount) * (item.fee_rate || 0) / 100);
+      totalConsultingFee += Math.round(advisoryFee * (item.commission_rate / 100));
     });
     
     const [year, month] = selectedMonth.split('-');
@@ -523,8 +529,8 @@ export default function Settlements() {
       employeeName: summary.manager_name,
       employeeId: summary.manager_id.slice(-8).toUpperCase(),
       salaryMonth: salaryMonthStr,
-      contractPayment: Math.round(totalContractPayment * 10000),
-      consultingFee: Math.round(totalConsultingFee * 10000),
+      contractPayment: totalContractPayment,
+      consultingFee: totalConsultingFee,
       additionalPayments: [],
     });
     setSalaryModalOpen(true);
@@ -605,9 +611,9 @@ export default function Settlements() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totals.contractAmount.toLocaleString()}만원</div>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totals.contractAmount.toLocaleString()}원</div>
             <p className="text-xs text-muted-foreground mt-1">
-              평균 계약금액: {Math.round(totals.avgContractAmount).toLocaleString()}만원
+              평균 계약금액: {totals.avgContractAmount.toLocaleString()}원
             </p>
             <p className="text-xs text-muted-foreground">
               계약 건수: {totals.contracts}건
@@ -627,12 +633,12 @@ export default function Settlements() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{(totals.executionFee || 0).toLocaleString()}만원</div>
+            <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{(totals.executionFee || 0).toLocaleString()}원</div>
             <p className="text-xs text-muted-foreground mt-1">
               평균 자문료율: {totals.avgFeeRate.toFixed(1)}%
             </p>
             <p className="text-xs text-muted-foreground">
-              총 집행금액: {totals.executionAmount.toLocaleString()}만원
+              총 집행금액: {totals.executionAmount.toLocaleString()}원
             </p>
             <p className="text-xs text-muted-foreground">
               집행 건수: {totals.executionCount}건
@@ -652,10 +658,10 @@ export default function Settlements() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {totals.grossCommission.toLocaleString()}만원
+              {totals.grossCommission.toLocaleString()}원
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              평균 잠재금액: {totals.monthlyDbCount > 0 ? Math.round((totals.contractAmount + (totals.executionFee || 0)) / totals.monthlyDbCount).toLocaleString() : 0}만원
+              평균 잠재금액: {totals.monthlyDbCount > 0 ? Math.round((totals.contractAmount + (totals.executionFee || 0)) / totals.monthlyDbCount).toLocaleString() : 0}원
             </p>
           </CardContent>
         </Card>
@@ -673,14 +679,14 @@ export default function Settlements() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {totals.clawbackAmount > 0 ? `-${totals.clawbackAmount.toLocaleString()}` : '0'}만원
+              {totals.clawbackAmount > 0 ? `-${totals.clawbackAmount.toLocaleString()}` : '0'}원
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">
                 환수 건수: {totals.clawbackCount}건
               </p>
               <p className="text-xs text-muted-foreground">
-                환수 계약금액: {totals.clawbackContractAmount.toLocaleString()}만원
+                환수 계약금액: {totals.clawbackContractAmount.toLocaleString()}원
               </p>
             </div>
           </CardContent>
@@ -699,10 +705,10 @@ export default function Settlements() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {totals.finalPayment.toLocaleString()}만원
+              {totals.finalPayment.toLocaleString()}원
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              공제세액: {totals.tax.toLocaleString()}만원
+              공제세액: {totals.tax.toLocaleString()}원
             </p>
           </CardContent>
         </Card>
@@ -754,15 +760,15 @@ export default function Settlements() {
                         {summary.manager_name}
                       </TableCell>
                       <TableCell className="text-right">{summary.total_contracts}건</TableCell>
-                      <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}원</TableCell>
                       <TableCell className="text-right">{summary.execution_count}건</TableCell>
-                      <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}원</TableCell>
+                      <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}원</TableCell>
                       <TableCell className="text-right text-red-600">
-                        {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}만원` : '-'}
+                        {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}원` : '-'}
                       </TableCell>
                       <TableCell className="text-right font-bold text-blue-600">
-                        {summary.final_payment.toLocaleString()}만원
+                        {summary.final_payment.toLocaleString()}원
                       </TableCell>
                       <TableCell className="text-center">
                         <Button
@@ -834,14 +840,14 @@ export default function Settlements() {
                     detailModalItems.forEach((item) => {
                       const customer = customers.find(c => c.id === item.customer_id);
                       const customerName = customer?.name || item.customer_name;
-                      const advisoryFee = Math.round(item.execution_amount * (item.fee_rate || 0) / 100 * 100) / 100;
-                      
-                      // 계약금 수당률: deposit_commission_rate 우선 사용, 없으면 commission_rate 사용
+                      const contractAmtWon = toWon(item.contract_amount);
+                      const execAmtWon = toWon(item.execution_amount);
+                      const advisoryFee = Math.round(execAmtWon * (item.fee_rate || 0) / 100);
                       const depositRate = item.deposit_commission_rate ?? item.commission_rate;
-                      const contractCommission = item.contract_amount * (depositRate / 100);
-                      const advisoryCommission = advisoryFee * (item.commission_rate / 100);
-                      const contractNet = Math.round(contractCommission * 0.967 * 100) / 100;
-                      const advisoryNet = Math.round(advisoryCommission * 0.967 * 100) / 100;
+                      const contractCommission = Math.round(contractAmtWon * (depositRate / 100));
+                      const advisoryCommission = Math.round(advisoryFee * (item.commission_rate / 100));
+                      const contractNet = Math.round(contractCommission * 0.967);
+                      const advisoryNet = Math.round(advisoryCommission * 0.967);
                       
                       // 환수 항목 (별도 처리 - 음수 값 표시)
                       if (item.is_clawback) {
@@ -858,15 +864,15 @@ export default function Settlements() {
                               <TableCell>
                                 <Badge className="bg-red-500 hover:bg-red-600 text-white border-none">환수</Badge>
                               </TableCell>
-                              <TableCell className="text-right text-red-600">{item.contract_amount.toLocaleString()}만원</TableCell>
+                              <TableCell className="text-right text-red-600">{contractAmtWon.toLocaleString()}원</TableCell>
                               <TableCell className="text-right text-muted-foreground">-</TableCell>
                               <TableCell className="text-right text-muted-foreground">-</TableCell>
                               <TableCell className="text-right text-muted-foreground">-</TableCell>
                               <TableCell className="text-right text-red-600">
-                                {contractCommission.toLocaleString()}만원
+                                {contractCommission.toLocaleString()}원
                               </TableCell>
                               <TableCell className="text-right text-red-600">
-                                {contractNet.toLocaleString()}만원
+                                {contractNet.toLocaleString()}원
                               </TableCell>
                             </TableRow>
                           )
@@ -887,15 +893,15 @@ export default function Settlements() {
                                 <TableCell>
                                   <Badge variant="default">계약금</Badge>
                                 </TableCell>
-                                <TableCell className="text-right">{item.contract_amount.toLocaleString()}만원</TableCell>
+                                <TableCell className="text-right">{contractAmtWon.toLocaleString()}원</TableCell>
                                 <TableCell className="text-right text-muted-foreground">-</TableCell>
                                 <TableCell className="text-right text-muted-foreground">-</TableCell>
                                 <TableCell className="text-right text-muted-foreground">-</TableCell>
                                 <TableCell className="text-right">
-                                  {contractCommission.toLocaleString()}만원
+                                  {contractCommission.toLocaleString()}원
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {contractNet.toLocaleString()}만원
+                                  {contractNet.toLocaleString()}원
                                 </TableCell>
                               </TableRow>
                             )
@@ -920,13 +926,13 @@ export default function Settlements() {
                                 </TableCell>
                                 <TableCell className="text-right text-muted-foreground">-</TableCell>
                                 <TableCell className="text-right">{item.fee_rate}%</TableCell>
-                                <TableCell className="text-right">{item.execution_amount.toLocaleString()}만원</TableCell>
-                                <TableCell className="text-right">{advisoryFee.toLocaleString()}만원</TableCell>
+                                <TableCell className="text-right">{execAmtWon.toLocaleString()}원</TableCell>
+                                <TableCell className="text-right">{advisoryFee.toLocaleString()}원</TableCell>
                                 <TableCell className="text-right">
-                                  {advisoryCommission.toLocaleString()}만원
+                                  {advisoryCommission.toLocaleString()}원
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {advisoryNet.toLocaleString()}만원
+                                  {advisoryNet.toLocaleString()}원
                                 </TableCell>
                               </TableRow>
                             )
@@ -1074,34 +1080,34 @@ export default function Settlements() {
                       >
                         <TableCell className="font-medium">{summary.manager_name}</TableCell>
                         <TableCell className="text-right">{summary.total_contracts}건</TableCell>
-                        <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}원</TableCell>
                         <TableCell className="text-right">{summary.execution_count}건</TableCell>
-                        <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}만원</TableCell>
-                        <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}만원</TableCell>
-                        <TableCell className="text-right">{summary.total_gross_commission.toLocaleString()}만원</TableCell>
-                        <TableCell className="text-right">{summary.total_tax.toLocaleString()}만원</TableCell>
+                        <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}원</TableCell>
+                        <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}원</TableCell>
+                        <TableCell className="text-right">{summary.total_gross_commission.toLocaleString()}원</TableCell>
+                        <TableCell className="text-right">{summary.total_tax.toLocaleString()}원</TableCell>
                         <TableCell className="text-right text-red-600">
-                          {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}만원` : '-'}
+                          {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}원` : '-'}
                         </TableCell>
                         <TableCell className="text-right font-bold text-purple-600">
-                          {summary.final_payment.toLocaleString()}만원
+                          {summary.final_payment.toLocaleString()}원
                         </TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/30 font-semibold border-t-2">
                       <TableCell>합계</TableCell>
                       <TableCell className="text-right">{totals.contracts}건</TableCell>
-                      <TableCell className="text-right">{totals.contractAmount.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{totals.contractAmount.toLocaleString()}원</TableCell>
                       <TableCell className="text-right">{totals.executionCount}건</TableCell>
-                      <TableCell className="text-right">{totals.executionAmount.toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right">{(totals.executionFee || 0).toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right">{totals.grossCommission.toLocaleString()}만원</TableCell>
-                      <TableCell className="text-right">{totals.tax.toLocaleString()}만원</TableCell>
+                      <TableCell className="text-right">{totals.executionAmount.toLocaleString()}원</TableCell>
+                      <TableCell className="text-right">{(totals.executionFee || 0).toLocaleString()}원</TableCell>
+                      <TableCell className="text-right">{totals.grossCommission.toLocaleString()}원</TableCell>
+                      <TableCell className="text-right">{totals.tax.toLocaleString()}원</TableCell>
                       <TableCell className="text-right text-red-600">
-                        {totals.clawbackCount > 0 ? `-${totals.clawbackAmount.toLocaleString()}만원` : '-'}
+                        {totals.clawbackCount > 0 ? `-${totals.clawbackAmount.toLocaleString()}원` : '-'}
                       </TableCell>
                       <TableCell className="text-right font-bold text-purple-600">
-                        {totals.finalPayment.toLocaleString()}만원
+                        {totals.finalPayment.toLocaleString()}원
                       </TableCell>
                     </TableRow>
                   </>

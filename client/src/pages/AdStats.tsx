@@ -205,17 +205,17 @@ export default function AdStats() {
         const status = c.status_code;
         let customerRevenue = 0;
 
-        const contractAmt = c.contract_amount || 0;
+        const contractAmtWon = Math.round((c.contract_amount || 0) * 10000);
         const isPrepaidOrOutsource = PREPAID_CONTRACT_STATUSES.includes(status);
         const isExecComplete = ALL_EXEC_STATUSES.includes(status);
         if (isPrepaidOrOutsource || isExecComplete) {
-          customerRevenue += contractAmt;
+          customerRevenue += contractAmtWon;
         }
 
         if (isExecComplete) {
-          const execAmt = c.execution_amount || 0;
+          const execAmtWon = Math.round((c.execution_amount || 0) * 10000);
           const feeRate = c.contract_fee_rate || 0;
-          customerRevenue += Math.round(execAmt * feeRate / 100);
+          customerRevenue += Math.round(execAmtWon * feeRate / 100);
         }
 
         revenue[src] += customerRevenue;
@@ -550,11 +550,11 @@ export default function AdStats() {
                           {dailySourceTotals.grandTotal > 0 ? ((dailySourceTotals.totals[source] / dailySourceTotals.grandTotal) * 100).toFixed(1) : '0.0'}%
                         </td>
                         <td className="py-2 px-3 text-right text-muted-foreground">
-                          {dailySourceTotals.revenue[source] > 0 ? `${dailySourceTotals.revenue[source].toLocaleString()}만원` : '-'}
+                          {dailySourceTotals.revenue[source] > 0 ? `${dailySourceTotals.revenue[source].toLocaleString()}원` : '-'}
                         </td>
                         <td className="py-2 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">
                           {dailySourceTotals.totals[source] > 0 && dailySourceTotals.revenue[source] > 0
-                            ? `${Math.round(dailySourceTotals.revenue[source] / dailySourceTotals.totals[source]).toLocaleString()}만원`
+                            ? `${Math.round(dailySourceTotals.revenue[source] / dailySourceTotals.totals[source]).toLocaleString()}원`
                             : '-'}
                         </td>
                       </tr>
@@ -563,10 +563,10 @@ export default function AdStats() {
                     <td className="py-2 px-3">합계</td>
                     <td className="py-2 px-3 text-right">{dailySourceTotals.grandTotal}건</td>
                     <td className="py-2 px-3 text-right">100%</td>
-                    <td className="py-2 px-3 text-right">{dailySourceTotals.grandRevenue > 0 ? `${dailySourceTotals.grandRevenue.toLocaleString()}만원` : '-'}</td>
+                    <td className="py-2 px-3 text-right">{dailySourceTotals.grandRevenue > 0 ? `${dailySourceTotals.grandRevenue.toLocaleString()}원` : '-'}</td>
                     <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">
                       {dailySourceTotals.grandTotal > 0 && dailySourceTotals.grandRevenue > 0
-                        ? `${Math.round(dailySourceTotals.grandRevenue / dailySourceTotals.grandTotal).toLocaleString()}만원`
+                        ? `${Math.round(dailySourceTotals.grandRevenue / dailySourceTotals.grandTotal).toLocaleString()}원`
                         : '-'}
                     </td>
                   </tr>
