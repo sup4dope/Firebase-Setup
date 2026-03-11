@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin, getAdminApp, type AuthenticatedRequest } from "./firebaseAdmin";
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
-import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, downloadDocument, checkEformsignConfig, mapEformsignStatus, extractEformsignStatus } from "./eformsignService";
+import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, downloadDocument, checkEformsignConfig, mapEformsignStatus, extractEformsignStatus, cancelDocument } from "./eformsignService";
 
 const FieldValue = admin.firestore.FieldValue;
 
@@ -1005,6 +1005,50 @@ export async function registerRoutes(
       res.json({ success: true, data: result });
     } catch (error: any) {
       console.error("[eformsign] 계약서 재발송 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/eformsign/contracts/:contractId/cancel", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { contractId } = req.params;
+      console.log(`[eformsign] 계약서 발송취소 시작: contractId=${contractId}`);
+
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+
+      const contractDoc = await firestore.collection('contracts_eformsign').doc(contractId).get();
+      if (!contractDoc.exists) {
+        return res.status(404).json({ success: false, error: '계약 레코드를 찾을 수 없습니다.' });
+      }
+
+      const contractData = contractDoc.data()!;
+      const { document_id, status } = contractData;
+
+      if (status === '서명완료' || status === '무효') {
+        return res.status(400).json({ success: false, error: `이미 ${status} 상태인 계약서는 취소할 수 없습니다.` });
+      }
+
+      if (document_id) {
+        try {
+          await cancelDocument(document_id);
+          console.log(`[eformsign] eformsign 문서 취소 성공: ${document_id}`);
+        } catch (eformsignError: any) {
+          console.error(`[eformsign] eformsign 문서 취소 실패:`, eformsignError.message);
+          return res.status(500).json({ success: false, error: `eformsign 취소 실패: ${eformsignError.message}` });
+        }
+      }
+
+      await firestore.collection('contracts_eformsign').doc(contractId).update({
+        status: '무효',
+        cancelled_at: new Date(),
+        cancelled_reason: '취소',
+      });
+
+      console.log(`[eformsign] 계약서 발송취소 완료: contractId=${contractId}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[eformsign] 계약서 발송취소 오류:", error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });

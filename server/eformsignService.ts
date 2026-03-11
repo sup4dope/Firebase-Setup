@@ -343,6 +343,10 @@ export async function deleteDocument(documentId: string): Promise<any> {
   return apiRequest('DELETE', `/documents/${documentId}`);
 }
 
+export async function cancelDocument(documentId: string): Promise<any> {
+  return apiRequest('DELETE', `/documents/${documentId}`);
+}
+
 export function checkEformsignConfig(): { configured: boolean; missing: string[] } {
   const missing: string[] = [];
   if (!API_KEY) missing.push('EFORMSIGN_API_KEY');

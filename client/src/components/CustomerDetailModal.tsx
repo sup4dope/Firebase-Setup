@@ -233,6 +233,7 @@ export function CustomerDetailModal({
   const [customerContracts, setCustomerContracts] = useState<Contract[]>([]);
   const [isLoadingContracts, setIsLoadingContracts] = useState(false);
   const [resendingContractId, setResendingContractId] = useState<string | null>(null);
+  const [cancellingContractId, setCancellingContractId] = useState<string | null>(null);
   const [syncingContractId, setSyncingContractId] = useState<string | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [downloadingContractId, setDownloadingContractId] = useState<string | null>(null);
@@ -4287,6 +4288,48 @@ export function CustomerDetailModal({
                                       <Send className="w-2.5 h-2.5" />
                                     )}
                                     재발송
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={cancellingContractId === contract.id}
+                                    onClick={async () => {
+                                      if (!confirm('이 계약서 발송을 취소하시겠습니까? eformsign에서도 취소됩니다.')) return;
+                                      setCancellingContractId(contract.id);
+                                      try {
+                                        const { authFetch } = await import('@/lib/firebase');
+                                        const res = await authFetch(`/api/eformsign/contracts/${contract.id}/cancel`, {
+                                          method: 'POST',
+                                        });
+                                        const data = await res.json();
+                                        if (data.success) {
+                                          toast({ title: '발송취소 완료', description: '계약서가 취소되었습니다.' });
+                                          if (customer?.id) {
+                                            const contractsRes = await authFetch(`/api/contracts?customer_id=${customer.id}`);
+                                            const contractsData = await contractsRes.json();
+                                            if (contractsData.success) {
+                                              setCustomerContracts(contractsData.data);
+                                            }
+                                          }
+                                        } else {
+                                          toast({ title: '취소 실패', description: data.error || '취소에 실패했습니다.', variant: 'destructive' });
+                                        }
+                                      } catch (error: any) {
+                                        console.error('Contract cancel error:', error);
+                                        toast({ title: '오류', description: error.message || '취소 중 오류가 발생했습니다.', variant: 'destructive' });
+                                      } finally {
+                                        setCancellingContractId(null);
+                                      }
+                                    }}
+                                    className="h-5 px-1.5 text-[10px] gap-0.5 text-red-500 hover:text-red-600 border-red-200 hover:border-red-300"
+                                    data-testid={`button-cancel-contract-${contract.id}`}
+                                  >
+                                    {cancellingContractId === contract.id ? (
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                    ) : (
+                                      <XCircle className="w-2.5 h-2.5" />
+                                    )}
+                                    발송취소
                                   </Button>
                                 </>
                               )}

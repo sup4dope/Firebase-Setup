@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ContractSendModal } from '@/components/ContractSendModal';
 import { useToast } from '@/hooks/use-toast';
-import { FileSignature, Search, Plus, RefreshCw, Trash2, Loader2 } from 'lucide-react';
+import { FileSignature, Search, Plus, RefreshCw, Trash2, Loader2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Contract, ContractStatus } from '@shared/types';
 
@@ -36,6 +36,7 @@ export default function Contracts() {
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const isSuperAdmin = user?.role === 'super_admin';
 
@@ -63,6 +64,26 @@ export default function Contracts() {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchContracts();
+  };
+
+  const handleCancel = async (contractId: string, contractName: string) => {
+    if (!confirm(`"${contractName}" 계약서 발송을 취소하시겠습니까? eformsign에서도 취소됩니다.`)) return;
+
+    setCancellingId(contractId);
+    try {
+      const res = await authFetch(`/api/eformsign/contracts/${contractId}/cancel`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: '발송취소 완료', description: '계약서가 취소되었습니다.' });
+        fetchContracts();
+      } else {
+        toast({ title: '취소 실패', description: data.error || '취소에 실패했습니다.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      toast({ title: '오류', description: error.message, variant: 'destructive' });
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   const handleDelete = async (contractId: string, contractName: string) => {
@@ -149,7 +170,7 @@ export default function Contracts() {
     };
   };
 
-  const colSpan = isSuperAdmin ? 9 : 8;
+  const colSpan = isSuperAdmin ? 10 : 9;
 
   if (loading) {
     return (
@@ -257,6 +278,7 @@ export default function Contracts() {
                   <TableHead>발송일</TableHead>
                   <TableHead>완료일</TableHead>
                   <TableHead>작성자</TableHead>
+                  <TableHead className="text-center w-20">관리</TableHead>
                   {isSuperAdmin && <TableHead className="text-center w-16">삭제</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -318,6 +340,25 @@ export default function Contracts() {
                         </TableCell>
                         <TableCell className="text-sm">
                           {contract.created_by}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {(contract.status === '발송완료' || contract.status === '서명대기' || contract.status === '거부') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-orange-500 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950 text-xs gap-1"
+                              onClick={() => handleCancel(contract.id, contract.template_name)}
+                              disabled={cancellingId === contract.id}
+                              data-testid={`button-cancel-contract-${contract.id}`}
+                            >
+                              {cancellingId === contract.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <XCircle className="w-3.5 h-3.5" />
+                              )}
+                              취소
+                            </Button>
+                          )}
                         </TableCell>
                         {isSuperAdmin && (
                           <TableCell className="text-center">
