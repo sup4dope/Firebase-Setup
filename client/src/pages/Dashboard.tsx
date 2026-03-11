@@ -70,6 +70,7 @@ export default function Dashboard() {
   });
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [selectedStaff, setSelectedStaff] = useState<string>('all');
+  const [lastInitUid, setLastInitUid] = useState<string | null>(null);
   
   // 미처리 상담 유입 관련 상태 (super_admin 전용)
   const [pendingConsultationsCount, setPendingConsultationsCount] = useState(0);
@@ -175,6 +176,13 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    if (user && isTeamLeader && lastInitUid !== user.uid) {
+      setSelectedStaff(user.uid);
+      setLastInitUid(user.uid);
+    }
+  }, [user, isTeamLeader, lastInitUid]);
+
+  useEffect(() => {
     fetchData();
   }, [user]);
 
@@ -218,17 +226,21 @@ export default function Dashboard() {
   // 유효한 직원 목록 (uid가 존재하는 직원만)
   const filteredStaffOptions = useMemo(() => {
     let filtered = users.filter(u => u.uid && u.uid.trim() !== '');
+    if (isTeamLeader) {
+      if (!user?.team_id) return filtered.filter(u => u.uid === user?.uid);
+      return filtered.filter(u => u.team_id === user.team_id);
+    }
     if (selectedTeam === 'all') {
       return filtered.filter(u => u.role !== 'super_admin' || isSuperAdmin);
     }
     return filtered.filter(u => u.team_id === selectedTeam);
-  }, [users, selectedTeam, isSuperAdmin]);
+  }, [users, selectedTeam, isSuperAdmin, isTeamLeader, user?.team_id, user?.uid]);
 
   // 필터 리셋
   const resetFilters = () => {
     setDateRange({ from: undefined, to: undefined });
     setSelectedTeam('all');
-    setSelectedStaff('all');
+    setSelectedStaff(isTeamLeader && user ? user.uid : 'all');
     setSearchQuery('');
   };
 
@@ -247,11 +259,13 @@ export default function Dashboard() {
       });
     }
 
-    // Filter by team/staff (super_admin only)
+    // Filter by team/staff (super_admin & team_leader)
     if (isSuperAdmin) {
       if (selectedTeam !== 'all') {
         result = result.filter(c => c.team_id === selectedTeam);
       }
+    }
+    if (isSuperAdmin || isTeamLeader) {
       if (selectedStaff !== 'all') {
         result = result.filter(c => c.manager_id === selectedStaff);
       }
@@ -282,7 +296,7 @@ export default function Dashboard() {
     }
 
     return result;
-  }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, isSuperAdmin]);
+  }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader]);
 
   // 퍼널 차트용 필터 (날짜/팀/담당자만 적용, 상태/검색어 제외)
   const funnelFilteredCustomers = useMemo(() => {
@@ -299,18 +313,20 @@ export default function Dashboard() {
       });
     }
 
-    // Filter by team/staff (super_admin only)
+    // Filter by team/staff (super_admin & team_leader)
     if (isSuperAdmin) {
       if (selectedTeam !== 'all') {
         result = result.filter(c => c.team_id === selectedTeam);
       }
+    }
+    if (isSuperAdmin || isTeamLeader) {
       if (selectedStaff !== 'all') {
         result = result.filter(c => c.manager_id === selectedStaff);
       }
     }
 
     return result;
-  }, [customers, dateRange, selectedTeam, selectedStaff, isSuperAdmin]);
+  }, [customers, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader]);
 
   // Handlers
   const handleCreateCustomer = async (data: InsertCustomer & { manager_name?: string; team_name?: string }) => {
@@ -1197,43 +1213,44 @@ export default function Dashboard() {
               </Popover>
             </div>
 
-            {/* 소속팀/담당자 필터 (super_admin만) */}
+            {/* 소속팀 필터 (super_admin만) */}
             {isSuperAdmin && (
-              <>
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm text-muted-foreground whitespace-nowrap">소속팀</Label>
-                  <Select value={selectedTeam || 'all'} onValueChange={setSelectedTeam}>
-                    <SelectTrigger className="w-[120px]" data-testid="select-team-dashboard">
-                      <SelectValue placeholder="전체 팀" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체 팀</SelectItem>
-                      {validTeams.map(team => (
-                        <SelectItem key={team.id} value={team.id}>
-                          {team.team_name || team.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm text-muted-foreground whitespace-nowrap">소속팀</Label>
+                <Select value={selectedTeam || 'all'} onValueChange={setSelectedTeam}>
+                  <SelectTrigger className="w-[120px]" data-testid="select-team-dashboard">
+                    <SelectValue placeholder="전체 팀" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 팀</SelectItem>
+                    {validTeams.map(team => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.team_name || team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm text-muted-foreground whitespace-nowrap">담당자</Label>
-                  <Select value={selectedStaff || 'all'} onValueChange={setSelectedStaff}>
-                    <SelectTrigger className="w-[120px]" data-testid="select-staff-dashboard">
-                      <SelectValue placeholder="전체 직원" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체 직원</SelectItem>
-                      {filteredStaffOptions.map(staff => (
-                        <SelectItem key={staff.uid} value={staff.uid}>
-                          {staff.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
+            {/* 담당자 필터 (super_admin & team_leader) */}
+            {(isSuperAdmin || isTeamLeader) && (
+              <div className="flex items-center gap-2">
+                <Label className="text-sm text-muted-foreground whitespace-nowrap">담당자</Label>
+                <Select value={selectedStaff || 'all'} onValueChange={setSelectedStaff}>
+                  <SelectTrigger className="w-[120px]" data-testid="select-staff-dashboard">
+                    <SelectValue placeholder="전체 팀원" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{isTeamLeader ? '전체 팀원' : '전체 직원'}</SelectItem>
+                    {filteredStaffOptions.map(staff => (
+                      <SelectItem key={staff.uid} value={staff.uid}>
+                        {staff.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
 
             {/* 검색창 */}
