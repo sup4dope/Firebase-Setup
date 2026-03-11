@@ -1044,60 +1044,73 @@ export function CustomerTable({
                 >
                   {(() => {
                     const memoHistory = customer.memo_history || [];
+                    const isSuperAdmin = currentUser?.role === 'super_admin';
                     const lastMemo = memoHistory.length > 0 ? memoHistory[memoHistory.length - 1] : null;
                     const latestActiveMemo = [...memoHistory].reverse().find(m => !m.is_deleted);
+
+                    const recentMemos = [...memoHistory].reverse().filter(m => {
+                      if (m.is_deleted && !isSuperAdmin) return false;
+                      return true;
+                    }).slice(0, 5);
 
                     if (!lastMemo && !customer.latest_memo) {
                       return <span className="text-muted-foreground text-sm">-</span>;
                     }
 
-                    if (lastMemo?.is_deleted) {
-                      if (currentUser?.role === 'super_admin') {
-                        return (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-sm text-muted-foreground truncate block max-w-[140px] line-through">
-                                {lastMemo.content}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs">
-                              <p className="text-sm line-through">{lastMemo.content}</p>
-                              <p className="text-xs text-red-400">삭제: {lastMemo.deleted_by_name}</p>
-                              <p className="text-xs text-muted-foreground mt-1">더블클릭하여 메모 추가</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      }
-                      return (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="text-sm text-muted-foreground italic truncate block max-w-[140px]">
-                              [삭제된 메세지 입니다.]
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-xs">
-                            <p className="text-sm italic">[삭제된 메세지 입니다.]</p>
-                            <p className="text-xs text-muted-foreground mt-1">더블클릭하여 메모 추가</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    }
+                    const displayText = lastMemo?.is_deleted
+                      ? (isSuperAdmin ? lastMemo.content : '[삭제된 메세지 입니다.]')
+                      : (latestActiveMemo?.content || customer.latest_memo);
 
-                    const displayMemo = latestActiveMemo?.content || customer.latest_memo;
-                    if (!displayMemo) {
+                    if (!displayText) {
                       return <span className="text-muted-foreground text-sm">-</span>;
                     }
+
+                    const formatDate = (d: any) => {
+                      if (!d) return '';
+                      const date = d instanceof Date ? d : d?.toDate ? d.toDate() : new Date(d);
+                      const mm = String(date.getMonth() + 1).padStart(2, '0');
+                      const dd = String(date.getDate()).padStart(2, '0');
+                      const hh = String(date.getHours()).padStart(2, '0');
+                      const mi = String(date.getMinutes()).padStart(2, '0');
+                      return `${mm}.${dd} ${hh}:${mi}`;
+                    };
 
                     return (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="text-sm text-muted-foreground truncate block max-w-[140px]">
-                            {displayMemo}
+                          <span className={cn(
+                            "text-sm text-muted-foreground truncate block max-w-[140px]",
+                            lastMemo?.is_deleted && isSuperAdmin && "line-through",
+                            lastMemo?.is_deleted && !isSuperAdmin && "italic"
+                          )}>
+                            {displayText}
                           </span>
                         </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs">
-                          <p className="text-sm">{displayMemo}</p>
-                          <p className="text-xs text-muted-foreground mt-1">더블클릭하여 메모 추가</p>
+                        <TooltipContent side="top" className="max-w-[320px] p-0">
+                          <div className="p-2 space-y-1.5">
+                            {recentMemos.length > 0 ? recentMemos.map((memo, idx) => (
+                              <div key={idx} className={cn(
+                                "text-sm",
+                                idx > 0 && "border-t border-border pt-1.5"
+                              )}>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                                  <span className="font-medium">{memo.author_name || '알 수 없음'}</span>
+                                  <span>·</span>
+                                  <span>{formatDate(memo.created_at)}</span>
+                                  {memo.is_deleted && isSuperAdmin && (
+                                    <span className="text-red-400 ml-1">삭제됨</span>
+                                  )}
+                                </div>
+                                <p className={cn(
+                                  "text-sm break-words",
+                                  memo.is_deleted && "line-through text-muted-foreground"
+                                )}>{memo.content}</p>
+                              </div>
+                            )) : (
+                              <p className="text-sm">{displayText}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground border-t border-border pt-1.5">더블클릭하여 메모 추가</p>
+                          </div>
                         </TooltipContent>
                       </Tooltip>
                     );
