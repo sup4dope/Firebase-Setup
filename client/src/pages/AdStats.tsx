@@ -193,14 +193,31 @@ export default function AdStats() {
       });
       grandTotal += (d as any)['합계'] || 0;
     });
+    const PREPAID_CONTRACT_STATUSES = [
+      '계약완료(선불)', '서류취합완료(선불)', '신청완료(선불)', '집행완료(선불)',
+      '계약완료(외주)', '서류취합완료(외주)', '신청완료(외주)', '집행완료(외주)',
+    ];
+    const ALL_EXEC_STATUSES = ['집행완료', '집행완료(선불)', '집행완료(후불)', '집행완료(외주)'];
+
     dateFilteredCustomers.forEach(c => {
       const src = c.entry_source;
       if (src && revenue[src] !== undefined) {
+        const status = c.status_code;
+        let customerRevenue = 0;
+
         const contractAmt = c.contract_amount || 0;
-        const feeRate = c.contract_fee_rate || 0;
-        const execAmt = c.execution_amount || 0;
-        const advisoryFee = execAmt > 0 ? Math.round(execAmt * feeRate / 100) : 0;
-        const customerRevenue = contractAmt + advisoryFee;
+        const isPrepaidOrOutsource = PREPAID_CONTRACT_STATUSES.includes(status);
+        const isExecComplete = ALL_EXEC_STATUSES.includes(status);
+        if (isPrepaidOrOutsource || isExecComplete) {
+          customerRevenue += contractAmt;
+        }
+
+        if (isExecComplete) {
+          const execAmt = c.execution_amount || 0;
+          const feeRate = c.contract_fee_rate || 0;
+          customerRevenue += Math.round(execAmt * feeRate / 100);
+        }
+
         revenue[src] += customerRevenue;
         grandRevenue += customerRevenue;
       }
