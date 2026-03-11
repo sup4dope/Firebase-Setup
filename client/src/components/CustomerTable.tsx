@@ -529,7 +529,8 @@ export function CustomerTable({
                   isClosed
                     ? "opacity-40 bg-muted/40 dark:bg-gray-900/60 hover:opacity-70 hover:bg-muted/50"
                     : "hover:bg-muted/30",
-                  overdueTodoCustomerIds.has(customer.id) && !isClosed && "overdue-todo-row"
+                  overdueTodoCustomerIds.has(customer.id) && !isClosed && "overdue-todo-row",
+                  !overdueTodoCustomerIds.has(customer.id) && !isClosed && (customer.status_code === '상담대기' || customer.status_code === '단기부재') && "priority-status-row"
                 )}
                 data-testid={`row-customer-${customer.id}`}
               >
