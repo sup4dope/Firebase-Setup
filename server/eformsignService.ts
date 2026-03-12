@@ -344,7 +344,7 @@ export async function deleteDocument(documentId: string): Promise<any> {
 }
 
 export async function cancelDocument(documentId: string): Promise<any> {
-  return apiRequest('POST', `/documents/${documentId}/void`);
+  return apiRequest('DELETE', `/documents/${documentId}/cancel`);
 }
 
 export function checkEformsignConfig(): { configured: boolean; missing: string[] } {
