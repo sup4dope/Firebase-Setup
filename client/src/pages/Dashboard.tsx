@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,7 @@ import {
   processClawbackForFinalRejection,
   updateCustomerManager,
   deleteOverdueTodosForCustomer,
+  getPreviousStatusForCustomer,
 } from '@/lib/firestore';
 import { Plus, Search, RefreshCw, CalendarIcon, Download, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +57,8 @@ export default function Dashboard() {
   const { toast } = useToast();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const customersRef = useRef<Customer[]>([]);
+  useEffect(() => { customersRef.current = customers; }, [customers]);
   const [users, setUsers] = useState<User[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map());
@@ -237,6 +240,23 @@ export default function Dashboard() {
           }
         }
         setOverdueTodoCustomerIds(overdueCustomerIds);
+
+        for (const cid of overdueCustomerIds) {
+          const c = customersRef.current.find(x => x.id === cid);
+          if (c && c.status_code === '예약') {
+            const deleted = await deleteOverdueTodosForCustomer(cid);
+            if (deleted > 0) {
+              const prevStatus = await getPreviousStatusForCustomer(cid);
+              const restoreStatus = (prevStatus && prevStatus !== '예약' ? prevStatus : '상담대기') as StatusCode;
+              await updateCustomerStatus(cid, '예약' as StatusCode, restoreStatus, user.uid, user.name || '시스템');
+              setCustomers(prev =>
+                prev.map(x => x.id === cid ? { ...x, status_code: restoreStatus } : x)
+              );
+              overdueCustomerIds.delete(cid);
+            }
+          }
+        }
+        setOverdueTodoCustomerIds(new Set(overdueCustomerIds));
       } catch (error) {
         console.error('Error loading overdue todos:', error);
       }
@@ -247,16 +267,33 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [user, users, isSuperAdmin, isTeamLeader]);
 
-  // 경과 TODO 고객 액션 후 갱신 헬퍼
-  const handleOverdueTodoAction = async (customerId: string) => {
+  // 경과 TODO 고객 액션 후 갱신 헬퍼 (skipRestore: 상태 변경 직후 호출 시 예약 자동복원 방지)
+  const handleOverdueTodoAction = async (customerId: string, skipRestore = false) => {
     try {
-      const deleted = await deleteOverdueTodosForCustomer(customerId, user?.uid);
+      const deleted = await deleteOverdueTodosForCustomer(customerId);
       if (deleted > 0) {
         setOverdueTodoCustomerIds(prev => {
           const next = new Set(prev);
           next.delete(customerId);
           return next;
         });
+
+        if (!skipRestore) {
+          const { getDoc } = await import('firebase/firestore');
+          const { doc: firestoreDoc } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase');
+          const customerDoc = await getDoc(firestoreDoc(db, 'customers', customerId));
+          const currentStatus = customerDoc.data()?.status_code;
+
+          if (currentStatus === '예약' && user) {
+            const prevStatus = await getPreviousStatusForCustomer(customerId);
+            const restoreStatus = (prevStatus && prevStatus !== '예약' ? prevStatus : '상담대기') as StatusCode;
+            await updateCustomerStatus(customerId, '예약' as StatusCode, restoreStatus, user.uid, user.name || '시스템');
+            setCustomers(prev =>
+              prev.map(c => c.id === customerId ? { ...c, status_code: restoreStatus } : c)
+            );
+          }
+        }
       }
     } catch (error) {
       console.error('Error deleting overdue todos:', error);
@@ -495,7 +532,7 @@ export default function Dashboard() {
       const now = new Date();
       const logs = await getContractLogsForMonth(now.getFullYear(), now.getMonth() + 1);
       setStatusLogs(logs);
-      handleOverdueTodoAction(customerId);
+      handleOverdueTodoAction(customerId, true);
       toast({
         title: '성공',
         description: '상태가 변경되었습니다.',
@@ -604,7 +641,7 @@ export default function Dashboard() {
       const logs = await getContractLogsForMonth(now.getFullYear(), now.getMonth() + 1);
       setStatusLogs(logs);
 
-      handleOverdueTodoAction(statusChangeModal.customerId);
+      handleOverdueTodoAction(statusChangeModal.customerId, true);
       setStatusChangeModal(prev => ({ ...prev, isOpen: false }));
       toast({
         title: '성공',
