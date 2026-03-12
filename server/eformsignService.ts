@@ -344,7 +344,35 @@ export async function deleteDocument(documentId: string): Promise<any> {
 }
 
 export async function cancelDocument(documentId: string): Promise<any> {
-  return apiRequest('DELETE', `/documents/${documentId}/cancel`);
+  const endpoints = [
+    { method: 'DELETE' as const, path: `/documents/${documentId}/cancel` },
+    { method: 'DELETE' as const, path: `/documents/${documentId}` },
+    { method: 'POST' as const, path: `/documents/${documentId}/void` },
+  ];
+
+  let lastError: any = null;
+  for (const ep of endpoints) {
+    try {
+      const result = await apiRequest(ep.method, ep.path);
+      return result;
+    } catch (error: any) {
+      lastError = error;
+      const is404 = error.message?.includes('404');
+      const is405 = error.message?.includes('405');
+      if (is404 || is405) {
+        console.log(`[eformsign] ${ep.method} ${ep.path} → ${is404 ? '404' : '405'}, 다음 엔드포인트 시도`);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lastError?.message?.includes('404')) {
+    console.log(`[eformsign] 문서 ${documentId}를 eformsign에서 찾을 수 없음 (이미 만료/삭제됨). 로컬 취소 진행.`);
+    return { already_gone: true };
+  }
+
+  throw lastError;
 }
 
 export function checkEformsignConfig(): { configured: boolean; missing: string[] } {
