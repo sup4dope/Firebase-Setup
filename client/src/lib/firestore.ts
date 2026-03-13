@@ -698,13 +698,24 @@ export const getActiveStaffForAssignment = async (): Promise<User[]> => {
     uid: docSnap.data().uid || docSnap.id,
   } as User));
   
-  return allUsers
+  console.log('[StaffAssignment] 전체 직원 수:', allUsers.length, '명단:', allUsers.map(u => `${u.name}(uid=${u.uid}, status=${u.status}, db_dist=${(u as any).db_distribution_enabled})`));
+  
+  const filtered = allUsers
     .filter(user => {
-      if (user.status === '퇴사') return false;
-      if ((user as any).db_distribution_enabled === false) return false;
+      if (user.status === '퇴사') {
+        console.log(`[StaffAssignment] ${user.name} 제외: 퇴사`);
+        return false;
+      }
+      if ((user as any).db_distribution_enabled === false) {
+        console.log(`[StaffAssignment] ${user.name} 제외: DB분배 비활성화`);
+        return false;
+      }
       return true;
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  
+  console.log('[StaffAssignment] 필터 후 직원 수:', filtered.length, '명단:', filtered.map(u => u.name));
+  return filtered;
 };
 
 // 마지막 배정 인덱스 조회
