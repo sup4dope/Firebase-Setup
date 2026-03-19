@@ -74,6 +74,7 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '집행완료(외주)', label: '집행완료(외주)' },
     { id: '집행완료(후불)', label: '집행완료(후불)' },
     { id: '최종부결', label: '최종부결' },
+    { id: '민원처리', label: '민원처리' },
   ],
   '쓰레기통': [
     { id: '거절사유 미파악', label: '거절사유 미파악' },
@@ -204,11 +205,14 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
 
   // 하위 상태 칩 렌더링 (부모 테마 테두리)
   const renderSubStatus = (sub: { id: string; label: string }, parentTheme: string) => {
-    // 최종부결은 빨간색으로 특별 처리
+    // 최종부결은 빨간색, 민원처리는 주황색으로 특별 처리
     const isRejection = sub.id === '최종부결';
+    const isCivilComplaint = sub.id === '민원처리';
     const theme = isRejection 
       ? { accent: 'border-l-red-500', text: 'text-red-300' } 
-      : getTheme(parentTheme);
+      : isCivilComplaint
+        ? { accent: 'border-l-orange-500', text: 'text-orange-300' }
+        : getTheme(parentTheme);
     const subCount = getSubStatusCount(sub.id);
     
     return (
@@ -219,7 +223,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
           "w-full h-10 rounded-md border-l-4 transition-all duration-200",
           "flex items-center justify-between px-3",
           "bg-muted dark:bg-slate-900/60 backdrop-blur-sm",
-          isRejection ? "text-red-600 dark:text-red-300" : "text-foreground dark:text-gray-200",
+          isRejection ? "text-red-600 dark:text-red-300" : isCivilComplaint ? "text-orange-600 dark:text-orange-300" : "text-foreground dark:text-gray-200",
           theme.accent,
           "hover:bg-accent dark:hover:bg-slate-800/80 hover:shadow-md",
           selectedStage === sub.id && "ring-2 ring-primary"
