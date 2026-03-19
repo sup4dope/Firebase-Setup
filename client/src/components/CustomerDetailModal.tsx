@@ -4328,7 +4328,7 @@ export function CustomerDetailModal({
                               <span className="text-xs text-muted-foreground">
                                 {safeFormatDate(memo.created_at, "MM/dd HH:mm")}
                               </span>
-                              {!memo.is_deleted && currentUser && (currentUser.role === 'super_admin' || currentUser.uid === memo.author_id) && (
+                              {!memo.is_deleted && currentUser && (currentUser.role === 'super_admin' || currentUser.role === 'team_leader' || currentUser.uid === memo.author_id) && (
                                 <button
                                   onClick={() => handleDeleteMemo(memo.id)}
                                   className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 ml-auto"
