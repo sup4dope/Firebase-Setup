@@ -159,6 +159,11 @@ export function HeaderRankings() {
         }
         effectiveStatus = '계약완료(외주)';
       }
+      else if (statusCode === '민원처리') {
+        scoreDate = customer.contract_completion_date || customer.execution_date || getDateFallback(customer);
+        isExecuted = !!(customer.execution_amount && customer.execution_date);
+        effectiveStatus = '계약완료(선불)';
+      }
 
       if (!scoreDate) return;
       const sDate = new Date(scoreDate);

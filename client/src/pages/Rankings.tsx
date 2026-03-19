@@ -367,6 +367,11 @@ export default function Rankings() {
         }
         effectiveStatusForScore = '계약완료(외주)';
       }
+      else if (statusCode === '민원처리') {
+        scoreDate = customer.contract_completion_date || customer.execution_date || getDateFallback(customer);
+        isExecuted = !!(customer.execution_amount && customer.execution_date);
+        effectiveStatusForScore = '계약완료(선불)';
+      }
 
       if (!scoreDate) return;
 
