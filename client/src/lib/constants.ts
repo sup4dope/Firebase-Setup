@@ -62,6 +62,7 @@ export const ALL_STATUS_VALUES = [
   "집행완료(후불)",
   "집행완료(외주)",
   "최종부결",
+  "민원처리",
 ] as const;
 
 // 상태별 스타일 정의 (한글 상태명을 키로 사용) - 라이트/다크 모드 지원
@@ -129,6 +130,9 @@ export const STATUS_STYLES: Record<string, { bg: string; text: string; border?: 
   
   // 최종부결 - 진한 빨간색
   "최종부결": { bg: "bg-red-700/20", text: "text-red-800 dark:text-red-400", border: "border-red-700/30" },
+  
+  // 민원처리 - 주황/경고색
+  "민원처리": { bg: "bg-orange-600/20", text: "text-orange-700 dark:text-orange-400", border: "border-orange-600/30" },
 };
 
 // 상태 옵션 (드롭다운용) - value와 label 모두 한글
@@ -192,6 +196,7 @@ export const STATUS_OPTIONS: { value: string; label: string; group?: string }[] 
   { value: "집행완료(후불)", label: "집행완료(후불)", group: "집행" },
   { value: "집행완료(외주)", label: "집행완료(외주)", group: "집행" },
   { value: "최종부결", label: "최종부결", group: "집행" },
+  { value: "민원처리", label: "민원처리", group: "집행" },
 ];
 
 // 퍼널 필터링 그룹 정의 (30가지 규칙)
@@ -258,12 +263,13 @@ export const FUNNEL_GROUPS: Record<string, string[]> = {
   "신청완료(후불)": ["신청완료(후불)"],
   
   // 27~32. 집행완료 (상위 그룹 및 개별)
-  "집행완료_그룹": ["집행완료", "집행완료(선불)", "집행완료(후불)", "집행완료(외주)", "최종부결"],
+  "집행완료_그룹": ["집행완료", "집행완료(선불)", "집행완료(후불)", "집행완료(외주)", "최종부결", "민원처리"],
   "집행완료": ["집행완료"],  // 레거시 지원용
   "집행완료(선불)": ["집행완료", "집행완료(선불)"],  // 레거시 포함
   "집행완료(후불)": ["집행완료(후불)"],
   "집행완료(외주)": ["집행완료(외주)"],
   "최종부결": ["최종부결"],
+  "민원처리": ["민원처리"],
   
   // 쓰레기통 하위 개별 항목
   "거절사유 미파악": ["거절사유 미파악"],
@@ -361,6 +367,12 @@ export const FUNNEL_CATEGORIES = [
     label: "최종부결",
     statuses: ["최종부결"],
     color: "rose",
+  },
+  {
+    id: "민원처리",
+    label: "민원처리",
+    statuses: ["민원처리"],
+    color: "orange",
   },
 ];
 

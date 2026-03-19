@@ -3552,8 +3552,10 @@ export function CustomerDetailModal({
                               const groupColor =
                                 option.value === "최종부결"
                                   ? "text-red-300"
-                                  : GROUP_COLORS[option.group || ""] ||
-                                    "text-muted-foreground";
+                                  : option.value === "민원처리"
+                                    ? "text-orange-300"
+                                    : GROUP_COLORS[option.group || ""] ||
+                                      "text-muted-foreground";
                               const isSelected =
                                 formData.status_code === option.value;
                               return (

@@ -113,6 +113,14 @@ const getStatusBadgeInfo = (statusCode: string): { label: string; colorClass: st
       category: '집행',
     };
   }
+  // 민원처리는 주황색으로 특별 처리
+  if (statusCode === '민원처리') {
+    return {
+      label: statusCode,
+      colorClass: 'bg-orange-600/20 text-orange-700 dark:text-orange-400',
+      category: '집행',
+    };
+  }
   
   // 카테고리 결정
   let category = '기타';
@@ -789,6 +797,13 @@ export function CustomerTable({
                               <SelectItem value="집행완료(후불)" className="text-teal-600 dark:text-teal-400 focus:bg-accent cursor-pointer pl-4">집행완료(후불)</SelectItem>
                             )}
                             <SelectItem value="최종부결" className="text-red-600 dark:text-red-400 focus:bg-accent cursor-pointer pl-4">최종부결</SelectItem>
+                            <SelectItem value="민원처리" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">민원처리</SelectItem>
+                          </SelectGroup>
+
+                          {/* 수납대기 */}
+                          <SelectGroup>
+                            <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">수납대기</SelectLabel>
+                            <SelectItem value="수납대기" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">수납대기</SelectItem>
                           </SelectGroup>
                         </SelectContent>
                       </Select>
