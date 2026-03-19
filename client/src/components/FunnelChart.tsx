@@ -73,8 +73,6 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '집행완료(선불)', label: '집행완료(선불)' },
     { id: '집행완료(외주)', label: '집행완료(외주)' },
     { id: '집행완료(후불)', label: '집행완료(후불)' },
-    { id: '최종부결', label: '최종부결' },
-    { id: '민원처리', label: '민원처리' },
   ],
   '쓰레기통': [
     { id: '거절사유 미파악', label: '거절사유 미파악' },
@@ -400,6 +398,14 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
                 {hasSubStatuses && isExpanded && (
                   <div className="mt-2 flex flex-col gap-1 w-full animate-in slide-in-from-top-2 duration-200">
                     {SUB_STATUSES[stage.id].map((sub) => renderSubStatus(sub, stage.theme))}
+                  </div>
+                )}
+
+                {/* 집행완료 그룹 아래에 최종부결/민원처리 독립 표시 */}
+                {stage.id === '집행완료_그룹' && (
+                  <div className="mt-2 flex flex-col gap-1 w-full">
+                    {renderSubStatus({ id: '최종부결', label: '최종부결' }, stage.theme)}
+                    {renderSubStatus({ id: '민원처리', label: '민원처리' }, stage.theme)}
                   </div>
                 )}
               </div>
