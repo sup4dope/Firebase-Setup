@@ -40,7 +40,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MemoModal } from './MemoModal';
 import { TodoForm } from './TodoForm';
-import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users, Plus, XCircle, CheckCircle, RotateCcw } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, History, Check, X, FolderOpen, AlertTriangle, Users, Plus, XCircle, CheckCircle, RotateCcw, ArrowUpDown, ArrowDown } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   Popover,
@@ -164,6 +164,8 @@ interface CustomerTableProps {
   onApproveOrg?: (customerId: string, customer: Customer, orgName: string, executionDate: string, executionAmount: number) => void;
   currentUser?: User;
   overdueTodoCustomerIds?: Set<string>;
+  sortMode?: 'updated_at' | 'entry_date';
+  onSortModeChange?: (mode: 'updated_at' | 'entry_date') => void;
 }
 
 // 스테이지 이름 가져오기 (한글 상태명 기반)
@@ -197,6 +199,8 @@ export function CustomerTable({
   onApproveOrg,
   currentUser,
   overdueTodoCustomerIds = new Set(),
+  sortMode,
+  onSortModeChange,
 }: CustomerTableProps) {
   const canDelete = userRole === 'super_admin';
   const canApproveOrg = userRole === 'super_admin'; // 승인은 super_admin만 가능
@@ -510,7 +514,27 @@ export function CustomerTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead className="w-28 font-semibold whitespace-nowrap text-center">유입일자</TableHead>
+              <TableHead className="w-28 font-semibold whitespace-nowrap text-center">
+                {!selectedStage && onSortModeChange ? (
+                  <button
+                    onClick={() => onSortModeChange(sortMode === 'entry_date' ? 'updated_at' : 'entry_date')}
+                    className={cn(
+                      "inline-flex items-center gap-1 hover:text-primary transition-colors cursor-pointer",
+                      sortMode === 'entry_date' && "text-primary"
+                    )}
+                    data-testid="button-sort-entry-date"
+                  >
+                    유입일자
+                    {sortMode === 'entry_date' ? (
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    ) : (
+                      <ArrowUpDown className="w-3.5 h-3.5 opacity-50" />
+                    )}
+                  </button>
+                ) : (
+                  '유입일자'
+                )}
+              </TableHead>
               <TableHead className="w-[50px] font-semibold text-center whitespace-nowrap">No</TableHead>
               <TableHead className="w-[90px] font-semibold whitespace-nowrap">고객명</TableHead>
               <TableHead className="w-[150px] font-semibold whitespace-nowrap">상태</TableHead>

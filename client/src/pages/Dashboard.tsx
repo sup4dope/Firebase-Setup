@@ -66,6 +66,14 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<'updated_at' | 'entry_date'>('updated_at');
+  
+  const handleStageClick = (stage: string | null) => {
+    setSelectedStage(stage);
+    if (stage !== null) {
+      setSortMode('updated_at');
+    }
+  };
   
   // 필터 상태 (Stats 페이지와 동일)
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
@@ -394,6 +402,21 @@ export default function Dashboard() {
       );
     }
 
+    // 정렬: 전체 상태에서 유입일자 정렬 선택 시 entry_date+daily_no, 그 외에는 항상 updated_at 내림차순
+    if (sortMode === 'entry_date' && !selectedStage) {
+      result = [...result].sort((a, b) => {
+        const dateCompare = b.entry_date.localeCompare(a.entry_date);
+        if (dateCompare !== 0) return dateCompare;
+        return (b.daily_no || 0) - (a.daily_no || 0);
+      });
+    } else {
+      result = [...result].sort((a, b) => {
+        const aTime = a.updated_at ? new Date(a.updated_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+        const bTime = b.updated_at ? new Date(b.updated_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+        return bTime - aTime;
+      });
+    }
+
     // 경과 TODO가 있는 고객을 최상단에 배치
     if (overdueTodoCustomerIds.size > 0) {
       result = [...result].sort((a, b) => {
@@ -404,7 +427,7 @@ export default function Dashboard() {
     }
 
     return result;
-  }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader, overdueTodoCustomerIds]);
+  }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader, overdueTodoCustomerIds, sortMode]);
 
   // 퍼널 차트용 필터 (날짜/팀/담당자만 적용, 상태/검색어 제외)
   const funnelFilteredCustomers = useMemo(() => {
@@ -1489,7 +1512,7 @@ export default function Dashboard() {
         <FunnelChart
           customers={funnelFilteredCustomers}
           selectedStage={selectedStage}
-          onStageClick={setSelectedStage}
+          onStageClick={handleStageClick}
         />
 
         {/* Customer List Section */}
@@ -1505,7 +1528,7 @@ export default function Dashboard() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => setSelectedStage(null)}
+                onClick={() => handleStageClick(null)}
                 className="text-gray-400"
               >
                 필터 초기화
@@ -1534,6 +1557,8 @@ export default function Dashboard() {
             onAddProcessingOrgWithAutoStatus={handleAddProcessingOrgWithAutoStatus}
             onApproveOrg={handleApproveOrg}
             overdueTodoCustomerIds={overdueTodoCustomerIds}
+            sortMode={sortMode}
+            onSortModeChange={setSortMode}
           />
         </div>
       </div>
