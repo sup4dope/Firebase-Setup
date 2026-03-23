@@ -328,11 +328,6 @@ export default function Dashboard() {
     await fetchData();
   };
 
-  // Calculate KPI
-  const kpi = useMemo(() => {
-    return calculateKPI(customers, statusLogs, holidayMap);
-  }, [customers, statusLogs, holidayMap]);
-
   // 유효한 팀 목록 (id가 존재하는 팀만)
   const validTeams = useMemo(() => {
     return teams.filter(t => t.id && t.id.trim() !== '');
@@ -466,6 +461,11 @@ export default function Dashboard() {
 
     return result;
   }, [customers, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader]);
+
+  // Calculate KPI (팀/담당자/기간 필터 적용)
+  const kpi = useMemo(() => {
+    return calculateKPI(funnelFilteredCustomers, statusLogs, holidayMap);
+  }, [funnelFilteredCustomers, statusLogs, holidayMap]);
 
   // Handlers
   const handleCreateCustomer = async (data: InsertCustomer & { manager_name?: string; team_name?: string }) => {
