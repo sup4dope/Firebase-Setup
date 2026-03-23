@@ -281,10 +281,11 @@ export default function CompanySettlement() {
     return (revenueData.grossRevenue / expenseSummary.marketing) * 100;
   }, [revenueData.grossRevenue, expenseSummary.marketing]);
 
+  const totalCost = revenueData.employeeCommission + expenseSummary.total;
   const roi = useMemo(() => {
-    if (expenseSummary.marketing === 0) return 0;
-    return (revenueData.grossRevenue / expenseSummary.marketing) * 100;
-  }, [revenueData.grossRevenue, expenseSummary.marketing]);
+    if (totalCost === 0) return 0;
+    return (operatingProfit / totalCost) * 100;
+  }, [operatingProfit, totalCost]);
 
   const fetchData = async () => {
     if (!isSuperAdmin) {
@@ -602,7 +603,7 @@ export default function CompanySettlement() {
       ['계약 건수', revenueData.contractCount],
       ['집행 건수', revenueData.executionCount],
       ['광고 효율성 (ROAS)', `${roas.toFixed(0)}%`],
-      ['DB 효율성 (ROI)', `${roi.toFixed(0)}%`],
+      ['투자수익률 (ROI)', `${roi.toFixed(1)}%`],
     ];
 
     const wb = XLSX.utils.book_new();
@@ -874,7 +875,7 @@ export default function CompanySettlement() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Percent className="w-4 h-4" />
-                  DB 효율성 (ROI)
+                  투자수익률 (ROI)
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
@@ -882,15 +883,15 @@ export default function CompanySettlement() {
                     <TooltipContent side="top" className="max-w-[280px]">
                       <div className="space-y-1.5 text-xs">
                         <p className="font-semibold">계산식</p>
-                        <p>ROI = (총매출 ÷ 마케팅비) × 100</p>
+                        <p>ROI = (영업이익 ÷ 총비용) × 100</p>
                         <p className="text-muted-foreground mt-2">
-                          • 총매출: 해당 월 총 수익
+                          • 영업이익: 총매출 - 직원수수료 - 비용합계
                         </p>
                         <p className="text-muted-foreground">
-                          • 마케팅비: 비용관리에서 '마케팅비' 카테고리 합계
+                          • 총비용: 직원수수료 + 마케팅비 + 고정비 + 운영비 + 기타
                         </p>
                         <p className="text-muted-foreground mt-1">
-                          💡 ROI 500% = 마케팅비 1원당 5원 수익
+                          💡 ROI 100% = 투자비 대비 동일 수익
                         </p>
                       </div>
                     </TooltipContent>
@@ -898,11 +899,11 @@ export default function CompanySettlement() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
-                  {roi.toFixed(0)}%
+                <div className={`text-2xl font-bold ${roi >= 0 ? 'text-cyan-600 dark:text-cyan-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {roi.toFixed(1)}%
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  광고비: {formatAmount(expenseSummary.marketing)}
+                  총비용: {formatAmount(totalCost)}
                 </p>
               </CardContent>
             </Card>
