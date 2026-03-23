@@ -593,6 +593,49 @@ export default function AnnualLeave() {
                   <span>공휴일</span>
                 </div>
               </div>
+
+              {selectedDate && (() => {
+                const leavesOnSelected = approvedLeaveDates.get(selectedDate) || [];
+                return (
+                  <div className="mt-4 pt-4 border-t" data-testid="selected-date-leaves">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CalendarDays className="w-4 h-4 text-primary" />
+                      <span className="font-medium text-sm">
+                        {format(parseISO(selectedDate), 'M월 d일 (E)', { locale: ko })} 연차 현황
+                      </span>
+                    </div>
+                    {leavesOnSelected.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">등록된 연차가 없습니다.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {leavesOnSelected.map(req => (
+                          <div
+                            key={req.id}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50 border"
+                            data-testid={`leave-info-${req.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                'w-2 h-2 rounded-full',
+                                req.status === 'approved' && 'bg-green-500',
+                                req.status === 'pending_leader' && 'bg-yellow-500',
+                                req.status === 'pending_admin' && 'bg-blue-500'
+                              )} />
+                              <span className="font-medium text-sm">{req.user_name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {LEAVE_TYPE_LABELS[req.leave_type]}
+                              </Badge>
+                            </div>
+                            <Badge className={cn('text-xs', STATUS_COLORS[req.status])}>
+                              {STATUS_LABELS[req.status]}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
