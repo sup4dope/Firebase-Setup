@@ -276,10 +276,10 @@ export default function CompanySettlement() {
     return revenueData.grossRevenue * 0.15;
   }, [revenueData.grossRevenue]);
 
-  const cvr = useMemo(() => {
-    if (adDbCount === 0) return 0;
-    return (revenueData.contractCount / adDbCount) * 100;
-  }, [revenueData.contractCount, adDbCount]);
+  const roas = useMemo(() => {
+    if (expenseSummary.marketing === 0) return 0;
+    return (revenueData.grossRevenue / expenseSummary.marketing) * 100;
+  }, [revenueData.grossRevenue, expenseSummary.marketing]);
 
   const roi = useMemo(() => {
     if (expenseSummary.marketing === 0) return 0;
@@ -601,8 +601,7 @@ export default function CompanySettlement() {
       ['[ 지표 ]', ''],
       ['계약 건수', revenueData.contractCount],
       ['집행 건수', revenueData.executionCount],
-      ['광고 DB 수', adDbCount],
-      ['DB 전환율 (CVR)', `${cvr.toFixed(1)}%`],
+      ['광고 효율성 (ROAS)', `${roas.toFixed(0)}%`],
       ['DB 효율성 (ROI)', `${roi.toFixed(0)}%`],
     ];
 
@@ -659,7 +658,7 @@ export default function CompanySettlement() {
     XLSX.writeFile(wb, fileName);
 
     toast({ title: '내보내기 완료', description: `${fileName} 파일이 다운로드되었습니다.` });
-  }, [revenueData, expenseSummary, operatingProfit, adDbCount, cvr, roi, expenses, selectedMonth, dateRangeMode, dateRangeLabel, dateRangeStart, dateRangeEnd]);
+  }, [revenueData, expenseSummary, operatingProfit, roas, roi, expenses, selectedMonth, dateRangeMode, dateRangeLabel, dateRangeStart, dateRangeEnd]);
 
   if (!isSuperAdmin) {
     return (
@@ -838,7 +837,7 @@ export default function CompanySettlement() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Target className="w-4 h-4" />
-                  DB 전환율 (CVR)
+                  광고 효율성 (ROAS)
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
@@ -846,12 +845,15 @@ export default function CompanySettlement() {
                     <TooltipContent side="top" className="max-w-[280px]">
                       <div className="space-y-1.5 text-xs">
                         <p className="font-semibold">계산식</p>
-                        <p>CVR = (계약 건수 ÷ 광고 유입 DB) × 100</p>
+                        <p>ROAS = (총매출 ÷ 광고비) × 100</p>
                         <p className="text-muted-foreground mt-2">
-                          • 계약 건수: 해당 월 정산 건수
+                          • 총매출: 해당 월 총 수익
                         </p>
                         <p className="text-muted-foreground">
-                          • 광고 DB: 유입경로가 '광고'이고 해당 월에 등록된 고객 수
+                          • 광고비: 비용관리에서 '마케팅비' 카테고리 합계
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          💡 ROAS 500% = 광고비 1원당 매출 5원
                         </p>
                       </div>
                     </TooltipContent>
@@ -860,10 +862,10 @@ export default function CompanySettlement() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  {cvr.toFixed(1)}%
+                  {roas.toFixed(0)}%
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {revenueData.contractCount}건 / {adDbCount} DB
+                  매출: {formatAmount(revenueData.grossRevenue)} / 광고비: {formatAmount(expenseSummary.marketing)}
                 </p>
               </CardContent>
             </Card>
