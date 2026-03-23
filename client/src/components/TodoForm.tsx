@@ -35,9 +35,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar as CalendarIcon, Search, Clock, AlertCircle, AlertTriangle, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { createTodoItem } from '@/lib/firestore';
+import { createTodoItem, deleteActiveTodosForCustomer, updateCustomerStatus } from '@/lib/firestore';
+import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import type { User, Customer, UserRole, TodoPriority, InsertTodoItem } from '@shared/types';
+import type { User, Customer, UserRole, TodoPriority, InsertTodoItem, StatusCode } from '@shared/types';
 
 const todoSchema = z.object({
   title: z.string().min(1, '제목을 입력해주세요'),
@@ -142,6 +144,10 @@ export function TodoForm({
 
       const customer = customers.find(c => c.id === data.customer_id);
 
+      if (customer && data.customer_id) {
+        await deleteActiveTodosForCustomer(data.customer_id);
+      }
+
       const todoData: InsertTodoItem = {
         title: data.title,
         memo: data.memo || undefined,
@@ -156,16 +162,38 @@ export function TodoForm({
 
       await createTodoItem(todoData);
 
+      if (customer && data.customer_id && customer.status_code !== '예약') {
+        const oldStatus = customer.status_code;
+        await updateCustomerStatus(
+          data.customer_id,
+          oldStatus as StatusCode,
+          '예약' as StatusCode,
+          currentUser.uid,
+          currentUser.name || '시스템'
+        );
+        await addDoc(collection(db, "counseling_logs"), {
+          customer_id: data.customer_id,
+          action_type: "status_change",
+          description: `상태 변경: ${oldStatus} → 예약 (TODO 등록)`,
+          old_value: oldStatus,
+          new_value: "예약",
+          changed_by_name: currentUser.name || "관리자",
+          changed_at: new Date(),
+          type: "log",
+        });
+      }
+
       toast({
         title: '할 일 등록 완료',
-        description: '새로운 할 일이 추가되었습니다.',
+        description: customer && customer.status_code !== '예약'
+          ? '할 일이 추가되고 고객 상태가 예약으로 변경되었습니다.'
+          : '새로운 할 일이 추가되었습니다.',
       });
 
       form.reset();
       setCustomerSearch('');
       onOpenChange(false);
       onTodoCreated?.();
-      // 전역 이벤트 발생 - AppSidebar에서 수신하여 목록 새로고침
       window.dispatchEvent(new CustomEvent('todoCreated'));
     } catch (error) {
       console.error('Error creating todo:', error);

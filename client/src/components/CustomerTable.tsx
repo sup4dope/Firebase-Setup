@@ -1487,13 +1487,6 @@ export function CustomerTable({
           userRole={userRole}
           defaultCustomerId={reservationPending.customer?.id}
           onTodoCreated={() => {
-            if (reservationPending.customer) {
-              onStatusChange(
-                reservationPending.customer.id,
-                reservationPending.customer.status_code,
-                "예약" as StatusCode
-              );
-            }
             setReservationPending({ isOpen: false, customer: null });
           }}
         />

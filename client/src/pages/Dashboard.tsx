@@ -201,6 +201,14 @@ export default function Dashboard() {
     fetchData();
   }, [user]);
 
+  useEffect(() => {
+    const handleTodoCreated = () => {
+      fetchData();
+    };
+    window.addEventListener('todoCreated', handleTodoCreated);
+    return () => window.removeEventListener('todoCreated', handleTodoCreated);
+  }, [user]);
+
   // super_admin: 미처리 상담 개수 조회
   useEffect(() => {
     const fetchPendingCount = async () => {

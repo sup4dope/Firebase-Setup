@@ -5014,6 +5014,10 @@ export function CustomerDetailModal({
           defaultCustomerId={customer?.id}
           onTodoCreated={() => {
             setTodoModalOpen(false);
+            if (customer?.id && formData.status_code !== '예약') {
+              setFormData((prev) => ({ ...prev, status_code: "예약" }));
+              onSave?.({ id: customer.id, status_code: "예약" } as any);
+            }
             onTodoCreated?.();
           }}
         />
@@ -5029,31 +5033,11 @@ export function CustomerDetailModal({
           currentUser={currentUser}
           userRole={currentUser.role}
           defaultCustomerId={customer?.id}
-          onTodoCreated={async () => {
+          onTodoCreated={() => {
             setReservationTodoOpen(false);
             if (customer?.id) {
-              const oldStatus = formData.status_code;
               setFormData((prev) => ({ ...prev, status_code: "예약" }));
-              try {
-                const customerRef = doc(db, "customers", customer.id);
-                await updateDoc(customerRef, {
-                  status_code: "예약",
-                  updated_at: new Date(),
-                });
-                await addDoc(collection(db, "counseling_logs"), {
-                  customer_id: customer.id,
-                  action_type: "status_change",
-                  description: `상태 변경: ${oldStatus} → 예약`,
-                  old_value: oldStatus,
-                  new_value: "예약",
-                  changed_by_name: currentUser?.name || "관리자",
-                  changed_at: new Date(),
-                  type: "log",
-                });
-                onSave?.({ id: customer.id, status_code: "예약" } as any);
-              } catch (error) {
-                console.error("예약 상태 변경 오류:", error);
-              }
+              onSave?.({ id: customer.id, status_code: "예약" } as any);
             }
             onTodoCreated?.();
           }}

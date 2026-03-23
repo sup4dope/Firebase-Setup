@@ -1083,6 +1083,21 @@ export const deleteTodoItem = async (id: string): Promise<void> => {
   await deleteDoc(doc(db, 'todo_list', id));
 };
 
+export const deleteActiveTodosForCustomer = async (customerId: string): Promise<number> => {
+  const q = query(
+    collection(db, 'todo_list'),
+    where('customer_id', '==', customerId),
+    where('status', '==', '진행중'),
+  );
+  const snapshot = await getDocs(q);
+  let deletedCount = 0;
+  for (const docSnap of snapshot.docs) {
+    await deleteDoc(docSnap.ref);
+    deletedCount++;
+  }
+  return deletedCount;
+};
+
 // 특정 고객의 경과된 TODO 자동 삭제 (고객 액션 시 호출)
 export const deleteOverdueTodosForCustomer = async (customerId: string): Promise<number> => {
   const now = new Date();
