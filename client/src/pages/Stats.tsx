@@ -403,41 +403,25 @@ export default function Stats() {
 
     const current = calcRates(selectedCustomers);
 
-    const staffRates = allStaff.map(u => {
-      const staffCustomers = dateFilteredCustomers.filter(c => c.manager_id === u.uid);
-      return calcRates(staffCustomers);
-    }).filter(r => r.total > 0);
+    const allStaffCustomers = dateFilteredCustomers.filter(c =>
+      allStaff.some(u => u.uid === c.manager_id)
+    );
+    const companyRates = calcRates(allStaffCustomers);
 
-    const avgCount = staffRates.length || 1;
-    const avg = {
-      inflowToContract: Math.round(staffRates.reduce((s, r) => s + r.inflowToContract, 0) / avgCount * 10) / 10,
-      contractToApply: Math.round(staffRates.reduce((s, r) => s + r.contractToApply, 0) / avgCount * 10) / 10,
-      applyToExecute: Math.round(staffRates.reduce((s, r) => s + r.applyToExecute, 0) / avgCount * 10) / 10,
-      inflowToExecute: Math.round(staffRates.reduce((s, r) => s + r.inflowToExecute, 0) / avgCount * 10) / 10,
-    };
-
-    let teamAvg: typeof avg | null = null;
+    let teamRates: ReturnType<typeof calcRates> | null = null;
     if (isTeamLeader && user?.team_id) {
-      const teamStaffRates = allStaff
-        .filter(u => u.team_id === user.team_id)
-        .map(u => {
-          const staffCustomers = dateFilteredCustomers.filter(c => c.manager_id === u.uid);
-          return calcRates(staffCustomers);
-        }).filter(r => r.total > 0);
-      const tCount = teamStaffRates.length || 1;
-      teamAvg = {
-        inflowToContract: Math.round(teamStaffRates.reduce((s, r) => s + r.inflowToContract, 0) / tCount * 10) / 10,
-        contractToApply: Math.round(teamStaffRates.reduce((s, r) => s + r.contractToApply, 0) / tCount * 10) / 10,
-        applyToExecute: Math.round(teamStaffRates.reduce((s, r) => s + r.applyToExecute, 0) / tCount * 10) / 10,
-        inflowToExecute: Math.round(teamStaffRates.reduce((s, r) => s + r.inflowToExecute, 0) / tCount * 10) / 10,
-      };
+      const teamStaff = allStaff.filter(u => u.team_id === user.team_id);
+      const teamCustomers = dateFilteredCustomers.filter(c =>
+        teamStaff.some(u => u.uid === c.manager_id)
+      );
+      teamRates = calcRates(teamCustomers);
     }
 
     return [
-      { name: '유입→계약', current: current.inflowToContract, companyAvg: avg.inflowToContract, teamAvg: teamAvg?.inflowToContract, currentCount: `${current.contracted}/${current.total}` },
-      { name: '계약→신청', current: current.contractToApply, companyAvg: avg.contractToApply, teamAvg: teamAvg?.contractToApply, currentCount: `${current.applied}/${current.contracted}` },
-      { name: '신청→집행', current: current.applyToExecute, companyAvg: avg.applyToExecute, teamAvg: teamAvg?.applyToExecute, currentCount: `${current.executed}/${current.applied}` },
-      { name: '종합 전환율', current: current.inflowToExecute, companyAvg: avg.inflowToExecute, teamAvg: teamAvg?.inflowToExecute, currentCount: `${current.executed}/${current.total}` },
+      { name: '유입→계약', current: current.inflowToContract, companyAvg: companyRates.inflowToContract, teamAvg: teamRates?.inflowToContract, currentCount: `${current.contracted}/${current.total}` },
+      { name: '계약→신청', current: current.contractToApply, companyAvg: companyRates.contractToApply, teamAvg: teamRates?.contractToApply, currentCount: `${current.applied}/${current.contracted}` },
+      { name: '신청→집행', current: current.applyToExecute, companyAvg: companyRates.applyToExecute, teamAvg: teamRates?.applyToExecute, currentCount: `${current.executed}/${current.applied}` },
+      { name: '종합 전환율', current: current.inflowToExecute, companyAvg: companyRates.inflowToExecute, teamAvg: teamRates?.inflowToExecute, currentCount: `${current.executed}/${current.total}` },
     ];
   }, [selectedCustomers, dateFilteredCustomers, allStaff, isTeamLeader, user]);
 
