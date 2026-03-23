@@ -278,7 +278,6 @@ export default function AdStats() {
     const trash = allFiltered.filter(c => TRASH_STATUSES.includes(c.status_code)).length;
     const target = allFiltered.filter(c => TARGET_STATUSES.includes(c.status_code)).length;
     const contractAndBeyond = allFiltered.filter(c =>
-      CONTRACT_SENT_STATUSES.includes(c.status_code) ||
       CONTRACT_STATUSES.includes(c.status_code) ||
       DOCS_STATUSES.includes(c.status_code) ||
       APPLY_STATUSES.includes(c.status_code) ||
