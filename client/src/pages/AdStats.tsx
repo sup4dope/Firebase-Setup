@@ -281,7 +281,8 @@ export default function AdStats() {
       CONTRACT_STATUSES.includes(c.status_code) ||
       DOCS_STATUSES.includes(c.status_code) ||
       APPLY_STATUSES.includes(c.status_code) ||
-      EXEC_STATUSES.includes(c.status_code)
+      EXEC_STATUSES.includes(c.status_code) ||
+      c.status_code === '민원처리'
     ).length;
     const exec = allFiltered.filter(c => EXEC_STATUSES.includes(c.status_code)).length;
 
