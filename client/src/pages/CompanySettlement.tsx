@@ -206,6 +206,7 @@ export default function CompanySettlement() {
     name: '',
     amount: 0,
     month: selectedMonth,
+    expense_date: format(new Date(), 'yyyy-MM-dd'),
     description: '',
     is_recurring: false,
   });
@@ -419,6 +420,7 @@ export default function CompanySettlement() {
         name: expense.name,
         amount: expense.amount,
         month: expense.month,
+        expense_date: expense.expense_date || '',
         description: expense.description || '',
         is_recurring: expense.is_recurring,
       });
@@ -429,6 +431,7 @@ export default function CompanySettlement() {
         name: '',
         amount: 0,
         month: selectedMonth,
+        expense_date: format(new Date(), 'yyyy-MM-dd'),
         description: '',
         is_recurring: false,
       });
@@ -1010,6 +1013,7 @@ export default function CompanySettlement() {
                         <TableRow>
                           <TableHead>카테고리</TableHead>
                           <TableHead>항목명</TableHead>
+                          <TableHead>발생일</TableHead>
                           <TableHead className="text-right">금액</TableHead>
                           {!isPeriodSummary(selectedMonth) && !dateRangeMode && (
                             <TableHead className="w-[80px]"></TableHead>
@@ -1045,6 +1049,9 @@ export default function CompanySettlement() {
                                     </div>
                                   )}
                                 </div>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                                {expense.expense_date || '-'}
                               </TableCell>
                               <TableCell className="text-right font-semibold tabular-nums">
                                 {expense.amount.toLocaleString()}원
@@ -1252,6 +1259,15 @@ export default function CompanySettlement() {
                 value={formData.amount || ''}
                 onChange={e => setFormData({ ...formData, amount: parseInt(e.target.value) || 0 })}
                 data-testid="input-expense-amount"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>비용 발생일</Label>
+              <Input
+                type="date"
+                value={formData.expense_date || ''}
+                onChange={e => setFormData({ ...formData, expense_date: e.target.value })}
+                data-testid="input-expense-date"
               />
             </div>
             <div className="space-y-2">

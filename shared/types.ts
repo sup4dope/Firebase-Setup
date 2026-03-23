@@ -439,6 +439,7 @@ export interface Expense {
   name: string; // 항목명 (예: "네이버 광고", "임대료")
   amount: number; // 금액 (원)
   month: string; // 해당 월 (YYYY-MM)
+  expense_date?: string; // 비용 발생일 (YYYY-MM-DD)
   description?: string; // 설명
   is_recurring: boolean; // 매월 반복 여부
   created_at: Date;
