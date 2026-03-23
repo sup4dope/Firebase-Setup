@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -239,6 +239,16 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
   const duplicateCount = consultations.filter(c => c.isDuplicate).length;
   const isAnyProcessing = importing || importingIds.size > 0 || deletingIds.size > 0;
 
+  const sourceCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    consultations.forEach(({ data }) => {
+      const source = mapUtmToEntrySource(data.utm_source, data.source, data.utm_campaign);
+      map[source] = (map[source] || 0) + 1;
+    });
+    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
+    return sorted;
+  }, [consultations]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0">
@@ -272,21 +282,42 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
             </div>
           ) : (
             <>
-              <div className="px-6 py-3 bg-muted/50 border-b flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-muted-foreground">총 <span className="font-semibold text-foreground">{consultations.length}건</span></span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      신규 {newCount}건
-                    </Badge>
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      중복 {duplicateCount}건
-                    </Badge>
+              <div className="px-6 py-3 bg-muted/50 border-b shrink-0 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-muted-foreground">총 <span className="font-semibold text-foreground">{consultations.length}건</span></span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        신규 {newCount}건
+                      </Badge>
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        중복 {duplicateCount}건
+                      </Badge>
+                    </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    * 중복: 사업자등록번호가 이미 등록된 고객 (메모로 추가됨)
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  * 중복: 사업자등록번호가 이미 등록된 고객 (메모로 추가됨)
-                </p>
+                {sourceCountMap.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      유입경로별:
+                    </span>
+                    {sourceCountMap.map(([source, count]) => (
+                      <Badge
+                        key={source}
+                        variant="outline"
+                        className="text-xs font-normal gap-1"
+                        data-testid={`badge-source-count-${source}`}
+                      >
+                        {source}
+                        <span className="font-semibold text-foreground">{count}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto">
