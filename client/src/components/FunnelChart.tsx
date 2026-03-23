@@ -86,6 +86,8 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '본인아님', label: '본인아님' },
     { id: '사업자아님', label: '사업자아님' },
     { id: '이중계약', label: '이중계약' },
+    { id: '세금체납', label: '세금체납' },
+    { id: '단박거절', label: '단박거절' },
   ],
 };
 

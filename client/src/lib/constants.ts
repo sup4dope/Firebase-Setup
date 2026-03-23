@@ -22,6 +22,8 @@ export const ALL_STATUS_VALUES = [
   "본인아님",
   "사업자아님",
   "이중계약",
+  "세금체납",
+  "단박거절",
   
   // 희망타겟
   "업력미달",
@@ -88,6 +90,8 @@ export const STATUS_STYLES: Record<string, { bg: string; text: string; border?: 
   "본인아님": { bg: "bg-rose-500/20", text: "text-rose-700 dark:text-rose-300", border: "border-rose-500/30" },
   "사업자아님": { bg: "bg-red-500/20", text: "text-red-700 dark:text-red-300", border: "border-red-500/30" },
   "이중계약": { bg: "bg-rose-600/20", text: "text-rose-700 dark:text-rose-300", border: "border-rose-600/30" },
+  "세금체납": { bg: "bg-red-600/20", text: "text-red-700 dark:text-red-300", border: "border-red-600/30" },
+  "단박거절": { bg: "bg-rose-500/20", text: "text-rose-700 dark:text-rose-300", border: "border-rose-500/30" },
   
   // 희망타겟 - 노란색
   "업력미달": { bg: "bg-yellow-500/20", text: "text-amber-700 dark:text-yellow-300", border: "border-yellow-500/30" },
@@ -157,6 +161,8 @@ export const STATUS_OPTIONS: { value: string; label: string; group?: string }[] 
   { value: "본인아님", label: "본인아님", group: "거절" },
   { value: "사업자아님", label: "사업자아님", group: "거절" },
   { value: "이중계약", label: "이중계약", group: "거절" },
+  { value: "세금체납", label: "세금체납", group: "거절" },
+  { value: "단박거절", label: "단박거절", group: "거절" },
   
   // 희망타겟
   { value: "업력미달", label: "업력미달", group: "희망타겟" },
@@ -210,7 +216,8 @@ export const FUNNEL_GROUPS: Record<string, string[]> = {
   // 3. 쓰레기통 (상위 그룹) - 하위 항목들 포함
   "쓰레기통": [
     "쓰레기통", "거절사유 미파악", "인증불가", "정부기관 오인", "기타자금 오인",
-    "불가업종", "매출없음", "신용점수 미달", "차입금초과", "본인아님", "사업자아님", "이중계약"
+    "불가업종", "매출없음", "신용점수 미달", "차입금초과", "본인아님", "사업자아님", "이중계약",
+    "세금체납", "단박거절"
   ],
   
   // 4, 5. 부재중
@@ -283,6 +290,8 @@ export const FUNNEL_GROUPS: Record<string, string[]> = {
   "본인아님": ["본인아님"],
   "사업자아님": ["사업자아님"],
   "이중계약": ["이중계약"],
+  "세금체납": ["세금체납"],
+  "단박거절": ["단박거절"],
 };
 
 // 퍼널 차트 카테고리 정의 (상단 헤더용)
