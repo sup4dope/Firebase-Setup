@@ -88,6 +88,7 @@ import {
   RefreshCw,
   FileDown,
   FileText,
+  Search,
 } from 'lucide-react';
 import { SalaryStatement, type SalaryItem } from '@/components/salary/salary-statement';
 import {
@@ -119,6 +120,7 @@ export default function Settlements() {
   const [detailModalItems, setDetailModalItems] = useState<SettlementItem[]>([]);
   const [salaryModalOpen, setSalaryModalOpen] = useState(false);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState('');
   const [salaryData, setSalaryData] = useState<{
     employeeName: string;
     employeeId: string;
@@ -310,6 +312,11 @@ export default function Settlements() {
       };
     });
   }, [items, users, selectedMonth, user]);
+
+  const filteredSummaries = useMemo(() => {
+    if (!employeeSearch.trim()) return summaries;
+    return summaries.filter(s => s.manager_name.includes(employeeSearch.trim()));
+  }, [summaries, employeeSearch]);
 
   const totals = useMemo(() => {
     // Point-in-time 정확성: 환수 항목이 아닌 원본 정산은 모두 포함 (status 관계없이)
@@ -555,7 +562,7 @@ export default function Settlements() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 flex flex-col h-full">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center bg-muted/50 rounded-lg border">
           <Button
@@ -713,80 +720,90 @@ export default function Settlements() {
           </CardContent>
         </Card>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>직원별 정산 현황</CardTitle>
+      <Card className="flex flex-col min-h-0 flex-1">
+        <CardHeader className="flex-shrink-0">
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle>직원별 정산 현황</CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="직원명 검색..."
+                value={employeeSearch}
+                onChange={e => setEmployeeSearch(e.target.value)}
+                className="pl-9 h-9"
+                data-testid="input-employee-search"
+              />
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[400px]">
-            <Table>
-              <TableHeader>
+        <CardContent className="flex-1 min-h-0 overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>직원명</TableHead>
+                <TableHead className="text-right">계약 건수</TableHead>
+                <TableHead className="text-right">총 계약금</TableHead>
+                <TableHead className="text-right">집행건수</TableHead>
+                <TableHead className="text-right">집행금액</TableHead>
+                <TableHead className="text-right">총 자문금액</TableHead>
+                <TableHead className="text-right">환수</TableHead>
+                <TableHead className="text-right">최종지급액(세후)</TableHead>
+                <TableHead className="text-center">급여명세서</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredSummaries.length === 0 ? (
                 <TableRow>
-                  <TableHead>직원명</TableHead>
-                  <TableHead className="text-right">계약 건수</TableHead>
-                  <TableHead className="text-right">총 계약금</TableHead>
-                  <TableHead className="text-right">집행건수</TableHead>
-                  <TableHead className="text-right">집행금액</TableHead>
-                  <TableHead className="text-right">총 자문금액</TableHead>
-                  <TableHead className="text-right">환수</TableHead>
-                  <TableHead className="text-right">최종지급액(세후)</TableHead>
-                  <TableHead className="text-center">급여명세서</TableHead>
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    {employeeSearch ? '검색 결과가 없습니다.' : '해당 월에 정산 데이터가 없습니다.'}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {summaries.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                      해당 월에 정산 데이터가 없습니다.
+              ) : (
+                filteredSummaries.map((summary) => (
+                  <TableRow
+                    key={summary.manager_id}
+                    data-testid={`row-manager-${summary.manager_id}`}
+                  >
+                    <TableCell 
+                      className="font-medium cursor-pointer hover:underline"
+                      onDoubleClick={() => {
+                        const periodMonths = getMonthsForPeriod(selectedMonth);
+                        handleShowDetail(
+                          `${summary.manager_name} 정산 내역`,
+                          (item) => item.manager_id === summary.manager_id && periodMonths.includes(item.settlement_month)
+                        );
+                      }}
+                      data-testid={`cell-manager-name-${summary.manager_id}`}
+                    >
+                      {summary.manager_name}
+                    </TableCell>
+                    <TableCell className="text-right">{summary.total_contracts}건</TableCell>
+                    <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}원</TableCell>
+                    <TableCell className="text-right">{summary.execution_count}건</TableCell>
+                    <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}원</TableCell>
+                    <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}원</TableCell>
+                    <TableCell className="text-right text-red-600">
+                      {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}원` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-blue-600">
+                      {summary.final_payment.toLocaleString()}원
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleShowSalaryStatement(summary)}
+                        data-testid={`button-salary-${summary.manager_id}`}
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        명세서
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  summaries.map((summary) => (
-                    <TableRow
-                      key={summary.manager_id}
-                      data-testid={`row-manager-${summary.manager_id}`}
-                    >
-                      <TableCell 
-                        className="font-medium cursor-pointer hover:underline"
-                        onDoubleClick={() => {
-                          const periodMonths = getMonthsForPeriod(selectedMonth);
-                          handleShowDetail(
-                            `${summary.manager_name} 정산 내역`,
-                            (item) => item.manager_id === summary.manager_id && periodMonths.includes(item.settlement_month)
-                          );
-                        }}
-                        data-testid={`cell-manager-name-${summary.manager_id}`}
-                      >
-                        {summary.manager_name}
-                      </TableCell>
-                      <TableCell className="text-right">{summary.total_contracts}건</TableCell>
-                      <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}원</TableCell>
-                      <TableCell className="text-right">{summary.execution_count}건</TableCell>
-                      <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}원</TableCell>
-                      <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}원</TableCell>
-                      <TableCell className="text-right text-red-600">
-                        {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}원` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-blue-600">
-                        {summary.final_payment.toLocaleString()}원
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleShowSalaryStatement(summary)}
-                          data-testid={`button-salary-${summary.manager_id}`}
-                        >
-                          <FileText className="h-4 w-4 mr-1" />
-                          명세서
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
