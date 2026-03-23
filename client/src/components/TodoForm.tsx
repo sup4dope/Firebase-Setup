@@ -71,19 +71,17 @@ const PRIORITY_OPTIONS: { value: TodoPriority; label: string; color: string; ico
   { value: 'low', label: '낮음', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50', icon: Minus },
 ];
 
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
-  const hour = Math.floor(i / 2);
-  const minute = (i % 2) * 30;
-  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-});
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 
-// 현재 시간을 30분 단위로 반올림
 const getRoundedTimeNow = (): string => {
   const now = new Date();
-  const minutes = now.getMinutes();
-  const roundedMinutes = minutes < 30 ? 30 : 0;
-  const hours = minutes < 30 ? now.getHours() : (now.getHours() + 1) % 24;
-  return `${hours.toString().padStart(2, '0')}:${roundedMinutes.toString().padStart(2, '0')}`;
+  const h = now.getHours();
+  const m = Math.ceil(now.getMinutes() / 5) * 5;
+  if (m >= 60) {
+    return `${((h + 1) % 24).toString().padStart(2, '0')}:00`;
+  }
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 };
 
 export function TodoForm({
@@ -347,27 +345,45 @@ export function TodoForm({
               <FormField
                 control={form.control}
                 name="due_time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>마감 시간 *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-8 text-sm" data-testid="select-due-time">
-                          <Clock className="w-4 h-4 mr-2" />
-                          <SelectValue placeholder="시간 선택" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="max-h-48">
-                        {TIME_OPTIONS.map(time => (
-                          <SelectItem key={time} value={time}>
-                            {time}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const [hh, mm] = (field.value || '09:00').split(':');
+                  return (
+                    <FormItem>
+                      <FormLabel>마감 시간 *</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <Select
+                          value={hh}
+                          onValueChange={(v) => field.onChange(`${v}:${mm}`)}
+                        >
+                          <SelectTrigger className="h-8 text-sm w-[70px]" data-testid="select-due-hour">
+                            <SelectValue placeholder="시" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-48">
+                            {HOUR_OPTIONS.map(h => (
+                              <SelectItem key={h} value={h}>{h}시</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-muted-foreground font-semibold">:</span>
+                        <Select
+                          value={mm}
+                          onValueChange={(v) => field.onChange(`${hh}:${v}`)}
+                        >
+                          <SelectTrigger className="h-8 text-sm w-[70px]" data-testid="select-due-minute">
+                            <SelectValue placeholder="분" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-48">
+                            {MINUTE_OPTIONS.map(m => (
+                              <SelectItem key={m} value={m}>{m}분</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             </div>
 

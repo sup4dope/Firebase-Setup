@@ -73,11 +73,8 @@ const PRIORITY_OPTIONS: { value: TodoPriority; label: string; icon: typeof Alert
   { value: 'low', label: '낮음', icon: Minus },
 ];
 
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
-  const hour = Math.floor(i / 2);
-  const minute = (i % 2) * 30;
-  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-});
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 
 export function TodoDetailModal({
   open,
@@ -105,7 +102,7 @@ export function TodoDetailModal({
     if (todo && open) {
       const dueDate = todo.due_date instanceof Date ? todo.due_date : new Date(todo.due_date);
       const hours = dueDate.getHours().toString().padStart(2, '0');
-      const minutes = (Math.floor(dueDate.getMinutes() / 30) * 30).toString().padStart(2, '0');
+      const minutes = (Math.round(dueDate.getMinutes() / 5) * 5 % 60).toString().padStart(2, '0');
       
       form.reset({
         title: todo.title,
@@ -256,27 +253,45 @@ export function TodoDetailModal({
               <FormField
                 control={form.control}
                 name="due_time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>마감 시간 *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-8 text-sm" data-testid="select-edit-due-time">
-                          <Clock className="w-4 h-4 mr-2" />
-                          <SelectValue placeholder="시간 선택" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="max-h-48">
-                        {TIME_OPTIONS.map(time => (
-                          <SelectItem key={time} value={time}>
-                            {time}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const [hh, mm] = (field.value || '09:00').split(':');
+                  return (
+                    <FormItem>
+                      <FormLabel>마감 시간 *</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <Select
+                          value={hh}
+                          onValueChange={(v) => field.onChange(`${v}:${mm}`)}
+                        >
+                          <SelectTrigger className="h-8 text-sm w-[70px]" data-testid="select-edit-due-hour">
+                            <SelectValue placeholder="시" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-48">
+                            {HOUR_OPTIONS.map(h => (
+                              <SelectItem key={h} value={h}>{h}시</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-muted-foreground font-semibold">:</span>
+                        <Select
+                          value={mm}
+                          onValueChange={(v) => field.onChange(`${hh}:${v}`)}
+                        >
+                          <SelectTrigger className="h-8 text-sm w-[70px]" data-testid="select-edit-due-minute">
+                            <SelectValue placeholder="분" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-48">
+                            {MINUTE_OPTIONS.map(m => (
+                              <SelectItem key={m} value={m}>{m}분</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             </div>
 
