@@ -47,7 +47,14 @@ export const calculateKPI = (
   holidayMap: Map<string, string>,
   date: Date = new Date()
 ): KPIData => {
-  const contractStatuses = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
+  const CONTRACT_AND_BEYOND_STATUSES = [
+    '계약서발송완료(선불)', '계약서발송완료(후불)', '계약서발송완료(외주)',
+    '계약완료(선불)', '계약완료(외주)', '계약완료(후불)',
+    '수납대기',
+    '서류취합완료(선불)', '서류취합완료(외주)', '서류취합완료(후불)',
+    '신청완료(선불)', '신청완료(외주)', '신청완료(후불)',
+    '집행완료', '집행완료(선불)', '집행완료(후불)', '집행완료(외주)',
+  ];
   
   // 해당 월에 유입된 고객 (entry_date 기준)
   const monthlyCustomers = customers.filter(c => {
@@ -57,29 +64,10 @@ export const calculateKPI = (
   });
   const totalCounselingCount = monthlyCustomers.length;
   
-  // 해당 월 유입 고객 ID Set
-  const monthlyCustomerIds = new Set(monthlyCustomers.map(c => c.id));
-  
-  // 해당 월에 계약완료 상태로 변경된 고객 중, 해당 월 유입 고객만 필터링
-  const contractCustomerIds = new Set(
-    statusLogs
-      .filter(log => {
-        const changedAt = log.changed_at instanceof Date ? log.changed_at : new Date(log.changed_at);
-        return contractStatuses.includes(log.new_status) &&
-               isSameMonth(changedAt, date) &&
-               monthlyCustomerIds.has(log.customer_id);
-      })
-      .map(l => l.customer_id)
-  );
-  
-  // 추가: 현재 계약완료 상태인 해당 월 유입 고객도 포함 (로그 누락 보완)
-  monthlyCustomers.forEach(c => {
-    if (c.status_code && contractStatuses.includes(c.status_code)) {
-      contractCustomerIds.add(c.id);
-    }
-  });
-  
-  const contractCount = contractCustomerIds.size;
+  // 계약 건수: 해당 월 유입 고객 중 현재 상태가 계약서발송 이후 단계인 고객
+  const contractCount = monthlyCustomers.filter(c =>
+    c.status_code && CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
+  ).length;
   
   // 계약률 계산
   const contractRate = totalCounselingCount > 0 
