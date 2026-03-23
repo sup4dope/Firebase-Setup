@@ -538,10 +538,21 @@ export default function Stats() {
     return days.map(day => {
       const dayStr = format(day, 'yyyy-MM-dd');
       const inflowCount = selectedCustomers.filter(c => c.entry_date === dayStr).length;
-      const contractCount = selectedCustomers.filter(c =>
-        c.entry_date === dayStr && CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
+      const sameDayContract = selectedCustomers.filter(c =>
+        c.entry_date === dayStr &&
+        c.contract_completion_date === dayStr &&
+        CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
       ).length;
-      return { date: format(day, 'MM/dd'), 유입: inflowCount, 계약: contractCount };
+      const contractByDate = selectedCustomers.filter(c =>
+        c.contract_completion_date === dayStr &&
+        CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
+      ).length;
+      return {
+        date: format(day, 'MM/dd'),
+        유입: inflowCount,
+        당일계약: sameDayContract,
+        '계약일 기준': contractByDate,
+      };
     });
   }, [selectedCustomers, dateRange]);
 
@@ -1061,12 +1072,37 @@ export default function Stats() {
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} interval="preserveStartEnd" />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length > 0) {
+                        const data = payload[0].payload;
+                        const otherDayContract = (data['계약일 기준'] || 0) - (data['당일계약'] || 0);
+                        return (
+                          <div style={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                            color: 'hsl(var(--card-foreground))',
+                          }}>
+                            <p style={{ fontWeight: 'bold', marginBottom: '6px' }}>{label}</p>
+                            <p style={{ color: '#6366f1' }}>유입: {data['유입']}건</p>
+                            <p style={{ color: '#22c55e' }}>당일유입 → 당일계약: {data['당일계약']}건</p>
+                            <p style={{ color: '#f59e0b' }}>계약일 기준 전체: {data['계약일 기준']}건</p>
+                            {otherDayContract > 0 && (
+                              <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>
+                                ※ 타 유입일 계약: {otherDayContract}건
+                              </p>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                   />
                   <Legend />
                   <Line type="monotone" dataKey="유입" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="계약" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="당일계약" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="계약일 기준" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
