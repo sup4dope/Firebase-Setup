@@ -5,7 +5,6 @@ import {
   eachDayOfInterval,
   isWeekend,
   isSameMonth,
-  isBefore,
   isAfter,
   format,
 } from 'date-fns';
@@ -48,33 +47,39 @@ export const calculateKPI = (
   holidayMap: Map<string, string>,
   date: Date = new Date()
 ): KPIData => {
-  const monthStart = startOfMonth(date);
+  const contractStatuses = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
   
-  // 현재 DB에 있는 고객 ID Set (삭제되지 않은 고객만)
-  const existingCustomerIds = new Set(customers.map(c => c.id));
-  
-  // 해당 월에 유입된 고객 수 (entry_date 기준) = 전체 상담 건수
-  const totalCounselingCount = customers.filter(c => {
+  // 해당 월에 유입된 고객 (entry_date 기준)
+  const monthlyCustomers = customers.filter(c => {
     if (!c.entry_date) return false;
     const entryDate = new Date(c.entry_date);
     return isSameMonth(entryDate, date);
-  }).length;
+  });
+  const totalCounselingCount = monthlyCustomers.length;
   
-  // 계약완료 상태 목록 (한글 상태명)
-  const contractStatuses = ['계약완료(선불)', '계약완료(외주)', '계약완료(후불)'];
+  // 해당 월 유입 고객 ID Set
+  const monthlyCustomerIds = new Set(monthlyCustomers.map(c => c.id));
   
-  // 이번 달에 계약완료 상태로 변경된 로그 중, 현재 DB에 존재하는 고객만 필터링
-  const contractLogs = statusLogs.filter(log => {
-    const changedAt = log.changed_at instanceof Date ? log.changed_at : new Date(log.changed_at);
-    return contractStatuses.includes(log.new_status) && 
-           isSameMonth(changedAt, date) &&
-           !isBefore(changedAt, monthStart) &&
-           existingCustomerIds.has(log.customer_id);
+  // 해당 월에 계약완료 상태로 변경된 고객 중, 해당 월 유입 고객만 필터링
+  const contractCustomerIds = new Set(
+    statusLogs
+      .filter(log => {
+        const changedAt = log.changed_at instanceof Date ? log.changed_at : new Date(log.changed_at);
+        return contractStatuses.includes(log.new_status) &&
+               isSameMonth(changedAt, date) &&
+               monthlyCustomerIds.has(log.customer_id);
+      })
+      .map(l => l.customer_id)
+  );
+  
+  // 추가: 현재 계약완료 상태인 해당 월 유입 고객도 포함 (로그 누락 보완)
+  monthlyCustomers.forEach(c => {
+    if (c.status_code && contractStatuses.includes(c.status_code)) {
+      contractCustomerIds.add(c.id);
+    }
   });
   
-  // 이번 달 계약완료 고객의 고유 ID = 성공 건수
-  const uniqueContractCustomerIds = new Set(contractLogs.map(l => l.customer_id));
-  const contractCount = uniqueContractCustomerIds.size;
+  const contractCount = contractCustomerIds.size;
   
   // 계약률 계산
   const contractRate = totalCounselingCount > 0 
