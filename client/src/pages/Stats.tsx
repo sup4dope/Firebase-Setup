@@ -424,6 +424,7 @@ export default function Stats() {
 
   const negativeDataAnalysis = useMemo(() => {
     const negativeCustomers = selectedCustomers.filter(c => getGroup(c.status_code) !== null);
+    const companyNegativeCustomers = dateFilteredCustomers.filter(c => getGroup(c.status_code) !== null);
 
     const managerStats: Record<string, { name: string; A: number; B: number; C: number; D: number; total: number }> = {};
     const reasonCounts: Record<string, number> = {};
@@ -459,17 +460,32 @@ export default function Stats() {
         isAverage: false,
       }));
 
-    const totalA = Object.values(managerStats).reduce((sum, s) => sum + s.A, 0);
-    const totalB = Object.values(managerStats).reduce((sum, s) => sum + s.B, 0);
-    const totalC = Object.values(managerStats).reduce((sum, s) => sum + s.C, 0);
-    const grandTotal = totalA + totalB + totalC;
+    const companyManagerStats: Record<string, { A: number; B: number; C: number; total: number }> = {};
+    companyNegativeCustomers.forEach(customer => {
+      const group = getGroup(customer.status_code.trim());
+      if (!group || group === 'D') return;
+      const managerId = customer.manager_id || 'unknown';
+      if (!companyManagerStats[managerId]) {
+        companyManagerStats[managerId] = { A: 0, B: 0, C: 0, total: 0 };
+      }
+      companyManagerStats[managerId].total += 1;
+      if (group === 'A' || group === 'B' || group === 'C') {
+        companyManagerStats[managerId][group] += 1;
+      }
+    });
 
-    const avgData = grandTotal > 0 ? {
+    const companyManagerCount = Object.keys(companyManagerStats).length || 1;
+    const compTotalA = Object.values(companyManagerStats).reduce((sum, s) => sum + s.A, 0);
+    const compTotalB = Object.values(companyManagerStats).reduce((sum, s) => sum + s.B, 0);
+    const compTotalC = Object.values(companyManagerStats).reduce((sum, s) => sum + s.C, 0);
+    const compGrandTotal = compTotalA + compTotalB + compTotalC;
+
+    const avgData = compGrandTotal > 0 ? {
       name: '평균',
-      A: Math.round(totalA / (managerData.length || 1)),
-      B: Math.round(totalB / (managerData.length || 1)),
-      C: Math.round(totalC / (managerData.length || 1)),
-      total: Math.round(grandTotal / (managerData.length || 1)),
+      A: Math.round(compTotalA / companyManagerCount),
+      B: Math.round(compTotalB / companyManagerCount),
+      C: Math.round(compTotalC / companyManagerCount),
+      total: Math.round(compGrandTotal / companyManagerCount),
       isAverage: true,
     } : null;
 
@@ -504,14 +520,15 @@ export default function Stats() {
         total: s.total,
       }));
 
-    const totalD = Object.values(managerStats).reduce((sum, s) => sum + s.D, 0);
-    const totalAB = Object.values(managerStats).reduce((sum, s) => sum + s.A + s.B, 0);
-    const totalAll = Object.values(managerStats).reduce((sum, s) => sum + s.total, 0);
-    const avgX = totalAll > 0 ? Math.round((totalD / totalAll) * 100) : 0;
-    const avgY = totalAll > 0 ? Math.round((totalAB / totalAll) * 100) : 0;
+    const compAllNeg = companyNegativeCustomers;
+    const compTotalD = compAllNeg.filter(c => getGroup(c.status_code.trim()) === 'D').length;
+    const compTotalAB = compAllNeg.filter(c => { const g = getGroup(c.status_code.trim()); return g === 'A' || g === 'B'; }).length;
+    const compTotalAll = compAllNeg.length;
+    const avgX = compTotalAll > 0 ? Math.round((compTotalD / compTotalAll) * 100) : 0;
+    const avgY = compTotalAll > 0 ? Math.round((compTotalAB / compTotalAll) * 100) : 0;
 
     return { stackedBarData, pieData, scatterData, scatterAvg: { avgX, avgY } };
-  }, [selectedCustomers]);
+  }, [selectedCustomers, dateFilteredCustomers]);
 
   const trendData = useMemo(() => {
     const rangeFrom = dateRange.from || startOfMonth(new Date());
