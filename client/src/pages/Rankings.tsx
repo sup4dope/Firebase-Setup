@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
@@ -41,6 +42,7 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
+  Search,
 } from 'lucide-react';
 import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
 import type { Customer, User as UserType, Team } from '@shared/types';
@@ -194,6 +196,7 @@ export default function Rankings() {
   const [selectedPeriod, setSelectedPeriod] = useState(() => format(new Date(), 'yyyy-MM'));
   const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'individual' | 'team'>('individual');
+  const [rankingSearch, setRankingSearch] = useState('');
 
   const monthOptions = useMemo(() => {
     const options: string[] = [];
@@ -511,6 +514,16 @@ export default function Rankings() {
       .sort((a, b) => b.totalScore - a.totalScore);
   }, [contractScores, teams]);
 
+  const filteredIndividualRankings = useMemo(() => {
+    if (!rankingSearch.trim()) return individualRankings;
+    return individualRankings.filter(r => r.name.includes(rankingSearch.trim()));
+  }, [individualRankings, rankingSearch]);
+
+  const filteredTeamRankings = useMemo(() => {
+    if (!rankingSearch.trim()) return teamRankings;
+    return teamRankings.filter(r => r.name.includes(rankingSearch.trim()));
+  }, [teamRankings, rankingSearch]);
+
   const renderRankingTable = (rankings: RankingEntry[]) => (
     <Table>
       <TableHeader>
@@ -651,7 +664,7 @@ export default function Rankings() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 flex flex-col h-full">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-yellow-500/20 rounded-lg">
@@ -816,8 +829,8 @@ export default function Rankings() {
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'individual' | 'team')}>
-        <div className="relative">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'individual' | 'team')} className="flex flex-col min-h-0 flex-1">
+        <div className="relative flex flex-col min-h-0 flex-1">
           <div className="flex">
             <button
               onClick={() => setActiveTab('individual')}
@@ -845,22 +858,32 @@ export default function Rankings() {
             </button>
           </div>
           
-          <Card className="rounded-tl-none border-t">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                {activeTab === 'individual' ? '전체 개인 순위' : '전체 팀 순위'}
-              </CardTitle>
+          <Card className="rounded-tl-none border-t flex flex-col min-h-0 flex-1">
+            <CardHeader className="flex-shrink-0">
+              <div className="flex items-center justify-between gap-4">
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  {activeTab === 'individual' ? '전체 개인 순위' : '전체 팀 순위'}
+                </CardTitle>
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={activeTab === 'individual' ? '담당자 검색...' : '팀 검색...'}
+                    value={rankingSearch}
+                    onChange={e => setRankingSearch(e.target.value)}
+                    className="pl-9 h-9"
+                    data-testid="input-ranking-search"
+                  />
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[500px]">
-                <TabsContent value="individual" className="mt-0">
-                  {renderRankingTable(individualRankings)}
-                </TabsContent>
-                <TabsContent value="team" className="mt-0">
-                  {renderRankingTable(teamRankings)}
-                </TabsContent>
-              </ScrollArea>
+            <CardContent className="flex-1 min-h-0 overflow-auto">
+              <TabsContent value="individual" className="mt-0">
+                {renderRankingTable(filteredIndividualRankings)}
+              </TabsContent>
+              <TabsContent value="team" className="mt-0">
+                {renderRankingTable(filteredTeamRankings)}
+              </TabsContent>
             </CardContent>
           </Card>
         </div>
