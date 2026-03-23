@@ -403,10 +403,7 @@ export default function Stats() {
 
     const current = calcRates(selectedCustomers);
 
-    const allStaffCustomers = dateFilteredCustomers.filter(c =>
-      allStaff.some(u => u.uid === c.manager_id)
-    );
-    const companyRates = calcRates(allStaffCustomers);
+    const companyRates = calcRates(dateFilteredCustomers);
 
     let teamRates: ReturnType<typeof calcRates> | null = null;
     if (isTeamLeader && user?.team_id) {
