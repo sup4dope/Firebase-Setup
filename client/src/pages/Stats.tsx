@@ -187,28 +187,38 @@ function calcMetrics(custs: Customer[]): StatsMetrics {
 function calcStaffAvgMetrics(allCustomers: Customer[], staffMembers: User[]): StatsMetrics {
   if (staffMembers.length === 0) return calcMetrics([]);
 
-  const staffMetrics = staffMembers.map(u => {
+  const staffCount = staffMembers.length;
+
+  const staffCustomers = allCustomers.filter(c =>
+    staffMembers.some(u => u.uid === c.manager_id)
+  );
+
+  const companyMetrics = calcMetrics(staffCustomers);
+
+  const staffMetricsAll = staffMembers.map(u => {
     const staffCusts = allCustomers.filter(c => c.manager_id === u.uid);
     return calcMetrics(staffCusts);
-  }).filter(m => m.totalInflow > 0);
+  });
 
-  const count = staffMetrics.length || 1;
+  const activeStaffMetrics = staffMetricsAll.filter(m => m.totalInflow > 0);
+  const activeCount = activeStaffMetrics.length || 1;
+
   const avg: StatsMetrics = {
-    totalInflow: Math.round(staffMetrics.reduce((s, m) => s + m.totalInflow, 0) / count),
-    contractedCount: Math.round(staffMetrics.reduce((s, m) => s + m.contractedCount, 0) / count),
-    contractRate: Math.round(staffMetrics.reduce((s, m) => s + m.contractRate, 0) / count * 10) / 10,
-    totalDepositAmount: Math.round(staffMetrics.reduce((s, m) => s + m.totalDepositAmount, 0) / count),
-    avgContractFeeRate: Math.round(staffMetrics.reduce((s, m) => s + m.avgContractFeeRate, 0) / count * 10) / 10,
-    executedCount: Math.round(staffMetrics.reduce((s, m) => s + m.executedCount, 0) / count),
-    totalExecutionAmount: Math.round(staffMetrics.reduce((s, m) => s + m.totalExecutionAmount, 0) / count),
-    totalCollectionAmount: Math.round(staffMetrics.reduce((s, m) => s + m.totalCollectionAmount, 0) / count),
-    pendingExecutionCount: Math.round(staffMetrics.reduce((s, m) => s + m.pendingExecutionCount, 0) / count),
-    avgPendingExecutionAmount: Math.round(staffMetrics.reduce((s, m) => s + m.avgPendingExecutionAmount, 0) / count),
-    avgConversionRate: Math.round(staffMetrics.reduce((s, m) => s + m.avgConversionRate, 0) / count * 10) / 10,
+    totalInflow: Math.round(companyMetrics.totalInflow / staffCount),
+    contractedCount: Math.round(companyMetrics.contractedCount / staffCount),
+    contractRate: Math.round(companyMetrics.contractRate * 10) / 10,
+    totalDepositAmount: Math.round(companyMetrics.totalDepositAmount / staffCount),
+    avgContractFeeRate: Math.round(activeStaffMetrics.reduce((s, m) => s + m.avgContractFeeRate, 0) / activeCount * 10) / 10,
+    executedCount: Math.round(companyMetrics.executedCount / staffCount),
+    totalExecutionAmount: Math.round(companyMetrics.totalExecutionAmount / staffCount),
+    totalCollectionAmount: Math.round(companyMetrics.totalCollectionAmount / staffCount),
+    pendingExecutionCount: Math.round(companyMetrics.pendingExecutionCount / staffCount),
+    avgPendingExecutionAmount: Math.round(companyMetrics.avgPendingExecutionAmount / staffCount),
+    avgConversionRate: Math.round(companyMetrics.avgConversionRate * 10) / 10,
     entrySourceStats: {},
   };
   ENTRY_SOURCES.forEach(src => {
-    avg.entrySourceStats[src] = Math.round(staffMetrics.reduce((s, m) => s + (m.entrySourceStats[src] || 0), 0) / count);
+    avg.entrySourceStats[src] = Math.round((companyMetrics.entrySourceStats[src] || 0) / staffCount);
   });
 
   return avg;
@@ -325,6 +335,13 @@ export default function Stats() {
     return calcStaffAvgMetrics(dateFilteredCustomers, allStaff);
   }, [dateFilteredCustomers, allStaff]);
 
+  const selectedTeamAvgMetrics = useMemo(() => {
+    if (selectedTeam === 'all') return null;
+    const teamStaff = allStaff.filter(u => u.team_id === selectedTeam);
+    if (teamStaff.length === 0) return null;
+    return calcStaffAvgMetrics(dateFilteredCustomers, teamStaff);
+  }, [dateFilteredCustomers, allStaff, selectedTeam]);
+
   const teamAvgMetrics = useMemo(() => {
     if (!isTeamLeader || !user?.team_id) return null;
     const teamStaff = allStaff.filter(u => u.team_id === user.team_id);
@@ -355,13 +372,17 @@ export default function Stats() {
 
   const avgLabel = useMemo(() => {
     if (isTeamLeader && selectedStaff !== 'all') return '팀 평균';
+    if (isSuperAdmin && selectedStaff === 'all' && selectedTeam === 'all') return '1인 평균';
+    if (isSuperAdmin && selectedStaff === 'all' && selectedTeam !== 'all') return '팀 1인 평균';
     return '회사 평균';
-  }, [isTeamLeader, selectedStaff]);
+  }, [isTeamLeader, isSuperAdmin, selectedStaff, selectedTeam]);
 
   const avgMetrics = useMemo(() => {
     if (isTeamLeader && selectedStaff !== 'all' && teamAvgMetrics) return teamAvgMetrics;
+    if (isSuperAdmin && selectedStaff !== 'all') return companyAvgMetrics;
+    if (isSuperAdmin && selectedTeam !== 'all' && selectedTeamAvgMetrics) return selectedTeamAvgMetrics;
     return companyAvgMetrics;
-  }, [isTeamLeader, selectedStaff, teamAvgMetrics, companyAvgMetrics]);
+  }, [isTeamLeader, isSuperAdmin, selectedStaff, selectedTeam, teamAvgMetrics, selectedTeamAvgMetrics, companyAvgMetrics]);
 
   const conversionRateData = useMemo(() => {
     const calcRates = (custs: Customer[]) => {
