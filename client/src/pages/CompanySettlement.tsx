@@ -759,7 +759,7 @@ export default function CompanySettlement() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {[...Array(5)].map((_, i) => (
             <Skeleton key={i} className="h-32" />
           ))}
@@ -1008,13 +1008,14 @@ export default function CompanySettlement() {
                       )}
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>카테고리</TableHead>
-                          <TableHead>항목명</TableHead>
-                          <TableHead>발생일</TableHead>
-                          <TableHead className="text-right">금액</TableHead>
+                          <TableHead className="whitespace-nowrap">카테고리</TableHead>
+                          <TableHead className="whitespace-nowrap">항목명</TableHead>
+                          <TableHead className="whitespace-nowrap hidden md:table-cell">발생일</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">금액</TableHead>
                           {!isPeriodSummary(selectedMonth) && !dateRangeMode && (
                             <TableHead className="w-[80px]"></TableHead>
                           )}
@@ -1050,7 +1051,7 @@ export default function CompanySettlement() {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              <TableCell className="text-xs text-muted-foreground whitespace-nowrap hidden md:table-cell">
                                 {expense.expense_date || '-'}
                               </TableCell>
                               <TableCell className="text-right font-semibold tabular-nums">
@@ -1088,6 +1089,7 @@ export default function CompanySettlement() {
                         })}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </ScrollArea>
 

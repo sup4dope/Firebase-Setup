@@ -109,8 +109,8 @@ export default function Holidays() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">공휴일 관리</h1>
+    <div className="p-3 md:p-6 max-w-3xl mx-auto">
+      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">공휴일 관리</h1>
       <HolidayManagement
         holidays={holidays}
         onAdd={handleAddHoliday}

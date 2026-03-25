@@ -731,7 +731,7 @@ export default function AdStats() {
       )}
 
       <Dialog open={detailModal.open} onOpenChange={(open) => !open && setDetailModal({ open: false, source: '', customers: [] })}>
-        <DialogContent className="max-w-4xl max-h-[85vh]" data-testid="dialog-detail-modal">
+        <DialogContent className="max-w-4xl max-h-[90vh] md:max-h-[85vh]" data-testid="dialog-detail-modal">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {detailModal.source} DB 상세 ({detailModal.customers.length}건)
@@ -753,17 +753,18 @@ export default function AdStats() {
                 </div>
               </div>
 
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left">
-                    <th className="py-2 px-2 font-medium text-muted-foreground">등급</th>
-                    <th className="py-2 px-2 font-medium text-muted-foreground">대표자</th>
-                    <th className="py-2 px-2 font-medium text-muted-foreground">상호명</th>
-                    <th className="py-2 px-2 font-medium text-muted-foreground">상태</th>
-                    <th className="py-2 px-2 font-medium text-muted-foreground">매출</th>
-                    <th className="py-2 px-2 font-medium text-muted-foreground">신용점수</th>
-                    <th className="py-2 px-2 font-medium text-muted-foreground">업종</th>
-                    <th className="py-2 px-2 font-medium text-muted-foreground">담당자</th>
+                    <th className="py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">등급</th>
+                    <th className="py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">대표자</th>
+                    <th className="py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">상호명</th>
+                    <th className="py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">상태</th>
+                    <th className="py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">매출</th>
+                    <th className="py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">신용점수</th>
+                    <th className="py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">업종</th>
+                    <th className="py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">담당자</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -816,14 +817,15 @@ export default function AdStats() {
                             </Badge>
                           </td>
                           <td className="py-2 px-2 text-right">{rev > 0 ? `${rev}억` : '-'}</td>
-                          <td className="py-2 px-2 text-right">{c.credit_score || '-'}</td>
-                          <td className="py-2 px-2 text-muted-foreground text-xs">{c.business_type || '-'}</td>
+                          <td className="py-2 px-2 text-right hidden md:table-cell">{c.credit_score || '-'}</td>
+                          <td className="py-2 px-2 text-muted-foreground text-xs hidden md:table-cell">{c.business_type || '-'}</td>
                           <td className="py-2 px-2 text-muted-foreground text-xs">{c.manager_name || '-'}</td>
                         </tr>
                       );
                     })}
                 </tbody>
               </table>
+              </div>
             </div>
           </ScrollArea>
         </DialogContent>

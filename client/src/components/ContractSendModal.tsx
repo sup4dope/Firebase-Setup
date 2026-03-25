@@ -320,7 +320,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="contract-send-modal">
+      <DialogContent className="max-w-2xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto" data-testid="contract-send-modal">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />

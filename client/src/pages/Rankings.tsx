@@ -525,14 +525,15 @@ export default function Rankings() {
   }, [teamRankings, rankingSearch]);
 
   const renderRankingTable = (rankings: RankingEntry[]) => (
+    <div className="overflow-x-auto">
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-16 text-center">순위</TableHead>
-          <TableHead>{activeTab === 'individual' ? '담당자' : '팀'}</TableHead>
-          {activeTab === 'individual' && <TableHead>소속팀</TableHead>}
-          <TableHead className="text-right pr-10">총점</TableHead>
-          <TableHead className="pl-6" style={{ width: '312px', minWidth: '312px', maxWidth: '312px' }}>점수 분포</TableHead>
+          <TableHead className="w-16 text-center whitespace-nowrap">순위</TableHead>
+          <TableHead className="whitespace-nowrap">{activeTab === 'individual' ? '담당자' : '팀'}</TableHead>
+          {activeTab === 'individual' && <TableHead className="whitespace-nowrap hidden md:table-cell">소속팀</TableHead>}
+          <TableHead className="text-right pr-10 whitespace-nowrap">총점</TableHead>
+          <TableHead className="pl-6 hidden lg:table-cell" style={{ width: '312px', minWidth: '312px', maxWidth: '312px' }}>점수 분포</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -567,7 +568,7 @@ export default function Rankings() {
                   </div>
                 </TableCell>
                 {activeTab === 'individual' && (
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <span className="text-sm text-muted-foreground">
                       {entry.teamName || '-'}
                     </span>
@@ -577,7 +578,7 @@ export default function Rankings() {
                   <span className="font-bold text-lg">{entry.totalScore.toLocaleString()}</span>
                   <span className="text-muted-foreground text-sm ml-1">점</span>
                 </TableCell>
-                <TableCell className="pl-6" style={{ width: '312px', minWidth: '312px', maxWidth: '312px' }}>
+                <TableCell className="pl-6 hidden lg:table-cell" style={{ width: '312px', minWidth: '312px', maxWidth: '312px' }}>
                   <div className="space-y-1">
                     {entry.totalScore > 0 ? (
                       <div className="flex h-2.5 w-full rounded-full overflow-hidden">
@@ -643,6 +644,7 @@ export default function Rankings() {
         )}
       </TableBody>
     </Table>
+    </div>
   );
 
   const topThree = activeTab === 'individual' 

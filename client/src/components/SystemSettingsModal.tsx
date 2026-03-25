@@ -495,7 +495,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-5xl h-[85vh] bg-background border-border text-foreground flex flex-col overflow-hidden">
+        <DialogContent className="max-w-5xl h-[90vh] md:h-[85vh] bg-background border-border text-foreground flex flex-col overflow-hidden">
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
               <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-600 dark:text-blue-400" />

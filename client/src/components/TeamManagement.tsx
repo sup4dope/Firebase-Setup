@@ -137,12 +137,13 @@ export function TeamManagement({
           )}
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>팀명</TableHead>
-                <TableHead>인원</TableHead>
-                <TableHead>생성일</TableHead>
+                <TableHead className="whitespace-nowrap">팀명</TableHead>
+                <TableHead className="whitespace-nowrap">인원</TableHead>
+                <TableHead className="whitespace-nowrap hidden md:table-cell">생성일</TableHead>
                 {isSuperAdmin && <TableHead className="w-[100px]"></TableHead>}
               </TableRow>
             </TableHeader>
@@ -156,7 +157,7 @@ export function TeamManagement({
                       {getUserCountByTeam(team.id)}명
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground hidden md:table-cell">
                     {format(team.created_at, 'yyyy-MM-dd')}
                   </TableCell>
                   {isSuperAdmin && (
@@ -193,6 +194,7 @@ export function TeamManagement({
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -202,13 +204,14 @@ export function TeamManagement({
           <CardTitle className="text-lg">사용자 관리</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>이름</TableHead>
-                <TableHead>이메일</TableHead>
-                <TableHead>권한</TableHead>
-                <TableHead>소속 팀</TableHead>
+                <TableHead className="whitespace-nowrap">이름</TableHead>
+                <TableHead className="whitespace-nowrap hidden md:table-cell">이메일</TableHead>
+                <TableHead className="whitespace-nowrap">권한</TableHead>
+                <TableHead className="whitespace-nowrap">소속 팀</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -224,7 +227,7 @@ export function TeamManagement({
                       <span className="font-medium">{user.name}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                  <TableCell className="text-muted-foreground hidden md:table-cell">{user.email}</TableCell>
                   <TableCell>
                     {isSuperAdmin ? (
                       <Select
@@ -280,6 +283,7 @@ export function TeamManagement({
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

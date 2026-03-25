@@ -267,19 +267,20 @@ export default function Contracts() {
       <TooltipProvider>
         <Card>
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 text-center">No</TableHead>
-                  <TableHead>고객명</TableHead>
-                  <TableHead>상호명</TableHead>
-                  <TableHead>계약서명</TableHead>
-                  <TableHead className="text-center">상태</TableHead>
-                  <TableHead>발송일</TableHead>
-                  <TableHead>완료일</TableHead>
-                  <TableHead>작성자</TableHead>
-                  <TableHead className="text-center w-20">관리</TableHead>
-                  {isSuperAdmin && <TableHead className="text-center w-16">삭제</TableHead>}
+                  <TableHead className="w-12 text-center whitespace-nowrap hidden md:table-cell">No</TableHead>
+                  <TableHead className="whitespace-nowrap">고객명</TableHead>
+                  <TableHead className="whitespace-nowrap hidden md:table-cell">상호명</TableHead>
+                  <TableHead className="whitespace-nowrap hidden lg:table-cell">계약서명</TableHead>
+                  <TableHead className="text-center whitespace-nowrap">상태</TableHead>
+                  <TableHead className="whitespace-nowrap hidden md:table-cell">발송일</TableHead>
+                  <TableHead className="whitespace-nowrap hidden lg:table-cell">완료일</TableHead>
+                  <TableHead className="whitespace-nowrap hidden lg:table-cell">작성자</TableHead>
+                  <TableHead className="text-center w-20 whitespace-nowrap">관리</TableHead>
+                  {isSuperAdmin && <TableHead className="text-center w-16 whitespace-nowrap">삭제</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -296,16 +297,16 @@ export default function Contracts() {
                     const statusInfo = getStatusDisplayInfo(contract);
                     return (
                       <TableRow key={contract.id} data-testid={`row-contract-${contract.id}`}>
-                        <TableCell className="text-center text-muted-foreground text-sm">
+                        <TableCell className="text-center text-muted-foreground text-sm hidden md:table-cell">
                           {idx + 1}
                         </TableCell>
                         <TableCell className="font-medium" data-testid={`text-customer-name-${contract.id}`}>
                           {(contract as any).fields?.['대표자명'] || (contract as any).fields?.['성명'] || '-'}
                         </TableCell>
-                        <TableCell data-testid={`text-company-name-${contract.id}`}>
+                        <TableCell className="hidden md:table-cell" data-testid={`text-company-name-${contract.id}`}>
                           {contract.customer_name}
                         </TableCell>
-                        <TableCell data-testid={`text-template-name-${contract.id}`}>
+                        <TableCell className="hidden lg:table-cell" data-testid={`text-template-name-${contract.id}`}>
                           {contract.template_name}
                         </TableCell>
                         <TableCell className="text-center">
@@ -332,13 +333,13 @@ export default function Contracts() {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                           {formatDate(contract.sent_at)}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className="text-sm text-muted-foreground hidden lg:table-cell">
                           {formatDate(contract.completed_at)}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-sm hidden lg:table-cell">
                           {contract.created_by}
                         </TableCell>
                         <TableCell className="text-center">
@@ -384,6 +385,7 @@ export default function Contracts() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </TooltipProvider>

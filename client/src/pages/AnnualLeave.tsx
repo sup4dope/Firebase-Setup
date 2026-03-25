@@ -722,24 +722,25 @@ export default function AnnualLeave() {
                     신청 내역이 없습니다.
                   </div>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>신청일</TableHead>
-                        <TableHead>사용일</TableHead>
-                        <TableHead>유형</TableHead>
-                        <TableHead>사유</TableHead>
-                        <TableHead>상태</TableHead>
-                        <TableHead>작업</TableHead>
+                        <TableHead className="whitespace-nowrap hidden md:table-cell">신청일</TableHead>
+                        <TableHead className="whitespace-nowrap">사용일</TableHead>
+                        <TableHead className="whitespace-nowrap">유형</TableHead>
+                        <TableHead className="whitespace-nowrap hidden md:table-cell">사유</TableHead>
+                        <TableHead className="whitespace-nowrap">상태</TableHead>
+                        <TableHead className="whitespace-nowrap">작업</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {myRequests.map(req => (
                         <TableRow key={req.id}>
-                          <TableCell>{format(req.created_at, 'yyyy-MM-dd')}</TableCell>
+                          <TableCell className="hidden md:table-cell">{format(req.created_at, 'yyyy-MM-dd')}</TableCell>
                           <TableCell>{req.leave_date}</TableCell>
                           <TableCell>{LEAVE_TYPE_LABELS[req.leave_type]}</TableCell>
-                          <TableCell className="max-w-[200px] truncate">{req.reason}</TableCell>
+                          <TableCell className="max-w-[200px] truncate hidden md:table-cell">{req.reason}</TableCell>
                           <TableCell>
                             <Badge className={STATUS_COLORS[req.status]}>
                               {STATUS_LABELS[req.status]}
@@ -766,6 +767,7 @@ export default function AnnualLeave() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -780,16 +782,17 @@ export default function AnnualLeave() {
                       승인 대기 중인 신청이 없습니다.
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>신청자</TableHead>
-                          <TableHead>팀</TableHead>
-                          <TableHead>사용일</TableHead>
-                          <TableHead>유형</TableHead>
-                          <TableHead>사유</TableHead>
-                          <TableHead>상태</TableHead>
-                          <TableHead>작업</TableHead>
+                          <TableHead className="whitespace-nowrap">신청자</TableHead>
+                          <TableHead className="whitespace-nowrap hidden md:table-cell">팀</TableHead>
+                          <TableHead className="whitespace-nowrap">사용일</TableHead>
+                          <TableHead className="whitespace-nowrap">유형</TableHead>
+                          <TableHead className="whitespace-nowrap hidden md:table-cell">사유</TableHead>
+                          <TableHead className="whitespace-nowrap">상태</TableHead>
+                          <TableHead className="whitespace-nowrap">작업</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -801,10 +804,10 @@ export default function AnnualLeave() {
                           return (
                             <TableRow key={req.id}>
                               <TableCell>{req.user_name}</TableCell>
-                              <TableCell>{req.team_name || '-'}</TableCell>
+                              <TableCell className="hidden md:table-cell">{req.team_name || '-'}</TableCell>
                               <TableCell>{req.leave_date}</TableCell>
                               <TableCell>{LEAVE_TYPE_LABELS[req.leave_type]}</TableCell>
-                              <TableCell className="max-w-[200px] truncate">{req.reason}</TableCell>
+                              <TableCell className="max-w-[200px] truncate hidden md:table-cell">{req.reason}</TableCell>
                               <TableCell>
                                 <Badge className={STATUS_COLORS[req.status]}>
                                   {STATUS_LABELS[req.status]}
@@ -841,6 +844,7 @@ export default function AnnualLeave() {
                         })}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -856,24 +860,25 @@ export default function AnnualLeave() {
                       신청 내역이 없습니다.
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>신청자</TableHead>
-                          <TableHead>팀</TableHead>
-                          <TableHead>사용일</TableHead>
-                          <TableHead>유형</TableHead>
-                          <TableHead>상태</TableHead>
-                          <TableHead>1차 승인</TableHead>
-                          <TableHead>최종 승인</TableHead>
-                          <TableHead>작업</TableHead>
+                          <TableHead className="whitespace-nowrap">신청자</TableHead>
+                          <TableHead className="whitespace-nowrap hidden md:table-cell">팀</TableHead>
+                          <TableHead className="whitespace-nowrap">사용일</TableHead>
+                          <TableHead className="whitespace-nowrap">유형</TableHead>
+                          <TableHead className="whitespace-nowrap">상태</TableHead>
+                          <TableHead className="whitespace-nowrap hidden md:table-cell">1차 승인</TableHead>
+                          <TableHead className="whitespace-nowrap hidden md:table-cell">최종 승인</TableHead>
+                          <TableHead className="whitespace-nowrap">작업</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {allRequests.map(req => (
                           <TableRow key={req.id}>
                             <TableCell>{req.user_name}</TableCell>
-                            <TableCell>{req.team_name || '-'}</TableCell>
+                            <TableCell className="hidden md:table-cell">{req.team_name || '-'}</TableCell>
                             <TableCell>{req.leave_date}</TableCell>
                             <TableCell>{LEAVE_TYPE_LABELS[req.leave_type]}</TableCell>
                             <TableCell>
@@ -881,7 +886,7 @@ export default function AnnualLeave() {
                                 {STATUS_LABELS[req.status]}
                               </Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell">
                               {req.leader_approved_name && (
                                 <div className="text-sm">
                                   {req.leader_approved_name}
@@ -891,7 +896,7 @@ export default function AnnualLeave() {
                                 </div>
                               )}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell">
                               {req.admin_approved_name && (
                                 <div className="text-sm">
                                   {req.admin_approved_name}
@@ -932,6 +937,7 @@ export default function AnnualLeave() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>

@@ -2073,7 +2073,7 @@ export function CustomerDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] p-0 bg-card flex flex-col overflow-hidden">
+      <DialogContent className="max-w-[90vw] w-[calc(100%-1rem)] md:w-[90vw] h-[95vh] md:h-[90vh] p-0 bg-card flex flex-col overflow-hidden">
         <VisuallyHidden>
           <DialogTitle>
             {isNewCustomer
@@ -2081,10 +2081,10 @@ export function CustomerDetailModal({
               : `${customer?.name || "고객"} 상세정보`}
           </DialogTitle>
         </VisuallyHidden>
-        {/* Header - h-16 shrink-0 고정 */}
-        <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b bg-card/80">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-foreground">
+        {/* Header - h-14 md:h-16 shrink-0 고정 */}
+        <div className="h-14 md:h-16 shrink-0 flex items-center justify-between px-3 md:px-6 border-b bg-card/80">
+          <div className="flex items-center gap-2 md:gap-3 overflow-x-auto">
+            <h2 className="text-base md:text-lg font-bold text-foreground whitespace-nowrap">
               {isNewCustomer
                 ? "신규 고객 등록"
                 : `${customer?.name || "고객"} 상세정보`}
@@ -2216,10 +2216,10 @@ export function CustomerDetailModal({
           </div>
         </div>
 
-        {/* Main Content - 3단 레이아웃 (좌-중-우) */}
-        <div className="flex-1 flex flex-row h-[calc(100%-4rem)] overflow-hidden">
+        {/* Main Content - 3단 레이아웃 (좌-중-우), 모바일은 세로 스크롤 */}
+        <div className="flex-1 flex flex-col md:flex-row h-[calc(100%-3.5rem)] md:h-[calc(100%-4rem)] overflow-y-auto md:overflow-hidden">
           {/* Section 1: 좌측 패널 - 상세 정보 입력 (35%) */}
-          <div className="w-[25%] min-w-[260px] h-full border-r overflow-y-auto">
+          <div className="w-full md:w-[25%] md:min-w-[260px] h-auto md:h-full border-b md:border-b-0 md:border-r overflow-y-auto shrink-0">
             <div className="p-1.5 space-y-1">
               {/* 유입경로 (최상단) - 1. 상단에 바짝 붙임 */}
               <div className="space-y-0.5 ml-[6px] mr-[6px] pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
@@ -3380,7 +3380,7 @@ export function CustomerDetailModal({
           </div>
 
           {/* Section 2: 중앙 패널 - 탭 기반 금융 분석 대시보드 (40%) */}
-          <div className="flex-1 h-full bg-muted/50 dark:bg-gray-950 flex flex-col overflow-hidden border-r">
+          <div className="flex-1 min-h-[300px] md:min-h-0 md:h-full bg-muted/50 dark:bg-gray-950 flex flex-col overflow-hidden border-b md:border-b-0 md:border-r">
             {/* Center Panel Tabs */}
             <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b bg-muted/50 pl-[6px] pr-[6px] pt-[2px] pb-[2px]">
               <div className="flex items-center gap-2">
@@ -4006,7 +4006,7 @@ export function CustomerDetailModal({
           </div>
 
           {/* Section 3: 우측 패널 - 커뮤니케이션 (25%) */}
-          <div className="w-[25%] min-w-[280px] h-full flex flex-col overflow-hidden">
+          <div className="w-full md:w-[25%] md:min-w-[280px] min-h-[300px] md:min-h-0 md:h-full flex flex-col overflow-hidden">
             {/* 상단 50%: 메모/변경이력 탭 */}
             <div className="h-1/2 flex flex-col border-b">
               {/* Tab Headers */}

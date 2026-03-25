@@ -299,8 +299,8 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`max-h-[85vh] flex flex-col p-0 transition-all duration-300 ${showAssignmentStats ? 'max-w-6xl' : 'max-w-4xl'}`}>
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+      <DialogContent className={`max-h-[90vh] md:max-h-[85vh] flex flex-col p-0 transition-all duration-300 ${showAssignmentStats ? 'max-w-6xl' : 'max-w-4xl'}`}>
+        <DialogHeader className="px-4 md:px-6 pt-4 md:pt-6 pb-3 md:pb-4 border-b shrink-0">
           <DialogTitle className="text-lg font-semibold flex items-center gap-2">
             <Download className="w-5 h-5" />
             DB 유입 프리뷰
@@ -310,7 +310,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 flex overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
           <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {loading ? (
             <div className="p-6 space-y-4">
@@ -331,9 +331,9 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
             </div>
           ) : (
             <>
-              <div className="px-6 py-3 bg-muted/50 border-b shrink-0 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 text-sm">
+              <div className="px-3 md:px-6 py-2 md:py-3 bg-muted/50 border-b shrink-0 space-y-2">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 md:gap-4 text-sm">
                     <span className="text-muted-foreground">총 <span className="font-semibold text-foreground">{consultations.length}건</span></span>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -344,7 +344,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 md:gap-3">
                     <button
                       onClick={() => setShowAssignmentStats(!showAssignmentStats)}
                       className={`flex items-center gap-1.5 text-xs transition-colors ${showAssignmentStats ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-muted-foreground hover:text-foreground'}`}
@@ -354,7 +354,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                       <span>배정 현황</span>
                       {showAssignmentStats ? <X className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </button>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground hidden md:inline">
                       * 중복: 사업자등록번호가 이미 등록된 고객
                     </p>
                   </div>
@@ -555,7 +555,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
           </div>
 
           {showAssignmentStats && (
-            <div className="w-[280px] shrink-0 border-l bg-muted/20 flex flex-col overflow-hidden">
+            <div className="w-full md:w-[280px] shrink-0 border-t md:border-t-0 md:border-l bg-muted/20 flex flex-col overflow-hidden max-h-[40vh] md:max-h-none">
               <div className="px-4 py-3 border-b bg-muted/50 shrink-0">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold flex items-center gap-1.5">
@@ -634,11 +634,11 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
           )}
         </div>
 
-        <div className="px-6 py-4 border-t bg-muted/30 flex items-center justify-between shrink-0">
-          <p className="text-xs text-muted-foreground">
+        <div className="px-3 md:px-6 py-3 md:py-4 border-t bg-muted/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 shrink-0">
+          <p className="text-xs text-muted-foreground hidden md:block">
             * 신규 고객은 자동 생성되고, 중복 고객은 기존 고객에 메모로 추가됩니다.
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
             <Button 
               variant="outline" 
               onClick={handleSendDelayNotification}

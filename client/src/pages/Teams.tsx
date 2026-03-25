@@ -212,8 +212,8 @@ export default function Teams() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">팀 관리</h1>
+    <div className="p-3 md:p-6 max-w-5xl mx-auto">
+      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">팀 관리</h1>
       <TeamManagement
         teams={teams}
         users={users}

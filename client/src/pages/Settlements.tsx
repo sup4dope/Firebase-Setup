@@ -808,9 +808,9 @@ export default function Settlements() {
       </Card>
 
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[85vh]">
-          <DialogHeader className="flex flex-row items-center justify-between gap-4">
-            <DialogTitle>{detailModalTitle}</DialogTitle>
+        <DialogContent className="max-w-[95vw] max-h-[90vh] md:max-h-[85vh]">
+          <DialogHeader className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
+            <DialogTitle className="text-base md:text-lg">{detailModalTitle}</DialogTitle>
             {isSuperAdmin && (
               <Button
                 variant="outline"
@@ -825,20 +825,21 @@ export default function Settlements() {
             )}
           </DialogHeader>
           <ScrollArea className="h-[70vh]">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>수당일자</TableHead>
-                  <TableHead>유입경로</TableHead>
-                  <TableHead>고유번호</TableHead>
-                  <TableHead>고객명</TableHead>
-                  <TableHead>수당구분</TableHead>
-                  <TableHead className="text-right">계약금</TableHead>
-                  <TableHead className="text-right">자문료율</TableHead>
-                  <TableHead className="text-right">집행금액</TableHead>
-                  <TableHead className="text-right">자문료액</TableHead>
-                  <TableHead className="text-right">세전수당</TableHead>
-                  <TableHead className="text-right">실지급액</TableHead>
+                  <TableHead className="whitespace-nowrap">수당일자</TableHead>
+                  <TableHead className="whitespace-nowrap">유입경로</TableHead>
+                  <TableHead className="whitespace-nowrap">고유번호</TableHead>
+                  <TableHead className="whitespace-nowrap">고객명</TableHead>
+                  <TableHead className="whitespace-nowrap">수당구분</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">계약금</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">자문료율</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">집행금액</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">자문료액</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">세전수당</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">실지급액</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -966,6 +967,7 @@ export default function Settlements() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
@@ -1051,25 +1053,26 @@ export default function Settlements() {
       </Dialog>
 
       <Dialog open={summaryModalOpen} onOpenChange={setSummaryModalOpen}>
-        <DialogContent className="max-w-[90vw] max-h-[85vh]" data-testid="dialog-all-employees-summary">
+        <DialogContent className="max-w-[90vw] max-h-[90vh] md:max-h-[85vh]" data-testid="dialog-all-employees-summary">
           <DialogHeader>
             <DialogTitle>{getPeriodLabel(selectedMonth)} 전체 직원 정산 현황</DialogTitle>
             <DialogDescription>모든 직원의 정산 요약 정보입니다.</DialogDescription>
           </DialogHeader>
           <ScrollArea className="h-[65vh]">
+            <div className="overflow-x-auto">
             <Table data-testid="table-all-employees-summary">
               <TableHeader>
                 <TableRow>
-                  <TableHead>직원명</TableHead>
-                  <TableHead className="text-right">계약 건수</TableHead>
-                  <TableHead className="text-right">총 계약금</TableHead>
-                  <TableHead className="text-right">집행건수</TableHead>
-                  <TableHead className="text-right">집행금액</TableHead>
-                  <TableHead className="text-right">총 자문금액</TableHead>
-                  <TableHead className="text-right">세전수당</TableHead>
-                  <TableHead className="text-right">공제세액</TableHead>
-                  <TableHead className="text-right">환수</TableHead>
-                  <TableHead className="text-right font-bold">최종지급액(세후)</TableHead>
+                  <TableHead className="whitespace-nowrap">직원명</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">계약 건수</TableHead>
+                  <TableHead className="text-right whitespace-nowrap hidden md:table-cell">총 계약금</TableHead>
+                  <TableHead className="text-right whitespace-nowrap hidden lg:table-cell">집행건수</TableHead>
+                  <TableHead className="text-right whitespace-nowrap hidden lg:table-cell">집행금액</TableHead>
+                  <TableHead className="text-right whitespace-nowrap hidden lg:table-cell">총 자문금액</TableHead>
+                  <TableHead className="text-right whitespace-nowrap hidden md:table-cell">세전수당</TableHead>
+                  <TableHead className="text-right whitespace-nowrap hidden md:table-cell">공제세액</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">환수</TableHead>
+                  <TableHead className="text-right font-bold whitespace-nowrap">최종지급액(세후)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1095,14 +1098,14 @@ export default function Settlements() {
                         }}
                         data-testid={`summary-row-manager-${summary.manager_id}`}
                       >
-                        <TableCell className="font-medium">{summary.manager_name}</TableCell>
+                        <TableCell className="font-medium whitespace-nowrap">{summary.manager_name}</TableCell>
                         <TableCell className="text-right">{summary.total_contracts}건</TableCell>
-                        <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}원</TableCell>
-                        <TableCell className="text-right">{summary.execution_count}건</TableCell>
-                        <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}원</TableCell>
-                        <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}원</TableCell>
-                        <TableCell className="text-right">{summary.total_gross_commission.toLocaleString()}원</TableCell>
-                        <TableCell className="text-right">{summary.total_tax.toLocaleString()}원</TableCell>
+                        <TableCell className="text-right hidden md:table-cell">{summary.total_contract_amount.toLocaleString()}원</TableCell>
+                        <TableCell className="text-right hidden lg:table-cell">{summary.execution_count}건</TableCell>
+                        <TableCell className="text-right hidden lg:table-cell">{summary.total_execution_amount.toLocaleString()}원</TableCell>
+                        <TableCell className="text-right hidden lg:table-cell">{(summary.total_execution_fee || 0).toLocaleString()}원</TableCell>
+                        <TableCell className="text-right hidden md:table-cell">{summary.total_gross_commission.toLocaleString()}원</TableCell>
+                        <TableCell className="text-right hidden md:table-cell">{summary.total_tax.toLocaleString()}원</TableCell>
                         <TableCell className="text-right text-red-600">
                           {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}원` : '-'}
                         </TableCell>
@@ -1112,14 +1115,14 @@ export default function Settlements() {
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/30 font-semibold border-t-2">
-                      <TableCell>합계</TableCell>
+                      <TableCell className="whitespace-nowrap">합계</TableCell>
                       <TableCell className="text-right">{totals.contracts}건</TableCell>
-                      <TableCell className="text-right">{totals.contractAmount.toLocaleString()}원</TableCell>
-                      <TableCell className="text-right">{totals.executionCount}건</TableCell>
-                      <TableCell className="text-right">{totals.executionAmount.toLocaleString()}원</TableCell>
-                      <TableCell className="text-right">{(totals.executionFee || 0).toLocaleString()}원</TableCell>
-                      <TableCell className="text-right">{totals.grossCommission.toLocaleString()}원</TableCell>
-                      <TableCell className="text-right">{totals.tax.toLocaleString()}원</TableCell>
+                      <TableCell className="text-right hidden md:table-cell">{totals.contractAmount.toLocaleString()}원</TableCell>
+                      <TableCell className="text-right hidden lg:table-cell">{totals.executionCount}건</TableCell>
+                      <TableCell className="text-right hidden lg:table-cell">{totals.executionAmount.toLocaleString()}원</TableCell>
+                      <TableCell className="text-right hidden lg:table-cell">{(totals.executionFee || 0).toLocaleString()}원</TableCell>
+                      <TableCell className="text-right hidden md:table-cell">{totals.grossCommission.toLocaleString()}원</TableCell>
+                      <TableCell className="text-right hidden md:table-cell">{totals.tax.toLocaleString()}원</TableCell>
                       <TableCell className="text-right text-red-600">
                         {totals.clawbackCount > 0 ? `-${totals.clawbackAmount.toLocaleString()}원` : '-'}
                       </TableCell>
@@ -1131,6 +1134,7 @@ export default function Settlements() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
