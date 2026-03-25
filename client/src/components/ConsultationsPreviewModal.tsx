@@ -299,7 +299,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0">
+      <DialogContent className={`max-h-[85vh] flex flex-col p-0 transition-all duration-300 ${showAssignmentStats ? 'max-w-6xl' : 'max-w-4xl'}`}>
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle className="text-lg font-semibold flex items-center gap-2">
             <Download className="w-5 h-5" />
@@ -310,7 +310,8 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 flex overflow-hidden">
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {loading ? (
             <div className="p-6 space-y-4">
               {[1, 2, 3].map(i => (
@@ -343,9 +344,20 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                       </Badge>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    * 중복: 사업자등록번호가 이미 등록된 고객 (메모로 추가됨)
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowAssignmentStats(!showAssignmentStats)}
+                      className={`flex items-center gap-1.5 text-xs transition-colors ${showAssignmentStats ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                      data-testid="button-toggle-assignment-stats"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      <span>배정 현황</span>
+                      {showAssignmentStats ? <X className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                    <p className="text-xs text-muted-foreground">
+                      * 중복: 사업자등록번호가 이미 등록된 고객
+                    </p>
+                  </div>
                 </div>
                 {sourceCountMap.length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap">
@@ -364,71 +376,6 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                         <span className="font-semibold text-foreground">{count}</span>
                       </Badge>
                     ))}
-                  </div>
-                )}
-
-                <button
-                  onClick={() => setShowAssignmentStats(!showAssignmentStats)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-fit"
-                  data-testid="button-toggle-assignment-stats"
-                >
-                  <BarChart3 className="w-3 h-3" />
-                  <span>직원별 DB 배정 현황</span>
-                  {showAssignmentStats ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
-
-                {showAssignmentStats && loadingStats && (
-                  <div className="flex items-center justify-center py-3 text-xs text-muted-foreground">
-                    <span className="animate-pulse">배정 현황 로딩 중...</span>
-                  </div>
-                )}
-
-                {showAssignmentStats && !loadingStats && assignmentStats.length === 0 && (
-                  <div className="text-xs text-muted-foreground text-center py-3">
-                    이번 달 배정 데이터가 없습니다.
-                  </div>
-                )}
-
-                {showAssignmentStats && !loadingStats && assignmentStats.length > 0 && (
-                  <div className="rounded-lg border bg-card overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-left px-3 py-1.5 font-medium">직원명</th>
-                          <th className="text-left px-3 py-1.5 font-medium">소속팀</th>
-                          <th className="text-right px-3 py-1.5 font-medium">오늘</th>
-                          <th className="text-right px-3 py-1.5 font-medium">이번 주</th>
-                          <th className="text-right px-3 py-1.5 font-medium">이번 달</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {assignmentStats.map(stat => (
-                          <tr key={stat.uid} className="border-b last:border-b-0" data-testid={`row-assignment-${stat.uid}`}>
-                            <td className="px-3 py-1.5 font-medium">{stat.name}</td>
-                            <td className="px-3 py-1.5 text-muted-foreground">{stat.teamName}</td>
-                            <td className="px-3 py-1.5 text-right">
-                              <span className={stat.todayCount > 0 ? 'font-semibold text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}>
-                                {stat.todayCount}건
-                              </span>
-                            </td>
-                            <td className="px-3 py-1.5 text-right">{stat.weekCount}건</td>
-                            <td className="px-3 py-1.5 text-right">{stat.monthCount}건</td>
-                          </tr>
-                        ))}
-                        <tr className="bg-muted/30 font-medium">
-                          <td className="px-3 py-1.5" colSpan={2}>합계</td>
-                          <td className="px-3 py-1.5 text-right text-blue-600 dark:text-blue-400">
-                            {assignmentStats.reduce((sum, s) => sum + s.todayCount, 0)}건
-                          </td>
-                          <td className="px-3 py-1.5 text-right">
-                            {assignmentStats.reduce((sum, s) => sum + s.weekCount, 0)}건
-                          </td>
-                          <td className="px-3 py-1.5 text-right">
-                            {assignmentStats.reduce((sum, s) => sum + s.monthCount, 0)}건
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
                   </div>
                 )}
               </div>
@@ -604,6 +551,86 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                 </div>
               </div>
             </>
+          )}
+          </div>
+
+          {showAssignmentStats && (
+            <div className="w-[280px] shrink-0 border-l bg-muted/20 flex flex-col overflow-hidden">
+              <div className="px-4 py-3 border-b bg-muted/50 shrink-0">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                    <BarChart3 className="w-4 h-4" />
+                    직원별 DB 배정 현황
+                  </h3>
+                  <button
+                    onClick={() => setShowAssignmentStats(false)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {loadingStats ? (
+                  <div className="flex items-center justify-center py-8 text-xs text-muted-foreground">
+                    <span className="animate-pulse">로딩 중...</span>
+                  </div>
+                ) : assignmentStats.length === 0 ? (
+                  <div className="text-xs text-muted-foreground text-center py-8">
+                    이번 달 배정 데이터가 없습니다.
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {assignmentStats.map(stat => (
+                      <div key={stat.uid} className="px-4 py-2.5 hover:bg-muted/30 transition-colors" data-testid={`row-assignment-${stat.uid}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium">{stat.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{stat.teamName}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                          <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground">오늘</span>
+                            <span className={stat.todayCount > 0 ? 'font-bold text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}>
+                              {stat.todayCount}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground">주</span>
+                            <span className="font-medium">{stat.weekCount}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground">월</span>
+                            <span className="font-medium">{stat.monthCount}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="px-4 py-2.5 bg-muted/40">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold">합계</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs font-medium">
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">오늘</span>
+                          <span className="text-blue-600 dark:text-blue-400 font-bold">
+                            {assignmentStats.reduce((sum, s) => sum + s.todayCount, 0)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">주</span>
+                          <span>{assignmentStats.reduce((sum, s) => sum + s.weekCount, 0)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">월</span>
+                          <span>{assignmentStats.reduce((sum, s) => sum + s.monthCount, 0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
