@@ -239,7 +239,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
   };
 
   return (
-    <div className="space-y-4 w-full px-2 md:px-0">
+    <div className="space-y-4 w-full px-4 md:px-0">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">상태 분류</h3>
         <div className="text-sm text-muted-foreground">
