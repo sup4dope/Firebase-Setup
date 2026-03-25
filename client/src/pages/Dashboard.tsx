@@ -1515,7 +1515,7 @@ export default function Dashboard() {
         </div>
       </div>
       {/* Main Content Area - Scrollable */}
-      <div className="flex-1 overflow-auto p-2 md:p-4 space-y-3 md:space-y-4 bg-background">
+      <div className="flex-1 overflow-auto p-3 md:p-4 space-y-3 md:space-y-4 bg-background">
         {/* Funnel Chart - Wide and centered */}
         <FunnelChart
           customers={funnelFilteredCustomers}
