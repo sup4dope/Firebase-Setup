@@ -386,7 +386,7 @@ export default function Settlements() {
   // Show loading skeleton while auth is still resolving
   if (authLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-3 md:p-6 space-y-4 md:space-y-6">
         <Skeleton className="h-10 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {[1, 2, 3, 4, 5].map(i => (
@@ -549,7 +549,7 @@ export default function Settlements() {
 
   if (dataLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-3 md:p-6 space-y-4 md:space-y-6">
         <Skeleton className="h-10 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {[1, 2, 3, 4, 5].map(i => (
@@ -562,7 +562,7 @@ export default function Settlements() {
   }
 
   return (
-    <div className="p-6 space-y-6 flex flex-col h-full">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 flex flex-col h-full">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center bg-muted/50 rounded-lg border">
           <Button
@@ -743,10 +743,10 @@ export default function Settlements() {
                 <TableHead>직원명</TableHead>
                 <TableHead className="text-right">계약 건수</TableHead>
                 <TableHead className="text-right">총 계약금</TableHead>
-                <TableHead className="text-right">집행건수</TableHead>
-                <TableHead className="text-right">집행금액</TableHead>
-                <TableHead className="text-right">총 자문금액</TableHead>
-                <TableHead className="text-right">환수</TableHead>
+                <TableHead className="text-right hidden md:table-cell">집행건수</TableHead>
+                <TableHead className="text-right hidden md:table-cell">집행금액</TableHead>
+                <TableHead className="text-right hidden lg:table-cell">총 자문금액</TableHead>
+                <TableHead className="text-right hidden lg:table-cell">환수</TableHead>
                 <TableHead className="text-right">최종지급액(세후)</TableHead>
                 <TableHead className="text-center">급여명세서</TableHead>
               </TableRow>
@@ -779,10 +779,10 @@ export default function Settlements() {
                     </TableCell>
                     <TableCell className="text-right">{summary.total_contracts}건</TableCell>
                     <TableCell className="text-right">{summary.total_contract_amount.toLocaleString()}원</TableCell>
-                    <TableCell className="text-right">{summary.execution_count}건</TableCell>
-                    <TableCell className="text-right">{summary.total_execution_amount.toLocaleString()}원</TableCell>
-                    <TableCell className="text-right">{(summary.total_execution_fee || 0).toLocaleString()}원</TableCell>
-                    <TableCell className="text-right text-red-600">
+                    <TableCell className="text-right hidden md:table-cell">{summary.execution_count}건</TableCell>
+                    <TableCell className="text-right hidden md:table-cell">{summary.total_execution_amount.toLocaleString()}원</TableCell>
+                    <TableCell className="text-right hidden lg:table-cell">{(summary.total_execution_fee || 0).toLocaleString()}원</TableCell>
+                    <TableCell className="text-right text-red-600 hidden lg:table-cell">
                       {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}원` : '-'}
                     </TableCell>
                     <TableCell className="text-right font-bold text-blue-600">

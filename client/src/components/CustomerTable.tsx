@@ -518,7 +518,7 @@ export function CustomerTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead className="w-28 font-semibold whitespace-nowrap text-center">
+              <TableHead className="w-28 font-semibold whitespace-nowrap text-center hidden md:table-cell">
                 {!selectedStage && onSortModeChange ? (
                   <button
                     onClick={() => onSortModeChange(sortMode === 'entry_date' ? 'updated_at' : 'entry_date')}
@@ -539,17 +539,17 @@ export function CustomerTable({
                   '유입일자'
                 )}
               </TableHead>
-              <TableHead className="w-[50px] font-semibold text-center whitespace-nowrap">No</TableHead>
+              <TableHead className="w-[50px] font-semibold text-center whitespace-nowrap hidden md:table-cell">No</TableHead>
               <TableHead className="w-[90px] font-semibold whitespace-nowrap">고객명</TableHead>
               <TableHead className="w-[150px] font-semibold whitespace-nowrap">상태</TableHead>
-              <TableHead className="w-[70px] font-semibold text-center whitespace-nowrap">신용점수</TableHead>
-              <TableHead className="w-[130px] font-semibold whitespace-nowrap">상호명</TableHead>
-              <TableHead className="w-[60px] font-semibold text-center whitespace-nowrap">7년초과</TableHead>
-              <TableHead className="w-[90px] font-semibold text-right whitespace-nowrap">3년평균</TableHead>
-              <TableHead className="w-[90px] font-semibold text-right whitespace-nowrap">최근매출</TableHead>
-              <TableHead className="w-[90px] font-semibold whitespace-nowrap">업종</TableHead>
-              <TableHead className="w-[100px] font-semibold whitespace-nowrap text-center">진행기관</TableHead>
-              <TableHead className="w-[160px] font-semibold whitespace-nowrap">최근 메모</TableHead>
+              <TableHead className="w-[70px] font-semibold text-center whitespace-nowrap hidden lg:table-cell">신용점수</TableHead>
+              <TableHead className="w-[130px] font-semibold whitespace-nowrap hidden md:table-cell">상호명</TableHead>
+              <TableHead className="w-[60px] font-semibold text-center whitespace-nowrap hidden xl:table-cell">7년초과</TableHead>
+              <TableHead className="w-[90px] font-semibold text-right whitespace-nowrap hidden xl:table-cell">3년평균</TableHead>
+              <TableHead className="w-[90px] font-semibold text-right whitespace-nowrap hidden xl:table-cell">최근매출</TableHead>
+              <TableHead className="w-[90px] font-semibold whitespace-nowrap hidden lg:table-cell">업종</TableHead>
+              <TableHead className="w-[100px] font-semibold whitespace-nowrap text-center hidden lg:table-cell">진행기관</TableHead>
+              <TableHead className="w-[160px] font-semibold whitespace-nowrap hidden md:table-cell">최근 메모</TableHead>
               <TableHead className="w-20 font-semibold whitespace-nowrap text-left">담당자</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -571,12 +571,12 @@ export function CustomerTable({
                 data-testid={`row-customer-${customer.id}`}
               >
                 {/* 유입일자 */}
-                <TableCell className="text-sm tabular-nums whitespace-nowrap">
+                <TableCell className="text-sm tabular-nums whitespace-nowrap hidden md:table-cell">
                   {customer.entry_date}
                 </TableCell>
                 
                 {/* No - daily_no (당일 일련번호) */}
-                <TableCell className="text-center text-muted-foreground tabular-nums font-medium">
+                <TableCell className="text-center text-muted-foreground tabular-nums font-medium hidden md:table-cell">
                   {customer.daily_no || customer.daily_sequence || '-'}
                 </TableCell>
                 
@@ -840,7 +840,7 @@ export function CustomerTable({
                 </TableCell>
                 
                 {/* 신용점수 - 800+ yellow pulse, 700- red */}
-                <TableCell className="text-center">
+                <TableCell className="text-center hidden lg:table-cell">
                   <span className={cn(
                     "font-semibold tabular-nums",
                     (customer.credit_score || 0) >= 800 && "text-yellow-400 animate-pulse",
@@ -852,12 +852,12 @@ export function CustomerTable({
                 </TableCell>
                 
                 {/* 상호명 */}
-                <TableCell className="text-muted-foreground truncate max-w-[130px]">
+                <TableCell className="text-muted-foreground truncate max-w-[130px] hidden md:table-cell">
                   {customer.company_name}
                 </TableCell>
                 
                 {/* 7년 초과 - 경고 표시 (부정적 조건) */}
-                <TableCell className="text-center">
+                <TableCell className="text-center hidden xl:table-cell">
                   {customer.over_7_years ? (
                     <Badge variant="outline" className="bg-orange-900/30 text-orange-400 border-orange-500/20">
                       <AlertTriangle className="w-3 h-3" />
@@ -870,7 +870,7 @@ export function CustomerTable({
                 </TableCell>
                 
                 {/* 3년 평균 매출 (Y-1, Y-2, Y-3 평균) */}
-                <TableCell className="text-right tabular-nums">
+                <TableCell className="text-right tabular-nums hidden xl:table-cell">
                   {(() => {
                     const y1 = customer.sales_y1 || 0;
                     const y2 = customer.sales_y2 || 0;
@@ -883,17 +883,17 @@ export function CustomerTable({
                 </TableCell>
                 
                 {/* 최근 매출(작년) */}
-                <TableCell className="text-right tabular-nums">
+                <TableCell className="text-right tabular-nums hidden xl:table-cell">
                   {customer.recent_sales ? `${customer.recent_sales.toFixed(1)}억` : '-'}
                 </TableCell>
                 
                 {/* 업종 */}
-                <TableCell className="text-muted-foreground text-sm">
+                <TableCell className="text-muted-foreground text-sm hidden lg:table-cell">
                   {customer.business_type || customer.industry || '-'}
                 </TableCell>
                 
                 {/* 진행기관 - 다중 기관 뱃지 */}
-                <TableCell>
+                <TableCell className="hidden lg:table-cell">
                   <Popover>
                     <PopoverTrigger asChild>
                       <div 
@@ -1084,7 +1084,7 @@ export function CustomerTable({
                 {/* 최근 메모 - truncate with tooltip, double-click to open modal */}
                 <TableCell
                   onDoubleClick={() => handleMemoDoubleClick(customer)}
-                  className="cursor-pointer"
+                  className="cursor-pointer hidden md:table-cell"
                   data-testid={`cell-memo-${customer.id}`}
                 >
                   {(() => {

@@ -405,7 +405,7 @@ export default function AnnualLeave() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-3 md:p-6 space-y-4 md:space-y-6">
         <Skeleton className="h-8 w-48" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Skeleton className="h-24" />
@@ -419,7 +419,7 @@ export default function AnnualLeave() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-6 space-y-6">
+      <div className="p-3 md:p-6 space-y-4 md:space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold" data-testid="text-page-title">연차 관리</h1>
         </div>

@@ -193,12 +193,14 @@ function AuthenticatedApp() {
           onSignOut={signOut}
         />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between gap-4 h-14 px-4 border-b bg-background sticky top-0 z-50">
-            <div className="flex items-center gap-4">
+          <header className="flex items-center justify-between gap-2 md:gap-4 h-12 md:h-14 px-2 md:px-4 border-b bg-background sticky top-0 z-50">
+            <div className="flex items-center gap-2 md:gap-4">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <HeaderRankings />
+              <div className="hidden md:block">
+                <HeaderRankings />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-2">
               <NotificationBell
                 customers={customers}
                 users={users}

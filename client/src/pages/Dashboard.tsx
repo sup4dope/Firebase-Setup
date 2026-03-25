@@ -1375,15 +1375,15 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-background">
       {/* Top Header - Stats Summary + Filters */}
-      <div className="flex-shrink-0 p-4 border-b bg-card dark:bg-gray-900/30">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      <div className="flex-shrink-0 p-2 md:p-4 border-b bg-card dark:bg-gray-900/30">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 md:gap-4">
           {/* Left: KPI Summary */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 md:gap-6 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0">
             <KPIWidgets kpi={kpi} compact />
           </div>
           
           {/* Right: Search & Filters & Actions */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 md:gap-3 flex-wrap">
             {/* 접수일자 필터 */}
             <div className="flex items-center gap-2">
               <Label className="text-sm text-muted-foreground whitespace-nowrap">접수일자</Label>
@@ -1515,7 +1515,7 @@ export default function Dashboard() {
         </div>
       </div>
       {/* Main Content Area - Scrollable */}
-      <div className="flex-1 overflow-auto p-4 space-y-4 bg-background">
+      <div className="flex-1 overflow-auto p-2 md:p-4 space-y-3 md:space-y-4 bg-background">
         {/* Funnel Chart - Wide and centered */}
         <FunnelChart
           customers={funnelFilteredCustomers}

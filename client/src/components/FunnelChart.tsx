@@ -247,19 +247,19 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         </div>
       </div>
 
-      <div className="flex flex-row items-start w-full gap-0">
+      <div className="flex flex-row items-start w-full gap-0 overflow-x-auto pb-2 md:pb-0 min-w-0">
         {/* Column 1: 전체 */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-[70px] md:min-w-0">
           {renderStageHeader('all', '전체', 'all', getStageCount('all'), false, false)}
         </div>
 
         {/* Arrow */}
-        <div className="w-8 h-16 flex items-center justify-center shrink-0">
-          <ChevronRight className="w-5 h-5 text-gray-500" />
+        <div className="w-5 md:w-8 h-16 flex items-center justify-center shrink-0">
+          <ChevronRight className="w-4 md:w-5 h-4 md:h-5 text-gray-500" />
         </div>
 
         {/* Column 2: 상담대기 + 부재중 + 쓰레기통 (세로 스택) */}
-        <div className="flex-1 flex flex-col min-w-0 gap-2">
+        <div className="flex-1 flex flex-col min-w-[70px] md:min-w-0 gap-2">
           {/* 상담대기 헤더 - 건수가 있으면 깜빡임 */}
           <div className={cn("relative w-full group", consultationCount > 0 && "funnel-pulse-glow")}>
             <button
@@ -380,12 +380,12 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
           return (
             <div key={stage.id} className="contents">
               {/* Arrow */}
-              <div className="w-8 h-16 flex items-center justify-center shrink-0">
-                <ChevronRight className="w-5 h-5 text-gray-500" />
+              <div className="w-5 md:w-8 h-16 flex items-center justify-center shrink-0">
+                <ChevronRight className="w-4 md:w-5 h-4 md:h-5 text-gray-500" />
               </div>
               
               {/* Stage column */}
-              <div className="flex-1 flex flex-col min-w-0">
+              <div className="flex-1 flex flex-col min-w-[70px] md:min-w-0">
                 {renderStageHeader(
                   stage.id, 
                   stage.label, 

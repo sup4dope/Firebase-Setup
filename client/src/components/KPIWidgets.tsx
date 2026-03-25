@@ -23,11 +23,11 @@ export function KPIWidgets({ kpi, compact = false }: KPIWidgetsProps) {
   // Compact 모드 (대시보드 상단)
   if (compact) {
     return (
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-2 md:gap-3 flex-wrap">
         {/* 계약률 */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-card dark:bg-gray-800/60 rounded-lg border">
-          <div className="w-8 h-8 bg-blue-600/20 rounded-md flex items-center justify-center">
-            <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+        <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-card dark:bg-gray-800/60 rounded-lg border">
+          <div className="w-6 h-6 md:w-8 md:h-8 bg-blue-600/20 rounded-md flex items-center justify-center">
+            <FileText className="w-3 h-3 md:w-4 md:h-4 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
             <p className="text-xs text-muted-foreground">계약률</p>
@@ -41,9 +41,9 @@ export function KPIWidgets({ kpi, compact = false }: KPIWidgetsProps) {
         </div>
 
         {/* 당월 매출 */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-card dark:bg-gray-800/60 rounded-lg border">
-          <div className="w-8 h-8 bg-emerald-600/20 rounded-md flex items-center justify-center">
-            <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+        <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-card dark:bg-gray-800/60 rounded-lg border">
+          <div className="w-6 h-6 md:w-8 md:h-8 bg-emerald-600/20 rounded-md flex items-center justify-center">
+            <DollarSign className="w-3 h-3 md:w-4 md:h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div>
             <p className="text-xs text-muted-foreground">당월 매출</p>
@@ -54,9 +54,9 @@ export function KPIWidgets({ kpi, compact = false }: KPIWidgetsProps) {
         </div>
 
         {/* 예상 매출 */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-card dark:bg-gray-800/60 rounded-lg border">
-          <div className="w-8 h-8 bg-amber-600/20 rounded-md flex items-center justify-center">
-            <TrendingUp className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+        <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-card dark:bg-gray-800/60 rounded-lg border">
+          <div className="w-6 h-6 md:w-8 md:h-8 bg-amber-600/20 rounded-md flex items-center justify-center">
+            <TrendingUp className="w-3 h-3 md:w-4 md:h-4 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
             <p className="text-xs text-muted-foreground">예상 매출</p>
@@ -67,9 +67,9 @@ export function KPIWidgets({ kpi, compact = false }: KPIWidgetsProps) {
         </div>
 
         {/* 영업일 */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-card dark:bg-gray-800/60 rounded-lg border">
-          <div className="w-8 h-8 bg-purple-600/20 rounded-md flex items-center justify-center">
-            <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+        <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-card dark:bg-gray-800/60 rounded-lg border">
+          <div className="w-6 h-6 md:w-8 md:h-8 bg-purple-600/20 rounded-md flex items-center justify-center">
+            <Calendar className="w-3 h-3 md:w-4 md:h-4 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
             <p className="text-xs text-muted-foreground">영업일</p>

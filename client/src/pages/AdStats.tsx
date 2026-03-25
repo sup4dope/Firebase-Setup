@@ -313,7 +313,7 @@ export default function AdStats() {
   const pct = (n: number, d: number) => d > 0 ? ((n / d) * 100).toFixed(1) : '0.0';
 
   return (
-    <div className="p-6 space-y-6 max-w-[1400px] mx-auto" data-testid="ad-stats-page">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 max-w-[1400px] mx-auto" data-testid="ad-stats-page">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">광고통계</h1>

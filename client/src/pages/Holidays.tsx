@@ -101,7 +101,7 @@ export default function Holidays() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <div className="p-3 md:p-6 space-y-4 md:space-y-6 max-w-3xl mx-auto">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-96 w-full" />
       </div>

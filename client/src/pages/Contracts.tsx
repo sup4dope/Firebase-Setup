@@ -174,7 +174,7 @@ export default function Contracts() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto" data-testid="contracts-loading">
+      <div className="p-3 md:p-6 space-y-4 md:space-y-6 max-w-7xl mx-auto" data-testid="contracts-loading">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-96 w-full" />
@@ -183,7 +183,7 @@ export default function Contracts() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto" data-testid="contracts-page">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 max-w-7xl mx-auto" data-testid="contracts-page">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <FileSignature className="w-6 h-6 text-primary" />
