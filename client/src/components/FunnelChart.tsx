@@ -239,7 +239,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
   };
 
   return (
-    <div className="space-y-4 w-full px-1 md:px-0">
+    <div className="space-y-4 w-full px-2 md:px-0">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">상태 분류</h3>
         <div className="text-sm text-muted-foreground">
@@ -247,7 +247,7 @@ export function FunnelChart({ customers, selectedStage, onStageClick }: FunnelCh
         </div>
       </div>
 
-      <div className="flex flex-row items-start w-full gap-0 overflow-x-auto pb-2 md:pb-0 min-w-0">
+      <div className="flex flex-row items-start w-full gap-0 overflow-x-auto pb-2 md:pb-0 min-w-0 pt-1">
         {/* Column 1: 전체 */}
         <div className="flex-1 flex flex-col min-w-[70px] md:min-w-0">
           {renderStageHeader('all', '전체', 'all', getStageCount('all'), false, false)}
