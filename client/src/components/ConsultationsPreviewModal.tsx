@@ -6,8 +6,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Download, X, Phone, Building2, Calendar, CreditCard, MapPin, FileText, AlertCircle, Clock, Trash2, UserPlus, Users, Globe } from 'lucide-react';
+import { Download, X, Phone, Building2, Calendar, CreditCard, MapPin, FileText, AlertCircle, Clock, Trash2, UserPlus, Users, Globe, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { startOfWeek, startOfMonth, startOfDay } from 'date-fns';
 import { 
   getPendingConsultations, 
   getCustomerByBusinessNumber, 
@@ -15,9 +16,10 @@ import {
   processConsultationToCustomer, 
   deleteConsultation, 
   getActiveStaffForAssignment,
+  getCustomersSince,
   mapUtmToEntrySource 
 } from '@/lib/firestore';
-import type { Consultation, User } from '@shared/types';
+import type { Consultation, User, Customer } from '@shared/types';
 
 interface ConsultationsPreviewModalProps {
   open: boolean;
@@ -40,12 +42,16 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [staffList, setStaffList] = useState<User[]>([]);
   const [selectedManagers, setSelectedManagers] = useState<Record<string, string>>({});
+  const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [showAssignmentStats, setShowAssignmentStats] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (open) {
       fetchConsultations();
       fetchStaffList();
+      fetchCustomers();
     }
   }, [open]);
 
@@ -81,6 +87,48 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
       console.error('Error fetching staff list:', error);
     }
   };
+
+  const fetchCustomers = async () => {
+    setLoadingStats(true);
+    try {
+      const monthStart = startOfMonth(new Date());
+      const customers = await getCustomersSince(monthStart);
+      setRecentCustomers(customers);
+    } catch (error) {
+      console.error('Error fetching customers for stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  const assignmentStats = useMemo(() => {
+    if (staffList.length === 0) return [];
+
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+
+    const byManager: Record<string, { today: number; week: number; month: number }> = {};
+    for (const c of recentCustomers) {
+      if (!c.manager_id) continue;
+      if (!byManager[c.manager_id]) {
+        byManager[c.manager_id] = { today: 0, week: 0, month: 0 };
+      }
+      const d = c.created_at instanceof Date ? c.created_at : new Date(c.created_at);
+      byManager[c.manager_id].month++;
+      if (d >= weekStart) byManager[c.manager_id].week++;
+      if (d >= todayStart) byManager[c.manager_id].today++;
+    }
+
+    return staffList.map(staff => ({
+      uid: staff.uid,
+      name: staff.name,
+      teamName: staff.team_name || '미배정',
+      todayCount: byManager[staff.uid]?.today || 0,
+      weekCount: byManager[staff.uid]?.week || 0,
+      monthCount: byManager[staff.uid]?.month || 0,
+    })).sort((a, b) => b.todayCount - a.todayCount || b.weekCount - a.weekCount);
+  }, [staffList, recentCustomers]);
 
   const handleImportAll = async () => {
     setImporting(true);
@@ -316,6 +364,71 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                         <span className="font-semibold text-foreground">{count}</span>
                       </Badge>
                     ))}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setShowAssignmentStats(!showAssignmentStats)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-fit"
+                  data-testid="button-toggle-assignment-stats"
+                >
+                  <BarChart3 className="w-3 h-3" />
+                  <span>직원별 DB 배정 현황</span>
+                  {showAssignmentStats ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+
+                {showAssignmentStats && loadingStats && (
+                  <div className="flex items-center justify-center py-3 text-xs text-muted-foreground">
+                    <span className="animate-pulse">배정 현황 로딩 중...</span>
+                  </div>
+                )}
+
+                {showAssignmentStats && !loadingStats && assignmentStats.length === 0 && (
+                  <div className="text-xs text-muted-foreground text-center py-3">
+                    이번 달 배정 데이터가 없습니다.
+                  </div>
+                )}
+
+                {showAssignmentStats && !loadingStats && assignmentStats.length > 0 && (
+                  <div className="rounded-lg border bg-card overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left px-3 py-1.5 font-medium">직원명</th>
+                          <th className="text-left px-3 py-1.5 font-medium">소속팀</th>
+                          <th className="text-right px-3 py-1.5 font-medium">오늘</th>
+                          <th className="text-right px-3 py-1.5 font-medium">이번 주</th>
+                          <th className="text-right px-3 py-1.5 font-medium">이번 달</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assignmentStats.map(stat => (
+                          <tr key={stat.uid} className="border-b last:border-b-0" data-testid={`row-assignment-${stat.uid}`}>
+                            <td className="px-3 py-1.5 font-medium">{stat.name}</td>
+                            <td className="px-3 py-1.5 text-muted-foreground">{stat.teamName}</td>
+                            <td className="px-3 py-1.5 text-right">
+                              <span className={stat.todayCount > 0 ? 'font-semibold text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}>
+                                {stat.todayCount}건
+                              </span>
+                            </td>
+                            <td className="px-3 py-1.5 text-right">{stat.weekCount}건</td>
+                            <td className="px-3 py-1.5 text-right">{stat.monthCount}건</td>
+                          </tr>
+                        ))}
+                        <tr className="bg-muted/30 font-medium">
+                          <td className="px-3 py-1.5" colSpan={2}>합계</td>
+                          <td className="px-3 py-1.5 text-right text-blue-600 dark:text-blue-400">
+                            {assignmentStats.reduce((sum, s) => sum + s.todayCount, 0)}건
+                          </td>
+                          <td className="px-3 py-1.5 text-right">
+                            {assignmentStats.reduce((sum, s) => sum + s.weekCount, 0)}건
+                          </td>
+                          <td className="px-3 py-1.5 text-right">
+                            {assignmentStats.reduce((sum, s) => sum + s.monthCount, 0)}건
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

@@ -253,6 +253,25 @@ export const getCustomers = async (): Promise<Customer[]> => {
   });
 };
 
+export const getCustomersSince = async (sinceDate: Date): Promise<Customer[]> => {
+  const q = query(
+    collection(db, 'customers'),
+    where('created_at', '>=', Timestamp.fromDate(sinceDate)),
+    orderBy('created_at', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      ...data,
+      id: doc.id,
+      created_at: toDate(data.created_at),
+      updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
+      daily_no: data.daily_no || null,
+    } as Customer;
+  });
+};
+
 export const getCustomersByManager = async (managerId: string): Promise<Customer[]> => {
   try {
     const q = query(
