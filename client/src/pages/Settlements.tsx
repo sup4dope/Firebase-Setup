@@ -614,7 +614,7 @@ export default function Settlements() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Users className="w-4 h-4" />
-              총 계약금액
+              계약금 수당
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -636,7 +636,7 @@ export default function Settlements() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
-              총 자문금액
+              자문료 수당
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -742,10 +742,10 @@ export default function Settlements() {
               <TableRow>
                 <TableHead>직원명</TableHead>
                 <TableHead className="text-right">계약 건수</TableHead>
-                <TableHead className="text-right">총 계약금</TableHead>
+                <TableHead className="text-right">계약금 수당</TableHead>
                 <TableHead className="text-right hidden md:table-cell">집행건수</TableHead>
                 <TableHead className="text-right hidden md:table-cell">집행금액</TableHead>
-                <TableHead className="text-right hidden lg:table-cell">총 자문금액</TableHead>
+                <TableHead className="text-right hidden lg:table-cell">자문료 수당</TableHead>
                 <TableHead className="text-right hidden lg:table-cell">환수</TableHead>
                 <TableHead className="text-right">최종지급액(세후)</TableHead>
                 <TableHead className="text-center">급여명세서</TableHead>
@@ -1065,10 +1065,10 @@ export default function Settlements() {
                 <TableRow>
                   <TableHead className="whitespace-nowrap">직원명</TableHead>
                   <TableHead className="text-right whitespace-nowrap">계약 건수</TableHead>
-                  <TableHead className="text-right whitespace-nowrap hidden md:table-cell">총 계약금</TableHead>
+                  <TableHead className="text-right whitespace-nowrap hidden md:table-cell">계약금 수당</TableHead>
                   <TableHead className="text-right whitespace-nowrap hidden lg:table-cell">집행건수</TableHead>
                   <TableHead className="text-right whitespace-nowrap hidden lg:table-cell">집행금액</TableHead>
-                  <TableHead className="text-right whitespace-nowrap hidden lg:table-cell">총 자문금액</TableHead>
+                  <TableHead className="text-right whitespace-nowrap hidden lg:table-cell">자문료 수당</TableHead>
                   <TableHead className="text-right whitespace-nowrap hidden md:table-cell">세전수당</TableHead>
                   <TableHead className="text-right whitespace-nowrap hidden md:table-cell">공제세액</TableHead>
                   <TableHead className="text-right whitespace-nowrap">환수</TableHead>
