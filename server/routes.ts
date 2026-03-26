@@ -1461,6 +1461,13 @@ export async function registerRoutes(
       }
 
       const firestore = admin.firestore();
+
+      let adminName = '관리자';
+      const adminDoc = await firestore.collection('users').doc(req.user!.uid).get();
+      if (adminDoc.exists) {
+        adminName = adminDoc.data()?.name || req.user!.name || '관리자';
+      }
+
       const docRef = await firestore.collection('leave_requests').add({
         user_id,
         user_name,
@@ -1472,7 +1479,7 @@ export async function registerRoutes(
         reason: reason || '관리자 등록',
         status: 'approved',
         admin_approved_by: req.user!.uid,
-        admin_approved_name: req.user!.name || '관리자',
+        admin_approved_name: adminName,
         admin_approved_at: admin.firestore.FieldValue.serverTimestamp(),
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
