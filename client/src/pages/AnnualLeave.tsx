@@ -65,6 +65,7 @@ import {
   cancelApprovedLeave,
   getAllUsers,
 } from '@/lib/firestore';
+import { authFetch } from '@/lib/firebase';
 import { fetchYearlyHolidays, isWeekend } from '@/lib/publicHolidays';
 import type { LeaveRequest, LeaveType, LeaveStatus, LeaveSummary, InsertLeaveRequest, User } from '@shared/types';
 import { cn } from '@/lib/utils';
@@ -281,18 +282,24 @@ export default function AnnualLeave() {
     setIsSubmitting(true);
     try {
       if (isProxyRegistration && targetUser) {
-        const requestData: InsertLeaveRequest = {
-          user_id: targetUser.uid,
-          user_name: targetUser.name,
-          team_id: targetUser.team_id || '',
-          team_name: targetUser.team_name || '',
-          leave_date: selectedDate,
-          leave_type: leaveType,
-          leave_days: LEAVE_TYPE_DAYS[leaveType],
-          reason: reason.trim() || '관리자 등록',
-          status: 'approved',
-        };
-        await createLeaveRequest(requestData);
+        const response = await authFetch('/api/leave-requests/admin-create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: targetUser.uid,
+            user_name: targetUser.name,
+            team_id: targetUser.team_id || '',
+            team_name: targetUser.team_name || '',
+            leave_date: selectedDate,
+            leave_type: leaveType,
+            leave_days: LEAVE_TYPE_DAYS[leaveType],
+            reason: reason.trim() || '관리자 등록',
+          }),
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || '연차 등록 실패');
+        }
         toast({
           title: '연차 등록 완료',
           description: `${targetUser.name}님의 연차가 승인 상태로 등록되었습니다.`,

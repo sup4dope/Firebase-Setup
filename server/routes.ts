@@ -1452,5 +1452,47 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/leave-requests/admin-create", requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { user_id, user_name, team_id, team_name, leave_date, leave_type, leave_days, reason } = req.body;
+      
+      if (!user_id || !user_name || !leave_date || !leave_type) {
+        return res.status(400).json({ error: "필수 필드가 누락되었습니다." });
+      }
+
+      const firestore = admin.firestore();
+      const docRef = await firestore.collection('leave_requests').add({
+        user_id,
+        user_name,
+        team_id: team_id || '',
+        team_name: team_name || '',
+        leave_date,
+        leave_type,
+        leave_days: leave_days || (leave_type === 'full' ? 1.0 : 0.5),
+        reason: reason || '관리자 등록',
+        status: 'approved',
+        admin_approved_by: req.user!.uid,
+        admin_approved_name: req.user!.name || '관리자',
+        admin_approved_at: admin.firestore.FieldValue.serverTimestamp(),
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      const userRef = firestore.collection('users').doc(user_id);
+      const userDoc = await userRef.get();
+      if (userDoc.exists) {
+        const currentUsed = userDoc.data()?.usedLeave || 0;
+        await userRef.update({
+          usedLeave: currentUsed + (leave_days || (leave_type === 'full' ? 1.0 : 0.5)),
+        });
+      }
+
+      res.json({ result: "success", id: docRef.id });
+    } catch (error: any) {
+      console.error("[LeaveRequest] 관리자 연차 등록 오류:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }
