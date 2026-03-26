@@ -354,7 +354,7 @@ export default function AdStats() {
               >
                 <CalendarDays className="w-3.5 h-3.5" />
                 {dateRangeMode === 'preset' ? (
-                  <span>최근 {daysRange}일</span>
+                  <span>{daysRange === '1' ? '오늘' : `최근 ${daysRange}일`}</span>
                 ) : dateRange?.from ? (
                   <span>
                     {format(dateRange.from, 'yy.MM.dd')}
@@ -395,6 +395,7 @@ export default function AdStats() {
               {dateRangeMode === 'preset' ? (
                 <div className="p-3 space-y-1">
                   {[
+                    { value: '1', label: '오늘' },
                     { value: '7', label: '최근 7일' },
                     { value: '14', label: '최근 14일' },
                     { value: '30', label: '최근 30일' },
