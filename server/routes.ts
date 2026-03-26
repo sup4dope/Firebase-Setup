@@ -1452,7 +1452,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/leave-requests/admin-create", requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/leave-requests/admin-create", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { user_id, user_name, team_id, team_name, leave_date, leave_type, leave_days, reason } = req.body;
       

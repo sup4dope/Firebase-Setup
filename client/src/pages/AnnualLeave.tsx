@@ -297,7 +297,7 @@ export default function AnnualLeave() {
           }),
         });
         if (!response.ok) {
-          const err = await response.json();
+          const err = await response.json().catch(() => ({}));
           throw new Error(err.error || '연차 등록 실패');
         }
         toast({
