@@ -3475,7 +3475,7 @@ export function CustomerDetailModal({
                           return false;
                         }
                         
-                        return getStatusTransitionAllowed(currentStatus, option.value);
+                        return getStatusTransitionAllowed(currentStatus, option.value, isSuperAdmin);
                       });
                       
                       const groups = filteredOptions.reduce(

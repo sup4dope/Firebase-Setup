@@ -635,7 +635,7 @@ export function CustomerTable({
                     const currentStatus = customer.status_code || '';
                     
                     const canSelectStatus = (targetStatus: string): boolean => {
-                      return getStatusTransitionAllowed(currentStatus, targetStatus);
+                      return getStatusTransitionAllowed(currentStatus, targetStatus, isSuperAdmin);
                     };
                     
                     return (

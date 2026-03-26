@@ -226,8 +226,9 @@ const getContractCategory = (status: string): string | null => {
   return null;
 };
 
-export function getStatusTransitionAllowed(currentStatus: string, targetStatus: string): boolean {
+export function getStatusTransitionAllowed(currentStatus: string, targetStatus: string, isSuperAdmin: boolean = false): boolean {
   if (currentStatus === targetStatus) return false;
+  if (isSuperAdmin) return true;
 
   const isCurrentPreContract = PRE_CONTRACT_STATUSES.includes(currentStatus);
   const isTargetPreContract = PRE_CONTRACT_STATUSES.includes(targetStatus);
