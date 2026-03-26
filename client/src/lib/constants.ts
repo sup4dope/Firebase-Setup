@@ -205,6 +205,80 @@ export const STATUS_OPTIONS: { value: string; label: string; group?: string }[] 
   { value: "민원처리", label: "민원처리", group: "집행" },
 ];
 
+export const PRE_CONTRACT_STATUSES = [
+  '상담대기', '단기부재', '장기부재', '예약',
+  '거절사유 미파악', '인증불가', '정부기관 오인', '기타자금 오인',
+  '불가업종', '매출없음', '신용점수 미달', '차입금초과',
+  '본인아님', '사업자아님', '이중계약', '세금체납', '단박거절',
+  '업력미달', '최근대출', '인증미동의(국세청)', '인증미동의(공여내역)',
+  '진행기간 미동의', '자문료 미동의', '계약금미동의(선불)', '계약금미동의(후불)',
+];
+
+export const HOPE_TARGET_STATUSES = [
+  '업력미달', '최근대출', '인증미동의(국세청)', '인증미동의(공여내역)',
+  '진행기간 미동의', '자문료 미동의', '계약금미동의(선불)', '계약금미동의(후불)',
+];
+
+const getContractCategory = (status: string): string | null => {
+  if (status.includes('(선불)')) return '선불';
+  if (status.includes('(외주)')) return '외주';
+  if (status.includes('(후불)')) return '후불';
+  return null;
+};
+
+export function getStatusTransitionAllowed(currentStatus: string, targetStatus: string): boolean {
+  if (currentStatus === targetStatus) return false;
+
+  const isCurrentPreContract = PRE_CONTRACT_STATUSES.includes(currentStatus);
+  const isTargetPreContract = PRE_CONTRACT_STATUSES.includes(targetStatus);
+
+  if (isCurrentPreContract) {
+    return isTargetPreContract;
+  }
+
+  if (currentStatus.includes('계약서발송완료')) {
+    return !isTargetPreContract;
+  }
+
+  if (currentStatus === '수납대기') {
+    return HOPE_TARGET_STATUSES.includes(targetStatus);
+  }
+
+  if (currentStatus.includes('계약완료')) {
+    const cat = getContractCategory(currentStatus);
+    if (cat) {
+      return targetStatus === `서류취합완료(${cat})`;
+    }
+    return false;
+  }
+
+  if (currentStatus.includes('서류취합완료')) {
+    const cat = getContractCategory(currentStatus);
+    if (cat) {
+      return targetStatus === `신청완료(${cat})` || targetStatus === '최종부결' || targetStatus === '민원처리';
+    }
+    return false;
+  }
+
+  if (currentStatus.includes('신청완료')) {
+    const cat = getContractCategory(currentStatus);
+    if (cat) {
+      return targetStatus === `집행완료(${cat})` || targetStatus === '최종부결' || targetStatus === '민원처리';
+    }
+    return false;
+  }
+
+  if (currentStatus.includes('집행완료')) {
+    return targetStatus === '최종부결' || targetStatus === '민원처리';
+  }
+
+  if (currentStatus === '최종부결' || currentStatus === '민원처리') {
+    return !isTargetPreContract;
+  }
+
+  return !isTargetPreContract;
+}
+
 // 퍼널 필터링 그룹 정의 (30가지 규칙)
 export const FUNNEL_GROUPS: Record<string, string[]> = {
   // 1. 전체

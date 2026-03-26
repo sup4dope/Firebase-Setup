@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { Customer, UserRole, StatusCode, CustomerMemo, User, ProcessingOrg } from '@shared/types';
-import { STATUS_OPTIONS, STATUS_STYLES, getStatusStyle, FUNNEL_GROUPS, PROCESSING_ORGS, ORG_STATUS_COLORS, type ProcessingOrgStatus } from '@/lib/constants';
+import { STATUS_OPTIONS, STATUS_STYLES, getStatusStyle, FUNNEL_GROUPS, PROCESSING_ORGS, ORG_STATUS_COLORS, type ProcessingOrgStatus, getStatusTransitionAllowed } from '@/lib/constants';
 
 const CLOSED_STATUSES = new Set([
   '장기부재',
@@ -632,40 +632,10 @@ export function CustomerTable({
                     const isSuperAdmin = userRole === 'super_admin';
                     const canChangeToExecution = userRole === 'team_leader' || userRole === 'super_admin';
                     
-                    // 카테고리 추출 함수 (선불/외주/후불)
-                    const getCategory = (status: string): string | null => {
-                      if (status.includes('(선불)')) return '선불';
-                      if (status.includes('(외주)')) return '외주';
-                      if (status.includes('(후불)')) return '후불';
-                      return null;
-                    };
+                    const currentStatus = customer.status_code || '';
                     
-                    // 현재 상태의 카테고리와 단계
-                    const currentCategory = getCategory(customer.status_code || '');
-                    const getStage = (status: string): number => {
-                      if (status.includes('계약완료')) return 1;
-                      if (status.includes('서류취합완료')) return 2;
-                      if (status.includes('신청완료')) return 3;
-                      if (status.includes('집행완료')) return 4;
-                      return 0;
-                    };
-                    const currentStage = getStage(customer.status_code || '');
-                    
-                    // 상태 옵션 필터링 함수
                     const canSelectStatus = (targetStatus: string): boolean => {
-                      if (isSuperAdmin) return true;
-                      
-                      if (targetStatus.includes('계약완료')) return false;
-                      
-                      const targetCategory = getCategory(targetStatus);
-                      const targetStage = getStage(targetStatus);
-                      
-                      if (currentCategory && targetCategory && currentStage >= 1 && targetStage >= 1) {
-                        if (targetCategory !== currentCategory) {
-                          return false;
-                        }
-                      }
-                      return true;
+                      return getStatusTransitionAllowed(currentStatus, targetStatus);
                     };
                     
                     return (
@@ -722,23 +692,28 @@ export function CustomerTable({
                           sideOffset={5}
                         >
                           {/* 상담 그룹 */}
+                          {canSelectStatus('상담대기') && (
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1">상담</SelectLabel>
                             <SelectItem value="상담대기" className="text-purple-600 dark:text-purple-400 focus:bg-accent cursor-pointer pl-4">상담대기</SelectItem>
                           </SelectGroup>
+                          )}
 
                           {/* 부재 그룹 */}
+                          {(canSelectStatus('단기부재') || canSelectStatus('장기부재') || canSelectStatus('예약')) && (
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">부재</SelectLabel>
-                            <SelectItem value="단기부재" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">단기부재</SelectItem>
-                            <SelectItem value="장기부재" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">장기부재</SelectItem>
-                            <SelectItem value="예약" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">예약</SelectItem>
+                            {canSelectStatus('단기부재') && <SelectItem value="단기부재" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">단기부재</SelectItem>}
+                            {canSelectStatus('장기부재') && <SelectItem value="장기부재" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">장기부재</SelectItem>}
+                            {canSelectStatus('예약') && <SelectItem value="예약" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">예약</SelectItem>}
                           </SelectGroup>
+                          )}
 
                           {/* 거절 그룹 (쓰레기통) */}
+                          {TRASH_REASONS.some(r => canSelectStatus(r.id)) && (
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">거절</SelectLabel>
-                            {TRASH_REASONS.map(reason => (
+                            {TRASH_REASONS.filter(reason => canSelectStatus(reason.id)).map(reason => (
                               <SelectItem 
                                 key={reason.id} 
                                 value={reason.id}
@@ -748,8 +723,10 @@ export function CustomerTable({
                               </SelectItem>
                             ))}
                           </SelectGroup>
+                          )}
 
                           {/* 희망타겟 그룹 */}
+                          {canSelectStatus('업력미달') && (
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">희망타겟</SelectLabel>
                             <SelectItem value="업력미달" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">업력미달</SelectItem>
@@ -761,16 +738,28 @@ export function CustomerTable({
                             <SelectItem value="계약금미동의(선불)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">계약금미동의(선불)</SelectItem>
                             <SelectItem value="계약금미동의(후불)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">계약금미동의(후불)</SelectItem>
                           </SelectGroup>
+                          )}
 
                           {/* 계약서발송완료 그룹 */}
+                          {(canSelectStatus('계약서발송완료(선불)') || canSelectStatus('계약서발송완료(후불)') || canSelectStatus('계약서발송완료(외주)')) && (
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">계약서발송완료</SelectLabel>
-                            <SelectItem value="계약서발송완료(선불)" className="text-lime-600 dark:text-lime-400 focus:bg-accent cursor-pointer pl-4">계약서발송완료(선불)</SelectItem>
-                            <SelectItem value="계약서발송완료(후불)" className="text-lime-600 dark:text-lime-400 focus:bg-accent cursor-pointer pl-4">계약서발송완료(후불)</SelectItem>
-                            <SelectItem value="계약서발송완료(외주)" className="text-lime-600 dark:text-lime-400 focus:bg-accent cursor-pointer pl-4">계약서발송완료(외주)</SelectItem>
+                            {canSelectStatus('계약서발송완료(선불)') && <SelectItem value="계약서발송완료(선불)" className="text-lime-600 dark:text-lime-400 focus:bg-accent cursor-pointer pl-4">계약서발송완료(선불)</SelectItem>}
+                            {canSelectStatus('계약서발송완료(후불)') && <SelectItem value="계약서발송완료(후불)" className="text-lime-600 dark:text-lime-400 focus:bg-accent cursor-pointer pl-4">계약서발송완료(후불)</SelectItem>}
+                            {canSelectStatus('계약서발송완료(외주)') && <SelectItem value="계약서발송완료(외주)" className="text-lime-600 dark:text-lime-400 focus:bg-accent cursor-pointer pl-4">계약서발송완료(외주)</SelectItem>}
                           </SelectGroup>
+                          )}
+
+                          {/* 수납대기 */}
+                          {canSelectStatus('수납대기') && (
+                          <SelectGroup>
+                            <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">수납대기</SelectLabel>
+                            <SelectItem value="수납대기" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">수납대기</SelectItem>
+                          </SelectGroup>
+                          )}
 
                           {/* 계약완료 그룹 */}
+                          {(canSelectStatus('계약완료(선불)') || canSelectStatus('계약완료(외주)') || canSelectStatus('계약완료(후불)')) && (
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">계약완료</SelectLabel>
                             {canSelectStatus('계약완료(선불)') && (
@@ -783,8 +772,10 @@ export function CustomerTable({
                               <SelectItem value="계약완료(후불)" className="text-emerald-600 dark:text-emerald-400 focus:bg-accent cursor-pointer pl-4">계약완료(후불)</SelectItem>
                             )}
                           </SelectGroup>
+                          )}
 
                           {/* 서류취합 그룹 */}
+                          {(canSelectStatus('서류취합완료(선불)') || canSelectStatus('서류취합완료(외주)') || canSelectStatus('서류취합완료(후불)')) && (
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">서류취합</SelectLabel>
                             {canSelectStatus('서류취합완료(선불)') && (
@@ -797,8 +788,10 @@ export function CustomerTable({
                               <SelectItem value="서류취합완료(후불)" className="text-blue-600 dark:text-blue-400 focus:bg-accent cursor-pointer pl-4">서류취합완료(후불)</SelectItem>
                             )}
                           </SelectGroup>
+                          )}
 
                           {/* 신청완료 그룹 */}
+                          {(canSelectStatus('신청완료(선불)') || canSelectStatus('신청완료(외주)') || canSelectStatus('신청완료(후불)')) && (
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">신청완료</SelectLabel>
                             {canSelectStatus('신청완료(선불)') && (
@@ -811,10 +804,15 @@ export function CustomerTable({
                               <SelectItem value="신청완료(후불)" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">신청완료(후불)</SelectItem>
                             )}
                           </SelectGroup>
+                          )}
 
                           {/* 집행완료 그룹 - team_leader, super_admin만 선택 가능 */}
+                          {(
+                            (canChangeToExecution && (canSelectStatus('집행완료(선불)') || canSelectStatus('집행완료(외주)') || canSelectStatus('집행완료(후불)'))) ||
+                            canSelectStatus('최종부결') || canSelectStatus('민원처리')
+                          ) && (
                           <SelectGroup>
-                            <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">집행완료</SelectLabel>
+                            <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">집행/종결</SelectLabel>
                             {canChangeToExecution && canSelectStatus('집행완료(선불)') && (
                               <SelectItem value="집행완료(선불)" className="text-teal-600 dark:text-teal-400 focus:bg-accent cursor-pointer pl-4">집행완료(선불)</SelectItem>
                             )}
@@ -824,15 +822,10 @@ export function CustomerTable({
                             {canChangeToExecution && canSelectStatus('집행완료(후불)') && (
                               <SelectItem value="집행완료(후불)" className="text-teal-600 dark:text-teal-400 focus:bg-accent cursor-pointer pl-4">집행완료(후불)</SelectItem>
                             )}
-                            <SelectItem value="최종부결" className="text-red-600 dark:text-red-400 focus:bg-accent cursor-pointer pl-4">최종부결</SelectItem>
-                            <SelectItem value="민원처리" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">민원처리</SelectItem>
+                            {canSelectStatus('최종부결') && <SelectItem value="최종부결" className="text-red-600 dark:text-red-400 focus:bg-accent cursor-pointer pl-4">최종부결</SelectItem>}
+                            {canSelectStatus('민원처리') && <SelectItem value="민원처리" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">민원처리</SelectItem>}
                           </SelectGroup>
-
-                          {/* 수납대기 */}
-                          <SelectGroup>
-                            <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">수납대기</SelectLabel>
-                            <SelectItem value="수납대기" className="text-cyan-600 dark:text-cyan-400 focus:bg-accent cursor-pointer pl-4">수납대기</SelectItem>
-                          </SelectGroup>
+                          )}
                         </SelectContent>
                       </Select>
                     );
