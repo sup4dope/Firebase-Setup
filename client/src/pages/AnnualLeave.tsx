@@ -161,6 +161,9 @@ export default function AnnualLeave() {
       if (isSuperAdmin) {
         const allUsers = await getAllUsers();
         setStaffList(allUsers.filter(u => u.status !== '퇴사' && u.role !== 'super_admin'));
+      } else if (isTeamLeader && user.team_id) {
+        const allUsers = await getAllUsers();
+        setStaffList(allUsers.filter(u => u.status !== '퇴사' && u.team_id === user.team_id && u.uid !== user.uid));
       }
     } catch (error) {
       console.error('Error fetching leave data:', error);
@@ -792,6 +795,9 @@ export default function AnnualLeave() {
             {isSuperAdmin && (
               <TabsTrigger value="all-requests" data-testid="tab-all-requests">전체 내역</TabsTrigger>
             )}
+            {(isSuperAdmin || isTeamLeader) && (
+              <TabsTrigger value="staff-summary" data-testid="tab-staff-summary">직원 연차 현황</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="my-requests">
@@ -1017,6 +1023,91 @@ export default function AnnualLeave() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {(isSuperAdmin || isTeamLeader) && (
+            <TabsContent value="staff-summary">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {isSuperAdmin ? '전체 직원 연차 현황' : '팀원 연차 현황'}
+                  </CardTitle>
+                  <CardDescription>
+                    {isSuperAdmin ? '모든 직원의 연차 사용 현황을 확인합니다.' : '소속 팀원의 연차 사용 현황을 확인합니다.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {staffList.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      조회할 직원이 없습니다.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="whitespace-nowrap">직원명</TableHead>
+                            <TableHead className="whitespace-nowrap hidden md:table-cell">소속팀</TableHead>
+                            <TableHead className="whitespace-nowrap text-center">총 연차</TableHead>
+                            <TableHead className="whitespace-nowrap text-center">사용</TableHead>
+                            <TableHead className="whitespace-nowrap text-center">잔여</TableHead>
+                            <TableHead className="whitespace-nowrap text-center hidden md:table-cell">소진율</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {staffList
+                            .sort((a, b) => {
+                              const teamCompare = (a.team_name || '').localeCompare(b.team_name || '', 'ko');
+                              if (teamCompare !== 0) return teamCompare;
+                              return a.name.localeCompare(b.name, 'ko');
+                            })
+                            .map(staff => {
+                              const total = staff.totalLeave ?? 15;
+                              const used = staff.usedLeave ?? 0;
+                              const remaining = total - used;
+                              const usageRate = total > 0 ? ((used / total) * 100).toFixed(0) : '0';
+                              return (
+                                <TableRow key={staff.uid} data-testid={`row-staff-leave-${staff.uid}`}>
+                                  <TableCell className="font-medium">{staff.name}</TableCell>
+                                  <TableCell className="text-muted-foreground hidden md:table-cell">{staff.team_name || '-'}</TableCell>
+                                  <TableCell className="text-center">{total}일</TableCell>
+                                  <TableCell className="text-center">
+                                    <span className={used > 0 ? 'text-orange-600 dark:text-orange-400 font-medium' : ''}>
+                                      {used}일
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <span className={cn(
+                                      'font-semibold',
+                                      remaining <= 3 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                                    )}>
+                                      {remaining}일
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center hidden md:table-cell">
+                                    <div className="flex items-center gap-2 justify-center">
+                                      <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                          className={cn(
+                                            'h-full rounded-full transition-all',
+                                            Number(usageRate) >= 80 ? 'bg-red-500' : Number(usageRate) >= 50 ? 'bg-yellow-500' : 'bg-green-500'
+                                          )}
+                                          style={{ width: `${Math.min(Number(usageRate), 100)}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs text-muted-foreground w-8">{usageRate}%</span>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                        </TableBody>
+                      </Table>
                     </div>
                   )}
                 </CardContent>
