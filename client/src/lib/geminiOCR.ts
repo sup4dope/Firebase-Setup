@@ -128,9 +128,9 @@ export function isBusinessRegistrationFile(fileName: string): boolean {
     return false;
   }
   
-  const matched = normalizedName.includes('사업자등록증');
+  const matched = normalizedName.includes('사업자등록증') || normalizedName.includes('사등');
   
-  console.log(`🔍 파일명 체크: "${fileName}" -> 정규화: "${normalizedName}" -> '사업자등록증' 포함: ${matched}`);
+  console.log(`🔍 파일명 체크: "${fileName}" -> 정규화: "${normalizedName}" -> 사업자등록증/사등 포함: ${matched}`);
   return matched;
 }
 
@@ -170,9 +170,10 @@ export function isVatCertificateFile(fileName: string): boolean {
   
   const matched = normalizedName.includes('부가가치세과세표준증명') || 
                   normalizedName.includes('과세표준증명') ||
-                  normalizedName.includes('부가세과세표준');
+                  normalizedName.includes('부가세과세표준') ||
+                  normalizedName.includes('매출');
   
-  console.log(`🔍 부가세 과세표준증명 파일 체크: "${fileName}" -> 매칭: ${matched}`);
+  console.log(`🔍 부가세 과세표준증명/매출 파일 체크: "${fileName}" -> 매칭: ${matched}`);
   return matched;
 }
 
@@ -259,9 +260,10 @@ export function isCreditReportFile(fileName: string): boolean {
   
   const matched = normalizedName.includes('신용공여내역') || 
                   normalizedName.includes('사업자신용정보공여') ||
-                  normalizedName.includes('신용정보공여');
+                  normalizedName.includes('신용정보공여') ||
+                  normalizedName.includes('공여');
   
-  console.log(`🔍 신용공여내역 파일 체크: "${fileName}" -> 매칭: ${matched}`);
+  console.log(`🔍 신용공여내역/공여 파일 체크: "${fileName}" -> 매칭: ${matched}`);
   return matched;
 }
 
