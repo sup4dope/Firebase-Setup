@@ -142,7 +142,11 @@ export default function AdStats() {
   };
 
   const toggleAllSources = () => {
-    setSelectedSources(new Set(ENTRY_SOURCES));
+    if (isAllSelected) {
+      setSelectedSources(new Set());
+    } else {
+      setSelectedSources(new Set(ENTRY_SOURCES));
+    }
   };
 
   const { chartStartDate, chartEndDate, chartDays } = useMemo(() => {
