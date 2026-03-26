@@ -15,8 +15,10 @@ import { useEffect } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
-import type { Customer } from '@shared/types';
+import type { Customer, SettlementItem } from '@shared/types';
 import type { EntrySourceType } from '@shared/types';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const ENTRY_SOURCES: EntrySourceType[] = ['캐시노트 인앱광고', '구글애즈', '구글애즈(QS)', '구글애즈(e)', '광고', '외주', '고객소개', '승인복제'];
 
@@ -100,6 +102,7 @@ const GRADE_DESCRIPTIONS: Record<DbGrade, string> = {
 export default function AdStats() {
   const { isSuperAdmin } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [settlements, setSettlements] = useState<SettlementItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(ENTRY_SOURCES));
   const [sourceFilterOpen, setSourceFilterOpen] = useState(false);
@@ -113,8 +116,13 @@ export default function AdStats() {
     if (!isSuperAdmin) return;
     const load = async () => {
       try {
-        const data = await getCustomers();
+        const [data, settlementSnapshot] = await Promise.all([
+          getCustomers(),
+          getDocs(collection(db, 'settlements')),
+        ]);
         setCustomers(data);
+        const settlementDocs = settlementSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SettlementItem));
+        setSettlements(settlementDocs);
       } finally {
         setLoading(false);
       }
@@ -230,42 +238,33 @@ export default function AdStats() {
       });
       grandTotal += (d as any)['합계'] || 0;
     });
-    const PREPAID_CONTRACT_STATUSES = [
-      '계약완료(선불)', '서류취합완료(선불)', '신청완료(선불)', '집행완료(선불)',
-      '계약완료(외주)', '서류취합완료(외주)', '신청완료(외주)', '집행완료(외주)',
-    ];
-    const ALL_EXEC_STATUSES = ['집행완료', '집행완료(선불)', '집행완료(후불)', '집행완료(외주)'];
+    const dateFilteredCustomerIds = new Set(dateFilteredCustomers.map(c => c.id));
+
+    settlements.forEach(s => {
+      if (!s.customer_id || !dateFilteredCustomerIds.has(s.customer_id)) return;
+      const src = s.entry_source;
+      if (!src || revenue[src] === undefined) return;
+
+      if (s.is_clawback) {
+        const loss = Math.round(Math.abs(s.total_revenue || 0) * 10000);
+        revenue[src] -= loss;
+        grandRevenue -= loss;
+      } else {
+        const rev = Math.round((s.total_revenue || 0) * 10000);
+        revenue[src] += rev;
+        grandRevenue += rev;
+      }
+    });
 
     dateFilteredCustomers.forEach(c => {
       const src = c.entry_source;
-      if (src && revenue[src] !== undefined) {
-        const status = c.status_code;
-        let customerRevenue = 0;
-
-        const contractAmtWon = Math.round((c.contract_amount || 0) * 10000);
-        const isPrepaidOrOutsource = PREPAID_CONTRACT_STATUSES.includes(status);
-        const isExecComplete = ALL_EXEC_STATUSES.includes(status);
-        if (isPrepaidOrOutsource || isExecComplete) {
-          customerRevenue += contractAmtWon;
-        }
-
-        if (isExecComplete) {
-          const execAmtWon = Math.round((c.execution_amount || 0) * 10000);
-          const feeRate = c.contract_fee_rate || 0;
-          customerRevenue += Math.round(execAmtWon * feeRate / 100);
-        }
-
-        revenue[src] += customerRevenue;
-        grandRevenue += customerRevenue;
-
-        if (CONTRACT_AND_BEYOND.includes(status)) {
-          contracts[src]++;
-          grandContracts++;
-        }
+      if (src && contracts[src] !== undefined && CONTRACT_AND_BEYOND.includes(c.status_code)) {
+        contracts[src]++;
+        grandContracts++;
       }
     });
     return { totals, grandTotal, sources, revenue, grandRevenue, contracts, grandContracts };
-  }, [dailySourceData, activeSourcesToFilter, dateFilteredCustomers]);
+  }, [dailySourceData, activeSourcesToFilter, dateFilteredCustomers, settlements]);
 
   const sourceStats = useMemo(() => {
     const sources = activeSourcesToFilter;
