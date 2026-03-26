@@ -3,13 +3,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { BarChart3, TrendingUp, AlertTriangle, Target, Trash2, FileCheck, Users, ChevronRight, Star, X, CalendarDays } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertTriangle, Target, Trash2, FileCheck, Users, ChevronRight, Star, X, CalendarDays, Check, Filter } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, CartesianGrid } from 'recharts';
 import { getCustomers } from '@/lib/firestore';
 import { useEffect } from 'react';
@@ -102,7 +101,8 @@ export default function AdStats() {
   const { isSuperAdmin } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSource, setSelectedSource] = useState<string>('all');
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(ENTRY_SOURCES));
+  const [sourceFilterOpen, setSourceFilterOpen] = useState(false);
   const [daysRange, setDaysRange] = useState<string>('30');
   const [dateRangeMode, setDateRangeMode] = useState<'preset' | 'custom'>('preset');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -122,6 +122,29 @@ export default function AdStats() {
     load();
   }, [isSuperAdmin]);
 
+  const isAllSelected = selectedSources.size === ENTRY_SOURCES.length;
+  const activeSourcesToFilter = useMemo(() => {
+    if (selectedSources.size === 0) return ENTRY_SOURCES;
+    return ENTRY_SOURCES.filter(s => selectedSources.has(s));
+  }, [selectedSources]);
+
+  const toggleSource = (source: string) => {
+    setSelectedSources(prev => {
+      const next = new Set(prev);
+      if (next.has(source)) {
+        next.delete(source);
+        if (next.size === 0) return new Set(ENTRY_SOURCES);
+      } else {
+        next.add(source);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllSources = () => {
+    setSelectedSources(new Set(ENTRY_SOURCES));
+  };
+
   const { chartStartDate, chartEndDate, chartDays } = useMemo(() => {
     const now = new Date();
     if (dateRangeMode === 'custom' && dateRange?.from) {
@@ -138,7 +161,7 @@ export default function AdStats() {
   }, [dateRangeMode, dateRange, daysRange]);
 
   const dailySourceData = useMemo(() => {
-    const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
+    const sources = activeSourcesToFilter;
     const relevantCustomers = customers.filter(c => sources.includes(c.entry_source as EntrySourceType));
 
     const dateMap: Record<string, Record<string, number>> = {};
@@ -165,7 +188,7 @@ export default function AdStats() {
     });
 
     return Object.entries(dateMap).map(([date, counts]) => ({ date, ...counts }));
-  }, [customers, selectedSource, chartStartDate, chartEndDate, chartDays]);
+  }, [customers, activeSourcesToFilter, chartStartDate, chartEndDate, chartDays]);
 
   const dateFilteredCustomers = useMemo(() => {
     return customers.filter(c => {
@@ -177,12 +200,11 @@ export default function AdStats() {
   }, [customers, chartStartDate, chartEndDate]);
 
   const activeSources = useMemo(() => {
-    const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
-    return sources.filter(s => dailySourceData.some(d => (d as any)[s] > 0));
-  }, [dailySourceData, selectedSource]);
+    return activeSourcesToFilter.filter(s => dailySourceData.some(d => (d as any)[s] > 0));
+  }, [dailySourceData, activeSourcesToFilter]);
 
   const dailySourceTotals = useMemo(() => {
-    const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
+    const sources = activeSourcesToFilter;
     const totals: Record<string, number> = {};
     const revenue: Record<string, number> = {};
     sources.forEach(s => { totals[s] = 0; revenue[s] = 0; });
@@ -225,10 +247,10 @@ export default function AdStats() {
       }
     });
     return { totals, grandTotal, sources, revenue, grandRevenue };
-  }, [dailySourceData, selectedSource, dateFilteredCustomers]);
+  }, [dailySourceData, activeSourcesToFilter, dateFilteredCustomers]);
 
   const sourceStats = useMemo(() => {
-    const sources = selectedSource === 'all' ? ENTRY_SOURCES : [selectedSource as EntrySourceType];
+    const sources = activeSourcesToFilter;
 
     return sources.map(source => {
       const filtered = dateFilteredCustomers.filter(c => c.entry_source === source);
@@ -265,12 +287,10 @@ export default function AdStats() {
 
       return { source, total, consulting, trash, target, contractSent, contract, docs, apply, exec, absence, finalReject, trashDetails, targetDetails, grades };
     }).filter(s => s.total > 0);
-  }, [dateFilteredCustomers, selectedSource]);
+  }, [dateFilteredCustomers, activeSourcesToFilter]);
 
   const totalStats = useMemo(() => {
-    const allFiltered = selectedSource === 'all'
-      ? dateFilteredCustomers.filter(c => ENTRY_SOURCES.includes(c.entry_source as EntrySourceType))
-      : dateFilteredCustomers.filter(c => c.entry_source === selectedSource);
+    const allFiltered = dateFilteredCustomers.filter(c => activeSourcesToFilter.includes(c.entry_source as EntrySourceType));
     const total = allFiltered.length;
     if (total === 0) return null;
 
@@ -287,7 +307,7 @@ export default function AdStats() {
     const exec = allFiltered.filter(c => EXEC_STATUSES.includes(c.status_code)).length;
 
     return { total, consulting, trash, target, contractAndBeyond, exec };
-  }, [dateFilteredCustomers, selectedSource]);
+  }, [dateFilteredCustomers, activeSourcesToFilter]);
 
   const openDetailModal = (source: string) => {
     const filtered = dateFilteredCustomers.filter(c => c.entry_source === source);
@@ -409,17 +429,58 @@ export default function AdStats() {
               )}
             </PopoverContent>
           </Popover>
-          <Select value={selectedSource} onValueChange={setSelectedSource} data-testid="select-source-filter">
-            <SelectTrigger className="w-[160px] h-8">
-              <SelectValue placeholder="유입경로 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">전체 유입경로</SelectItem>
-              {ENTRY_SOURCES.map(s => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={sourceFilterOpen} onOpenChange={setSourceFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs px-3 gap-1.5"
+                data-testid="button-source-filter"
+              >
+                <Filter className="w-3.5 h-3.5" />
+                {isAllSelected ? (
+                  <span>전체 유입경로</span>
+                ) : (
+                  <span>유입경로 {selectedSources.size}개 선택</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[220px] p-2" align="end">
+              <div className="space-y-1">
+                <button
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors ${isAllSelected ? 'font-semibold text-primary' : 'text-muted-foreground'}`}
+                  onClick={toggleAllSources}
+                  data-testid="button-source-all"
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center ${isAllSelected ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                    {isAllSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                  </div>
+                  전체 선택
+                </button>
+                <Separator />
+                {ENTRY_SOURCES.map(source => {
+                  const isSelected = selectedSources.has(source);
+                  return (
+                    <button
+                      key={source}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors ${isSelected ? 'font-medium' : 'text-muted-foreground'}`}
+                      onClick={() => toggleSource(source)}
+                      data-testid={`button-source-${source}`}
+                    >
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                        {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                      </div>
+                      <span className="truncate">{source}</span>
+                      <div
+                        className="w-2.5 h-2.5 rounded-full ml-auto flex-shrink-0"
+                        style={{ backgroundColor: SOURCE_LINE_COLORS[source] || '#6b7280' }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -496,7 +557,7 @@ export default function AdStats() {
                   itemSorter={(item: any) => -(item.value || 0)}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                {selectedSource === 'all' && (
+                {activeSourcesToFilter.length > 1 && (
                   <Line
                     type="monotone"
                     dataKey="합계"
