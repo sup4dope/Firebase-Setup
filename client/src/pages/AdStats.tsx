@@ -211,9 +211,19 @@ export default function AdStats() {
     const sources = activeSourcesToFilter;
     const totals: Record<string, number> = {};
     const revenue: Record<string, number> = {};
-    sources.forEach(s => { totals[s] = 0; revenue[s] = 0; });
+    const contracts: Record<string, number> = {};
+    sources.forEach(s => { totals[s] = 0; revenue[s] = 0; contracts[s] = 0; });
     let grandTotal = 0;
     let grandRevenue = 0;
+    let grandContracts = 0;
+    const CONTRACT_AND_BEYOND = [
+      ...CONTRACT_SENT_STATUSES,
+      ...CONTRACT_STATUSES,
+      '수납대기',
+      '서류취합완료(선불)', '서류취합완료(외주)', '서류취합완료(후불)',
+      '신청완료(선불)', '신청완료(외주)', '신청완료(후불)',
+      '집행완료(선불)', '집행완료(후불)', '집행완료(외주)',
+    ];
     dailySourceData.forEach(d => {
       sources.forEach(s => {
         const val = (d as any)[s] || 0;
@@ -248,9 +258,14 @@ export default function AdStats() {
 
         revenue[src] += customerRevenue;
         grandRevenue += customerRevenue;
+
+        if (CONTRACT_AND_BEYOND.includes(status)) {
+          contracts[src]++;
+          grandContracts++;
+        }
       }
     });
-    return { totals, grandTotal, sources, revenue, grandRevenue };
+    return { totals, grandTotal, sources, revenue, grandRevenue, contracts, grandContracts };
   }, [dailySourceData, activeSourcesToFilter, dateFilteredCustomers]);
 
   const sourceStats = useMemo(() => {
@@ -599,6 +614,7 @@ export default function AdStats() {
                     <th className="py-2 px-3 text-left font-medium text-muted-foreground">유입경로</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">접수 건수</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">비율</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">계약률</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">총매출</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">건당 잠재가치</th>
                   </tr>
@@ -617,6 +633,12 @@ export default function AdStats() {
                         <td className="py-2 px-3 text-right text-muted-foreground">
                           {dailySourceTotals.grandTotal > 0 ? ((dailySourceTotals.totals[source] / dailySourceTotals.grandTotal) * 100).toFixed(1) : '0.0'}%
                         </td>
+                        <td className="py-2 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          {dailySourceTotals.totals[source] > 0
+                            ? `${((dailySourceTotals.contracts[source] / dailySourceTotals.totals[source]) * 100).toFixed(1)}%`
+                            : '0.0%'}
+                          <span className="text-xs text-muted-foreground ml-1">({dailySourceTotals.contracts[source]}건)</span>
+                        </td>
                         <td className="py-2 px-3 text-right text-muted-foreground">
                           {dailySourceTotals.revenue[source] > 0 ? `${dailySourceTotals.revenue[source].toLocaleString()}원` : '-'}
                         </td>
@@ -631,6 +653,12 @@ export default function AdStats() {
                     <td className="py-2 px-3">합계</td>
                     <td className="py-2 px-3 text-right">{dailySourceTotals.grandTotal}건</td>
                     <td className="py-2 px-3 text-right">100%</td>
+                    <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">
+                      {dailySourceTotals.grandTotal > 0
+                        ? `${((dailySourceTotals.grandContracts / dailySourceTotals.grandTotal) * 100).toFixed(1)}%`
+                        : '0.0%'}
+                      <span className="text-xs text-muted-foreground ml-1">({dailySourceTotals.grandContracts}건)</span>
+                    </td>
                     <td className="py-2 px-3 text-right">{dailySourceTotals.grandRevenue > 0 ? `${dailySourceTotals.grandRevenue.toLocaleString()}원` : '-'}</td>
                     <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">
                       {dailySourceTotals.grandTotal > 0 && dailySourceTotals.grandRevenue > 0
