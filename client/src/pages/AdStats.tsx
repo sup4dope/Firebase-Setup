@@ -217,12 +217,11 @@ export default function AdStats() {
     let grandRevenue = 0;
     let grandContracts = 0;
     const CONTRACT_AND_BEYOND = [
-      ...CONTRACT_SENT_STATUSES,
       ...CONTRACT_STATUSES,
-      '수납대기',
-      '서류취합완료(선불)', '서류취합완료(외주)', '서류취합완료(후불)',
-      '신청완료(선불)', '신청완료(외주)', '신청완료(후불)',
-      '집행완료(선불)', '집행완료(후불)', '집행완료(외주)',
+      ...DOCS_STATUSES,
+      ...APPLY_STATUSES,
+      ...EXEC_STATUSES,
+      '민원처리',
     ];
     dailySourceData.forEach(d => {
       sources.forEach(s => {
