@@ -63,9 +63,10 @@ import {
   deleteLeaveRequest,
   getLeaveSummary,
   cancelApprovedLeave,
+  getAllUsers,
 } from '@/lib/firestore';
 import { fetchYearlyHolidays, isWeekend } from '@/lib/publicHolidays';
-import type { LeaveRequest, LeaveType, LeaveStatus, LeaveSummary, InsertLeaveRequest } from '@shared/types';
+import type { LeaveRequest, LeaveType, LeaveStatus, LeaveSummary, InsertLeaveRequest, User } from '@shared/types';
 import { cn } from '@/lib/utils';
 
 const LEAVE_TYPE_LABELS: Record<LeaveType, string> = {
@@ -116,6 +117,8 @@ export default function AnnualLeave() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectingRequest, setRejectingRequest] = useState<LeaveRequest | null>(null);
+  const [staffList, setStaffList] = useState<User[]>([]);
+  const [targetUserId, setTargetUserId] = useState<string>('');
 
   const fetchData = async () => {
     if (!user) return;
@@ -153,6 +156,11 @@ export default function AnnualLeave() {
       setMyRequests(myReqs);
       setPendingRequests(roleData.pending);
       setAllRequests(roleData.all);
+
+      if (isSuperAdmin) {
+        const allUsers = await getAllUsers();
+        setStaffList(allUsers.filter(u => u.status !== '퇴사' && u.role !== 'super_admin'));
+      }
     } catch (error) {
       console.error('Error fetching leave data:', error);
       toast({
@@ -222,23 +230,49 @@ export default function AnnualLeave() {
 
   const handleSubmitRequest = async () => {
     if (!user || !selectedDate) return;
-    
-    if (!leaveSummary || leaveSummary.remainingLeave < LEAVE_TYPE_DAYS[leaveType]) {
+
+    const isProxyRegistration = isSuperAdmin && targetUserId;
+    const targetUser = isProxyRegistration ? staffList.find(u => u.uid === targetUserId) : null;
+
+    if (!isSuperAdmin) {
+      if (!leaveSummary || leaveSummary.remainingLeave < LEAVE_TYPE_DAYS[leaveType]) {
+        toast({
+          title: '잔여 연차 부족',
+          description: '신청 가능한 연차가 부족합니다.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const alreadyRequested = myRequests.find(
+        r => r.leave_date === selectedDate && r.status !== 'rejected'
+      );
+      if (alreadyRequested) {
+        toast({
+          title: '중복 신청',
+          description: '해당 날짜에 이미 연차 신청이 있습니다.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    if (isProxyRegistration && !targetUser) {
       toast({
-        title: '잔여 연차 부족',
-        description: '신청 가능한 연차가 부족합니다.',
+        title: '직원 선택 필요',
+        description: '연차를 등록할 직원을 선택하세요.',
         variant: 'destructive',
       });
       return;
     }
 
-    const alreadyRequested = myRequests.find(
-      r => r.leave_date === selectedDate && r.status !== 'rejected'
+    const duplicateCheck = allRequests.find(
+      r => r.user_id === (isProxyRegistration ? targetUserId : user.uid) && r.leave_date === selectedDate && r.status !== 'rejected' && r.status !== 'cancelled'
     );
-    if (alreadyRequested) {
+    if (duplicateCheck) {
       toast({
         title: '중복 신청',
-        description: '해당 날짜에 이미 연차 신청이 있습니다.',
+        description: `${isProxyRegistration ? targetUser?.name + '님의 ' : ''}해당 날짜에 이미 연차 신청이 있습니다.`,
         variant: 'destructive',
       });
       return;
@@ -246,28 +280,46 @@ export default function AnnualLeave() {
 
     setIsSubmitting(true);
     try {
-      const requestData: InsertLeaveRequest = {
-        user_id: user.uid,
-        user_name: user.name,
-        team_id: user.team_id,
-        team_name: user.team_name,
-        leave_date: selectedDate,
-        leave_type: leaveType,
-        leave_days: LEAVE_TYPE_DAYS[leaveType],
-        reason: reason.trim() || '개인 사유',
-        status: 'pending_leader',
-      };
-
-      await createLeaveRequest(requestData);
-      
-      toast({
-        title: '신청 완료',
-        description: '연차 신청이 접수되었습니다. 팀장 승인을 기다려주세요.',
-      });
+      if (isProxyRegistration && targetUser) {
+        const requestData: InsertLeaveRequest = {
+          user_id: targetUser.uid,
+          user_name: targetUser.name,
+          team_id: targetUser.team_id || '',
+          team_name: targetUser.team_name || '',
+          leave_date: selectedDate,
+          leave_type: leaveType,
+          leave_days: LEAVE_TYPE_DAYS[leaveType],
+          reason: reason.trim() || '관리자 등록',
+          status: 'approved',
+        };
+        await createLeaveRequest(requestData);
+        toast({
+          title: '연차 등록 완료',
+          description: `${targetUser.name}님의 연차가 승인 상태로 등록되었습니다.`,
+        });
+      } else {
+        const requestData: InsertLeaveRequest = {
+          user_id: user.uid,
+          user_name: user.name,
+          team_id: user.team_id,
+          team_name: user.team_name,
+          leave_date: selectedDate,
+          leave_type: leaveType,
+          leave_days: LEAVE_TYPE_DAYS[leaveType],
+          reason: reason.trim() || '개인 사유',
+          status: 'pending_leader',
+        };
+        await createLeaveRequest(requestData);
+        toast({
+          title: '신청 완료',
+          description: '연차 신청이 접수되었습니다. 팀장 승인을 기다려주세요.',
+        });
+      }
 
       setSelectedDate('');
       setReason('');
       setLeaveType('full');
+      setTargetUserId('');
       await fetchData();
     } catch (error) {
       console.error('Error creating leave request:', error);
@@ -641,10 +693,31 @@ export default function AnnualLeave() {
 
           <Card>
             <CardHeader>
-              <CardTitle>연차 신청</CardTitle>
-              <CardDescription>원하는 날짜를 달력에서 클릭하세요</CardDescription>
+              <CardTitle>{isSuperAdmin ? '연차 등록' : '연차 신청'}</CardTitle>
+              <CardDescription>
+                {isSuperAdmin ? '직원을 선택하고 날짜를 달력에서 클릭하세요' : '원하는 날짜를 달력에서 클릭하세요'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {isSuperAdmin && (
+                <div className="space-y-2">
+                  <Label>대상 직원</Label>
+                  <Select value={targetUserId} onValueChange={setTargetUserId}>
+                    <SelectTrigger data-testid="select-target-user">
+                      <SelectValue placeholder="직원을 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {staffList
+                        .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+                        .map(staff => (
+                          <SelectItem key={staff.uid} value={staff.uid}>
+                            {staff.name} ({staff.team_name || '미배정'})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>선택된 날짜</Label>
                 <Input
@@ -668,7 +741,7 @@ export default function AnnualLeave() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>사유 (필수)</Label>
+                <Label>사유 {isSuperAdmin ? '(선택)' : '(필수)'}</Label>
                 <Textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
@@ -680,16 +753,16 @@ export default function AnnualLeave() {
               <Button
                 className="w-full"
                 onClick={handleSubmitRequest}
-                disabled={!selectedDate || !reason.trim() || isSubmitting}
+                disabled={!selectedDate || (!isSuperAdmin && !reason.trim()) || (isSuperAdmin && !targetUserId) || isSubmitting}
                 data-testid="button-submit-leave"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    신청 중...
+                    {isSuperAdmin ? '등록 중...' : '신청 중...'}
                   </>
                 ) : (
-                  '연차 신청'
+                  isSuperAdmin ? '연차 등록' : '연차 신청'
                 )}
               </Button>
             </CardContent>

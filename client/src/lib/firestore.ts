@@ -727,11 +727,14 @@ export const getTodayApprovedLeaveUserIds = async (): Promise<Set<string>> => {
   snapshot.docs.forEach(docSnap => {
     const data = docSnap.data();
     const leaveType = data.leave_type;
+    const minutes = today.getMinutes();
+    const currentTime = now * 60 + minutes;
+    const halfDayCutoff = 13 * 60 + 30;
     if (leaveType === 'full') {
       userIds.add(data.user_id);
-    } else if (leaveType === 'am' && now < 14) {
+    } else if (leaveType === 'am' && currentTime < halfDayCutoff) {
       userIds.add(data.user_id);
-    } else if (leaveType === 'pm' && now >= 14) {
+    } else if (leaveType === 'pm' && currentTime >= halfDayCutoff) {
       userIds.add(data.user_id);
     }
   });
