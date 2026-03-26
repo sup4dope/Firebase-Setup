@@ -51,6 +51,7 @@ import {
   updateTeamAdmin,
   updateCustomersTeamByManager,
   updateSettlementsTeamByManager,
+  getTodayApprovedLeaveUserIds,
 } from '@/lib/firestore';
 import { authFetch } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -108,6 +109,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     [userId: string]: { enabled: boolean; limit: number };
   }>({});
   const [savingDistribution, setSavingDistribution] = useState(false);
+  const [onLeaveUserIds, setOnLeaveUserIds] = useState<Set<string>>(new Set());
 
   const [newTeamName, setNewTeamName] = useState('');
 
@@ -456,7 +458,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     }
   };
 
-  const handleOpenDistributionSettings = () => {
+  const handleOpenDistributionSettings = async () => {
     const settings: { [userId: string]: { enabled: boolean; limit: number } } = {};
     users.forEach((user) => {
       settings[user.docId || user.uid] = {
@@ -465,6 +467,12 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       };
     });
     setDistributionSettings(settings);
+    try {
+      const leaveIds = await getTodayApprovedLeaveUserIds();
+      setOnLeaveUserIds(leaveIds);
+    } catch (e) {
+      console.error('연차 정보 조회 실패:', e);
+    }
     setShowDistributionSettings(true);
   };
 
@@ -1621,25 +1629,40 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                       const userId = user.docId || user.uid;
                       const settings = distributionSettings[userId] || { enabled: true, limit: 0 };
                       const team = teams.find(t => t.id === user.team_id);
+                      const isOnLeave = onLeaveUserIds.has(user.uid);
+                      const effectiveEnabled = settings.enabled && !isOnLeave;
                       return (
-                        <TableRow key={userId} className="border-border h-12">
+                        <TableRow key={userId} className={cn("border-border h-12", isOnLeave && "opacity-60 bg-muted/30")}>
                           <TableCell className="text-foreground font-medium py-2">
-                            {user.name}
+                            <div className="flex items-center gap-2">
+                              {user.name}
+                              {isOnLeave && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-orange-400 text-orange-600 dark:text-orange-400">
+                                  연차
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm py-2">
                             {team?.team_name || team?.name || '-'}
                           </TableCell>
                           <TableCell className="py-2 text-center">
-                            <Switch
-                              checked={settings.enabled}
-                              onCheckedChange={(checked) => {
-                                setDistributionSettings((prev) => ({
-                                  ...prev,
-                                  [userId]: { ...settings, enabled: checked },
-                                }));
-                              }}
-                              data-testid={`switch-distribution-${userId}`}
-                            />
+                            <div className="flex flex-col items-center gap-0.5">
+                              <Switch
+                                checked={settings.enabled}
+                                onCheckedChange={(checked) => {
+                                  setDistributionSettings((prev) => ({
+                                    ...prev,
+                                    [userId]: { ...settings, enabled: checked },
+                                  }));
+                                }}
+                                disabled={isOnLeave}
+                                data-testid={`switch-distribution-${userId}`}
+                              />
+                              {isOnLeave && (
+                                <span className="text-[10px] text-orange-500">자동 OFF</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="py-2 text-center">
                             <Input
@@ -1654,10 +1677,10 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                                   [userId]: { ...settings, limit: value },
                                 }));
                               }}
-                              disabled={!settings.enabled}
+                              disabled={!effectiveEnabled}
                               className={cn(
                                 "w-20 h-8 text-center bg-muted border-border",
-                                !settings.enabled && "opacity-50"
+                                !effectiveEnabled && "opacity-50"
                               )}
                               data-testid={`input-db-limit-${userId}`}
                             />

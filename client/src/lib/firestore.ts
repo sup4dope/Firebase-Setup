@@ -709,6 +709,36 @@ export const promoteToAdmin = async (uid: string): Promise<void> => {
 // 담당자 자동배정 시스템 (라운드로빈)
 // ============================================
 
+// 오늘 승인된 연차가 있는 직원 ID 목록 조회
+export const getTodayApprovedLeaveUserIds = async (): Promise<Set<string>> => {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
+  const q = query(
+    collection(db, 'leave_requests'),
+    where('leave_date', '==', todayStr),
+    where('status', '==', 'approved')
+  );
+  const snapshot = await getDocs(q);
+  
+  const now = today.getHours();
+  const userIds = new Set<string>();
+  
+  snapshot.docs.forEach(docSnap => {
+    const data = docSnap.data();
+    const leaveType = data.leave_type;
+    if (leaveType === 'full') {
+      userIds.add(data.user_id);
+    } else if (leaveType === 'am' && now < 14) {
+      userIds.add(data.user_id);
+    } else if (leaveType === 'pm' && now >= 14) {
+      userIds.add(data.user_id);
+    }
+  });
+  
+  return userIds;
+};
+
 // 배정 가능한 활성 직원 목록 조회 (재직 상태만)
 export const getActiveStaffForAssignment = async (): Promise<User[]> => {
   const snapshot = await getDocs(collection(db, 'users'));
@@ -717,7 +747,12 @@ export const getActiveStaffForAssignment = async (): Promise<User[]> => {
     uid: docSnap.data().uid || docSnap.id,
   } as User));
   
+  const onLeaveUserIds = await getTodayApprovedLeaveUserIds();
+  
   console.log('[StaffAssignment] 전체 직원 수:', allUsers.length, '명단:', allUsers.map(u => `${u.name}(uid=${u.uid}, status=${u.status}, db_dist=${(u as any).db_distribution_enabled})`));
+  if (onLeaveUserIds.size > 0) {
+    console.log('[StaffAssignment] 오늘 연차 직원:', [...onLeaveUserIds]);
+  }
   
   const filtered = allUsers
     .filter(user => {
@@ -727,6 +762,10 @@ export const getActiveStaffForAssignment = async (): Promise<User[]> => {
       }
       if ((user as any).db_distribution_enabled === false) {
         console.log(`[StaffAssignment] ${user.name} 제외: DB분배 비활성화`);
+        return false;
+      }
+      if (onLeaveUserIds.has(user.uid)) {
+        console.log(`[StaffAssignment] ${user.name} 제외: 오늘 연차`);
         return false;
       }
       return true;
