@@ -120,6 +120,7 @@ export default function AnnualLeave() {
   const [rejectingRequest, setRejectingRequest] = useState<LeaveRequest | null>(null);
   const [staffList, setStaffList] = useState<User[]>([]);
   const [targetUserId, setTargetUserId] = useState<string>('');
+  const [staffLeaveUsage, setStaffLeaveUsage] = useState<Map<string, number>>(new Map());
 
   const fetchData = async () => {
     if (!user) return;
@@ -158,12 +159,21 @@ export default function AnnualLeave() {
       setPendingRequests(roleData.pending);
       setAllRequests(roleData.all);
 
-      if (isSuperAdmin) {
+      if (isSuperAdmin || (isTeamLeader && user.team_id)) {
         const allUsers = await getAllUsers();
-        setStaffList(allUsers.filter(u => u.status !== '퇴사' && u.role !== 'super_admin'));
-      } else if (isTeamLeader && user.team_id) {
-        const allUsers = await getAllUsers();
-        setStaffList(allUsers.filter(u => u.status !== '퇴사' && u.team_id === user.team_id && u.uid !== user.uid));
+        const filtered = isSuperAdmin
+          ? allUsers.filter(u => u.status !== '퇴사' && u.role !== 'super_admin')
+          : allUsers.filter(u => u.status !== '퇴사' && u.team_id === user.team_id && u.uid !== user.uid);
+        setStaffList(filtered);
+
+        const allApproved = (isSuperAdmin ? roleData.all : await getLeaveRequestsByTeam(user.team_id!))
+          .filter(r => r.status === 'approved' && r.leave_date.startsWith(String(year)));
+        const usageMap = new Map<string, number>();
+        for (const req of allApproved) {
+          const days = req.leave_days ?? (req.leave_type === 'full' ? 1.0 : 0.5);
+          usageMap.set(req.user_id, (usageMap.get(req.user_id) || 0) + days);
+        }
+        setStaffLeaveUsage(usageMap);
       }
     } catch (error) {
       console.error('Error fetching leave data:', error);
@@ -1068,7 +1078,7 @@ export default function AnnualLeave() {
                             })
                             .map(staff => {
                               const total = staff.totalLeave ?? 15;
-                              const used = staff.usedLeave ?? 0;
+                              const used = staffLeaveUsage.get(staff.uid) ?? 0;
                               const remaining = total - used;
                               const usageRate = total > 0 ? ((used / total) * 100).toFixed(0) : '0';
                               return (
