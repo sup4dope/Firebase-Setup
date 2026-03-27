@@ -35,7 +35,8 @@ const calculateContractScore = (
   processingOrg: string,
   executionAmount: number,
   contractAmount: number = 0,
-  statusCode: string = ''
+  statusCode: string = '',
+  isExecuted: boolean = false
 ): { baseScore: number; categoryBonus: number; amountBonus: number; totalScore: number } => {
   let baseScore = 0;
   
@@ -55,8 +56,8 @@ const calculateContractScore = (
     baseScore = 10;
   }
   
-  const categoryBonus = CATEGORY_BONUS[processingOrg] ?? 0;
-  const amountBonus = getAmountBonus(executionAmount);
+  const categoryBonus = isExecuted ? (CATEGORY_BONUS[processingOrg] ?? 0) : 0;
+  const amountBonus = isExecuted ? getAmountBonus(executionAmount) : 0;
   const totalScore = baseScore + categoryBonus + amountBonus;
   return { baseScore, categoryBonus, amountBonus, totalScore };
 };
@@ -183,7 +184,7 @@ export function HeaderRankings() {
           const orgName = org.org || '미등록';
           const orgExecutionAmount = isExecuted ? (org.execution_amount || customer.execution_amount || 0) : 0;
           const orgContractAmount = isFirstOrg ? contractAmount : 0;
-          const score = calculateContractScore(orgName, orgExecutionAmount, orgContractAmount, effectiveStatus);
+          const score = calculateContractScore(orgName, orgExecutionAmount, orgContractAmount, effectiveStatus, isExecuted);
           const existing = scoresByUser.get(managerId) || { name: user.name || user.email, totalScore: 0 };
           existing.totalScore += score.totalScore;
           scoresByUser.set(managerId, existing);
@@ -192,7 +193,7 @@ export function HeaderRankings() {
       } else {
         const processingOrg = customer.processing_org || '미등록';
         const executionAmount = isExecuted ? (customer.execution_amount || 0) : 0;
-        const score = calculateContractScore(processingOrg, executionAmount, contractAmount, effectiveStatus);
+        const score = calculateContractScore(processingOrg, executionAmount, contractAmount, effectiveStatus, isExecuted);
         const existing = scoresByUser.get(managerId) || { name: user.name || user.email, totalScore: 0 };
         existing.totalScore += score.totalScore;
         scoresByUser.set(managerId, existing);

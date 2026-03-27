@@ -135,7 +135,8 @@ const calculateContractScore = (
   processingOrg: string,
   executionAmount: number,
   contractAmount: number = 0,
-  statusCode: string = ''
+  statusCode: string = '',
+  isExecuted: boolean = false
 ): { baseScore: number; categoryBonus: number; amountBonus: number; totalScore: number } => {
   let baseScore = 0;
   
@@ -155,8 +156,8 @@ const calculateContractScore = (
     baseScore = 10;
   }
   
-  const categoryBonus = CATEGORY_BONUS[processingOrg] ?? 0;
-  const amountBonus = getAmountBonus(executionAmount);
+  const categoryBonus = isExecuted ? (CATEGORY_BONUS[processingOrg] ?? 0) : 0;
+  const amountBonus = isExecuted ? getAmountBonus(executionAmount) : 0;
   const totalScore = baseScore + categoryBonus + amountBonus;
   return { baseScore, categoryBonus, amountBonus, totalScore };
 };
@@ -394,7 +395,8 @@ export default function Rankings() {
             orgName,
             orgExecutionAmount,
             orgContractAmount,
-            effectiveStatusForScore
+            effectiveStatusForScore,
+            isExecuted
           );
 
           scores.push({
@@ -423,7 +425,8 @@ export default function Rankings() {
           processingOrg,
           executionAmount,
           contractAmount,
-          effectiveStatusForScore
+          effectiveStatusForScore,
+          isExecuted
         );
 
         scores.push({
