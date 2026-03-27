@@ -88,6 +88,8 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '이중계약', label: '이중계약' },
     { id: '세금체납', label: '세금체납' },
     { id: '단박거절', label: '단박거절' },
+    { id: '정체성 의심', label: '정체성 의심' },
+    { id: '잘못 신청', label: '잘못 신청' },
   ],
 };
 
