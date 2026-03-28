@@ -20,7 +20,7 @@ import type { EntrySourceType } from '@shared/types';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const ENTRY_SOURCES: EntrySourceType[] = ['캐시노트 인앱광고', '구글애즈', '구글애즈(QS)', '구글애즈(e)', '광고', '외주', '고객소개', '승인복제'];
+const ENTRY_SOURCES: EntrySourceType[] = ['캐시노트 인앱광고', '구글애즈', '구글애즈(QS)', '구글애즈(QSe)', '구글애즈(e)', '광고', '외주', '고객소개', '승인복제'];
 
 const TRASH_STATUSES = [
   '거절사유 미파악', '인증불가', '정부기관 오인', '기타자금 오인',
@@ -46,6 +46,7 @@ const SOURCE_LINE_COLORS: Record<string, string> = {
   '캐시노트 인앱광고': '#3b82f6',
   '구글애즈': '#ef4444',
   '구글애즈(QS)': '#f97316',
+  '구글애즈(QSe)': '#e11d48',
   '구글애즈(e)': '#a855f7',
   '광고': '#8b5cf6',
   '외주': '#06b6d4',
