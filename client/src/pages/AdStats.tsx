@@ -28,6 +28,11 @@ const TRASH_STATUSES = [
   '신용점수 미달', '차입금초과', '세금체납', '이중계약', '거절사유 미파악'
 ];
 
+const AD_INEFFICIENCY_STATUSES = [
+  '잘못 신청', '단박거절', '본인아님', '사업자아님',
+  '정부기관 오인', '기타자금 오인', '매출없음', '세금체납', '거절사유 미파악'
+];
+
 const TARGET_STATUSES = [
   '업력미달', '최근대출', '인증미동의(국세청)', '인증미동의(공여내역)',
   '진행기간 미동의', '자문료 미동의', '계약금미동의(선불)', '계약금미동의(후불)'
@@ -273,7 +278,7 @@ export default function AdStats() {
     return sources.map(source => {
       const filtered = dateFilteredCustomers.filter(c => c.entry_source === source);
       const total = filtered.length;
-      if (total === 0) return { source, total: 0, consulting: 0, trash: 0, target: 0, contractSent: 0, contract: 0, docs: 0, apply: 0, exec: 0, absence: 0, finalReject: 0, trashDetails: {} as Record<string, number>, targetDetails: {} as Record<string, number>, grades: {} as Record<DbGrade, number> };
+      if (total === 0) return { source, total: 0, consulting: 0, trash: 0, target: 0, contractSent: 0, contract: 0, docs: 0, apply: 0, exec: 0, absence: 0, finalReject: 0, trashDetails: {} as Record<string, number>, targetDetails: {} as Record<string, number>, grades: {} as Record<DbGrade, number>, adInefficiency: 0 };
 
       const consulting = filtered.filter(c => c.status_code === '상담대기').length;
       const trash = filtered.filter(c => TRASH_STATUSES.includes(c.status_code)).length;
@@ -285,6 +290,8 @@ export default function AdStats() {
       const exec = filtered.filter(c => EXEC_STATUSES.includes(c.status_code)).length;
       const absence = filtered.filter(c => ABSENCE_STATUSES.includes(c.status_code)).length;
       const finalReject = filtered.filter(c => c.status_code === '최종부결').length;
+
+      const adInefficiency = filtered.filter(c => AD_INEFFICIENCY_STATUSES.includes(c.status_code)).length;
 
       const trashDetails: Record<string, number> = {};
       TRASH_STATUSES.forEach(s => {
@@ -303,7 +310,7 @@ export default function AdStats() {
         grades[gradeCustomer(c)]++;
       });
 
-      return { source, total, consulting, trash, target, contractSent, contract, docs, apply, exec, absence, finalReject, trashDetails, targetDetails, grades };
+      return { source, total, consulting, trash, target, contractSent, contract, docs, apply, exec, absence, finalReject, trashDetails, targetDetails, grades, adInefficiency };
     }).filter(s => s.total > 0);
   }, [dateFilteredCustomers, activeSourcesToFilter]);
 
@@ -762,13 +769,38 @@ export default function AdStats() {
                     <Trash2 className="w-4 h-4 text-red-500" /> 쓰레기통 세부
                   </h4>
                   {Object.keys(stat.trashDetails).length > 0 ? (
-                    <div className="space-y-1.5 text-sm">
-                      {Object.entries(stat.trashDetails)
-                        .sort(([, a], [, b]) => b - a)
-                        .map(([status, count]) => (
-                          <FlowRow key={status} label={status} count={count} total={stat.trash} color="text-red-600 dark:text-red-400" />
-                        ))}
-                    </div>
+                    <>
+                      <div className="mb-2">
+                        <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/30 px-1.5 py-0.5 rounded">
+                          광고비효율 {stat.adInefficiency}건 ({pct(stat.adInefficiency, stat.trash)}%)
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 text-sm">
+                        {Object.entries(stat.trashDetails)
+                          .filter(([status]) => AD_INEFFICIENCY_STATUSES.includes(status))
+                          .sort(([, a], [, b]) => b - a)
+                          .map(([status, count]) => (
+                            <FlowRow key={status} label={status} count={count} total={stat.trash} color="text-rose-600 dark:text-rose-400" />
+                          ))}
+                      </div>
+                      {Object.entries(stat.trashDetails).filter(([status]) => !AD_INEFFICIENCY_STATUSES.includes(status)).length > 0 && (
+                        <>
+                          <div className="mt-3 mb-2">
+                            <span className="text-xs font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded">
+                              기타 거절 {stat.trash - stat.adInefficiency}건 ({pct(stat.trash - stat.adInefficiency, stat.trash)}%)
+                            </span>
+                          </div>
+                          <div className="space-y-1.5 text-sm">
+                            {Object.entries(stat.trashDetails)
+                              .filter(([status]) => !AD_INEFFICIENCY_STATUSES.includes(status))
+                              .sort(([, a], [, b]) => b - a)
+                              .map(([status, count]) => (
+                                <FlowRow key={status} label={status} count={count} total={stat.trash} color="text-red-600 dark:text-red-400" />
+                              ))}
+                          </div>
+                        </>
+                      )}
+                    </>
                   ) : (
                     <p className="text-xs text-muted-foreground">데이터 없음</p>
                   )}
