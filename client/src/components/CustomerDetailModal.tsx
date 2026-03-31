@@ -3641,9 +3641,11 @@ export function CustomerDetailModal({
                     const oldStatus = formData.status_code;
                     
                     try {
+                      const todayStr = format(new Date(), 'yyyy-MM-dd');
                       const customerRef = doc(db, "customers", customer.id);
                       await updateDoc(customerRef, {
                         status_code: targetStatus,
+                        deposit_paid_date: todayStr,
                         updated_at: new Date(),
                       });
 

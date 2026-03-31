@@ -534,6 +534,7 @@ export default function Stats() {
     const rangeFrom = dateRange.from || startOfMonth(new Date());
     const rangeTo = dateRange.to || endOfMonth(new Date());
     const days = eachDayOfInterval({ start: rangeFrom, end: rangeTo });
+    const SCALE = 10;
 
     return days.map(day => {
       const dayStr = format(day, 'yyyy-MM-dd');
@@ -543,15 +544,17 @@ export default function Stats() {
         c.contract_completion_date === dayStr &&
         CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
       ).length;
-      const contractByDate = selectedCustomers.filter(c =>
-        c.contract_completion_date === dayStr &&
+      const depositByDate = selectedCustomers.filter(c =>
+        (c.deposit_paid_date || c.contract_completion_date) === dayStr &&
         CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
       ).length;
       return {
         date: format(day, 'MM/dd'),
         유입: inflowCount,
-        당일계약: sameDayContract,
-        '계약일 기준': contractByDate,
+        당일계약_raw: sameDayContract,
+        '당일계약(x10)': sameDayContract * SCALE,
+        수납일기준_raw: depositByDate,
+        '수납일 기준(x10)': depositByDate * SCALE,
       };
     });
   }, [selectedCustomers, dateRange]);
@@ -1062,7 +1065,10 @@ export default function Stats() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">일별 추이 분석</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">일별 추이 분석</CardTitle>
+              <span className="text-xs text-muted-foreground">※ 계약 1건 = 유입 10건 스케일</span>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -1075,7 +1081,6 @@ export default function Stats() {
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length > 0) {
                         const data = payload[0].payload;
-                        const otherDayContract = (data['계약일 기준'] || 0) - (data['당일계약'] || 0);
                         return (
                           <div style={{
                             backgroundColor: 'hsl(var(--card))',
@@ -1086,13 +1091,8 @@ export default function Stats() {
                           }}>
                             <p style={{ fontWeight: 'bold', marginBottom: '6px' }}>{label}</p>
                             <p style={{ color: '#6366f1' }}>유입: {data['유입']}건</p>
-                            <p style={{ color: '#22c55e' }}>당일유입 → 당일계약: {data['당일계약']}건</p>
-                            <p style={{ color: '#f59e0b' }}>계약일 기준 전체: {data['계약일 기준']}건</p>
-                            {otherDayContract > 0 && (
-                              <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>
-                                ※ 타 유입일 계약: {otherDayContract}건
-                              </p>
-                            )}
+                            <p style={{ color: '#22c55e' }}>당일유입 → 당일계약: {data['당일계약_raw']}건</p>
+                            <p style={{ color: '#f59e0b' }}>수납일 기준 전체: {data['수납일기준_raw']}건</p>
                           </div>
                         );
                       }
@@ -1101,8 +1101,8 @@ export default function Stats() {
                   />
                   <Legend />
                   <Line type="monotone" dataKey="유입" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="당일계약" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="계약일 기준" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="당일계약(x10)" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="수납일 기준(x10)" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

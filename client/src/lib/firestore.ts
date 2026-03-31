@@ -457,7 +457,10 @@ export const updateCustomerStatus = async (
     status_code: newStatus,
     updated_at: Timestamp.now(),
     // If reaching contract completion for the first time (한글 상태명)
-    ...(contractStatuses.includes(newStatus) && { contract_completion_date: new Date().toISOString().split('T')[0] })
+    ...(contractStatuses.includes(newStatus) && { 
+      contract_completion_date: new Date().toISOString().split('T')[0],
+      deposit_paid_date: new Date().toISOString().split('T')[0],
+    })
   });
   
   // Create status log

@@ -101,6 +101,7 @@ export interface Customer {
   processing_org?: string; // 신청/진행기관 (deprecated, use processing_orgs)
   processing_orgs?: ProcessingOrg[]; // 진행기관 목록 (다중 기관 지원)
   contract_completion_date?: string; // 최초 계약 도달일
+  deposit_paid_date?: string; // 수납일자 YYYY-MM-DD (수납완료 시점)
   notes?: string;
   created_at: Date;
   updated_at?: Date; // 최종 업데이트 시각 (메모/상태 변경 시)
