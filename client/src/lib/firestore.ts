@@ -2076,6 +2076,7 @@ const UTM_SOURCE_MAP: Record<string, EntrySourceType> = {
 
 export const mapUtmToEntrySource = (utmSource?: string, source?: string, utmCampaign?: string): EntrySourceType => {
   if (source === 'GoogleAds_Agency_Sheet') return '구글애즈(QS)';
+  if (utmCampaign === 'policy_funds_cashnote') return '캐시노트 인앱광고';
   if (utmCampaign === 'policy_funds_qs_easy') return '구글애즈(QSe)';
   if (utmCampaign === 'policy_funds_easy') return '구글애즈(e)';
   if (!utmSource || utmSource === 'direct' || utmSource === 'organic') return '캐시노트 인앱광고';
