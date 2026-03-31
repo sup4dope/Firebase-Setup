@@ -45,6 +45,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
   const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
   const [showAssignmentStats, setShowAssignmentStats] = useState(false);
+  const [filterMode, setFilterMode] = useState<'all' | 'new' | 'duplicate' | string>('all');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
       fetchConsultations();
       fetchStaffList();
       fetchCustomers();
+      setFilterMode('all');
     }
   }, [open]);
 
@@ -297,6 +299,20 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
     return sorted;
   }, [consultations]);
 
+  const filteredConsultations = useMemo(() => {
+    if (filterMode === 'all') return consultations;
+    if (filterMode === 'new') return consultations.filter(c => !c.isDuplicate);
+    if (filterMode === 'duplicate') return consultations.filter(c => c.isDuplicate);
+    return consultations.filter(c => {
+      const source = mapUtmToEntrySource(c.data.utm_source, c.data.source, c.data.utm_campaign);
+      return source === filterMode;
+    });
+  }, [consultations, filterMode]);
+
+  const toggleFilter = (mode: string) => {
+    setFilterMode(prev => prev === mode ? 'all' : mode);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`max-h-[90vh] md:max-h-[85vh] flex flex-col p-0 transition-all duration-300 ${showAssignmentStats ? 'max-w-6xl' : 'max-w-4xl'}`}>
@@ -334,12 +350,29 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
               <div className="px-3 md:px-6 py-2 md:py-3 bg-muted/50 border-b shrink-0 space-y-2">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                   <div className="flex items-center gap-3 md:gap-4 text-sm">
-                    <span className="text-muted-foreground">총 <span className="font-semibold text-foreground">{consultations.length}건</span></span>
+                    <button
+                      onClick={() => setFilterMode('all')}
+                      className={`text-muted-foreground transition-colors ${filterMode === 'all' ? 'font-semibold text-foreground' : 'hover:text-foreground'}`}
+                      data-testid="button-filter-all"
+                    >
+                      총 <span className="font-semibold text-foreground">{consultations.length}건</span>
+                      {filterMode !== 'all' && <span className="text-xs ml-1">({filteredConsultations.length}건 표시중)</span>}
+                    </button>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      <Badge
+                        variant="secondary"
+                        className={`cursor-pointer transition-all ${filterMode === 'new' ? 'ring-2 ring-green-500 bg-green-200 dark:bg-green-800/50' : 'bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-800/40'} text-green-700 dark:text-green-400`}
+                        onClick={() => toggleFilter('new')}
+                        data-testid="button-filter-new"
+                      >
                         신규 {newCount}건
                       </Badge>
-                      <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      <Badge
+                        variant="secondary"
+                        className={`cursor-pointer transition-all ${filterMode === 'duplicate' ? 'ring-2 ring-amber-500 bg-amber-200 dark:bg-amber-800/50' : 'bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800/40'} text-amber-700 dark:text-amber-400`}
+                        onClick={() => toggleFilter('duplicate')}
+                        data-testid="button-filter-duplicate"
+                      >
                         중복 {duplicateCount}건
                       </Badge>
                     </div>
@@ -369,7 +402,8 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                       <Badge
                         key={source}
                         variant="outline"
-                        className="text-xs font-normal gap-1"
+                        className={`text-xs font-normal gap-1 cursor-pointer transition-all ${filterMode === source ? 'ring-2 ring-primary bg-primary/10' : 'hover:bg-muted'}`}
+                        onClick={() => toggleFilter(source)}
                         data-testid={`badge-source-count-${source}`}
                       >
                         {source}
@@ -382,7 +416,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
 
               <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="p-4 space-y-3">
-                  {consultations.map(({ id, data, isDuplicate }, index) => {
+                  {filteredConsultations.map(({ id, data, isDuplicate }, index) => {
                     const isItemImporting = importingIds.has(id);
                     const isItemDeleting = deletingIds.has(id);
                     const isItemBusy = isItemImporting || isItemDeleting;
