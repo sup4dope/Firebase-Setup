@@ -1522,14 +1522,13 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
         continue;
       }
       
-      // 고객 데이터와 정산 데이터 동기화 확인 (정산 항목이 있지만 고객이 더 이상 정산 대상이 아닌 경우)
       const status = customer.status_code || '';
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
         (status.includes('계약완료') || status.includes('집행'));
+      const isReservation = status === '예약';
       
-      // 정산 대상 상태가 아니거나 정산월이 다른 경우에는 활성 정산만 삭제 (환수/취소 항목은 유지)
       if (settlement.status === '정상' && !settlement.is_clawback) {
-        if (!isTargetStatus) {
+        if (!isTargetStatus && !isReservation) {
           await deleteDoc(doc(db, 'settlements', settlement.id));
           deletedCount++;
           continue;
@@ -1643,8 +1642,12 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       ...docSnap.data(),
     } as SettlementItem));
     
-    // 정산 대상이 아닌 경우 (수납대기 상태 포함) - 기존 정산 항목 삭제
+    const isReservation = status === '예약';
     if (!isTargetStatus || isPaymentPending) {
+      if (isReservation && existingSettlements.length > 0) {
+        console.log(`[Settlement Sync] 예약 상태이지만 기존 정산 ${existingSettlements.length}건 유지: ${customer.company_name || customer.name}`);
+        return;
+      }
       if (existingSettlements.length > 0) {
         for (const settlement of existingSettlements) {
           await deleteDoc(doc(db, 'settlements', settlement.id));
