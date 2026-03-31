@@ -1611,7 +1611,6 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       contract_completion_date: toDateString(data.contract_completion_date) || undefined,
       contract_date: toDateString(data.contract_date) || undefined,
       execution_date: toDateString(data.execution_date) || undefined,
-      deposit_paid_date: data.deposit_paid_date || undefined,
       processing_orgs: data.processing_orgs || [],
     } as unknown as Customer;
     
@@ -1724,8 +1723,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
           continue;
         }
         
-        const hasDepositPaid = !!customer.deposit_paid_date;
-        const contractAmount = isFirstExecution && !isReExecution && hasDepositPaid
+        const contractAmount = isFirstExecution && !isReExecution 
           ? (customer.contract_amount || customer.deposit_amount || 0) 
           : 0;
         
@@ -1800,8 +1798,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         s.status === '정상' && !s.is_clawback && !s.org_name
       );
       
-      const hasDepositPaid = !!customer.deposit_paid_date;
-      const contractAmount = hasDepositPaid ? (customer.contract_amount || customer.deposit_amount || 0) : 0;
+      const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
       const executionAmount = customer.execution_amount || 0;
       const executionDate = customer.execution_date || '';
       const dateForMonth = executionDate || contractDate;
