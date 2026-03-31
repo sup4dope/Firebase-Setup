@@ -225,11 +225,17 @@ export default function AdStats() {
     const sources = activeSourcesToFilter;
     const totals: Record<string, number> = {};
     const revenue: Record<string, number> = {};
+    const depositRevenue: Record<string, number> = {};
+    const advisoryRevenue: Record<string, number> = {};
     const contracts: Record<string, number> = {};
-    sources.forEach(s => { totals[s] = 0; revenue[s] = 0; contracts[s] = 0; });
+    const execs: Record<string, number> = {};
+    sources.forEach(s => { totals[s] = 0; revenue[s] = 0; depositRevenue[s] = 0; advisoryRevenue[s] = 0; contracts[s] = 0; execs[s] = 0; });
     let grandTotal = 0;
     let grandRevenue = 0;
+    let grandDepositRevenue = 0;
+    let grandAdvisoryRevenue = 0;
     let grandContracts = 0;
+    let grandExecs = 0;
     const CONTRACT_AND_BEYOND = [
       ...CONTRACT_STATUSES,
       ...DOCS_STATUSES,
@@ -253,12 +259,24 @@ export default function AdStats() {
 
       if (s.is_clawback) {
         const loss = Math.round(Math.abs(s.total_revenue || 0) * 10000);
+        const depLoss = Math.round(Math.abs(s.contract_amount || 0) * 10000);
+        const advLoss = loss - depLoss;
         revenue[src] -= loss;
+        depositRevenue[src] -= depLoss;
+        advisoryRevenue[src] -= advLoss;
         grandRevenue -= loss;
+        grandDepositRevenue -= depLoss;
+        grandAdvisoryRevenue -= advLoss;
       } else {
         const rev = Math.round((s.total_revenue || 0) * 10000);
+        const dep = Math.round((s.contract_amount || 0) * 10000);
+        const adv = rev - dep;
         revenue[src] += rev;
+        depositRevenue[src] += dep;
+        advisoryRevenue[src] += adv;
         grandRevenue += rev;
+        grandDepositRevenue += dep;
+        grandAdvisoryRevenue += adv;
       }
     });
 
@@ -268,8 +286,12 @@ export default function AdStats() {
         contracts[src]++;
         grandContracts++;
       }
+      if (src && execs[src] !== undefined && EXEC_STATUSES.includes(c.status_code)) {
+        execs[src]++;
+        grandExecs++;
+      }
     });
-    return { totals, grandTotal, sources, revenue, grandRevenue, contracts, grandContracts };
+    return { totals, grandTotal, sources, revenue, grandRevenue, depositRevenue, advisoryRevenue, grandDepositRevenue, grandAdvisoryRevenue, contracts, grandContracts, execs, grandExecs };
   }, [dailySourceData, activeSourcesToFilter, dateFilteredCustomers, settlements]);
 
   const sourceStats = useMemo(() => {
@@ -614,13 +636,17 @@ export default function AdStats() {
 
           {dailySourceData.length > 0 && (
             <div className="mt-4 border rounded-lg overflow-hidden">
-              <table className="w-full text-sm" data-testid="table-daily-totals">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[900px]" data-testid="table-daily-totals">
                 <thead>
                   <tr className="bg-muted/50 border-b border-border">
                     <th className="py-2 px-3 text-left font-medium text-muted-foreground">유입경로</th>
-                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">접수 건수</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">접수</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">비율</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">계약률</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">집행률</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">계약금</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">자문료</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">총매출</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">건당 잠재가치</th>
                   </tr>
@@ -631,9 +657,11 @@ export default function AdStats() {
                     .sort((a, b) => dailySourceTotals.totals[b] - dailySourceTotals.totals[a])
                     .map(source => (
                       <tr key={source} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 px-3 font-medium flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: SOURCE_LINE_COLORS[source as EntrySourceType] || '#6b7280' }} />
-                          {source}
+                        <td className="py-2 px-3 font-medium">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: SOURCE_LINE_COLORS[source as EntrySourceType] || '#6b7280' }} />
+                            {source}
+                          </div>
                         </td>
                         <td className="py-2 px-3 text-right font-semibold">{dailySourceTotals.totals[source]}건</td>
                         <td className="py-2 px-3 text-right text-muted-foreground">
@@ -645,7 +673,19 @@ export default function AdStats() {
                             : '0.0%'}
                           <span className="text-xs text-muted-foreground ml-1">({dailySourceTotals.contracts[source]}건)</span>
                         </td>
+                        <td className="py-2 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">
+                          {dailySourceTotals.totals[source] > 0
+                            ? `${((dailySourceTotals.execs[source] / dailySourceTotals.totals[source]) * 100).toFixed(1)}%`
+                            : '0.0%'}
+                          <span className="text-xs text-muted-foreground ml-1">({dailySourceTotals.execs[source]}건)</span>
+                        </td>
                         <td className="py-2 px-3 text-right text-muted-foreground">
+                          {dailySourceTotals.depositRevenue[source] > 0 ? `${dailySourceTotals.depositRevenue[source].toLocaleString()}원` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right text-muted-foreground">
+                          {dailySourceTotals.advisoryRevenue[source] > 0 ? `${dailySourceTotals.advisoryRevenue[source].toLocaleString()}원` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right font-semibold">
                           {dailySourceTotals.revenue[source] > 0 ? `${dailySourceTotals.revenue[source].toLocaleString()}원` : '-'}
                         </td>
                         <td className="py-2 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">
@@ -665,6 +705,14 @@ export default function AdStats() {
                         : '0.0%'}
                       <span className="text-xs text-muted-foreground ml-1">({dailySourceTotals.grandContracts}건)</span>
                     </td>
+                    <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">
+                      {dailySourceTotals.grandTotal > 0
+                        ? `${((dailySourceTotals.grandExecs / dailySourceTotals.grandTotal) * 100).toFixed(1)}%`
+                        : '0.0%'}
+                      <span className="text-xs text-muted-foreground ml-1">({dailySourceTotals.grandExecs}건)</span>
+                    </td>
+                    <td className="py-2 px-3 text-right">{dailySourceTotals.grandDepositRevenue > 0 ? `${dailySourceTotals.grandDepositRevenue.toLocaleString()}원` : '-'}</td>
+                    <td className="py-2 px-3 text-right">{dailySourceTotals.grandAdvisoryRevenue > 0 ? `${dailySourceTotals.grandAdvisoryRevenue.toLocaleString()}원` : '-'}</td>
                     <td className="py-2 px-3 text-right">{dailySourceTotals.grandRevenue > 0 ? `${dailySourceTotals.grandRevenue.toLocaleString()}원` : '-'}</td>
                     <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">
                       {dailySourceTotals.grandTotal > 0 && dailySourceTotals.grandRevenue > 0
@@ -674,6 +722,7 @@ export default function AdStats() {
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </CardContent>
