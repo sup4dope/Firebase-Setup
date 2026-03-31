@@ -1484,14 +1484,15 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
         return false;
       }
       
-      // 기관별 정산월 중 해당 월과 일치하는 것이 있는지 확인
+      const depositPaidDate = (customer as any).deposit_paid_date || '';
+      if (depositPaidDate && depositPaidDate.slice(0, 7) === month) return true;
+      
       const hasOrgInMonth = approvedOrgs.some(
         (org: ProcessingOrg) => org.execution_date && org.execution_date.slice(0, 7) === month
       );
       
       if (hasOrgInMonth) return true;
       
-      // 레거시 호환: 고객 레벨 execution_date 확인
       const dateForSettlement = customer.execution_date || (customer as any).contract_date || customer.contract_completion_date || customer.entry_date;
       if (!dateForSettlement) return false;
       
@@ -1611,6 +1612,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       contract_completion_date: toDateString(data.contract_completion_date) || undefined,
       contract_date: toDateString(data.contract_date) || undefined,
       execution_date: toDateString(data.execution_date) || undefined,
+      deposit_paid_date: data.deposit_paid_date || undefined,
       processing_orgs: data.processing_orgs || [],
     } as unknown as Customer;
     
@@ -1717,15 +1719,18 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         }
         processedOrgs.add(settlementOrgName);
         
-        const settlementMonth = executionDate.slice(0, 7);
+        const contractAmount = isFirstExecution && !isReExecution 
+          ? (customer.contract_amount || customer.deposit_amount || 0) 
+          : 0;
+        
+        const depositPaidDate = (customer as any).deposit_paid_date || '';
+        const settlementMonth = (contractAmount > 0 && depositPaidDate)
+          ? depositPaidDate.slice(0, 7)
+          : executionDate.slice(0, 7);
         if (!settlementMonth) {
           console.log(`[Settlement Sync] 정산월 결정 불가: ${customer.company_name || customer.name} - ${orgName}`);
           continue;
         }
-        
-        const contractAmount = isFirstExecution && !isReExecution 
-          ? (customer.contract_amount || customer.deposit_amount || 0) 
-          : 0;
         
         const effectiveCommissionRate = isReExecution ? reExecutionRate : commissionRate;
         const effectiveDepositRate = isReExecution ? 0 : depositCommissionRate;
@@ -1755,7 +1760,6 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
             net_commission: calc.netCommission,
             contract_date: contractDate,
             execution_date: executionDate,
-            settlement_month: settlementMonth,
           });
           console.log(`[Settlement Sync] 기관별 정산 업데이트: ${customer.company_name || customer.name} - ${settlementOrgName}, 집행금액: ${executionAmount}만원`);
         } else {
@@ -1801,7 +1805,8 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
       const executionAmount = customer.execution_amount || 0;
       const executionDate = customer.execution_date || '';
-      const dateForMonth = executionDate || contractDate;
+      const depositPaidDate = (customer as any).deposit_paid_date || '';
+      const dateForMonth = (contractAmount > 0 && depositPaidDate) ? depositPaidDate : (executionDate || contractDate);
       const settlementMonth = dateForMonth ? dateForMonth.slice(0, 7) : '';
       
       if (!settlementMonth) {
@@ -1830,7 +1835,6 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
           net_commission: calc.netCommission,
           contract_date: contractDate,
           execution_date: executionDate,
-          settlement_month: settlementMonth,
         });
         console.log(`[Settlement Sync] 단일 고객 업데이트: ${customer.company_name || customer.name}`);
       } else if (!existingSettlements.some(s => s.customer_id === customerId && !s.org_name)) {
