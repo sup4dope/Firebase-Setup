@@ -2163,6 +2163,32 @@ export function CustomerDetailModal({
                 </Button>
               );
             })()}
+            {currentUser?.role === 'super_admin' && formData.id && (
+              <Select
+                value={formData.db_grade || ''}
+                onValueChange={async (value) => {
+                  const grade = value as 'S' | 'A' | 'B' | 'C' | 'F';
+                  setFormData(prev => ({ ...prev, db_grade: grade }));
+                  try {
+                    const customerRef = doc(db, "customers", formData.id!);
+                    await updateDoc(customerRef, { db_grade: grade, updated_at: new Date() });
+                  } catch (error) {
+                    console.error('DB등급 저장 실패:', error);
+                  }
+                }}
+              >
+                <SelectTrigger className="h-7 w-[80px] text-xs" data-testid="select-db-grade">
+                  <SelectValue placeholder="DB등급" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="S">S등급</SelectItem>
+                  <SelectItem value="A">A등급</SelectItem>
+                  <SelectItem value="B">B등급</SelectItem>
+                  <SelectItem value="C">C등급</SelectItem>
+                  <SelectItem value="F">F등급</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             {/* Read-only indicator for staff users */}
             {isReadOnly && (
               <Badge
