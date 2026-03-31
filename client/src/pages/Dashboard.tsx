@@ -33,6 +33,7 @@ import {
   updateCustomerManager,
   deleteOverdueTodosForCustomer,
   getPreviousStatusForCustomer,
+  getSettlementItems,
 } from '@/lib/firestore';
 import { Plus, Search, RefreshCw, CalendarIcon, Download, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -48,7 +49,7 @@ import { FUNNEL_GROUPS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Customer, User, Team, StatusLog, StatusCode, InsertCustomer, ProcessingOrg, TodoItem } from '@shared/types';
+import type { Customer, User, Team, StatusLog, StatusCode, InsertCustomer, ProcessingOrg, TodoItem, SettlementItem } from '@shared/types';
 
 const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
@@ -63,6 +64,7 @@ export default function Dashboard() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map());
   const [statusLogs, setStatusLogs] = useState<StatusLog[]>([]);
+  const [settlements, setSettlements] = useState<SettlementItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
@@ -165,12 +167,14 @@ export default function Dashboard() {
       };
 
       // 모든 데이터를 한번에 병렬 로딩 (statusLogs는 현재 월 계약 로그만)
-      const [fetchedUsers, fetchedTeams, fetchedHolidayMap, fetchedLogs, fetchedCustomers] = await Promise.all([
+      const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+      const [fetchedUsers, fetchedTeams, fetchedHolidayMap, fetchedLogs, fetchedCustomers, fetchedSettlements] = await Promise.all([
         getUsers(),
         getTeams(),
         fetchYearlyHolidays(currentYear),
         getContractLogsForMonth(currentYear, currentMonth),
         fetchCustomersByRole(),
+        getSettlementItems(currentMonthStr),
       ]);
 
       setUsers(fetchedUsers);
@@ -178,6 +182,7 @@ export default function Dashboard() {
       setHolidayMap(fetchedHolidayMap);
       setStatusLogs(fetchedLogs);
       setCustomers(fetchedCustomers);
+      setSettlements(fetchedSettlements);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -464,8 +469,8 @@ export default function Dashboard() {
 
   // Calculate KPI (팀/담당자/기간 필터 적용)
   const kpi = useMemo(() => {
-    return calculateKPI(funnelFilteredCustomers, statusLogs, holidayMap);
-  }, [funnelFilteredCustomers, statusLogs, holidayMap]);
+    return calculateKPI(funnelFilteredCustomers, statusLogs, holidayMap, new Date(), settlements);
+  }, [funnelFilteredCustomers, statusLogs, holidayMap, settlements]);
 
   // Handlers
   const handleCreateCustomer = async (data: InsertCustomer & { manager_name?: string; team_name?: string }) => {

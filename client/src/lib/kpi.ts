@@ -8,7 +8,7 @@ import {
   isAfter,
   format,
 } from 'date-fns';
-import type { Customer, StatusLog, KPIData } from '@shared/types';
+import type { Customer, StatusLog, KPIData, SettlementItem } from '@shared/types';
 
 // Check if a date is a holiday using Map<string, string> format (from public API)
 const isHolidayFromMap = (date: Date, holidayMap: Map<string, string>): boolean => {
@@ -45,7 +45,8 @@ export const calculateKPI = (
   customers: Customer[],
   statusLogs: StatusLog[],
   holidayMap: Map<string, string>,
-  date: Date = new Date()
+  date: Date = new Date(),
+  settlements: SettlementItem[] = []
 ): KPIData => {
   const CONTRACT_AND_BEYOND_STATUSES = [
     '계약완료(선불)', '계약완료(외주)', '계약완료(후불)',
@@ -55,7 +56,6 @@ export const calculateKPI = (
     '민원처리',
   ];
   
-  // 해당 월에 유입된 고객 (entry_date 기준)
   const monthlyCustomers = customers.filter(c => {
     if (!c.entry_date) return false;
     const entryDate = new Date(c.entry_date);
@@ -63,30 +63,22 @@ export const calculateKPI = (
   });
   const totalCounselingCount = monthlyCustomers.length;
   
-  // 계약 건수: 해당 월 유입 고객 중 현재 상태가 계약서발송 이후 단계인 고객
   const contractCount = monthlyCustomers.filter(c =>
     c.status_code && CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
   ).length;
   
-  // 계약률 계산
   const contractRate = totalCounselingCount > 0 
     ? Math.round((contractCount / totalCounselingCount) * 100) 
     : 0;
   
-  // 당월 매출: 해당 월에 유입된 고객들 중 집행완료 상태인 고객의 execution_amount 합계
-  const monthlyRevenue = customers
-    .filter(c => {
-      if (!c.entry_date) return false;
-      const entryDate = new Date(c.entry_date);
-      return isSameMonth(entryDate, date) && c.status_code?.includes('집행완료');
-    })
-    .reduce((sum, c) => sum + (c.execution_amount || 0), 0);
+  const currentMonth = format(date, 'yyyy-MM');
+  const monthlyRevenue = settlements
+    .filter(s => s.settlement_month === currentMonth && s.status === '정상' && !s.is_clawback)
+    .reduce((sum, s) => sum + (s.total_revenue || 0), 0);
   
-  // Business days calculation
   const totalBusinessDays = getBusinessDaysInMonth(date, holidayMap);
   const businessDaysElapsed = getElapsedBusinessDays(date, holidayMap);
   
-  // 예상 매출: (당월 총 집행금액 / 경과영업일) × 전체영업일
   const ratio = businessDaysElapsed > 0 ? totalBusinessDays / businessDaysElapsed : 1;
   const expectedRevenue = Math.round(monthlyRevenue * ratio);
   
