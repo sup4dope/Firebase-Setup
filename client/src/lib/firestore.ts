@@ -2078,6 +2078,17 @@ export const deleteSettlementItem = async (id: string): Promise<void> => {
   await deleteDoc(doc(db, 'settlements', id));
 };
 
+export const formatPhoneNumber = (phone: string): string => {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return phone;
+};
+
 // UTM 소스 → 유입경로 매핑
 const UTM_SOURCE_MAP: Record<string, EntrySourceType> = {
   cashnote: '캐시노트 인앱광고',
@@ -2514,7 +2525,7 @@ export const processConsultationToCustomer = async (
   managerOverride?: { managerId: string; managerName: string; managerPhone: string; teamId: string; teamName: string } | null
 ): Promise<Customer | null> => {
   try {
-    const phone = consultation.phone || '';
+    const phone = formatPhoneNumber(consultation.phone || '');
     const name = consultation.name || '';
     const companyName = consultation.businessName || '';
     const businessNumber = consultation.businessNumber || '';

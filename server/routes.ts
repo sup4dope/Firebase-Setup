@@ -1393,23 +1393,31 @@ export async function registerRoutes(
         });
       }
 
+      const formatPhone = (p: string): string => {
+        const digits = p.replace(/\D/g, '');
+        if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+        if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+        return p;
+      };
+      const formattedPhone = formatPhone(String(phone));
+
       const adminApp = getAdminApp();
       const db = adminApp.firestore();
 
       const existing = await db.collection("consultations")
-        .where("phone", "==", String(phone))
+        .where("phone", "==", formattedPhone)
         .where("processed", "==", false)
         .limit(1)
         .get();
 
       if (!existing.empty) {
-        console.log(`[Webhook] 중복 미처리 상담 존재 (phone: ${phone}), 스킵`);
+        console.log(`[Webhook] 중복 미처리 상담 존재 (phone: ${formattedPhone}), 스킵`);
         return res.status(200).json({ result: "duplicate", message: "이미 동일 연락처의 미처리 상담이 존재합니다." });
       }
 
       const consultationData = {
         name: String(name),
-        phone: String(phone),
+        phone: formattedPhone,
         businessName: String(businessName || ""),
         businessNumber: String(businessNumber || ""),
         businessAge: "",
@@ -1435,7 +1443,7 @@ export async function registerRoutes(
       try {
         const serviceList = Array.isArray(services) ? services : ["정책자금 (융자)"];
         const alimtalkResult = await sendConsultationAlimtalk({
-          customerPhone: String(phone),
+          customerPhone: formattedPhone,
           customerName: String(name),
           services: serviceList,
           createdAt: new Date(),
