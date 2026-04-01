@@ -63,16 +63,19 @@ export const calculateKPI = (
   const currentMonth = format(date, 'yyyy-MM');
   const totalCounselingCount = counselingCustomers.length;
 
-  const rangeStart = dateRange?.from ? startOfDay(dateRange.from) : startOfMonth(date);
-  const rangeEnd = dateRange?.to ? endOfDay(dateRange.to) : endOfMonth(date);
+  const hasDateRange = !!(dateRange?.from && dateRange?.to);
+  const rangeStart = hasDateRange ? startOfDay(dateRange!.from!) : startOfMonth(date);
+  const rangeEnd = hasDateRange ? endOfDay(dateRange!.to!) : endOfMonth(date);
 
   const contractCount = contractCandidates.filter(c => {
     const depositPaidDate = (c as any).deposit_paid_date as string | undefined;
     if (depositPaidDate) {
+      if (!hasDateRange) return true;
       const dpd = new Date(depositPaidDate);
       return dpd >= rangeStart && dpd <= rangeEnd;
     }
     if (!c.status_code || !CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)) return false;
+    if (!hasDateRange) return true;
     const fallbackDate = c.contract_completion_date;
     if (!fallbackDate) return false;
     const fbd = new Date(fallbackDate);
