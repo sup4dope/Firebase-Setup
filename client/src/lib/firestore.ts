@@ -2089,9 +2089,9 @@ export const mapUtmToEntrySource = (utmSource?: string, source?: string, utmCamp
   if (utmCampaign === 'policy_funds_cashnote') return '캐시노트 인앱광고';
   if (utmCampaign === 'policy_funds_qs_easy') return '구글애즈(QSe)';
   if (utmCampaign === 'policy_funds_easy') return '구글애즈(e)';
-  if (!utmSource || utmSource === 'direct' || utmSource === 'organic') return '캐시노트 인앱광고';
+  if (!utmSource || utmSource === 'direct' || utmSource === 'organic') return '광고';
   const mapped = UTM_SOURCE_MAP[utmSource.toLowerCase()];
-  return mapped || '캐시노트 인앱광고';
+  return mapped || '광고';
 };
 
 // 수당률 조회 (유입경로별)
