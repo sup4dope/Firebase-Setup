@@ -1,7 +1,9 @@
 // KPI calculation utilities for business days
 import {
   startOfMonth,
+  startOfDay,
   endOfMonth,
+  endOfDay,
   eachDayOfInterval,
   isWeekend,
   isSameMonth,
@@ -42,11 +44,13 @@ export const getElapsedBusinessDays = (date: Date, holidayMap: Map<string, strin
 
 // Calculate KPI data
 export const calculateKPI = (
-  customers: Customer[],
+  counselingCustomers: Customer[],
+  contractCandidates: Customer[],
   statusLogs: StatusLog[],
   holidayMap: Map<string, string>,
   date: Date = new Date(),
-  settlements: SettlementItem[] = []
+  settlements: SettlementItem[] = [],
+  dateRange?: { from?: Date; to?: Date }
 ): KPIData => {
   const CONTRACT_AND_BEYOND_STATUSES = [
     '계약완료(선불)', '계약완료(외주)', '계약완료(후불)',
@@ -57,19 +61,22 @@ export const calculateKPI = (
   ];
   
   const currentMonth = format(date, 'yyyy-MM');
-  
-  const monthlyCustomers = customers.filter(c => {
-    if (!c.entry_date) return false;
-    const entryDate = new Date(c.entry_date);
-    return isSameMonth(entryDate, date);
-  });
-  const totalCounselingCount = monthlyCustomers.length;
-  
-  const contractCount = monthlyCustomers.filter(c => {
+  const totalCounselingCount = counselingCustomers.length;
+
+  const rangeStart = dateRange?.from ? startOfDay(dateRange.from) : startOfMonth(date);
+  const rangeEnd = dateRange?.to ? endOfDay(dateRange.to) : endOfMonth(date);
+
+  const contractCount = contractCandidates.filter(c => {
     const depositPaidDate = (c as any).deposit_paid_date as string | undefined;
-    if (depositPaidDate) return true;
+    if (depositPaidDate) {
+      const dpd = new Date(depositPaidDate);
+      return dpd >= rangeStart && dpd <= rangeEnd;
+    }
     if (!c.status_code || !CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)) return false;
-    return true;
+    const fallbackDate = c.contract_completion_date;
+    if (!fallbackDate) return false;
+    const fbd = new Date(fallbackDate);
+    return fbd >= rangeStart && fbd <= rangeEnd;
   }).length;
   
   const contractRate = totalCounselingCount > 0 

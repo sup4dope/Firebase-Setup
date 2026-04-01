@@ -467,10 +467,26 @@ export default function Dashboard() {
     return result;
   }, [customers, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader]);
 
+  const contractCandidateCustomers = useMemo(() => {
+    let result = customers;
+    if (isSuperAdmin) {
+      if (selectedTeam !== 'all') {
+        result = result.filter(c => c.team_id === selectedTeam);
+      }
+    }
+    if (isSuperAdmin || isTeamLeader) {
+      if (selectedStaff !== 'all') {
+        result = result.filter(c => c.manager_id === selectedStaff);
+      }
+    }
+    return result;
+  }, [customers, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader]);
+
   // Calculate KPI (팀/담당자/기간 필터 적용)
   const kpi = useMemo(() => {
-    return calculateKPI(funnelFilteredCustomers, statusLogs, holidayMap, new Date(), settlements);
-  }, [funnelFilteredCustomers, statusLogs, holidayMap, settlements]);
+    const effectiveDateRange = dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined;
+    return calculateKPI(funnelFilteredCustomers, contractCandidateCustomers, statusLogs, holidayMap, new Date(), settlements, effectiveDateRange);
+  }, [funnelFilteredCustomers, contractCandidateCustomers, statusLogs, holidayMap, settlements, dateRange]);
 
   // Handlers
   const handleCreateCustomer = async (data: InsertCustomer & { manager_name?: string; team_name?: string }) => {
