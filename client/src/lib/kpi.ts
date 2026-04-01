@@ -56,6 +56,8 @@ export const calculateKPI = (
     '민원처리',
   ];
   
+  const currentMonth = format(date, 'yyyy-MM');
+  
   const monthlyCustomers = customers.filter(c => {
     if (!c.entry_date) return false;
     const entryDate = new Date(c.entry_date);
@@ -63,17 +65,19 @@ export const calculateKPI = (
   });
   const totalCounselingCount = monthlyCustomers.length;
   
-  const contractCount = monthlyCustomers.filter(c =>
-    c.status_code && CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
-  ).length;
+  const contractCount = monthlyCustomers.filter(c => {
+    const depositPaidDate = (c as any).deposit_paid_date as string | undefined;
+    if (depositPaidDate) return true;
+    if (!c.status_code || !CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)) return false;
+    return true;
+  }).length;
   
   const contractRate = totalCounselingCount > 0 
     ? Math.round((contractCount / totalCounselingCount) * 100) 
     : 0;
   
-  const currentMonth = format(date, 'yyyy-MM');
   const monthlyRevenue = settlements
-    .filter(s => s.settlement_month === currentMonth && s.status === '정상' && !s.is_clawback)
+    .filter(s => s.settlement_month === currentMonth && s.status === '정상' && !s.is_clawback && (s.execution_amount || 0) > 0)
     .reduce((sum, s) => sum + (s.total_revenue || 0), 0);
   
   const totalBusinessDays = getBusinessDaysInMonth(date, holidayMap);

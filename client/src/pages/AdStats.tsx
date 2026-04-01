@@ -282,7 +282,9 @@ export default function AdStats() {
 
     dateFilteredCustomers.forEach(c => {
       const src = c.entry_source;
-      if (src && contracts[src] !== undefined && CONTRACT_AND_BEYOND.includes(c.status_code)) {
+      const hasDeposit = !!(c as any).deposit_paid_date;
+      const isContracted = hasDeposit || CONTRACT_AND_BEYOND.includes(c.status_code);
+      if (src && contracts[src] !== undefined && isContracted) {
         contracts[src]++;
         grandContracts++;
       }
@@ -344,13 +346,14 @@ export default function AdStats() {
     const consulting = allFiltered.filter(c => c.status_code === '상담대기').length;
     const trash = allFiltered.filter(c => TRASH_STATUSES.includes(c.status_code)).length;
     const target = allFiltered.filter(c => TARGET_STATUSES.includes(c.status_code)).length;
-    const contractAndBeyond = allFiltered.filter(c =>
-      CONTRACT_STATUSES.includes(c.status_code) ||
-      DOCS_STATUSES.includes(c.status_code) ||
-      APPLY_STATUSES.includes(c.status_code) ||
-      EXEC_STATUSES.includes(c.status_code) ||
-      c.status_code === '민원처리'
-    ).length;
+    const contractAndBeyond = allFiltered.filter(c => {
+      if ((c as any).deposit_paid_date) return true;
+      return CONTRACT_STATUSES.includes(c.status_code) ||
+        DOCS_STATUSES.includes(c.status_code) ||
+        APPLY_STATUSES.includes(c.status_code) ||
+        EXEC_STATUSES.includes(c.status_code) ||
+        c.status_code === '민원처리';
+    }).length;
     const exec = allFiltered.filter(c => EXEC_STATUSES.includes(c.status_code)).length;
 
     return { total, consulting, trash, target, contractAndBeyond, exec };

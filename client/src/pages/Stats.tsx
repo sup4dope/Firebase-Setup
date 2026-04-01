@@ -120,9 +120,12 @@ interface StatsMetrics {
 function calcMetrics(custs: Customer[]): StatsMetrics {
   const totalInflow = custs.length;
 
-  const contractedCustomers = custs.filter(c =>
-    c.status_code && CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
-  );
+  const contractedCustomers = custs.filter(c => {
+    const depositPaidDate = (c as any).deposit_paid_date as string | undefined;
+    if (depositPaidDate) return true;
+    if (!c.status_code || !CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)) return false;
+    return true;
+  });
   const contractedCount = contractedCustomers.length;
   const contractRate = totalInflow > 0 ? (contractedCount / totalInflow) * 100 : 0;
 
