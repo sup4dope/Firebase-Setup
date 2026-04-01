@@ -342,37 +342,39 @@ export default function Rankings() {
       let effectiveStatusForScore: string = statusCode;
       let isExecuted = false;
 
+      const depositPaidDate = (customer as any).deposit_paid_date as string | undefined;
+
       if (statusCode === '집행완료') {
-        scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
+        scoreDate = depositPaidDate || customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
         isExecuted = true;
       }
       else if (isPrepaidStatus(statusCode)) {
-        scoreDate = customer.contract_completion_date || getDateFallback(customer);
+        scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
         isExecuted = statusCode === '집행완료(선불)';
         effectiveStatusForScore = '계약완료(선불)';
       }
       else if (isPostpaidStatus(statusCode)) {
         if (statusCode === '집행완료(후불)') {
-          scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
+          scoreDate = depositPaidDate || customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
           isExecuted = true;
         } else {
-          scoreDate = customer.contract_completion_date || getDateFallback(customer);
+          scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
           isExecuted = false;
         }
         effectiveStatusForScore = '계약완료(후불)';
       }
       else if (isOutsourceStatus(statusCode)) {
         if (statusCode === '집행완료(외주)') {
-          scoreDate = customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
+          scoreDate = depositPaidDate || customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
           isExecuted = true;
         } else {
-          scoreDate = customer.contract_completion_date || getDateFallback(customer);
+          scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
           isExecuted = false;
         }
         effectiveStatusForScore = '계약완료(외주)';
       }
       else if (statusCode === '민원처리') {
-        scoreDate = customer.contract_completion_date || customer.execution_date || getDateFallback(customer);
+        scoreDate = depositPaidDate || customer.contract_completion_date || customer.execution_date || getDateFallback(customer);
         isExecuted = !!(customer.execution_amount && customer.execution_date);
         effectiveStatusForScore = '계약완료(선불)';
       }
