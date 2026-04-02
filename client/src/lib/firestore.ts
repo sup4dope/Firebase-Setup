@@ -1697,17 +1697,26 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     allExecutions.sort((a, b) => a.executionDate.localeCompare(b.executionDate));
     
     // 5. 집행 항목이 있으면 각각 정산 생성/업데이트
+    const depositPaidDate = (customer as any).deposit_paid_date || '';
+    const hasDepositSettlement = depositPaidDate && existingSettlements.some(s =>
+      s.status === '정상' && !s.is_clawback && (s.contract_amount || 0) > 0 && !(s.execution_amount)
+    );
+
     if (allExecutions.length > 0) {
       const legacySettlements = existingSettlements.filter(s => 
         s.status === '정상' && !s.is_clawback && !s.org_name
       );
       for (const legacy of legacySettlements) {
+        const isDepositOnly = (legacy.contract_amount || 0) > 0 && !(legacy.execution_amount);
+        if (isDepositOnly && depositPaidDate) {
+          console.log(`[Settlement Sync] 계약금 수납 정산 유지: ${customer.company_name || customer.name}`);
+          continue;
+        }
         await deleteDoc(doc(db, 'settlements', legacy.id));
         console.log(`[Settlement Sync] 레거시 정산 삭제 (org_name 없음): ${customer.company_name || customer.name}`);
       }
       
       const processedOrgs = new Set<string>();
-      let isFirstExecution = true;
       
       for (const execEntry of allExecutions) {
         const { orgName, executionDate, executionAmount, isReExecution } = execEntry;
@@ -1719,11 +1728,11 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         }
         processedOrgs.add(settlementOrgName);
         
-        const contractAmount = isFirstExecution && !isReExecution 
-          ? (customer.contract_amount || customer.deposit_amount || 0) 
-          : 0;
+        const contractAmount = hasDepositSettlement ? 0
+          : (!isReExecution && processedOrgs.size === 1)
+            ? (customer.contract_amount || customer.deposit_amount || 0)
+            : 0;
         
-        const depositPaidDate = (customer as any).deposit_paid_date || '';
         const settlementMonth = (contractAmount > 0 && depositPaidDate)
           ? depositPaidDate.slice(0, 7)
           : executionDate.slice(0, 7);
