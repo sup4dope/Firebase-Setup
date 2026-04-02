@@ -349,8 +349,13 @@ export default function Rankings() {
         isExecuted = true;
       }
       else if (isPrepaidStatus(statusCode)) {
-        scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
-        isExecuted = statusCode === '집행완료(선불)';
+        if (statusCode === '집행완료(선불)') {
+          scoreDate = depositPaidDate || customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
+          isExecuted = true;
+        } else {
+          scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
+          isExecuted = false;
+        }
         effectiveStatusForScore = '계약완료(선불)';
       }
       else if (isPostpaidStatus(statusCode)) {
