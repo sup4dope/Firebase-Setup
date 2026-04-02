@@ -1484,7 +1484,7 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
         return false;
       }
       
-      const depositPaidDate = (customer as any).deposit_paid_date || '';
+      const depositPaidDate = (customer as any).deposit_paid_date || (customer as any).contract_date || customer.contract_completion_date || '';
       if (depositPaidDate && depositPaidDate.slice(0, 7) === month) return true;
       
       const hasOrgInMonth = approvedOrgs.some(
@@ -1697,7 +1697,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     allExecutions.sort((a, b) => a.executionDate.localeCompare(b.executionDate));
     
     // 5. 집행 항목이 있으면 각각 정산 생성/업데이트
-    const depositPaidDate = (customer as any).deposit_paid_date || '';
+    const depositPaidDate = (customer as any).deposit_paid_date || contractDate || '';
     const hasDepositSettlement = depositPaidDate && existingSettlements.some(s =>
       s.status === '정상' && !s.is_clawback && (s.contract_amount || 0) > 0 && !(s.execution_amount)
     );
@@ -1724,6 +1724,56 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       
       const processedOrgs = new Set<string>();
       
+      const customerContractAmount = customer.contract_amount || customer.deposit_amount || 0;
+      const depositMonth = depositPaidDate ? depositPaidDate.slice(0, 7) : '';
+      const firstExecDate = allExecutions.find(e => !e.isReExecution)?.executionDate || '';
+      const execMonth = firstExecDate ? firstExecDate.slice(0, 7) : '';
+      const needsDepositSplit = depositPaidDate && customerContractAmount > 0 && depositMonth !== execMonth;
+      
+      let depositSettlementExists = !!hasDepositSettlement;
+      
+      if (needsDepositSplit && !depositSettlementExists) {
+        const existingDepositSettlement = existingSettlements.find(s =>
+          s.status === '정상' && !s.is_clawback && !s.org_name && (s.contract_amount || 0) > 0 && !(s.execution_amount)
+        );
+        
+        if (existingDepositSettlement) {
+          if (existingDepositSettlement.settlement_month !== depositMonth) {
+            await updateSettlementItem(existingDepositSettlement.id, { settlement_month: depositMonth });
+            console.log(`[Settlement Sync] 계약금 정산 정산월 수정 (${existingDepositSettlement.settlement_month} → ${depositMonth}): ${customer.company_name || customer.name}`);
+          }
+          depositSettlementExists = true;
+        } else {
+          const depositCalc = calculateSettlement(customerContractAmount, 0, feeRate, commissionRate, depositCommissionRate);
+          const depositSettlementData: InsertSettlementItem = {
+            customer_id: customer.id,
+            customer_name: customer.company_name || customer.name,
+            manager_id: customer.manager_id,
+            manager_name: customer.manager_name || manager?.name || '',
+            team_id: customer.team_id,
+            team_name: customer.team_name || '',
+            entry_source: entrySource,
+            contract_amount: customerContractAmount,
+            execution_amount: 0,
+            fee_rate: feeRate,
+            total_revenue: depositCalc.totalRevenue,
+            commission_rate: commissionRate,
+            deposit_commission_rate: depositCommissionRate,
+            gross_commission: depositCalc.grossCommission,
+            tax_amount: depositCalc.taxAmount,
+            net_commission: depositCalc.netCommission,
+            settlement_month: depositMonth,
+            contract_date: contractDate,
+            execution_date: '',
+            status: '정상',
+            is_clawback: false,
+          };
+          await createSettlementItem(depositSettlementData);
+          depositSettlementExists = true;
+          console.log(`[Settlement Sync] 계약금 별도 정산 생성 (${depositMonth}): ${customer.company_name || customer.name}`);
+        }
+      }
+      
       for (const execEntry of allExecutions) {
         const { orgName, executionDate, executionAmount, isReExecution } = execEntry;
         
@@ -1734,9 +1784,9 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         }
         processedOrgs.add(settlementOrgName);
         
-        const contractAmount = hasDepositSettlement ? 0
-          : (!isReExecution && processedOrgs.size === 1)
-            ? (customer.contract_amount || customer.deposit_amount || 0)
+        const contractAmount = (depositSettlementExists || hasDepositSettlement) ? 0
+          : (!isReExecution && processedOrgs.size === 1 && !needsDepositSplit)
+            ? customerContractAmount
             : 0;
         
         const settlementMonth = (contractAmount > 0 && depositPaidDate)
@@ -1757,7 +1807,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         );
         
         if (existingOrgSettlement) {
-          await updateSettlementItem(existingOrgSettlement.id, {
+          const updatePayload: Record<string, any> = {
             customer_name: customer.company_name || customer.name,
             manager_id: customer.manager_id,
             manager_name: customer.manager_name || manager?.name || '',
@@ -1775,7 +1825,12 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
             net_commission: calc.netCommission,
             contract_date: contractDate,
             execution_date: executionDate,
-          });
+          };
+          if (existingOrgSettlement.settlement_month !== settlementMonth) {
+            updatePayload.settlement_month = settlementMonth;
+            console.log(`[Settlement Sync] 기관별 정산 정산월 수정 (${existingOrgSettlement.settlement_month} → ${settlementMonth}): ${customer.company_name || customer.name} - ${settlementOrgName}`);
+          }
+          await updateSettlementItem(existingOrgSettlement.id, updatePayload);
           console.log(`[Settlement Sync] 기관별 정산 업데이트: ${customer.company_name || customer.name} - ${settlementOrgName}, 집행금액: ${executionAmount}만원`);
         } else {
           const settlementData: InsertSettlementItem = {
@@ -1817,7 +1872,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       const contractAmount = customer.contract_amount || customer.deposit_amount || 0;
       const executionAmount = customer.execution_amount || 0;
       const executionDate = customer.execution_date || '';
-      const depositPaidDate = (customer as any).deposit_paid_date || '';
+      const depositPaidDate = (customer as any).deposit_paid_date || contractDate || '';
       const dateForMonth = (contractAmount > 0 && depositPaidDate) ? depositPaidDate : (executionDate || contractDate);
       const settlementMonth = dateForMonth ? dateForMonth.slice(0, 7) : '';
       
