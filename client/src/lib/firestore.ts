@@ -1807,9 +1807,6 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
           console.log(`[Settlement Sync] 기관별 정산 생성: ${customer.company_name || customer.name} - ${settlementOrgName}, 집행금액: ${executionAmount}만원, 재집행: ${isReExecution}`);
         }
         
-        if (!isReExecution) {
-          isFirstExecution = false;
-        }
       }
     } else {
       // 승인된 기관이 없는 경우 (레거시 호환: 단일 정산 방식)
@@ -1886,8 +1883,8 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         console.log(`[Settlement Sync] 단일 고객 생성: ${customer.company_name || customer.name}`);
       }
     }
-  } catch (error) {
-    console.error('Error syncing single customer settlement:', error);
+  } catch (error: any) {
+    console.error(`Error syncing single customer settlement (${customerId}):`, error?.message || error?.code || JSON.stringify(error) || error);
   }
 };
 
