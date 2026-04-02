@@ -1709,7 +1709,13 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       for (const legacy of legacySettlements) {
         const isDepositOnly = (legacy.contract_amount || 0) > 0 && !(legacy.execution_amount);
         if (isDepositOnly && depositPaidDate) {
-          console.log(`[Settlement Sync] 계약금 수납 정산 유지: ${customer.company_name || customer.name}`);
+          const correctMonth = depositPaidDate.slice(0, 7);
+          if (legacy.settlement_month !== correctMonth) {
+            await updateSettlementItem(legacy.id, { settlement_month: correctMonth });
+            console.log(`[Settlement Sync] 계약금 수납 정산 정산월 수정 (${legacy.settlement_month} → ${correctMonth}): ${customer.company_name || customer.name}`);
+          } else {
+            console.log(`[Settlement Sync] 계약금 수납 정산 유지: ${customer.company_name || customer.name}`);
+          }
           continue;
         }
         await deleteDoc(doc(db, 'settlements', legacy.id));
@@ -1826,7 +1832,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       const calc = calculateSettlement(contractAmount, executionAmount, feeRate, commissionRate, depositCommissionRate);
       
       if (activeSettlement) {
-        await updateSettlementItem(activeSettlement.id, {
+        const updatePayload: Record<string, any> = {
           customer_name: customer.company_name || customer.name,
           manager_id: customer.manager_id,
           manager_name: customer.manager_name || manager?.name || '',
@@ -1844,7 +1850,12 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
           net_commission: calc.netCommission,
           contract_date: contractDate,
           execution_date: executionDate,
-        });
+        };
+        if (depositPaidDate && activeSettlement.settlement_month !== settlementMonth) {
+          updatePayload.settlement_month = settlementMonth;
+          console.log(`[Settlement Sync] 정산월 수정 (${activeSettlement.settlement_month} → ${settlementMonth}): ${customer.company_name || customer.name}`);
+        }
+        await updateSettlementItem(activeSettlement.id, updatePayload);
         console.log(`[Settlement Sync] 단일 고객 업데이트: ${customer.company_name || customer.name}`);
       } else if (!existingSettlements.some(s => s.customer_id === customerId && !s.org_name)) {
         const settlementData: InsertSettlementItem = {
