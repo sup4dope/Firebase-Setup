@@ -125,57 +125,9 @@ export function HeaderRankings() {
 
     const scoresByUser = new Map<string, { name: string; totalScore: number }>();
 
-    customers.forEach(customer => {
-      const statusCode = customer.status_code || '';
-      let scoreDate: string | undefined;
-      let effectiveStatus: string = statusCode;
-      let isExecuted = false;
-
-      const depositPaidDate = (customer as any).deposit_paid_date as string | undefined;
-
-      if (statusCode === '집행완료') {
-        scoreDate = depositPaidDate || customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
-        isExecuted = true;
-      }
-      else if (isPrepaidStatus(statusCode)) {
-        if (statusCode === '집행완료(선불)') {
-          scoreDate = depositPaidDate || customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
-          isExecuted = true;
-        } else {
-          scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
-          isExecuted = false;
-        }
-        effectiveStatus = '계약완료(선불)';
-      }
-      else if (isPostpaidStatus(statusCode)) {
-        if (statusCode === '집행완료(후불)') {
-          scoreDate = depositPaidDate || customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
-          isExecuted = true;
-        } else {
-          scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
-          isExecuted = false;
-        }
-        effectiveStatus = '계약완료(후불)';
-      }
-      else if (isOutsourceStatus(statusCode)) {
-        if (statusCode === '집행완료(외주)') {
-          scoreDate = depositPaidDate || customer.execution_date || customer.contract_completion_date || getDateFallback(customer);
-          isExecuted = true;
-        } else {
-          scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
-          isExecuted = false;
-        }
-        effectiveStatus = '계약완료(외주)';
-      }
-      else if (statusCode === '민원처리') {
-        scoreDate = depositPaidDate || customer.contract_completion_date || customer.execution_date || getDateFallback(customer);
-        isExecuted = !!(customer.execution_amount && customer.execution_date);
-        effectiveStatus = '계약완료(선불)';
-      }
-
-      if (!scoreDate) return;
-      const sDate = new Date(scoreDate);
-      if (sDate < startDate || sDate > endDate) return;
+    const addScore = (customer: Customer, sDate: string, effStatus: string, isExec: boolean) => {
+      const d = new Date(sDate);
+      if (d < startDate || d > endDate) return;
 
       const managerId = customer.manager_id;
       if (!managerId) return;
@@ -189,9 +141,9 @@ export function HeaderRankings() {
         let isFirstOrg = true;
         for (const org of approvedOrgs) {
           const orgName = org.org || '미등록';
-          const orgExecutionAmount = isExecuted ? (org.execution_amount || customer.execution_amount || 0) : 0;
-          const orgContractAmount = isFirstOrg ? contractAmount : 0;
-          const score = calculateContractScore(orgName, orgExecutionAmount, orgContractAmount, effectiveStatus, isExecuted);
+          const orgExecAmt = isExec ? (org.execution_amount || customer.execution_amount || 0) : 0;
+          const orgContractAmt = isFirstOrg ? contractAmount : 0;
+          const score = calculateContractScore(orgName, orgExecAmt, orgContractAmt, effStatus, isExec);
           const existing = scoresByUser.get(managerId) || { name: user.name || user.email, totalScore: 0 };
           existing.totalScore += score.totalScore;
           scoresByUser.set(managerId, existing);
@@ -199,11 +151,74 @@ export function HeaderRankings() {
         }
       } else {
         const processingOrg = customer.processing_org || '미등록';
-        const executionAmount = isExecuted ? (customer.execution_amount || 0) : 0;
-        const score = calculateContractScore(processingOrg, executionAmount, contractAmount, effectiveStatus, isExecuted);
+        const executionAmount = isExec ? (customer.execution_amount || 0) : 0;
+        const score = calculateContractScore(processingOrg, executionAmount, contractAmount, effStatus, isExec);
         const existing = scoresByUser.get(managerId) || { name: user.name || user.email, totalScore: 0 };
         existing.totalScore += score.totalScore;
         scoresByUser.set(managerId, existing);
+      }
+    };
+
+    const handleExecSplit = (customer: Customer, baseStatus: string, execStatus: string) => {
+      const dpd = (customer as any).deposit_paid_date as string | undefined;
+      const contractDate = dpd || customer.contract_completion_date || getDateFallback(customer);
+      const execDate = customer.execution_date;
+      const cMonth = contractDate?.slice(0, 7);
+      const eMonth = execDate?.slice(0, 7);
+
+      if (contractDate && execDate && cMonth !== eMonth) {
+        addScore(customer, contractDate, baseStatus, false);
+        addScore(customer, execDate, execStatus, true);
+      } else {
+        const date = contractDate || execDate;
+        if (date) addScore(customer, date, baseStatus, true);
+      }
+    };
+
+    customers.forEach(customer => {
+      const statusCode = customer.status_code || '';
+      const depositPaidDate = (customer as any).deposit_paid_date as string | undefined;
+
+      if (statusCode === '집행완료') {
+        handleExecSplit(customer, '계약완료(선불)', '집행완료(선불)');
+        return;
+      }
+
+      if (isPrepaidStatus(statusCode)) {
+        if (statusCode === '집행완료(선불)') {
+          handleExecSplit(customer, '계약완료(선불)', '집행완료(선불)');
+          return;
+        }
+        const scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
+        if (scoreDate) addScore(customer, scoreDate, '계약완료(선불)', false);
+        return;
+      }
+
+      if (isPostpaidStatus(statusCode)) {
+        if (statusCode === '집행완료(후불)') {
+          handleExecSplit(customer, '계약완료(후불)', '집행완료(후불)');
+          return;
+        }
+        const scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
+        if (scoreDate) addScore(customer, scoreDate, '계약완료(후불)', false);
+        return;
+      }
+
+      if (isOutsourceStatus(statusCode)) {
+        if (statusCode === '집행완료(외주)') {
+          handleExecSplit(customer, '계약완료(외주)', '집행완료(외주)');
+          return;
+        }
+        const scoreDate = depositPaidDate || customer.contract_completion_date || getDateFallback(customer);
+        if (scoreDate) addScore(customer, scoreDate, '계약완료(외주)', false);
+        return;
+      }
+
+      if (statusCode === '민원처리') {
+        const scoreDate = depositPaidDate || customer.contract_completion_date || customer.execution_date || getDateFallback(customer);
+        const isExec = !!(customer.execution_amount && customer.execution_date);
+        if (scoreDate) addScore(customer, scoreDate, '계약완료(선불)', isExec);
+        return;
       }
     });
 
