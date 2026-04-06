@@ -123,6 +123,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     address: '',
     bank_name: '',
     bank_account: '',
+    has_vehicle: false,
     hire_date: new Date().toISOString().split('T')[0],
     role: 'staff' as UserRole,
     team_id: '' as string,
@@ -148,6 +149,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     address: '',
     bank_name: '',
     bank_account: '',
+    has_vehicle: false,
     hire_date: '',
     role: 'staff' as UserRole,
     team_id: '' as string,
@@ -218,6 +220,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         address: newEmployee.address || undefined,
         bank_name: newEmployee.bank_name || undefined,
         bank_account: newEmployee.bank_account || undefined,
+        has_vehicle: newEmployee.has_vehicle,
         hire_date: newEmployee.hire_date || undefined,
         role: newEmployee.role,
         team_id: newEmployee.team_id || null,
@@ -237,6 +240,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         address: '',
         bank_name: '',
         bank_account: '',
+        has_vehicle: false,
         hire_date: new Date().toISOString().split('T')[0],
         role: 'staff',
         team_id: '',
@@ -345,6 +349,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       address: user.address || '',
       bank_name: user.bank_name || '',
       bank_account: user.bank_account || '',
+      has_vehicle: user.has_vehicle || false,
       hire_date: user.hire_date || '',
       role: user.role,
       team_id: user.team_id || '',
@@ -378,6 +383,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         address: editEmployee.address || undefined,
         bank_name: editEmployee.bank_name || undefined,
         bank_account: editEmployee.bank_account || undefined,
+        has_vehicle: editEmployee.has_vehicle,
         hire_date: editEmployee.hire_date || undefined,
         role: editEmployee.role,
         team_id: editEmployee.team_id || null,
@@ -1111,6 +1117,15 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   />
                 </div>
               </div>
+
+              <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                <Label className="text-muted-foreground text-sm">차량 소유</Label>
+                <Switch
+                  checked={newEmployee.has_vehicle}
+                  onCheckedChange={(checked) => setNewEmployee({ ...newEmployee, has_vehicle: checked })}
+                  data-testid="switch-employee-has-vehicle"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-2">
@@ -1525,6 +1540,15 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                     data-testid="input-edit-employee-bank-account"
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                <Label className="text-muted-foreground text-sm">차량 소유</Label>
+                <Switch
+                  checked={editEmployee.has_vehicle}
+                  onCheckedChange={(checked) => setEditEmployee({ ...editEmployee, has_vehicle: checked })}
+                  data-testid="switch-edit-employee-has-vehicle"
+                />
               </div>
             </div>
 

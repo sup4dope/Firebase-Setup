@@ -40,6 +40,7 @@ export interface User {
   address?: string; // 거주지 주소
   bank_name?: string; // 급여계좌 은행명
   bank_account?: string; // 급여계좌 계좌번호
+  has_vehicle?: boolean; // 차량 소유여부
   hire_date?: string; // 입사일자 YYYY-MM-DD
   status?: UserStatus; // 재직/퇴사 상태
   current_ip?: string; // 현재 접속 IP
