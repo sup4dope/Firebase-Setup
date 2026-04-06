@@ -526,6 +526,8 @@ export default function Settlements() {
     if (!managerUser?.has_social_insurance || !managerUser.social_insurance_salary) return summary.final_payment;
 
     const siSalaryWon = managerUser.social_insurance_salary * 10000;
+    if (summary.total_net_commission < siSalaryWon) return summary.final_payment;
+
     const siDeductionWon = managerUser.has_vehicle ? SI_DEDUCTION_WITH_VEHICLE : SI_DEDUCTION_WITHOUT_VEHICLE;
     const remaining = Math.max(0, summary.total_gross_commission - siSalaryWon);
     const remainingTax = Math.floor(remaining * 0.033);
@@ -555,7 +557,10 @@ export default function Settlements() {
     const salaryMonthStr = `${year}년 ${parseInt(month)}월`;
 
     const managerUser = users.find(u => u.uid === summary.manager_id);
-    const useNewTax = isNewTaxApplicable(selectedMonth) && managerUser?.has_social_insurance && managerUser.social_insurance_salary;
+    const totalPaymentWon = totalContractPayment + totalConsultingFee;
+    const netAfter33 = Math.floor(totalPaymentWon * 0.967);
+    const siSalaryWon = managerUser?.social_insurance_salary ? managerUser.social_insurance_salary * 10000 : 0;
+    const useNewTax = isNewTaxApplicable(selectedMonth) && managerUser?.has_social_insurance && managerUser.social_insurance_salary && netAfter33 >= siSalaryWon;
     
     setSalaryData({
       employeeName: summary.manager_name,
@@ -566,7 +571,7 @@ export default function Settlements() {
       additionalPayments: [],
       hasSocialInsurance: useNewTax ? true : false,
       hasVehicle: useNewTax ? (managerUser?.has_vehicle || false) : false,
-      socialInsuranceSalary: useNewTax ? (managerUser!.social_insurance_salary! * 10000) : 0,
+      socialInsuranceSalary: useNewTax ? siSalaryWon : 0,
     });
     setSalaryModalOpen(true);
   };
