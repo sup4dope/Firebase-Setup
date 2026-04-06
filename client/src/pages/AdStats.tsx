@@ -640,7 +640,7 @@ export default function AdStats() {
           {dailySourceData.length > 0 && (
             <div className="mt-4 border rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[900px]" data-testid="table-daily-totals">
+              <table className="w-full text-sm min-w-[1150px]" data-testid="table-daily-totals">
                 <thead>
                   <tr className="bg-muted/50 border-b border-border">
                     <th className="py-2 px-3 text-left font-medium text-muted-foreground">유입경로</th>
@@ -649,7 +649,9 @@ export default function AdStats() {
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">계약률</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">집행률</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">계약금</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">건당 잠재계약금</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">자문료</th>
+                    <th className="py-2 px-3 text-right font-medium text-muted-foreground">건당 잠재자문료</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">총매출</th>
                     <th className="py-2 px-3 text-right font-medium text-muted-foreground">건당 잠재가치</th>
                   </tr>
@@ -685,8 +687,18 @@ export default function AdStats() {
                         <td className="py-2 px-3 text-right text-muted-foreground">
                           {dailySourceTotals.depositRevenue[source] > 0 ? `${dailySourceTotals.depositRevenue[source].toLocaleString()}원` : '-'}
                         </td>
+                        <td className="py-2 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          {dailySourceTotals.totals[source] > 0 && dailySourceTotals.depositRevenue[source] > 0
+                            ? `${Math.round(dailySourceTotals.depositRevenue[source] / dailySourceTotals.totals[source]).toLocaleString()}원`
+                            : '-'}
+                        </td>
                         <td className="py-2 px-3 text-right text-muted-foreground">
                           {dailySourceTotals.advisoryRevenue[source] > 0 ? `${dailySourceTotals.advisoryRevenue[source].toLocaleString()}원` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right font-semibold text-violet-600 dark:text-violet-400">
+                          {dailySourceTotals.totals[source] > 0 && dailySourceTotals.advisoryRevenue[source] > 0
+                            ? `${Math.round(dailySourceTotals.advisoryRevenue[source] / dailySourceTotals.totals[source]).toLocaleString()}원`
+                            : '-'}
                         </td>
                         <td className="py-2 px-3 text-right font-semibold">
                           {dailySourceTotals.revenue[source] > 0 ? `${dailySourceTotals.revenue[source].toLocaleString()}원` : '-'}
@@ -715,7 +727,17 @@ export default function AdStats() {
                       <span className="text-xs text-muted-foreground ml-1">({dailySourceTotals.grandExecs}건)</span>
                     </td>
                     <td className="py-2 px-3 text-right">{dailySourceTotals.grandDepositRevenue > 0 ? `${dailySourceTotals.grandDepositRevenue.toLocaleString()}원` : '-'}</td>
+                    <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">
+                      {dailySourceTotals.grandTotal > 0 && dailySourceTotals.grandDepositRevenue > 0
+                        ? `${Math.round(dailySourceTotals.grandDepositRevenue / dailySourceTotals.grandTotal).toLocaleString()}원`
+                        : '-'}
+                    </td>
                     <td className="py-2 px-3 text-right">{dailySourceTotals.grandAdvisoryRevenue > 0 ? `${dailySourceTotals.grandAdvisoryRevenue.toLocaleString()}원` : '-'}</td>
+                    <td className="py-2 px-3 text-right text-violet-600 dark:text-violet-400">
+                      {dailySourceTotals.grandTotal > 0 && dailySourceTotals.grandAdvisoryRevenue > 0
+                        ? `${Math.round(dailySourceTotals.grandAdvisoryRevenue / dailySourceTotals.grandTotal).toLocaleString()}원`
+                        : '-'}
+                    </td>
                     <td className="py-2 px-3 text-right">{dailySourceTotals.grandRevenue > 0 ? `${dailySourceTotals.grandRevenue.toLocaleString()}원` : '-'}</td>
                     <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">
                       {dailySourceTotals.grandTotal > 0 && dailySourceTotals.grandRevenue > 0
