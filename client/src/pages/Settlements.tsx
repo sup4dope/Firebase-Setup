@@ -128,6 +128,9 @@ export default function Settlements() {
     contractPayment: number;
     consultingFee: number;
     additionalPayments: SalaryItem[];
+    hasSocialInsurance?: boolean;
+    hasVehicle?: boolean;
+    socialInsuranceSalary?: number;
   } | null>(null);
 
   
@@ -509,6 +512,27 @@ export default function Settlements() {
     });
   };
 
+  const isNewTaxApplicable = (period: string): boolean => {
+    const months = getMonthsForPeriod(period);
+    return months.length > 0 && months.every(m => m >= '2026-04');
+  };
+
+  const SI_DEDUCTION_WITH_VEHICLE = 88410;
+  const SI_DEDUCTION_WITHOUT_VEHICLE = 109760;
+
+  const getAdjustedFinalPayment = (summary: MonthlySettlementSummary): number => {
+    if (!isNewTaxApplicable(selectedMonth)) return summary.final_payment;
+    const managerUser = users.find(u => u.uid === summary.manager_id);
+    if (!managerUser?.has_social_insurance || !managerUser.social_insurance_salary) return summary.final_payment;
+
+    const siSalaryWon = managerUser.social_insurance_salary * 10000;
+    const siDeductionWon = managerUser.has_vehicle ? SI_DEDUCTION_WITH_VEHICLE : SI_DEDUCTION_WITHOUT_VEHICLE;
+    const remaining = Math.max(0, summary.total_gross_commission - siSalaryWon);
+    const remainingTax = Math.floor(remaining * 0.033);
+    const totalDeductions = siDeductionWon + remainingTax;
+    return Math.round((summary.total_gross_commission - totalDeductions - summary.clawback_amount) * 100) / 100;
+  };
+
   const handleShowSalaryStatement = (summary: MonthlySettlementSummary) => {
     const periodMonths = getMonthsForPeriod(selectedMonth);
     const managerItems = items.filter(
@@ -521,7 +545,6 @@ export default function Settlements() {
     let totalConsultingFee = 0;
     
     managerItems.forEach(item => {
-      // 계약금 수당률: deposit_commission_rate 우선 사용, 없으면 commission_rate 사용
       const depositRate = item.deposit_commission_rate ?? item.commission_rate;
       totalContractPayment += Math.round(toWon(item.contract_amount) * (depositRate / 100));
       const advisoryFee = Math.round(toWon(item.execution_amount) * (item.fee_rate || 0) / 100);
@@ -530,7 +553,9 @@ export default function Settlements() {
     
     const [year, month] = selectedMonth.split('-');
     const salaryMonthStr = `${year}년 ${parseInt(month)}월`;
-    const today = new Date();
+
+    const managerUser = users.find(u => u.uid === summary.manager_id);
+    const useNewTax = isNewTaxApplicable(selectedMonth) && managerUser?.has_social_insurance && managerUser.social_insurance_salary;
     
     setSalaryData({
       employeeName: summary.manager_name,
@@ -539,6 +564,9 @@ export default function Settlements() {
       contractPayment: totalContractPayment,
       consultingFee: totalConsultingFee,
       additionalPayments: [],
+      hasSocialInsurance: useNewTax ? true : false,
+      hasVehicle: useNewTax ? (managerUser?.has_vehicle || false) : false,
+      socialInsuranceSalary: useNewTax ? (managerUser!.social_insurance_salary! * 10000) : 0,
     });
     setSalaryModalOpen(true);
   };
@@ -712,7 +740,7 @@ export default function Settlements() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {totals.finalPayment.toLocaleString()}원
+              {filteredSummaries.reduce((sum, s) => sum + getAdjustedFinalPayment(s), 0).toLocaleString()}원
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               공제세액: {totals.tax.toLocaleString()}원
@@ -786,7 +814,7 @@ export default function Settlements() {
                       {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}원` : '-'}
                     </TableCell>
                     <TableCell className="text-right font-bold text-blue-600">
-                      {summary.final_payment.toLocaleString()}원
+                      {getAdjustedFinalPayment(summary).toLocaleString()}원
                     </TableCell>
                     <TableCell className="text-center">
                       <Button
@@ -996,7 +1024,7 @@ export default function Settlements() {
                 employeeName={salaryData.employeeName}
                 employeeId={salaryData.employeeId}
                 department="컨설팅부"
-                position="프리랜서"
+                position={salaryData.hasSocialInsurance ? "사대보험" : "프리랜서"}
                 salaryMonth={salaryData.salaryMonth}
                 contractPayment={salaryData.contractPayment}
                 consultingFee={salaryData.consultingFee}
@@ -1005,6 +1033,9 @@ export default function Settlements() {
                 localTaxRate={0.3}
                 approverName="대표"
                 approverPosition="대표이사"
+                hasSocialInsurance={salaryData.hasSocialInsurance}
+                hasVehicle={salaryData.hasVehicle}
+                socialInsuranceSalary={salaryData.socialInsuranceSalary}
               />
             )}
           </div>
@@ -1110,7 +1141,7 @@ export default function Settlements() {
                           {summary.clawback_count > 0 ? `-${summary.clawback_amount.toLocaleString()}원` : '-'}
                         </TableCell>
                         <TableCell className="text-right font-bold text-purple-600">
-                          {summary.final_payment.toLocaleString()}원
+                          {getAdjustedFinalPayment(summary).toLocaleString()}원
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1127,7 +1158,7 @@ export default function Settlements() {
                         {totals.clawbackCount > 0 ? `-${totals.clawbackAmount.toLocaleString()}원` : '-'}
                       </TableCell>
                       <TableCell className="text-right font-bold text-purple-600">
-                        {totals.finalPayment.toLocaleString()}원
+                        {summaries.reduce((sum, s) => sum + getAdjustedFinalPayment(s), 0).toLocaleString()}원
                       </TableCell>
                     </TableRow>
                   </>

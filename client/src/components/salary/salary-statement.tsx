@@ -1,10 +1,28 @@
-import { User, Calendar, FileText, Percent, DollarSign } from "lucide-react"
+import { User, Calendar, FileText, Percent, DollarSign, Shield } from "lucide-react"
 import yieumSignature from "@assets/yieum_signature_1768113653178.png"
 
 interface SalaryItem {
   category: string
   amount: number
   description?: string
+}
+
+const SI_DEDUCTIONS_WITH_VEHICLE = {
+  nationalPension: 43220,
+  healthInsurance: 32710,
+  longTermCare: 4290,
+  employmentInsurance: 8190,
+  incomeTax: 0,
+  localTax: 0,
+}
+
+const SI_DEDUCTIONS_WITHOUT_VEHICLE = {
+  nationalPension: 52720,
+  healthInsurance: 39900,
+  longTermCare: 5240,
+  employmentInsurance: 9990,
+  incomeTax: 1740,
+  localTax: 170,
 }
 
 interface SalaryStatementProps {
@@ -23,6 +41,9 @@ interface SalaryStatementProps {
   localTaxRate?: number
   approverName?: string
   approverPosition?: string
+  hasSocialInsurance?: boolean
+  hasVehicle?: boolean
+  socialInsuranceSalary?: number
 }
 
 export function SalaryStatement({
@@ -41,12 +62,52 @@ export function SalaryStatement({
   localTaxRate = 0.3,
   approverName = "김대표",
   approverPosition = "대표이사",
+  hasSocialInsurance = false,
+  hasVehicle = false,
+  socialInsuranceSalary = 0,
 }: SalaryStatementProps) {
   const totalPayment = contractPayment + consultingFee + additionalPayments.reduce((sum, item) => sum + item.amount, 0)
-  const incomeTax = Math.floor(totalPayment * (incomeTaxRate / 100))
-  const localTax = Math.floor(totalPayment * (localTaxRate / 100))
-  const totalDeduction = incomeTax + localTax
-  const netPayment = totalPayment - totalDeduction
+
+  let totalDeduction = 0
+  let netPayment = 0
+
+  let siNationalPension = 0
+  let siHealthInsurance = 0
+  let siLongTermCare = 0
+  let siEmploymentInsurance = 0
+  let siIncomeTax = 0
+  let siLocalTax = 0
+  let totalSiDeduction = 0
+  let remainingPayment = 0
+  let remainingIncomeTax = 0
+  let remainingLocalTax = 0
+  let totalRemainingTax = 0
+  let incomeTax = 0
+  let localTax = 0
+
+  if (hasSocialInsurance && socialInsuranceSalary > 0) {
+    const si = hasVehicle ? SI_DEDUCTIONS_WITH_VEHICLE : SI_DEDUCTIONS_WITHOUT_VEHICLE
+    siNationalPension = si.nationalPension
+    siHealthInsurance = si.healthInsurance
+    siLongTermCare = si.longTermCare
+    siEmploymentInsurance = si.employmentInsurance
+    siIncomeTax = si.incomeTax
+    siLocalTax = si.localTax
+    totalSiDeduction = siNationalPension + siHealthInsurance + siLongTermCare + siEmploymentInsurance + siIncomeTax + siLocalTax
+
+    remainingPayment = Math.max(0, totalPayment - socialInsuranceSalary)
+    remainingIncomeTax = Math.floor(remainingPayment * (incomeTaxRate / 100))
+    remainingLocalTax = Math.floor(remainingPayment * (localTaxRate / 100))
+    totalRemainingTax = remainingIncomeTax + remainingLocalTax
+
+    totalDeduction = totalSiDeduction + totalRemainingTax
+    netPayment = totalPayment - totalDeduction
+  } else {
+    incomeTax = Math.floor(totalPayment * (incomeTaxRate / 100))
+    localTax = Math.floor(totalPayment * (localTaxRate / 100))
+    totalDeduction = incomeTax + localTax
+    netPayment = totalPayment - totalDeduction
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ko-KR").format(amount)
@@ -58,7 +119,7 @@ export function SalaryStatement({
         <div className="flex justify-between items-start mb-3">
           <div>
             <h1 className="text-3xl font-bold text-teal-900 mb-1 tracking-tight">급여명세서</h1>
-            <p className="text-xs text-teal-600 tracking-wide">Salary Statement (Freelance)</p>
+            <p className="text-xs text-teal-600 tracking-wide">Salary Statement {hasSocialInsurance ? '(Social Insurance)' : '(Freelance)'}</p>
           </div>
         </div>
 
@@ -164,28 +225,103 @@ export function SalaryStatement({
         </div>
       </div>
 
-      <div className="mb-4">
-        <div className="bg-gradient-to-r from-[#E63946] to-[#D62828] text-white py-2 px-4 rounded-t-lg flex items-center gap-2">
-          <Percent className="w-4 h-4" />
-          <h3 className="font-bold text-sm">공제 내역 (3.3% 원천징수)</h3>
-        </div>
-        <div className="border-2 border-[#E63946] border-t-0 rounded-b-lg">
-          <div className="bg-gradient-to-br from-white to-gray-50">
-            <div className="flex justify-between items-center py-2.5 px-4 border-b border-gray-200">
-              <span className="text-xs font-semibold text-[#2D3748]">소득세 ({incomeTaxRate}%)</span>
-              <span className="text-sm font-bold text-[#E63946]">-{formatCurrency(incomeTax)}원</span>
+      {hasSocialInsurance && socialInsuranceSalary > 0 ? (
+        <>
+          <div className="mb-3">
+            <div className="bg-gradient-to-r from-blue-700 to-blue-600 text-white py-2 px-4 rounded-t-lg flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              <h3 className="font-bold text-sm">사대보험 공제 (기준: {formatCurrency(socialInsuranceSalary)}원{hasVehicle ? ' / 비과세 운전지원금 포함' : ''})</h3>
             </div>
-            <div className="flex justify-between items-center py-2.5 px-4 border-b border-gray-200">
-              <span className="text-xs font-semibold text-[#2D3748]">지방소득세 ({localTaxRate}%)</span>
-              <span className="text-sm font-bold text-[#E63946]">-{formatCurrency(localTax)}원</span>
+            <div className="border-2 border-blue-600 border-t-0 rounded-b-lg">
+              <div className="bg-gradient-to-br from-white to-gray-50">
+                <div className="flex justify-between items-center py-2 px-4 border-b border-gray-200">
+                  <span className="text-xs font-semibold text-[#2D3748]">국민연금</span>
+                  <span className="text-sm font-bold text-blue-700">-{formatCurrency(siNationalPension)}원</span>
+                </div>
+                <div className="flex justify-between items-center py-2 px-4 border-b border-gray-200">
+                  <span className="text-xs font-semibold text-[#2D3748]">건강보험</span>
+                  <span className="text-sm font-bold text-blue-700">-{formatCurrency(siHealthInsurance)}원</span>
+                </div>
+                <div className="flex justify-between items-center py-2 px-4 border-b border-gray-200">
+                  <span className="text-xs font-semibold text-[#2D3748]">장기요양보험</span>
+                  <span className="text-sm font-bold text-blue-700">-{formatCurrency(siLongTermCare)}원</span>
+                </div>
+                <div className="flex justify-between items-center py-2 px-4 border-b border-gray-200">
+                  <span className="text-xs font-semibold text-[#2D3748]">고용보험</span>
+                  <span className="text-sm font-bold text-blue-700">-{formatCurrency(siEmploymentInsurance)}원</span>
+                </div>
+                <div className="flex justify-between items-center py-2 px-4 border-b border-gray-200">
+                  <span className="text-xs font-semibold text-[#2D3748]">소득세</span>
+                  <span className="text-sm font-bold text-blue-700">-{formatCurrency(siIncomeTax)}원</span>
+                </div>
+                <div className="flex justify-between items-center py-2 px-4 border-b border-gray-200">
+                  <span className="text-xs font-semibold text-[#2D3748]">지방소득세</span>
+                  <span className="text-sm font-bold text-blue-700">-{formatCurrency(siLocalTax)}원</span>
+                </div>
+                <div className="flex justify-between items-center py-2.5 px-4 bg-blue-50">
+                  <span className="text-xs font-bold text-[#2D3748]">사대보험 공제 소계</span>
+                  <span className="text-sm font-bold text-blue-700">-{formatCurrency(totalSiDeduction)}원</span>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between items-center py-3 px-4 bg-red-50">
+          </div>
+
+          {remainingPayment > 0 && (
+            <div className="mb-3">
+              <div className="bg-gradient-to-r from-[#E63946] to-[#D62828] text-white py-2 px-4 rounded-t-lg flex items-center gap-2">
+                <Percent className="w-4 h-4" />
+                <h3 className="font-bold text-sm">3.3% 원천징수 (잔여 수당: {formatCurrency(remainingPayment)}원)</h3>
+              </div>
+              <div className="border-2 border-[#E63946] border-t-0 rounded-b-lg">
+                <div className="bg-gradient-to-br from-white to-gray-50">
+                  <div className="flex justify-between items-center py-2.5 px-4 border-b border-gray-200">
+                    <span className="text-xs font-semibold text-[#2D3748]">소득세 ({incomeTaxRate}%)</span>
+                    <span className="text-sm font-bold text-[#E63946]">-{formatCurrency(remainingIncomeTax)}원</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2.5 px-4 border-b border-gray-200">
+                    <span className="text-xs font-semibold text-[#2D3748]">지방소득세 ({localTaxRate}%)</span>
+                    <span className="text-sm font-bold text-[#E63946]">-{formatCurrency(remainingLocalTax)}원</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2.5 px-4 bg-red-50">
+                    <span className="text-xs font-bold text-[#2D3748]">원천징수 소계</span>
+                    <span className="text-sm font-bold text-[#E63946]">-{formatCurrency(totalRemainingTax)}원</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mb-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg p-3 border border-slate-300">
+            <div className="flex justify-between items-center">
               <span className="text-sm font-bold text-[#2D3748]">총 공제액</span>
               <span className="text-lg font-bold text-[#E63946]">-{formatCurrency(totalDeduction)}원</span>
             </div>
           </div>
+        </>
+      ) : (
+        <div className="mb-4">
+          <div className="bg-gradient-to-r from-[#E63946] to-[#D62828] text-white py-2 px-4 rounded-t-lg flex items-center gap-2">
+            <Percent className="w-4 h-4" />
+            <h3 className="font-bold text-sm">공제 내역 (3.3% 원천징수)</h3>
+          </div>
+          <div className="border-2 border-[#E63946] border-t-0 rounded-b-lg">
+            <div className="bg-gradient-to-br from-white to-gray-50">
+              <div className="flex justify-between items-center py-2.5 px-4 border-b border-gray-200">
+                <span className="text-xs font-semibold text-[#2D3748]">소득세 ({incomeTaxRate}%)</span>
+                <span className="text-sm font-bold text-[#E63946]">-{formatCurrency(incomeTax)}원</span>
+              </div>
+              <div className="flex justify-between items-center py-2.5 px-4 border-b border-gray-200">
+                <span className="text-xs font-semibold text-[#2D3748]">지방소득세 ({localTaxRate}%)</span>
+                <span className="text-sm font-bold text-[#E63946]">-{formatCurrency(localTax)}원</span>
+              </div>
+              <div className="flex justify-between items-center py-3 px-4 bg-red-50">
+                <span className="text-sm font-bold text-[#2D3748]">총 공제액</span>
+                <span className="text-lg font-bold text-[#E63946]">-{formatCurrency(totalDeduction)}원</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mb-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg p-3.5 border-2 border-slate-300">
         <div className="flex items-center justify-center gap-3 text-center">
