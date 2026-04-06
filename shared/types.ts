@@ -41,6 +41,8 @@ export interface User {
   bank_name?: string; // 급여계좌 은행명
   bank_account?: string; // 급여계좌 계좌번호
   has_vehicle?: boolean; // 차량 소유여부
+  has_social_insurance?: boolean; // 사대보험 가입 여부
+  social_insurance_salary?: number; // 사대보험 처리 급여 (만원)
   hire_date?: string; // 입사일자 YYYY-MM-DD
   status?: UserStatus; // 재직/퇴사 상태
   current_ip?: string; // 현재 접속 IP

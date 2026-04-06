@@ -124,6 +124,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     bank_name: '',
     bank_account: '',
     has_vehicle: false,
+    has_social_insurance: false,
+    social_insurance_salary: 0,
     hire_date: new Date().toISOString().split('T')[0],
     role: 'staff' as UserRole,
     team_id: '' as string,
@@ -150,6 +152,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
     bank_name: '',
     bank_account: '',
     has_vehicle: false,
+    has_social_insurance: false,
+    social_insurance_salary: 0,
     hire_date: '',
     role: 'staff' as UserRole,
     team_id: '' as string,
@@ -221,6 +225,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         bank_name: newEmployee.bank_name || undefined,
         bank_account: newEmployee.bank_account || undefined,
         has_vehicle: newEmployee.has_vehicle,
+        has_social_insurance: newEmployee.has_social_insurance,
+        social_insurance_salary: newEmployee.has_social_insurance ? newEmployee.social_insurance_salary : 0,
         hire_date: newEmployee.hire_date || undefined,
         role: newEmployee.role,
         team_id: newEmployee.team_id || null,
@@ -241,6 +247,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         bank_name: '',
         bank_account: '',
         has_vehicle: false,
+        has_social_insurance: false,
+        social_insurance_salary: 0,
         hire_date: new Date().toISOString().split('T')[0],
         role: 'staff',
         team_id: '',
@@ -350,6 +358,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       bank_name: user.bank_name || '',
       bank_account: user.bank_account || '',
       has_vehicle: user.has_vehicle || false,
+      has_social_insurance: user.has_social_insurance || false,
+      social_insurance_salary: user.social_insurance_salary || 0,
       hire_date: user.hire_date || '',
       role: user.role,
       team_id: user.team_id || '',
@@ -384,6 +394,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         bank_name: editEmployee.bank_name || undefined,
         bank_account: editEmployee.bank_account || undefined,
         has_vehicle: editEmployee.has_vehicle,
+        has_social_insurance: editEmployee.has_social_insurance,
+        social_insurance_salary: editEmployee.has_social_insurance ? editEmployee.social_insurance_salary : 0,
         hire_date: editEmployee.hire_date || undefined,
         role: editEmployee.role,
         team_id: editEmployee.team_id || null,
@@ -1126,6 +1138,30 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   data-testid="switch-employee-has-vehicle"
                 />
               </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                  <Label className="text-muted-foreground text-sm">사대보험 가입</Label>
+                  <Switch
+                    checked={newEmployee.has_social_insurance}
+                    onCheckedChange={(checked) => setNewEmployee({ ...newEmployee, has_social_insurance: checked, social_insurance_salary: checked ? newEmployee.social_insurance_salary : 0 })}
+                    data-testid="switch-employee-social-insurance"
+                  />
+                </div>
+                {newEmployee.has_social_insurance && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">사대보험 처리 급여 (만원)</Label>
+                    <Input
+                      type="number"
+                      value={newEmployee.social_insurance_salary || ''}
+                      onChange={(e) => setNewEmployee({ ...newEmployee, social_insurance_salary: parseFloat(e.target.value) || 0 })}
+                      placeholder="사대보험 처리할 급여액 (만원)"
+                      className="bg-muted border-border text-foreground mt-1"
+                      data-testid="input-employee-social-insurance-salary"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end gap-2">
@@ -1549,6 +1585,30 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                   onCheckedChange={(checked) => setEditEmployee({ ...editEmployee, has_vehicle: checked })}
                   data-testid="switch-edit-employee-has-vehicle"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                  <Label className="text-muted-foreground text-sm">사대보험 가입</Label>
+                  <Switch
+                    checked={editEmployee.has_social_insurance}
+                    onCheckedChange={(checked) => setEditEmployee({ ...editEmployee, has_social_insurance: checked, social_insurance_salary: checked ? editEmployee.social_insurance_salary : 0 })}
+                    data-testid="switch-edit-employee-social-insurance"
+                  />
+                </div>
+                {editEmployee.has_social_insurance && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">사대보험 처리 급여 (만원)</Label>
+                    <Input
+                      type="number"
+                      value={editEmployee.social_insurance_salary || ''}
+                      onChange={(e) => setEditEmployee({ ...editEmployee, social_insurance_salary: parseFloat(e.target.value) || 0 })}
+                      placeholder="사대보험 처리할 급여액 (만원)"
+                      className="bg-muted border-border text-foreground mt-1"
+                      data-testid="input-edit-employee-social-insurance-salary"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
