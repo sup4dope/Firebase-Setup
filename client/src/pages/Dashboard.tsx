@@ -86,6 +86,8 @@ export default function Dashboard() {
   const [selectedStaff, setSelectedStaff] = useState<string>('all');
   const [lastInitUid, setLastInitUid] = useState<string | null>(null);
   
+  const [refreshing, setRefreshing] = useState(false);
+
   // 미처리 상담 유입 관련 상태 (super_admin 전용)
   const [pendingConsultationsCount, setPendingConsultationsCount] = useState(0);
   const [consultationsPreviewOpen, setConsultationsPreviewOpen] = useState(false);
@@ -357,6 +359,25 @@ export default function Dashboard() {
     setSelectedTeam('all');
     setSelectedStaff(isTeamLeader && user ? user.uid : 'all');
     setSearchQuery('');
+  };
+
+  const handleRefreshAll = async () => {
+    setRefreshing(true);
+    try {
+      await fetchData();
+      if (isSuperAdmin) {
+        const count = await getPendingConsultationsCount();
+        setPendingConsultationsCount(count);
+      }
+      toast({
+        title: '새로고침 완료',
+        description: '최신 데이터를 불러왔습니다.',
+      });
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // Filter customers (한글 상태명 기반)
@@ -1493,14 +1514,15 @@ export default function Dashboard() {
               />
             </div>
             
-            {/* 필터 리셋 버튼 */}
+            {/* 새로고침 버튼 */}
             <Button
               variant="ghost"
               size="icon"
-              onClick={resetFilters}
-              data-testid="button-reset-filters-dashboard"
+              onClick={handleRefreshAll}
+              disabled={refreshing}
+              data-testid="button-refresh-dashboard"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
 
             {/* 데이터 내보내기 */}
