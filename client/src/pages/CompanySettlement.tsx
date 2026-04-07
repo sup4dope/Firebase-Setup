@@ -84,8 +84,10 @@ import {
   getRevenueDataByMonth,
   getCumulativeTaxReserve,
   getCumulativeSummary,
+  getSettlementItems,
+  getCustomers,
 } from '@/lib/firestore';
-import type { Expense, ExpenseCategory, InsertExpense } from '@shared/types';
+import type { Expense, ExpenseCategory, InsertExpense, SettlementItem, Customer } from '@shared/types';
 
 const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string; icon: typeof Megaphone }[] = [
   { value: '마케팅비', label: '마케팅비', icon: Megaphone },
@@ -194,6 +196,12 @@ export default function CompanySettlement() {
     netProfitRate: 0,
   });
 
+  const [settlementItems, setSettlementItems] = useState<SettlementItem[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailModalTitle, setDetailModalTitle] = useState('');
+  const [detailModalItems, setDetailModalItems] = useState<SettlementItem[]>([]);
+
   const [dateRangeMode, setDateRangeMode] = useState(false);
   const [dateRangeDialogOpen, setDateRangeDialogOpen] = useState(false);
   const [dateRangeStart, setDateRangeStart] = useState('');
@@ -299,11 +307,13 @@ export default function CompanySettlement() {
       const months = getMonthsForPeriod(selectedMonth);
       const isSummary = isPeriodSummary(selectedMonth);
       
+      const [allCustomers] = await Promise.all([getCustomers()]);
+      setCustomers(allCustomers);
+
       if (isSummary) {
         const lastMonth = months[months.length - 1];
         
-        // 모든 데이터를 병렬로 로딩 (누적 세금 적립금 포함)
-        const [results, cumTax] = await Promise.all([
+        const [results, cumTax, ...settlementResults] = await Promise.all([
           Promise.all(
             months.map(m => Promise.all([
               getRevenueDataByMonth(m),
@@ -312,6 +322,7 @@ export default function CompanySettlement() {
             ]))
           ),
           getCumulativeTaxReserve(lastMonth),
+          ...months.map(m => getSettlementItems(m)),
         ]);
         
         const aggregatedRevenue = {
@@ -362,18 +373,22 @@ export default function CompanySettlement() {
           }
         });
 
+        const mergedSettlements = (settlementResults as SettlementItem[][]).flat();
+        setSettlementItems(mergedSettlements);
+
         setExpenses(mergedExpenses);
         setRevenueData(aggregatedRevenue);
         setExpenseSummary(aggregatedExpense);
         setAdDbCount(totalAdDb);
         setCumulativeTaxReserve(cumTax);
       } else {
-        const [expensesData, revenue, summary, dbCount, cumTaxReserve] = await Promise.all([
+        const [expensesData, revenue, summary, dbCount, cumTaxReserve, settlements] = await Promise.all([
           getExpensesByMonth(selectedMonth),
           getRevenueDataByMonth(selectedMonth),
           getExpenseSummaryByMonth(selectedMonth),
           getAdDbCountByMonth(selectedMonth),
           getCumulativeTaxReserve(selectedMonth),
+          getSettlementItems(selectedMonth),
         ]);
 
         setExpenses(expensesData);
@@ -381,6 +396,7 @@ export default function CompanySettlement() {
         setExpenseSummary(summary);
         setAdDbCount(dbCount);
         setCumulativeTaxReserve(cumTaxReserve);
+        setSettlementItems(settlements);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -411,6 +427,12 @@ export default function CompanySettlement() {
       setLoading(false);
     }
   }, [selectedMonth, isSuperAdmin]);
+
+  const handleShowDetail = (title: string, filterFn: (item: SettlementItem) => boolean) => {
+    setDetailModalTitle(title);
+    setDetailModalItems(settlementItems.filter(filterFn));
+    setDetailModalOpen(true);
+  };
 
   const handleOpenExpenseDialog = (expense?: Expense) => {
     if (expense) {
@@ -767,7 +789,11 @@ export default function CompanySettlement() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+            <Card
+              className="cursor-pointer hover-elevate bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20"
+              onClick={() => handleShowDetail('총매출 상세', (item) => !item.is_clawback)}
+              data-testid="card-gross-revenue"
+            >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
@@ -786,7 +812,11 @@ export default function CompanySettlement() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 border-indigo-500/20">
+            <Card
+              className="cursor-pointer hover-elevate bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 border-indigo-500/20"
+              onClick={() => handleShowDetail('총 계약금 상세', (item) => !item.is_clawback && (item.contract_amount || 0) > 0)}
+              data-testid="card-total-contract-amount"
+            >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <FileText className="w-4 h-4" />
@@ -803,7 +833,11 @@ export default function CompanySettlement() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-teal-500/10 to-teal-600/5 border-teal-500/20">
+            <Card
+              className="cursor-pointer hover-elevate bg-gradient-to-br from-teal-500/10 to-teal-600/5 border-teal-500/20"
+              onClick={() => handleShowDetail('총 자문료 상세', (item) => !item.is_clawback && (item.execution_amount || 0) > 0)}
+              data-testid="card-total-advisory-fee"
+            >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Calculator className="w-4 h-4" />
@@ -1216,6 +1250,91 @@ export default function CompanySettlement() {
           )}
           </>
       )}
+
+      <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[90vh] md:max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="text-base md:text-lg">{detailModalTitle}</DialogTitle>
+            <DialogDescription>
+              {detailModalItems.length}건의 정산 항목
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[70vh]">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">정산월</TableHead>
+                    <TableHead className="whitespace-nowrap">담당자</TableHead>
+                    <TableHead className="whitespace-nowrap">유입경로</TableHead>
+                    <TableHead className="whitespace-nowrap">고객명</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">계약금</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">자문료율</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">집행금액</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">자문료액</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">총매출</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detailModalItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                        해당하는 정산 데이터가 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <>
+                      {detailModalItems
+                        .sort((a, b) => (a.settlement_month || '').localeCompare(b.settlement_month || '') || (a.contract_date || '').localeCompare(b.contract_date || ''))
+                        .map((item) => {
+                          const customer = customers.find(c => c.id === item.customer_id);
+                          const contractWon = Math.round((item.contract_amount || 0) * 10000);
+                          const execWon = Math.round((item.execution_amount || 0) * 10000);
+                          const advisoryFee = Math.round(execWon * ((item.fee_rate || 0) / 100));
+                          const totalRevWon = Math.round((item.total_revenue || 0) * 10000);
+                          return (
+                            <TableRow key={item.id} data-testid={`row-detail-${item.id}`}>
+                              <TableCell className="whitespace-nowrap">{item.settlement_month}</TableCell>
+                              <TableCell className="whitespace-nowrap">{item.manager_name || '-'}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{item.entry_source || '-'}</Badge>
+                              </TableCell>
+                              <TableCell className="font-medium">{customer?.name || item.customer_name || '-'}</TableCell>
+                              <TableCell className="text-right tabular-nums">{contractWon > 0 ? `${contractWon.toLocaleString()}원` : '-'}</TableCell>
+                              <TableCell className="text-right tabular-nums">{(item.fee_rate || 0) > 0 ? `${item.fee_rate}%` : '-'}</TableCell>
+                              <TableCell className="text-right tabular-nums">{execWon > 0 ? `${execWon.toLocaleString()}원` : '-'}</TableCell>
+                              <TableCell className="text-right tabular-nums">{advisoryFee > 0 ? `${advisoryFee.toLocaleString()}원` : '-'}</TableCell>
+                              <TableCell className="text-right tabular-nums font-semibold">{totalRevWon > 0 ? `${totalRevWon.toLocaleString()}원` : '-'}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      <TableRow className="bg-muted/50 font-semibold">
+                        <TableCell colSpan={4} className="text-right">합계</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {Math.round(detailModalItems.reduce((s, i) => s + (i.contract_amount || 0), 0) * 10000).toLocaleString()}원
+                        </TableCell>
+                        <TableCell className="text-right">-</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {Math.round(detailModalItems.reduce((s, i) => s + (i.execution_amount || 0), 0) * 10000).toLocaleString()}원
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {Math.round(detailModalItems.reduce((s, i) => {
+                            const execWon = (i.execution_amount || 0) * 10000;
+                            return s + execWon * ((i.fee_rate || 0) / 100);
+                          }, 0)).toLocaleString()}원
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {Math.round(detailModalItems.reduce((s, i) => s + (i.total_revenue || 0), 0) * 10000).toLocaleString()}원
+                        </TableCell>
+                      </TableRow>
+                    </>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
         <DialogContent>
