@@ -159,10 +159,9 @@ function calcMetrics(custs: Customer[]): StatsMetrics {
     sum + getCustomerExecutionAmount(c), 0
   );
   const totalCollectionAmount = executedCustomers.reduce((sum, c) => {
-    const depositAmt = Number(c.contract_amount) || Number(c.deposit_amount) || 0;
     const execAmount = getCustomerExecutionAmount(c);
     const feeRate = Number(c.contract_fee_rate) || Number(c.commission_rate) || 0;
-    return sum + depositAmt + (execAmount * feeRate / 100);
+    return sum + (execAmount * feeRate / 100);
   }, 0);
 
   const pendingExecutionCustomers = custs.filter(c =>
@@ -772,7 +771,7 @@ export default function Stats() {
                   총 집행금액: {formatAmount(selectedMetrics.totalExecutionAmount).value} {formatAmount(selectedMetrics.totalExecutionAmount).unit}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  총 매출: {formatAmount(selectedMetrics.totalCollectionAmount).value} {formatAmount(selectedMetrics.totalCollectionAmount).unit}
+                  총 자문료: {formatAmount(selectedMetrics.totalCollectionAmount).value} {formatAmount(selectedMetrics.totalCollectionAmount).unit}
                 </p>
                 <div className="flex items-center justify-between pt-1 border-t border-emerald-500/10">
                   <span className="text-[10px] text-muted-foreground">{avgLabel}</span>
