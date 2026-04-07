@@ -149,9 +149,10 @@ function calcMetrics(custs: Customer[]): StatsMetrics {
     sum + (Number(c.execution_amount) || 0), 0
   );
   const totalCollectionAmount = executedCustomers.reduce((sum, c) => {
+    const depositAmt = Number(c.contract_amount) || Number(c.deposit_amount) || 0;
     const execAmount = Number(c.execution_amount) || 0;
     const feeRate = Number(c.contract_fee_rate) || Number(c.commission_rate) || 0;
-    return sum + (execAmount * feeRate / 100);
+    return sum + depositAmt + (execAmount * feeRate / 100);
   }, 0);
 
   const pendingExecutionCustomers = custs.filter(c =>
@@ -160,9 +161,9 @@ function calcMetrics(custs: Customer[]): StatsMetrics {
      '서류취합완료(선불)', '서류취합완료(외주)', '서류취합완료(후불)'].includes(c.status_code)
   );
   const pendingExecutionCount = pendingExecutionCustomers.length;
-  const avgPendingExecutionAmount = executedCount > 0
-    ? (totalExecutionAmount / executedCount) * pendingExecutionCount
-    : 0;
+  const avgPendingExecutionAmount = pendingExecutionCustomers.reduce((sum, c) =>
+    sum + (Number(c.contract_amount) || Number(c.deposit_amount) || 0), 0
+  );
 
   const avgConversionRate = totalInflow > 0 ? (executedCount / totalInflow) * 100 : 0;
 
@@ -784,7 +785,7 @@ export default function Stats() {
               </div>
               <div className="mt-3 pt-3 border-t border-amber-500/10 space-y-1">
                 <p className="text-xs text-muted-foreground">
-                  예상금액: {formatAmount(selectedMetrics.avgPendingExecutionAmount).value} {formatAmount(selectedMetrics.avgPendingExecutionAmount).unit}
+                  총 계약금: {formatAmount(selectedMetrics.avgPendingExecutionAmount).value} {formatAmount(selectedMetrics.avgPendingExecutionAmount).unit}
                 </p>
                 <div className="flex items-center justify-between pt-1 border-t border-amber-500/10">
                   <span className="text-[10px] text-muted-foreground">{avgLabel}</span>
