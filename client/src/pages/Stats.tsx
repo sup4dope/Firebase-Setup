@@ -170,9 +170,8 @@ function calcMetrics(custs: Customer[]): StatsMetrics {
      '서류취합완료(선불)', '서류취합완료(외주)', '서류취합완료(후불)'].includes(c.status_code)
   );
   const pendingExecutionCount = pendingExecutionCustomers.length;
-  const avgPendingExecutionAmount = pendingExecutionCustomers.reduce((sum, c) =>
-    sum + (Number(c.contract_amount) || Number(c.deposit_amount) || 0), 0
-  );
+  const avgExecutionPerCase = executedCount > 0 ? totalExecutionAmount / executedCount : 0;
+  const avgPendingExecutionAmount = avgExecutionPerCase * pendingExecutionCount;
 
   const avgConversionRate = totalInflow > 0 ? (executedCount / totalInflow) * 100 : 0;
 
@@ -794,7 +793,7 @@ export default function Stats() {
               </div>
               <div className="mt-3 pt-3 border-t border-amber-500/10 space-y-1">
                 <p className="text-xs text-muted-foreground">
-                  총 계약금: {formatAmount(selectedMetrics.avgPendingExecutionAmount).value} {formatAmount(selectedMetrics.avgPendingExecutionAmount).unit}
+                  예상 집행금액: {formatAmount(selectedMetrics.avgPendingExecutionAmount).value} {formatAmount(selectedMetrics.avgPendingExecutionAmount).unit}
                 </p>
                 <div className="flex items-center justify-between pt-1 border-t border-amber-500/10">
                   <span className="text-[10px] text-muted-foreground">{avgLabel}</span>
