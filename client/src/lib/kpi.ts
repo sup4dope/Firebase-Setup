@@ -88,7 +88,7 @@ export const calculateKPI = (
   
   const monthlyRevenue = settlements
     .filter(s => s.settlement_month === currentMonth && s.status === '정상' && !s.is_clawback && (s.execution_amount || 0) > 0)
-    .reduce((sum, s) => sum + (s.total_revenue || 0), 0);
+    .reduce((sum, s) => sum + (s.execution_amount || 0), 0);
   
   const totalBusinessDays = getBusinessDaysInMonth(date, holidayMap);
   const businessDaysElapsed = getElapsedBusinessDays(date, holidayMap);
