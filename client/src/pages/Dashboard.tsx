@@ -1407,7 +1407,6 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 md:gap-3 flex-wrap">
             {/* 접수일자 필터 */}
             <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground whitespace-nowrap">접수일자</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -1447,7 +1446,6 @@ export default function Dashboard() {
             {/* 소속팀 필터 (super_admin만) */}
             {isSuperAdmin && (
               <div className="flex items-center gap-2">
-                <Label className="text-sm text-muted-foreground whitespace-nowrap">소속팀</Label>
                 <Select value={selectedTeam || 'all'} onValueChange={setSelectedTeam}>
                   <SelectTrigger className="w-[120px]" data-testid="select-team-dashboard">
                     <SelectValue placeholder="전체 팀" />
@@ -1467,7 +1465,6 @@ export default function Dashboard() {
             {/* 담당자 필터 (super_admin & team_leader) */}
             {(isSuperAdmin || isTeamLeader) && (
               <div className="flex items-center gap-2">
-                <Label className="text-sm text-muted-foreground whitespace-nowrap">담당자</Label>
                 <Select value={selectedStaff || 'all'} onValueChange={setSelectedStaff}>
                   <SelectTrigger className="w-[120px]" data-testid="select-staff-dashboard">
                     <SelectValue placeholder="전체 팀원" />
