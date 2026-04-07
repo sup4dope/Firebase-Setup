@@ -145,12 +145,22 @@ function calcMetrics(custs: Customer[]): StatsMetrics {
 
   const executedCustomers = custs.filter(c => EXECUTION_STATUSES.includes(c.status_code));
   const executedCount = executedCustomers.length;
+
+  const getCustomerExecutionAmount = (c: Customer): number => {
+    const orgs = c.processing_orgs || [];
+    const approvedOrgs = orgs.filter(o => o.status === '승인' && o.execution_amount);
+    if (approvedOrgs.length > 0) {
+      return approvedOrgs.reduce((s, o) => s + (o.execution_amount || 0), 0);
+    }
+    return Number(c.execution_amount) || 0;
+  };
+
   const totalExecutionAmount = executedCustomers.reduce((sum, c) =>
-    sum + (Number(c.execution_amount) || 0), 0
+    sum + getCustomerExecutionAmount(c), 0
   );
   const totalCollectionAmount = executedCustomers.reduce((sum, c) => {
     const depositAmt = Number(c.contract_amount) || Number(c.deposit_amount) || 0;
-    const execAmount = Number(c.execution_amount) || 0;
+    const execAmount = getCustomerExecutionAmount(c);
     const feeRate = Number(c.contract_fee_rate) || Number(c.commission_rate) || 0;
     return sum + depositAmt + (execAmount * feeRate / 100);
   }, 0);
@@ -759,10 +769,10 @@ export default function Stats() {
               </div>
               <div className="mt-3 pt-3 border-t border-emerald-500/10 space-y-1">
                 <p className="text-xs text-muted-foreground">
-                  총 집행: {formatAmount(selectedMetrics.totalExecutionAmount).value} {formatAmount(selectedMetrics.totalExecutionAmount).unit}
+                  총 집행금액: {formatAmount(selectedMetrics.totalExecutionAmount).value} {formatAmount(selectedMetrics.totalExecutionAmount).unit}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  총 수납: {formatAmount(selectedMetrics.totalCollectionAmount).value} {formatAmount(selectedMetrics.totalCollectionAmount).unit}
+                  총 매출: {formatAmount(selectedMetrics.totalCollectionAmount).value} {formatAmount(selectedMetrics.totalCollectionAmount).unit}
                 </p>
                 <div className="flex items-center justify-between pt-1 border-t border-emerald-500/10">
                   <span className="text-[10px] text-muted-foreground">{avgLabel}</span>
