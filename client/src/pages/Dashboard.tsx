@@ -812,17 +812,18 @@ export default function Dashboard() {
   // Handle processing orgs change from dashboard table (multi-org support)
   const handleProcessingOrgsChange = async (customerId: string, processingOrgs: any[]) => {
     try {
-      await updateCustomer(customerId, {
+      const updateData: any = {
         processing_orgs: processingOrgs,
+        processing_org: processingOrgs.length > 0 ? processingOrgs[0].org : '미등록',
         updated_at: new Date(),
-      });
+      };
+      await updateCustomer(customerId, updateData);
       
       // Update local state
       setCustomers(prev =>
         prev.map(c => c.id === customerId ? {
           ...c,
-          processing_orgs: processingOrgs,
-          updated_at: new Date(),
+          ...updateData,
         } : c)
       );
       
@@ -1316,7 +1317,7 @@ export default function Dashboard() {
       }
 
       const isDirectFirestoreUpdate = 'processing_orgs' in cleanData && Object.keys(cleanData).every(key =>
-        ['id', 'processing_orgs', 'execution_amount', 'approved_amount', 'execution_date', 'status_code'].includes(key)
+        ['id', 'processing_orgs', 'processing_org', 'execution_amount', 'approved_amount', 'execution_date', 'status_code'].includes(key)
       );
 
       if (isDirectFirestoreUpdate) {

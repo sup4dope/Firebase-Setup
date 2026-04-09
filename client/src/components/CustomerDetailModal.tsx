@@ -3212,9 +3212,11 @@ export function CustomerDetailModal({
                                       .reduce((sum, o) => sum + (o.execution_amount || 0), 0);
                                     
                                     try {
+                                      const newProcessingOrg = updatedOrgs.length > 0 ? updatedOrgs[0].org : '미등록';
                                       const customerRef = doc(db, "customers", formData.id);
                                       await updateDoc(customerRef, {
                                         processing_orgs: updatedOrgs,
+                                        processing_org: newProcessingOrg,
                                         execution_amount: recalcExecutionAmount,
                                         approved_amount: recalcExecutionAmount,
                                         updated_at: new Date(),
@@ -3223,6 +3225,7 @@ export function CustomerDetailModal({
                                       setFormData(prev => ({
                                         ...prev,
                                         processing_orgs: updatedOrgs,
+                                        processing_org: newProcessingOrg,
                                         execution_amount: recalcExecutionAmount,
                                         approved_amount: recalcExecutionAmount,
                                       }));
@@ -3241,6 +3244,7 @@ export function CustomerDetailModal({
                                       onSave?.({
                                         id: formData.id,
                                         processing_orgs: updatedOrgs,
+                                        processing_org: newProcessingOrg,
                                         execution_amount: recalcExecutionAmount,
                                         approved_amount: recalcExecutionAmount,
                                       });

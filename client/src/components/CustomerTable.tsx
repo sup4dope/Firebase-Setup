@@ -473,7 +473,7 @@ export function CustomerTable({
   };
 
   const handleRemoveProcessingOrg = (customerId: string, customer: Customer, orgName: string) => {
-    const currentOrgs = customer.processing_orgs || [];
+    const currentOrgs = getProcessingOrgsFromCustomer(customer);
     const updatedOrgs = currentOrgs.filter(o => o.org !== orgName);
     onProcessingOrgsChange?.(customerId, updatedOrgs);
   };
