@@ -25,6 +25,7 @@ const FIELD_LABELS: Record<string, { label: string; icon: typeof TrendingUp; uni
   contract_amount: { label: '계약금', icon: Banknote, unit: '만원' },
   execution_amount: { label: '집행금액', icon: Wallet, unit: '만원' },
   contract_date: { label: '계약일', icon: Calendar, unit: '' },
+  deposit_paid_date: { label: '수납일자', icon: Calendar, unit: '' },
   execution_date: { label: '집행일', icon: Calendar, unit: '' },
 };
 

@@ -29,6 +29,7 @@ interface CustomerInfoEditModalProps {
     commission_rate: number;
     contract_amount: number;
     contract_date?: string;
+    deposit_paid_date?: string;
     processing_orgs?: ProcessingOrg[];
   }) => Promise<void>;
 }
@@ -42,6 +43,7 @@ export function CustomerInfoEditModal({
   const [commissionRate, setCommissionRate] = useState('');
   const [contractAmount, setContractAmount] = useState('');
   const [contractDate, setContractDate] = useState('');
+  const [depositPaidDate, setDepositPaidDate] = useState('');
   const [orgExecutions, setOrgExecutions] = useState<OrgExecutionData[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -50,6 +52,7 @@ export function CustomerInfoEditModal({
       setCommissionRate(String(customer.commission_rate || customer.contract_fee_rate || ''));
       setContractAmount(String(customer.contract_amount || customer.deposit_amount || ''));
       setContractDate((customer as any).contract_date || customer.contract_completion_date || '');
+      setDepositPaidDate((customer as any).deposit_paid_date || '');
       
       const approvedOrgs = (customer.processing_orgs || []).filter(
         (org: ProcessingOrg) => org.status === '승인'
@@ -101,6 +104,7 @@ export function CustomerInfoEditModal({
         commission_rate: Number(commissionRate) || 0,
         contract_amount: Number(contractAmount) || 0,
         contract_date: contractDate || undefined,
+        deposit_paid_date: depositPaidDate || undefined,
         processing_orgs: updatedProcessingOrgs,
       });
       onClose();
@@ -136,6 +140,17 @@ export function CustomerInfoEditModal({
                 value={contractDate}
                 onChange={(e) => setContractDate(e.target.value)}
                 data-testid="input-contract-date"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="deposit_paid_date">수납일자</Label>
+              <Input
+                id="deposit_paid_date"
+                type="date"
+                value={depositPaidDate}
+                onChange={(e) => setDepositPaidDate(e.target.value)}
+                data-testid="input-deposit-paid-date"
               />
             </div>
             
