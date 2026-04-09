@@ -520,8 +520,16 @@ export function CustomerDetailModal({
           // 금융 채무 상태 업데이트 (핵심!)
           setFinancialObligations(obligations);
           
-          // formData 업데이트 (OCR 저장된 필드들 포함)
           const phoneParts = freshData.phone?.split("-") || ["010", "", ""];
+          const migratedOrgs: ProcessingOrg[] = (() => {
+            if (freshData.processing_orgs && freshData.processing_orgs.length > 0) {
+              return freshData.processing_orgs;
+            }
+            if (freshData.processing_org && freshData.processing_org !== '미등록') {
+              return [{ org: freshData.processing_org, status: '진행중' as ProcessingOrgStatus }];
+            }
+            return [];
+          })();
           setFormData(prev => ({
             ...prev,
             ...freshData,
@@ -529,6 +537,7 @@ export function CustomerDetailModal({
             phone_part2: phoneParts[1] || "",
             phone_part3: phoneParts[2] || "",
             financial_obligations: obligations,
+            processing_orgs: migratedOrgs.length > 0 ? migratedOrgs : (prev.processing_orgs || []),
           }));
 
           // 문서 목록 업데이트
