@@ -664,9 +664,28 @@ export default function Dashboard() {
       if (statusChangeModal.targetStatus.includes('집행완료')) {
         if (statusChangeModal.executionAmount > 0) {
           additionalData.execution_amount = statusChangeModal.executionAmount;
+          additionalData.approved_amount = statusChangeModal.executionAmount;
         }
         if (statusChangeModal.executionDate) {
           additionalData.execution_date = statusChangeModal.executionDate;
+        }
+        const targetCustomer = customers.find(c => c.id === statusChangeModal.customerId);
+        const currentOrgs = targetCustomer?.processing_orgs || [];
+        if (currentOrgs.length > 0) {
+          const today = format(new Date(), 'yyyy-MM-dd');
+          additionalData.processing_orgs = currentOrgs.map((o: any) => {
+            if (o.status === '진행중') {
+              return {
+                ...o,
+                status: '승인',
+                approved_at: today,
+                execution_date: statusChangeModal.executionDate || today,
+                execution_amount: statusChangeModal.executionAmount || 0,
+              };
+            }
+            return o;
+          });
+          additionalData.processing_org = currentOrgs[0]?.org || '미등록';
         }
       }
 
@@ -1273,8 +1292,12 @@ export default function Dashboard() {
   const handleDetailModalSave = async (data: Partial<Customer>): Promise<string | undefined> => {
     // If data has an id, it's an update (even if it was originally a "new" customer)
     if (data.id) {
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, v]) => v !== undefined)
+      ) as Partial<Customer>;
+
       // ★핵심: 메모 전용 업데이트인지 확인 (recent_memo만 있으면 Firestore 저장 건너뛰기)
-      const isMemoOnlyUpdate = Object.keys(data).every(key => 
+      const isMemoOnlyUpdate = Object.keys(cleanData).every(key => 
         ['id', 'recent_memo', 'latest_memo', 'last_memo_date'].includes(key)
       );
       
@@ -1282,17 +1305,17 @@ export default function Dashboard() {
         console.log("📝 메모 전용 업데이트 -> 로컬 상태만 갱신 (Firestore 중복 저장 방지)");
         setCustomers(prev =>
           prev.map(c => {
-            if (c.id === data.id) {
-              return { ...c, ...data };
+            if (c.id === cleanData.id) {
+              return { ...c, ...cleanData };
             }
             return c;
           })
         );
-        handleOverdueTodoAction(data.id);
-        return data.id;
+        handleOverdueTodoAction(cleanData.id!);
+        return cleanData.id;
       }
 
-      const isDirectFirestoreUpdate = 'processing_orgs' in data && Object.keys(data).every(key =>
+      const isDirectFirestoreUpdate = 'processing_orgs' in cleanData && Object.keys(cleanData).every(key =>
         ['id', 'processing_orgs', 'execution_amount', 'approved_amount', 'execution_date', 'status_code'].includes(key)
       );
 
@@ -1300,25 +1323,24 @@ export default function Dashboard() {
         console.log("🔄 진행기관 직접 업데이트 -> 로컬 상태만 갱신 (Firestore 중복 저장 방지)");
         setCustomers(prev =>
           prev.map(c => {
-            if (c.id === data.id) {
-              return { ...c, ...data };
+            if (c.id === cleanData.id) {
+              return { ...c, ...cleanData };
             }
             return c;
           })
         );
-        handleOverdueTodoAction(data.id);
-        return data.id;
+        handleOverdueTodoAction(cleanData.id!);
+        return cleanData.id;
       }
       
       // Update existing customer - merge with existing data to preserve all fields
       setFormLoading(true);
       try {
-        await updateCustomer(data.id, data);
+        await updateCustomer(cleanData.id!, cleanData);
         setCustomers(prev =>
           prev.map(c => {
-            if (c.id === data.id) {
-              // Merge: keep existing fields (readable_id, created_at, etc.) and update with new data
-              return { ...c, ...data };
+            if (c.id === cleanData.id) {
+              return { ...c, ...cleanData };
             }
             return c;
           })

@@ -3173,12 +3173,11 @@ export function CustomerDetailModal({
                                       variant="ghost"
                                       className="h-6 w-6 p-0 text-green-600 hover:bg-green-100"
                                       onClick={() => {
-                                        // 승인 모달 열기 (집행일자/금액 입력)
                                         setOrgApprovalModal({
                                           isOpen: true,
                                           orgName: org.org,
-                                          executionDate: format(new Date(), 'yyyy-MM-dd'),
-                                          executionAmount: 0,
+                                          executionDate: org.execution_date || format(new Date(), 'yyyy-MM-dd'),
+                                          executionAmount: org.execution_amount || 0,
                                           isLoading: false,
                                         });
                                       }}
@@ -4884,9 +4883,28 @@ export function CustomerDetailModal({
                 if (statusChangeModal.targetStatus.includes("집행완료")) {
                   if (statusChangeModal.executionAmount > 0) {
                     updateData.execution_amount = statusChangeModal.executionAmount;
+                    updateData.approved_amount = statusChangeModal.executionAmount;
                   }
                   if (statusChangeModal.executionDate) {
                     updateData.execution_date = statusChangeModal.executionDate;
+                  }
+                  const currentOrgs = formData.processing_orgs || [];
+                  if (currentOrgs.length > 0) {
+                    const today = format(new Date(), 'yyyy-MM-dd');
+                    const updatedOrgs = currentOrgs.map(o => {
+                      if (o.status === '진행중') {
+                        return {
+                          ...o,
+                          status: '승인' as ProcessingOrgStatus,
+                          approved_at: today,
+                          execution_date: statusChangeModal.executionDate || today,
+                          execution_amount: statusChangeModal.executionAmount || 0,
+                        };
+                      }
+                      return o;
+                    });
+                    updateData.processing_orgs = updatedOrgs;
+                    updateData.processing_org = currentOrgs[0]?.org || '미등록';
                   }
                 }
 
@@ -4976,17 +4994,20 @@ export function CustomerDetailModal({
                     processing_orgs: updateData.processing_orgs ?? prev.processing_orgs,
                   }));
 
-                  // 대시보드에 상태 변경 알림
                   if (onSave) {
-                    onSave({
+                    const savePayload: Partial<Customer> = {
                       id: formData.id,
                       status_code: statusChangeModal.targetStatus as StatusCode,
-                      commission_rate: updateData.commission_rate,
-                      contract_amount: updateData.contract_amount,
-                      execution_amount: updateData.execution_amount,
-                      processing_org: updateData.processing_org,
-                      processing_orgs: updateData.processing_orgs,
-                    });
+                    };
+                    if (updateData.commission_rate !== undefined) savePayload.commission_rate = updateData.commission_rate;
+                    if (updateData.contract_amount !== undefined) savePayload.contract_amount = updateData.contract_amount;
+                    if (updateData.execution_amount !== undefined) savePayload.execution_amount = updateData.execution_amount;
+                    if (updateData.processing_org !== undefined) savePayload.processing_org = updateData.processing_org;
+                    if (updateData.processing_orgs !== undefined) savePayload.processing_orgs = updateData.processing_orgs;
+                    if (updateData.execution_date !== undefined) (savePayload as any).execution_date = updateData.execution_date;
+                    if (updateData.contract_date !== undefined) (savePayload as any).contract_date = updateData.contract_date;
+                    if (updateData.contract_fee_rate !== undefined) savePayload.contract_fee_rate = updateData.contract_fee_rate;
+                    onSave(savePayload);
                   }
 
                   const logs = await getCustomerHistoryLogs(formData.id);
