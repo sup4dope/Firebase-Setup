@@ -3433,40 +3433,40 @@ export function CustomerDetailModal({
           {/* Section 2: 중앙 패널 - 탭 기반 금융 분석 대시보드 (40%) */}
           <div className="flex-1 min-h-[300px] md:min-h-0 md:h-full bg-muted/50 dark:bg-gray-950 flex flex-col overflow-hidden border-b md:border-b-0 md:border-r">
             {/* Center Panel Tabs */}
-            <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b bg-muted/50 pl-[6px] pr-[6px] pt-[2px] pb-[2px]">
-              <div className="flex items-center gap-2">
+            <div className="shrink-0 flex flex-wrap items-center justify-between gap-1 px-4 py-2 border-b bg-muted/50 pl-[6px] pr-[6px] pt-[2px] pb-[2px]">
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink min-w-0">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setActiveCenterTab("documents")}
                   className={cn(
-                    "h-8 px-3 text-sm",
+                    "h-8 px-2 sm:px-3 text-sm",
                     activeCenterTab === "documents"
                       ? "bg-blue-600/20 text-blue-400"
                       : "text-muted-foreground",
                   )}
                   data-testid="tab-documents"
                 >
-                  <FileText className="w-4 h-4 mr-1.5" />
-                  서류 보기
+                  <FileText className="w-4 h-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">서류 보기</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     setActiveCenterTab("financial");
-                    setOcrExtractedCount(0); // 탭 클릭 시 배지 숨기기
+                    setOcrExtractedCount(0);
                   }}
                   className={cn(
-                    "h-8 px-3 text-sm relative",
+                    "h-8 px-2 sm:px-3 text-sm relative",
                     activeCenterTab === "financial"
                       ? "bg-emerald-600/20 text-emerald-400"
                       : "text-muted-foreground",
                   )}
                   data-testid="tab-financial"
                 >
-                  <Bot className="w-4 h-4 mr-1.5" />
-                  금융 분석
+                  <Bot className="w-4 h-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">금융 분석</span>
                   {ocrExtractedCount > 0 && activeCenterTab !== "financial" && (
                     <Badge 
                       variant="destructive" 
@@ -3481,15 +3481,15 @@ export function CustomerDetailModal({
                   size="sm"
                   onClick={() => setActiveCenterTab("summary")}
                   className={cn(
-                    "h-8 px-3 text-sm",
+                    "h-8 px-2 sm:px-3 text-sm",
                     activeCenterTab === "summary"
                       ? "bg-purple-600/20 text-purple-400"
                       : "text-muted-foreground",
                   )}
                   data-testid="tab-summary"
                 >
-                  <Search className="w-4 h-4 mr-1.5" />
-                  심사 요약
+                  <Search className="w-4 h-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">심사 요약</span>
                 </Button>
               </div>
 
