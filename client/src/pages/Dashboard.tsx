@@ -1291,6 +1291,24 @@ export default function Dashboard() {
         handleOverdueTodoAction(data.id);
         return data.id;
       }
+
+      const isDirectFirestoreUpdate = 'processing_orgs' in data && Object.keys(data).every(key =>
+        ['id', 'processing_orgs', 'execution_amount', 'approved_amount', 'execution_date', 'status_code'].includes(key)
+      );
+
+      if (isDirectFirestoreUpdate) {
+        console.log("🔄 진행기관 직접 업데이트 -> 로컬 상태만 갱신 (Firestore 중복 저장 방지)");
+        setCustomers(prev =>
+          prev.map(c => {
+            if (c.id === data.id) {
+              return { ...c, ...data };
+            }
+            return c;
+          })
+        );
+        handleOverdueTodoAction(data.id);
+        return data.id;
+      }
       
       // Update existing customer - merge with existing data to preserve all fields
       setFormLoading(true);

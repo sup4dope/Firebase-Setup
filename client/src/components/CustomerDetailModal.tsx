@@ -3199,14 +3199,25 @@ export function CustomerDetailModal({
                                     if (!formData.id) return;
                                     const updatedOrgs = (formData.processing_orgs || []).filter(o => o.org !== org.org);
                                     
+                                    const recalcExecutionAmount = updatedOrgs
+                                      .filter(o => o.status === '승인' && o.execution_amount)
+                                      .reduce((sum, o) => sum + (o.execution_amount || 0), 0);
+                                    
                                     try {
                                       const customerRef = doc(db, "customers", formData.id);
                                       await updateDoc(customerRef, {
                                         processing_orgs: updatedOrgs,
+                                        execution_amount: recalcExecutionAmount,
+                                        approved_amount: recalcExecutionAmount,
                                         updated_at: new Date(),
                                       });
                                       
-                                      setFormData(prev => ({ ...prev, processing_orgs: updatedOrgs }));
+                                      setFormData(prev => ({
+                                        ...prev,
+                                        processing_orgs: updatedOrgs,
+                                        execution_amount: recalcExecutionAmount,
+                                        approved_amount: recalcExecutionAmount,
+                                      }));
                                       
                                       await addDoc(collection(db, "customer_history_logs"), {
                                         customer_id: formData.id,
@@ -3222,6 +3233,8 @@ export function CustomerDetailModal({
                                       onSave?.({
                                         id: formData.id,
                                         processing_orgs: updatedOrgs,
+                                        execution_amount: recalcExecutionAmount,
+                                        approved_amount: recalcExecutionAmount,
                                       });
                                     } catch (error) {
                                       console.error("기관 삭제 실패:", error);
