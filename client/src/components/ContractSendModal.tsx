@@ -61,7 +61,7 @@ function formatContractAmount(manWon: number): string {
 interface ContractSendModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (info?: { templateName: string; contractType: 'pre' | 'post' | 'out' }) => void;
   preselectedCustomer?: Customer;
 }
 
@@ -298,7 +298,8 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
       if (data.success) {
         toast({ title: '발송 완료', description: '전자계약서가 성공적으로 발송되었습니다.' });
         onOpenChange(false);
-        onSuccess?.();
+        const cType = detectContractType(selectedTemplate?.name || '');
+        onSuccess?.({ templateName: selectedTemplate?.name || '', contractType: cType });
       } else {
         toast({ title: '발송 실패', description: data.error || '계약서 발송에 실패했습니다.', variant: 'destructive' });
       }

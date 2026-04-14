@@ -1298,6 +1298,21 @@ export default function Dashboard() {
         Object.entries(data).filter(([_, v]) => v !== undefined)
       ) as Partial<Customer>;
 
+      const isServerSynced = '_serverSynced' in cleanData;
+      if (isServerSynced) {
+        delete (cleanData as any)._serverSynced;
+        console.log("🔄 서버 동기화 완료 -> 로컬 상태만 갱신 (Firestore 중복 저장 방지)");
+        setCustomers(prev =>
+          prev.map(c => {
+            if (c.id === cleanData.id) {
+              return { ...c, ...cleanData };
+            }
+            return c;
+          })
+        );
+        return cleanData.id;
+      }
+
       // ★핵심: 메모 전용 업데이트인지 확인 (모달이 이미 Firestore 저장했으므로 로컬 상태만 갱신)
       const isMemoOnlyUpdate = Object.keys(cleanData).every(key => 
         ['id', 'recent_memo', 'latest_memo', 'last_memo_date', 'memo_history'].includes(key)

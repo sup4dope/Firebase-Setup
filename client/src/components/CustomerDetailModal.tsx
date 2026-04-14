@@ -5087,7 +5087,7 @@ export function CustomerDetailModal({
           open={contractSendModalOpen}
           onOpenChange={setContractSendModalOpen}
           preselectedCustomer={customer}
-          onSuccess={async () => {
+          onSuccess={async (info) => {
             toast({ title: '성공', description: '전자계약이 발송되었습니다.' });
             if (customer?.id) {
               try {
@@ -5096,6 +5096,16 @@ export function CustomerDetailModal({
                 setActiveBottomTab("contracts");
               } catch (error) {
                 console.error("Error loading contracts after send:", error);
+              }
+              if (info?.contractType) {
+                const statusMap: Record<'pre' | 'post' | 'out', string> = {
+                  'pre': '계약서발송완료(선불)',
+                  'post': '계약서발송완료(후불)',
+                  'out': '계약서발송완료(외주)',
+                };
+                const newStatus = statusMap[info.contractType];
+                setFormData((prev) => ({ ...prev, status_code: newStatus }));
+                onSave?.({ id: customer.id, status_code: newStatus, _serverSynced: true } as any);
               }
             }
           }}
