@@ -1298,9 +1298,9 @@ export default function Dashboard() {
         Object.entries(data).filter(([_, v]) => v !== undefined)
       ) as Partial<Customer>;
 
-      // ★핵심: 메모 전용 업데이트인지 확인 (recent_memo만 있으면 Firestore 저장 건너뛰기)
+      // ★핵심: 메모 전용 업데이트인지 확인 (모달이 이미 Firestore 저장했으므로 로컬 상태만 갱신)
       const isMemoOnlyUpdate = Object.keys(cleanData).every(key => 
-        ['id', 'recent_memo', 'latest_memo', 'last_memo_date'].includes(key)
+        ['id', 'recent_memo', 'latest_memo', 'last_memo_date', 'memo_history'].includes(key)
       );
       
       if (isMemoOnlyUpdate) {
