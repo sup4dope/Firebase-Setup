@@ -35,7 +35,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar as CalendarIcon, Search, Clock, AlertCircle, AlertTriangle, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { createTodoItem, deleteActiveTodosForCustomer, updateCustomerStatus } from '@/lib/firestore';
+import { createTodoItem, hasActiveTodoForCustomer, updateCustomerStatus } from '@/lib/firestore';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -143,7 +143,16 @@ export function TodoForm({
       const customer = customers.find(c => c.id === data.customer_id);
 
       if (customer && data.customer_id) {
-        await deleteActiveTodosForCustomer(data.customer_id);
+        const hasExisting = await hasActiveTodoForCustomer(data.customer_id);
+        if (hasExisting) {
+          toast({
+            title: '예약(TODO) 중복',
+            description: '이미 등록된 예약(TODO)이 있습니다. 기존 TODO를 삭제하거나 수정한 후 다시 시도해주세요.',
+            variant: 'destructive',
+          });
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       const todoData: InsertTodoItem = {

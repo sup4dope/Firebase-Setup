@@ -1162,6 +1162,16 @@ export const deleteActiveTodosForCustomer = async (customerId: string): Promise<
   return deletedCount;
 };
 
+export const hasActiveTodoForCustomer = async (customerId: string): Promise<boolean> => {
+  const q = query(
+    collection(db, 'todo_list'),
+    where('customer_id', '==', customerId),
+    where('status', '==', '진행중'),
+  );
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+};
+
 // 특정 고객의 경과된 TODO 자동 삭제 (고객 액션 시 호출)
 export const deleteOverdueTodosForCustomer = async (customerId: string): Promise<number> => {
   const now = new Date();
@@ -1188,17 +1198,18 @@ export const getPreviousStatusForCustomer = async (customerId: string): Promise<
     collection(db, 'status_logs'),
     where('customer_id', '==', customerId),
     orderBy('changed_at', 'desc'),
-    limit(2),
+    limit(10),
   );
   const snapshot = await getDocs(q);
   const docs = snapshot.docs;
-  if (docs.length >= 2) {
-    return docs[1].data().new_status || docs[1].data().previous_status || null;
+  for (const docSnap of docs) {
+    const data = docSnap.data();
+    const prevStatus = data.previous_status;
+    if (prevStatus && prevStatus !== '예약') {
+      return prevStatus;
+    }
   }
-  if (docs.length === 1) {
-    return docs[0].data().previous_status || null;
-  }
-  return null;
+  return '상담대기';
 };
 
 // ============ Customer Info Logs (자문료율, 계약금, 집행금액 변경 이력) ============

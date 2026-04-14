@@ -5053,7 +5053,7 @@ export function CustomerDetailModal({
             setTodoModalOpen(false);
             if (customer?.id && formData.status_code !== '예약') {
               setFormData((prev) => ({ ...prev, status_code: "예약" }));
-              onSave?.({ id: customer.id, status_code: "예약" } as any);
+              onSave?.({ id: customer.id, status_code: "예약", _serverSynced: true } as any);
             }
             onTodoCreated?.();
           }}
@@ -5074,7 +5074,7 @@ export function CustomerDetailModal({
             setReservationTodoOpen(false);
             if (customer?.id) {
               setFormData((prev) => ({ ...prev, status_code: "예약" }));
-              onSave?.({ id: customer.id, status_code: "예약" } as any);
+              onSave?.({ id: customer.id, status_code: "예약", _serverSynced: true } as any);
             }
             onTodoCreated?.();
           }}

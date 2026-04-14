@@ -60,6 +60,19 @@ export default function Dashboard() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const customersRef = useRef<Customer[]>([]);
   useEffect(() => { customersRef.current = customers; }, [customers]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.customerId && detail?.status_code) {
+        setCustomers(prev =>
+          prev.map(c => c.id === detail.customerId ? { ...c, status_code: detail.status_code } : c)
+        );
+      }
+    };
+    window.addEventListener('customerLocalSync', handler);
+    return () => window.removeEventListener('customerLocalSync', handler);
+  }, []);
   const [users, setUsers] = useState<User[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map());
@@ -232,6 +245,8 @@ export default function Dashboard() {
   }, [isSuperAdmin]);
 
   // 경과 TODO 실시간 추적
+  const prevOverdueRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!user) return;
 
@@ -262,24 +277,27 @@ export default function Dashboard() {
             }
           }
         }
-        setOverdueTodoCustomerIds(overdueCustomerIds);
 
+        const newOverdueIds: string[] = [];
         for (const cid of overdueCustomerIds) {
-          const c = customersRef.current.find(x => x.id === cid);
-          if (c && c.status_code === '예약') {
-            const deleted = await deleteOverdueTodosForCustomer(cid);
-            if (deleted > 0) {
-              const prevStatus = await getPreviousStatusForCustomer(cid);
-              const restoreStatus = (prevStatus && prevStatus !== '예약' ? prevStatus : '상담대기') as StatusCode;
-              await updateCustomerStatus(cid, '예약' as StatusCode, restoreStatus, user.uid, user.name || '시스템');
-              setCustomers(prev =>
-                prev.map(x => x.id === cid ? { ...x, status_code: restoreStatus } : x)
-              );
-              overdueCustomerIds.delete(cid);
-            }
+          if (!prevOverdueRef.current.has(cid)) {
+            newOverdueIds.push(cid);
           }
         }
-        setOverdueTodoCustomerIds(new Set(overdueCustomerIds));
+        if (newOverdueIds.length > 0) {
+          const names = newOverdueIds.map(cid => {
+            const c = customersRef.current.find(x => x.id === cid);
+            return c?.company_name || c?.name || '알 수 없음';
+          });
+          toast({
+            title: '⏰ TODO 기한 경과',
+            description: `${names.join(', ')} 고객의 TODO가 경과되었습니다.`,
+            variant: 'destructive',
+          });
+        }
+
+        prevOverdueRef.current = overdueCustomerIds;
+        setOverdueTodoCustomerIds(overdueCustomerIds);
       } catch (error) {
         console.error('Error loading overdue todos:', error);
       }
@@ -290,36 +308,52 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [user, users, isSuperAdmin, isTeamLeader]);
 
-  // 경과 TODO 고객 액션 후 갱신 헬퍼 (skipRestore: 상태 변경 직후 호출 시 예약 자동복원 방지)
-  const handleOverdueTodoAction = async (customerId: string, skipRestore = false) => {
+  const handleOverdueTodoAction = async (customerId: string, actionDesc: string = '', skipRestore = false) => {
     try {
-      const deleted = await deleteOverdueTodosForCustomer(customerId);
-      if (deleted > 0) {
+      const wasOverdue = overdueTodoCustomerIds.has(customerId);
+
+      if (wasOverdue) {
+        await deleteOverdueTodosForCustomer(customerId);
         setOverdueTodoCustomerIds(prev => {
           const next = new Set(prev);
           next.delete(customerId);
           return next;
         });
+        prevOverdueRef.current = new Set([...prevOverdueRef.current].filter(id => id !== customerId));
+      }
 
-        if (!skipRestore) {
-          const { getDoc } = await import('firebase/firestore');
-          const { doc: firestoreDoc } = await import('firebase/firestore');
-          const { db } = await import('@/lib/firebase');
-          const customerDoc = await getDoc(firestoreDoc(db, 'customers', customerId));
-          const currentStatus = customerDoc.data()?.status_code;
+      if (!skipRestore) {
+        const customer = customersRef.current.find(c => c.id === customerId);
+        const currentStatus = customer?.status_code;
 
-          if (currentStatus === '예약' && user) {
-            const prevStatus = await getPreviousStatusForCustomer(customerId);
-            const restoreStatus = (prevStatus && prevStatus !== '예약' ? prevStatus : '상담대기') as StatusCode;
-            await updateCustomerStatus(customerId, '예약' as StatusCode, restoreStatus, user.uid, user.name || '시스템');
-            setCustomers(prev =>
-              prev.map(c => c.id === customerId ? { ...c, status_code: restoreStatus } : c)
-            );
+        if (currentStatus === '예약' && user) {
+          const prevStatus = await getPreviousStatusForCustomer(customerId);
+          const restoreStatus = (prevStatus && prevStatus !== '예약' ? prevStatus : '상담대기') as StatusCode;
+          await updateCustomerStatus(customerId, '예약' as StatusCode, restoreStatus, user.uid, user.name || '시스템');
+          setCustomers(prev =>
+            prev.map(c => c.id === customerId ? { ...c, status_code: restoreStatus } : c)
+          );
+
+          if (wasOverdue && actionDesc) {
+            toast({
+              title: '경과 고정 해제',
+              description: `${actionDesc} → 예약에서 "${restoreStatus}"(으)로 복원되었습니다.`,
+            });
           }
+        } else if (wasOverdue && actionDesc) {
+          toast({
+            title: '경과 고정 해제',
+            description: `${actionDesc}(으)로 경과 고정이 해제되었습니다.`,
+          });
         }
+      } else if (wasOverdue && actionDesc) {
+        toast({
+          title: '경과 고정 해제',
+          description: `${actionDesc}(으)로 경과 고정이 해제되었습니다.`,
+        });
       }
     } catch (error) {
-      console.error('Error deleting overdue todos:', error);
+      console.error('Error handling overdue todo action:', error);
     }
   };
 
@@ -605,7 +639,7 @@ export default function Dashboard() {
       const now = new Date();
       const logs = await getContractLogsForMonth(now.getFullYear(), now.getMonth() + 1);
       setStatusLogs(logs);
-      handleOverdueTodoAction(customerId, true);
+      handleOverdueTodoAction(customerId, '상태 변경', true);
       toast({
         title: '성공',
         description: '상태가 변경되었습니다.',
@@ -733,7 +767,7 @@ export default function Dashboard() {
       const logs = await getContractLogsForMonth(now.getFullYear(), now.getMonth() + 1);
       setStatusLogs(logs);
 
-      handleOverdueTodoAction(statusChangeModal.customerId, true);
+      handleOverdueTodoAction(statusChangeModal.customerId, '상태 변경', true);
       setStatusChangeModal(prev => ({ ...prev, isOpen: false }));
       toast({
         title: '성공',
@@ -1084,7 +1118,7 @@ export default function Dashboard() {
         } : c)
       );
       
-      handleOverdueTodoAction(customerId);
+      handleOverdueTodoAction(customerId, '메모 작성');
       toast({
         title: '성공',
         description: '메모가 저장되었습니다.',
@@ -1260,6 +1294,7 @@ export default function Dashboard() {
         console.error('Settlement sync error:', err)
       );
 
+      handleOverdueTodoAction(customerId, '정보 수정');
       toast({
         title: '성공',
         description: '정보가 수정되었습니다.',
@@ -1328,7 +1363,7 @@ export default function Dashboard() {
             return c;
           })
         );
-        handleOverdueTodoAction(cleanData.id!);
+        handleOverdueTodoAction(cleanData.id!, '메모 작성');
         return cleanData.id;
       }
 
@@ -1346,7 +1381,7 @@ export default function Dashboard() {
             return c;
           })
         );
-        handleOverdueTodoAction(cleanData.id!);
+        handleOverdueTodoAction(cleanData.id!, '정보 수정');
         return cleanData.id;
       }
       
@@ -1362,9 +1397,8 @@ export default function Dashboard() {
             return c;
           })
         );
-        // ★수정: fetchData 대신 로컬 상태만 업데이트 (모달 깜빡임 방지)
         console.log("🔄 상세페이지 변경 감지 -> 로컬 상태 업데이트 완료");
-        handleOverdueTodoAction(data.id);
+        handleOverdueTodoAction(data.id, '정보 수정');
         return data.id;
       } catch (error: any) {
         console.error('Error updating customer:', error?.message || error?.code || error);

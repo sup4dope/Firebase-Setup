@@ -1488,6 +1488,11 @@ export function CustomerTable({
           userRole={userRole}
           defaultCustomerId={reservationPending.customer?.id}
           onTodoCreated={() => {
+            if (reservationPending.customer) {
+              window.dispatchEvent(new CustomEvent('customerLocalSync', {
+                detail: { customerId: reservationPending.customer.id, status_code: '예약' }
+              }));
+            }
             setReservationPending({ isOpen: false, customer: null });
           }}
         />
