@@ -116,7 +116,7 @@ export default function PaymentSendModal({ open, onClose, customer, onSuccess }:
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">고객:</span>
               <span className="font-medium" data-testid="payment-customer-name">
-                {customer.company_name || customer.representative_name}
+                {customer.representative_name || customer.company_name}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm">
