@@ -61,7 +61,7 @@ export default function PaymentSendModal({ open, onClose, customer, onSuccess }:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customer_id: customer.id,
-          customer_name: customer.representative_name || customer.company_name || '',
+          customer_name: customer.name || customer.company_name || '',
           phone,
           contract_amount_manwon: contractAmount,
           manager_id: customer.manager_id || '',
@@ -78,7 +78,7 @@ export default function PaymentSendModal({ open, onClose, customer, onSuccess }:
 
       toast({
         title: '결제 청구서 발송 완료',
-        description: `${customer.company_name || customer.representative_name}님에게 ${priceWon.toLocaleString()}원 청구서가 발송되었습니다.`,
+        description: `${customer.name || customer.company_name}님에게 ${priceWon.toLocaleString()}원 청구서가 발송되었습니다.`,
       });
 
       onSuccess?.(data.bill_id, priceWon);
@@ -116,7 +116,7 @@ export default function PaymentSendModal({ open, onClose, customer, onSuccess }:
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">고객:</span>
               <span className="font-medium" data-testid="payment-customer-name">
-                {customer.representative_name || customer.company_name}
+                {customer.name || customer.company_name}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm">
