@@ -12,6 +12,7 @@ import { startOfWeek, startOfMonth, startOfDay } from 'date-fns';
 import { 
   getPendingConsultations, 
   getCustomerByBusinessNumber, 
+  getCustomerByPhone,
   importAllPendingConsultations, 
   processConsultationToCustomer, 
   deleteConsultation, 
@@ -31,6 +32,7 @@ interface ConsultationWithDuplicate {
   id: string;
   data: Consultation;
   isDuplicate: boolean;
+  duplicateReasons: string[];
 }
 
 export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete }: ConsultationsPreviewModalProps) {
@@ -57,22 +59,76 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
     }
   }, [open]);
 
+  const normalizePhone = (phone: string) => phone.replace(/[-\s]/g, '').trim();
+
   const fetchConsultations = async () => {
     setLoading(true);
     try {
       const pending = await getPendingConsultations();
-      
+
       const consultationsWithDuplicate: ConsultationWithDuplicate[] = await Promise.all(
         pending.map(async ({ id, data }) => {
-          let isDuplicate = false;
+          const reasons: string[] = [];
+
           if (data.businessNumber) {
             const existing = await getCustomerByBusinessNumber(data.businessNumber);
-            isDuplicate = !!existing;
+            if (existing) {
+              reasons.push(`사업자번호 중복 (기존 고객: ${existing.name || existing.company_name})`);
+            }
           }
-          return { id, data, isDuplicate };
+
+          if (data.phone) {
+            const normalizedPhone = normalizePhone(data.phone);
+            if (normalizedPhone.length >= 10) {
+              const existing = await getCustomerByPhone(normalizedPhone);
+              if (existing) {
+                reasons.push(`연락처 중복 (기존 고객: ${existing.name || existing.company_name})`);
+              }
+            }
+          }
+
+          return { id, data, isDuplicate: reasons.length > 0, duplicateReasons: reasons };
         })
       );
-      
+
+      const phoneMap = new Map<string, string[]>();
+      const bizNumMap = new Map<string, string[]>();
+      for (const c of consultationsWithDuplicate) {
+        if (c.data.phone) {
+          const np = normalizePhone(c.data.phone);
+          if (np.length >= 10) {
+            if (!phoneMap.has(np)) phoneMap.set(np, []);
+            phoneMap.get(np)!.push(c.id);
+          }
+        }
+        if (c.data.businessNumber) {
+          const bn = c.data.businessNumber.trim();
+          if (bn) {
+            if (!bizNumMap.has(bn)) bizNumMap.set(bn, []);
+            bizNumMap.get(bn)!.push(c.id);
+          }
+        }
+      }
+
+      for (const c of consultationsWithDuplicate) {
+        if (c.data.phone) {
+          const np = normalizePhone(c.data.phone);
+          const group = phoneMap.get(np);
+          if (group && group.length > 1) {
+            c.duplicateReasons.push(`대기목록 내 연락처 중복 (${group.length}건)`);
+            c.isDuplicate = true;
+          }
+        }
+        if (c.data.businessNumber) {
+          const bn = c.data.businessNumber.trim();
+          const group = bizNumMap.get(bn);
+          if (group && group.length > 1) {
+            c.duplicateReasons.push(`대기목록 내 사업자번호 중복 (${group.length}건)`);
+            c.isDuplicate = true;
+          }
+        }
+      }
+
       setConsultations(consultationsWithDuplicate);
     } catch (error) {
       console.error('Error fetching consultations:', error);
@@ -175,9 +231,14 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
       }
 
       const businessNumber = data.businessNumber || '';
+      const phoneNorm = data.phone ? normalizePhone(data.phone) : '';
       let wasExisting = false;
       if (businessNumber) {
         const existing = await getCustomerByBusinessNumber(businessNumber);
+        wasExisting = !!existing;
+      }
+      if (!wasExisting && phoneNorm.length >= 10) {
+        const existing = await getCustomerByPhone(phoneNorm);
         wasExisting = !!existing;
       }
 
@@ -388,7 +449,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                       {showAssignmentStats ? <X className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </button>
                     <p className="text-xs text-muted-foreground hidden md:inline">
-                      * 중복: 사업자등록번호가 이미 등록된 고객
+                      * 중복: 사업자번호/연락처 기준 기존 고객 또는 대기목록 내 중복
                     </p>
                   </div>
                 </div>
@@ -416,7 +477,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
 
               <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="p-4 space-y-3">
-                  {filteredConsultations.map(({ id, data, isDuplicate }, index) => {
+                  {filteredConsultations.map(({ id, data, isDuplicate, duplicateReasons }, index) => {
                     const isItemImporting = importingIds.has(id);
                     const isItemDeleting = deletingIds.has(id);
                     const isItemBusy = isItemImporting || isItemDeleting;
@@ -441,7 +502,20 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                               {data.businessName && (
                                 <span className="text-sm text-muted-foreground">({data.businessName})</span>
                               )}
-                              {isDuplicate && (
+                              {isDuplicate && duplicateReasons.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {duplicateReasons.map((reason, ri) => (
+                                    <Badge key={ri} variant="outline" className={`text-xs ${
+                                      reason.includes('대기목록') 
+                                        ? 'border-red-500 text-red-600 dark:text-red-400' 
+                                        : 'border-amber-500 text-amber-600 dark:text-amber-400'
+                                    }`}>
+                                      {reason}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                              {isDuplicate && duplicateReasons.length === 0 && (
                                 <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400 text-xs">
                                   기존 고객
                                 </Badge>

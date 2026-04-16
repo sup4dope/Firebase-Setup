@@ -2637,10 +2637,12 @@ export const processConsultationToCustomer = async (
       return null;
     }
     
-    // 사업자등록번호로 기존 고객 확인 (각 상담은 개별 고객으로 생성하되, 사업자번호가 동일하면 기존 고객에 메모 추가)
     let existingCustomer: Customer | null = null;
     if (businessNumber) {
       existingCustomer = await getCustomerByBusinessNumber(businessNumber);
+    }
+    if (!existingCustomer && phone) {
+      existingCustomer = await getCustomerByPhone(phone);
     }
     
     const memoSummary = generateConsultationMemoSummary(consultation);
@@ -2774,11 +2776,15 @@ export const importAllPendingConsultations = async (): Promise<{
   for (const { id, data } of pending) {
     try {
       const businessNumber = data.businessNumber || '';
+      const phone = data.phone ? data.phone.replace(/[-\s]/g, '').trim() : '';
       let wasExisting = false;
       
-      // 사업자등록번호로 기존 고객 확인
       if (businessNumber) {
         const existing = await getCustomerByBusinessNumber(businessNumber);
+        wasExisting = !!existing;
+      }
+      if (!wasExisting && phone) {
+        const existing = await getCustomerByPhone(phone);
         wasExisting = !!existing;
       }
       
