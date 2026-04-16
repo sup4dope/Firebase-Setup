@@ -35,7 +35,7 @@ export default function PaymentSendModal({ open, onClose, customer, onSuccess }:
       setContractAmount(customer.contract_amount || 0);
       setPhone(customer.phone || '');
       const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 7);
+      futureDate.setDate(futureDate.getDate() + 14);
       setExpireDt(futureDate.toISOString().split('T')[0]);
     }
   }, [customer, open]);
