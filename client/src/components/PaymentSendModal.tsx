@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { authFetch } from '@/lib/firebase';
+import { authFetch, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -32,11 +33,22 @@ export default function PaymentSendModal({ open, onClose, customer, onSuccess }:
 
   useEffect(() => {
     if (customer && open) {
-      setContractAmount(customer.contract_amount || 0);
       setPhone(customer.phone || '');
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 14);
       setExpireDt(futureDate.toISOString().split('T')[0]);
+
+      const loadLatestAmount = async () => {
+        try {
+          const snap = await getDoc(doc(db, 'customers', customer.id));
+          const data = snap.data();
+          const amount = data?.contract_amount || data?.deposit_amount || customer.contract_amount || 0;
+          setContractAmount(amount);
+        } catch {
+          setContractAmount(customer.contract_amount || 0);
+        }
+      };
+      loadLatestAmount();
     }
   }, [customer, open]);
 
