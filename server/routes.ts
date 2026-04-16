@@ -1893,5 +1893,26 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/paymint/payments/:id", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const paymentId = req.params.id;
+
+      const docRef = firestore.collection('payments_paymint').doc(paymentId);
+      const doc = await docRef.get();
+      if (!doc.exists) {
+        return res.status(404).json({ error: '결제 내역을 찾을 수 없습니다.' });
+      }
+
+      await docRef.delete();
+      console.log(`[PayMint] 결제 내역 삭제: ${paymentId} by ${req.user!.email}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[PayMint Delete] 오류:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }

@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ContractSendModal } from '@/components/ContractSendModal';
 import { useToast } from '@/hooks/use-toast';
-import { FileSignature, Search, Plus, RefreshCw, Trash2, Loader2, XCircle, CreditCard, Send } from 'lucide-react';
+import { FileSignature, Search, Plus, RefreshCw, Trash2, Loader2, XCircle, CreditCard, Send, User } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Contract, ContractStatus, PaymentRecord } from '@shared/types';
 
@@ -50,11 +50,13 @@ export default function Contracts() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
+  const [senderFilter, setSenderFilter] = useState<string>('all');
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
 
   const isSuperAdmin = user?.role === 'super_admin';
 
@@ -194,6 +196,38 @@ export default function Contracts() {
     }
   };
 
+  const handlePaymentDelete = async (payment: PaymentRecord) => {
+    if (!confirm(`${payment.customer_name}의 결제 내역(${payment.bill_id})을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+
+    setDeletingPaymentId(payment.id);
+    try {
+      const res = await authFetch(`/api/paymint/payments/${payment.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: '삭제 완료', description: '결제 내역이 삭제되었습니다.' });
+        fetchPayments();
+      } else {
+        toast({ title: '삭제 실패', description: data.error || '삭제에 실패했습니다.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      toast({ title: '오류', description: error.message, variant: 'destructive' });
+    } finally {
+      setDeletingPaymentId(null);
+    }
+  };
+
+  const senderList = useMemo(() => {
+    if (activeTab === 'contracts') {
+      const names = new Set<string>();
+      contracts.forEach(c => { if (c.created_by) names.add(c.created_by); });
+      return Array.from(names).sort();
+    } else {
+      const names = new Set<string>();
+      payments.forEach(p => { if (p.sent_by_name) names.add(p.sent_by_name); });
+      return Array.from(names).sort();
+    }
+  }, [activeTab, contracts, payments]);
+
   const filteredContracts = useMemo(() => {
     let result = contracts;
 
@@ -203,6 +237,10 @@ export default function Contracts() {
       } else {
         result = result.filter(c => c.status === statusFilter);
       }
+    }
+
+    if (senderFilter !== 'all') {
+      result = result.filter(c => c.created_by === senderFilter);
     }
 
     if (searchQuery.trim()) {
@@ -217,13 +255,17 @@ export default function Contracts() {
     }
 
     return result;
-  }, [contracts, statusFilter, searchQuery]);
+  }, [contracts, statusFilter, senderFilter, searchQuery]);
 
   const filteredPayments = useMemo(() => {
     let result = payments;
 
     if (paymentFilter !== 'all') {
       result = result.filter(p => p.state === paymentFilter);
+    }
+
+    if (senderFilter !== 'all') {
+      result = result.filter(p => p.sent_by_name === senderFilter);
     }
 
     if (searchQuery.trim()) {
@@ -236,7 +278,7 @@ export default function Contracts() {
     }
 
     return result;
-  }, [payments, paymentFilter, searchQuery]);
+  }, [payments, paymentFilter, senderFilter, searchQuery]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: contracts.length };
@@ -360,7 +402,7 @@ export default function Contracts() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { setActiveTab('contracts'); setSearchQuery(''); }}
+          onClick={() => { setActiveTab('contracts'); setSearchQuery(''); setSenderFilter('all'); }}
           className={`rounded-none border-b-2 ${activeTab === 'contracts' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
           data-testid="tab-contracts"
         >
@@ -371,7 +413,7 @@ export default function Contracts() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { setActiveTab('payments'); setSearchQuery(''); }}
+          onClick={() => { setActiveTab('payments'); setSearchQuery(''); setSenderFilter('all'); }}
           className={`rounded-none border-b-2 ${activeTab === 'payments' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
           data-testid="tab-payments"
         >
@@ -381,8 +423,8 @@ export default function Contracts() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="relative flex-1 max-w-sm min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder={activeTab === 'contracts' ? '고객명, 상호명, 계약서명 검색...' : '고객명, 청구서ID, 발송자 검색...'}
@@ -418,6 +460,18 @@ export default function Contracts() {
             </SelectContent>
           </Select>
         )}
+        <Select value={senderFilter} onValueChange={setSenderFilter}>
+          <SelectTrigger className="w-[140px]" data-testid="select-sender-filter">
+            <User className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+            <SelectValue placeholder="담당자" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체 담당자</SelectItem>
+            {senderList.map(name => (
+              <SelectItem key={name} value={name}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {activeTab === 'contracts' ? (
@@ -569,12 +623,13 @@ export default function Contracts() {
                       <TableHead className="whitespace-nowrap hidden lg:table-cell">카드/은행</TableHead>
                       <TableHead className="whitespace-nowrap hidden lg:table-cell">발송자</TableHead>
                       <TableHead className="text-center w-28 whitespace-nowrap">관리</TableHead>
+                      {isSuperAdmin && <TableHead className="text-center w-16 whitespace-nowrap">삭제</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredPayments.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={isSuperAdmin ? 11 : 10} className="text-center py-12 text-muted-foreground">
                           {payments.length === 0
                             ? '결제 내역이 없습니다.'
                             : '검색 조건에 맞는 결제 내역이 없습니다.'}
@@ -642,6 +697,24 @@ export default function Contracts() {
                               )}
                             </div>
                           </TableCell>
+                          {isSuperAdmin && (
+                            <TableCell className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                                onClick={() => handlePaymentDelete(payment)}
+                                disabled={deletingPaymentId === payment.id}
+                                data-testid={`button-delete-payment-${payment.id}`}
+                              >
+                                {deletingPaymentId === payment.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                     )}
