@@ -48,3 +48,11 @@ integrations = ["firebase_barebones_javascript:1.0.0"]
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+PAYMINT_API_KEY = "PARTNER-V2-TEST-API-KEY"
+PAYMINT_MEMBER = "TEST-MEMBER-FOR-API"
+PAYMINT_MERCHANT = "TEST-MERCHANT-FOR-API"
+PAYMINT_API_URL = "https://stg.paymint.co.kr/partner"

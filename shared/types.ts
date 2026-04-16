@@ -641,3 +641,52 @@ export interface LeaveSummary {
   remainingLeave: number; // 잔여 연차
   pendingCount: number;   // 승인 대기 건수
 }
+
+// 결제선생(PayMint) 결제 상태
+export type PaymintState = 'W' | 'F' | 'C' | 'D';
+
+// 결제선생 결제 기록 (Firestore: payments_paymint collection)
+export interface PaymentRecord {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  bill_id: string;
+  short_url?: string;
+  amount: number;
+  contract_amount_manwon: number;
+  phone: string;
+  product_name: string;
+  message: string;
+  state: PaymintState;
+  sent_by: string;
+  sent_by_name: string;
+  manager_id: string;
+  manager_name: string;
+  expire_dt?: string;
+
+  appr_pay_type?: string;
+  appr_dt?: string;
+  appr_price?: string;
+  appr_issuer?: string;
+  appr_issuer_cd?: string;
+  appr_issuer_num?: string;
+  appr_acquirer_cd?: string;
+  appr_acquirer_nm?: string;
+  appr_num?: string;
+  appr_origin_num?: string;
+  appr_monthly?: string;
+  appr_state?: string;
+  appr_cash_num?: string;
+  appr_cash_trader?: string;
+  appr_cash_issuance_number?: string;
+
+  cancel_dt?: string;
+  cancel_num?: string;
+
+  contract_eformsign_id?: string;
+
+  created_at: Date;
+  updated_at?: Date;
+}
+
+export type InsertPaymentRecord = Omit<PaymentRecord, 'id' | 'created_at' | 'updated_at'>;

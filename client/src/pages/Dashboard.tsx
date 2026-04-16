@@ -43,7 +43,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { db, addCustomerHistoryLog } from '@/lib/firebase';
+import { db, addCustomerHistoryLog, authFetch } from '@/lib/firebase';
 import { addDoc, collection, doc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 import { FUNNEL_GROUPS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -159,6 +159,58 @@ export default function Dashboard() {
     selectedOrgs: [],
     existingOrgs: [],
   });
+
+  const [paymentNotifications, setPaymentNotifications] = useState<Array<{ id: string; customerId: string; customerName: string; amount: number }>>([]);
+  const seenPaymentIdsRef = useRef<Set<string>>(new Set());
+  const isInitialPaymentLoadRef = useRef(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const pollPayments = async () => {
+      try {
+        const res = await authFetch('/api/paymint/payments?state=F&limit=20');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !Array.isArray(data)) return;
+
+        if (isInitialPaymentLoadRef.current) {
+          data.forEach((p: any) => seenPaymentIdsRef.current.add(p.id));
+          isInitialPaymentLoadRef.current = false;
+          return;
+        }
+
+        const newPayments: Array<{ id: string; customerId: string; customerName: string; amount: number }> = [];
+        data.forEach((p: any) => {
+          if (!seenPaymentIdsRef.current.has(p.id)) {
+            seenPaymentIdsRef.current.add(p.id);
+            newPayments.push({
+              id: p.id,
+              customerId: p.customer_id,
+              customerName: p.customer_name || '알 수 없는 고객',
+              amount: Number(p.appr_price || p.amount || 0),
+            });
+          }
+        });
+        if (newPayments.length > 0) {
+          setPaymentNotifications(prev => [...prev, ...newPayments]);
+        }
+      } catch (err) {
+        // silent
+      }
+    };
+
+    pollPayments();
+    const interval = setInterval(pollPayments, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  const dismissPaymentNotification = (paymentId: string) => {
+    setPaymentNotifications(prev => prev.filter(n => n.id !== paymentId));
+  };
+
+  const dismissPaymentNotificationsByCustomer = (customerId: string) => {
+    setPaymentNotifications(prev => prev.filter(n => n.customerId !== customerId));
+  };
 
   // Fetch data - 모든 데이터를 병렬로 로딩하여 성능 최적화
   const fetchData = async () => {
@@ -1316,6 +1368,9 @@ export default function Dashboard() {
     setIsNewCustomerModal(false);
     setDetailModalInitialTab('memo');
     setDetailModalOpen(true);
+    if (customer.id) {
+      dismissPaymentNotificationsByCustomer(customer.id);
+    }
   };
 
   // Open detail modal for new customer
@@ -2053,6 +2108,33 @@ export default function Dashboard() {
         onOpenChange={setConsultationsPreviewOpen}
         onImportComplete={handleImportComplete}
       />
+
+      {paymentNotifications.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm" data-testid="payment-notifications">
+          {paymentNotifications.map((notif) => (
+            <div
+              key={notif.id}
+              className="bg-green-600 text-white rounded-lg shadow-lg p-4 flex items-start gap-3 animate-in slide-in-from-right-5 duration-300"
+              data-testid={`payment-notification-${notif.id}`}
+            >
+              <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm">결제 완료</p>
+                <p className="text-sm opacity-90 truncate">
+                  {notif.customerName} · {notif.amount.toLocaleString()}원
+                </p>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); dismissPaymentNotification(notif.id); }}
+                className="text-white/80 hover:text-white flex-shrink-0 mt-0.5"
+                data-testid={`dismiss-payment-notification-${notif.id}`}
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

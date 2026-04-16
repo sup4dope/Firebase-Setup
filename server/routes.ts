@@ -6,6 +6,7 @@ import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64,
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin, getAdminApp, type AuthenticatedRequest } from "./firebaseAdmin";
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
 import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, downloadDocument, checkEformsignConfig, mapEformsignStatus, extractEformsignStatus, cancelDocument } from "./eformsignService";
+import { sendBill, cancelBill, destroyBill, readBill, resendBill, getBalance, checkPaymintConfig, getPaymintStateLabel, type ApprovalCallbackData } from "./paymintService";
 
 const FieldValue = admin.firestore.FieldValue;
 
@@ -1505,6 +1506,384 @@ export async function registerRoutes(
       res.json({ result: "success", id: docRef.id });
     } catch (error: any) {
       console.error("[LeaveRequest] 관리자 연차 등록 오류:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================
+  // 결제선생(PayMint) API 라우트
+  // ============================================================
+
+  app.post("/api/paymint/send", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { customer_id, customer_name, phone, contract_amount_manwon, manager_id, manager_name, expire_dt, contract_eformsign_id } = req.body;
+
+      if (!customer_id || !customer_name || !phone || !contract_amount_manwon) {
+        return res.status(400).json({ error: '필수 값이 누락되었습니다.' });
+      }
+
+      const priceWon = Math.round(contract_amount_manwon * 10000 * 1.1);
+      const baseUrl = req.headers['x-forwarded-proto'] 
+        ? `${req.headers['x-forwarded-proto']}://${req.headers.host}`
+        : `${req.protocol}://${req.headers.host}`;
+      const callbackURL = `${baseUrl}/api/paymint/callback`;
+
+      const result = await sendBill({
+        productName: '정책자금 컨설팅 계약금',
+        message: `${customer_name}님, 계약금 결제 청구서입니다. (${contract_amount_manwon}만원 + VAT)`,
+        memberName: customer_name,
+        phone: phone.replace(/-/g, ''),
+        price: priceWon,
+        expireDt: expire_dt,
+        callbackURL,
+      });
+
+      if (result.code !== '0000') {
+        console.error(`[PayMint Send] 실패: ${result.code} - ${result.msg}`);
+        return res.status(400).json({ error: result.msg, code: result.code });
+      }
+
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const now = new Date();
+
+      const paymentData = {
+        customer_id,
+        customer_name,
+        bill_id: result.bill_id,
+        short_url: result.shortURL || '',
+        amount: priceWon,
+        contract_amount_manwon,
+        phone: phone.replace(/-/g, ''),
+        product_name: '정책자금 컨설팅 계약금',
+        message: `${customer_name}님, 계약금 결제 청구서입니다. (${contract_amount_manwon}만원 + VAT)`,
+        state: 'W',
+        sent_by: req.user!.uid,
+        sent_by_name: req.user!.name || '',
+        manager_id: manager_id || '',
+        manager_name: manager_name || '',
+        expire_dt: expire_dt || '',
+        contract_eformsign_id: contract_eformsign_id || '',
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      };
+
+      const docRef = await firestore.collection('payments_paymint').add(paymentData);
+      console.log(`[PayMint Send] 청구서 발송 성공: bill_id=${result.bill_id}, amount=${priceWon}원, customer=${customer_name}`);
+
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const memoContent = `[결제청구] 발송일: ${dateStr} | 금액: ${priceWon.toLocaleString()}원 (계약금 ${contract_amount_manwon}만원 + VAT)`;
+      const memoEntry = {
+        content: memoContent,
+        author_id: req.user!.uid,
+        author_name: req.user!.name || '시스템',
+        created_at: now.toISOString(),
+      };
+
+      await firestore.collection('customers').doc(customer_id).update({
+        memo_history: FieldValue.arrayUnion(memoEntry),
+        recent_memo: memoContent,
+        latest_memo: memoContent,
+        last_memo_date: dateStr,
+        updated_at: now.toISOString(),
+      });
+
+      res.json({
+        result: 'success',
+        payment_id: docRef.id,
+        bill_id: result.bill_id,
+        short_url: result.shortURL,
+        amount: priceWon,
+      });
+    } catch (error: any) {
+      console.error('[PayMint Send] 오류:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/paymint/callback", async (req, res) => {
+    try {
+      const data = req.body as ApprovalCallbackData;
+      console.log(`[PayMint Callback] bill_id=${data.bill_id}, state=${data.appr_state}`);
+
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+
+      const paymentsRef = firestore.collection('payments_paymint');
+      const snapshot = await paymentsRef.where('bill_id', '==', data.bill_id).limit(1).get();
+
+      if (snapshot.empty) {
+        console.error(`[PayMint Callback] bill_id=${data.bill_id} 결제 기록 없음`);
+        return res.json({ code: "0000", msg: "성공하였습니다." });
+      }
+
+      const paymentDoc = snapshot.docs[0];
+      const paymentData = paymentDoc.data();
+      const now = new Date();
+
+      const updateData: Record<string, any> = {
+        state: data.appr_state,
+        appr_pay_type: data.appr_pay_type || '',
+        appr_dt: data.appr_dt || '',
+        appr_price: data.appr_price || '',
+        appr_issuer: data.appr_issuer || '',
+        appr_issuer_cd: data.appr_issuer_cd || '',
+        appr_issuer_num: data.appr_issuer_num || '',
+        appr_acquirer_cd: data.appr_acquirer_cd || '',
+        appr_acquirer_nm: data.appr_acquirer_nm || '',
+        appr_num: data.appr_num || '',
+        appr_origin_num: data.appr_origin_num || '',
+        appr_monthly: data.appr_monthly || '',
+        appr_cash_num: data.appr_cash_num || '',
+        appr_cash_trader: data.appr_cash_trader || '',
+        appr_cash_issuance_number: data.appr_cash_issuance_number || '',
+        updated_at: now.toISOString(),
+      };
+
+      await paymentDoc.ref.update(updateData);
+      console.log(`[PayMint Callback] 결제 상태 업데이트: ${paymentDoc.id} → ${data.appr_state}`);
+
+      if (data.appr_state === 'F') {
+        const customerId = paymentData.customer_id;
+        const customerRef = firestore.collection('customers').doc(customerId);
+        const customerSnap = await customerRef.get();
+
+        if (customerSnap.exists) {
+          const customerData = customerSnap.data();
+          const previousStatus = customerData?.status_code || '';
+          const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+          const issuerInfo = data.appr_issuer ? ` (${data.appr_issuer})` : '';
+          const memoContent = `[결제완료] 결제일: ${dateStr} | 금액: ${Number(data.appr_price || 0).toLocaleString()}원${issuerInfo} | 승인번호: ${data.appr_num || '-'}`;
+          const memoEntry = {
+            content: memoContent,
+            author_id: 'system',
+            author_name: '시스템(결제선생)',
+            created_at: now.toISOString(),
+          };
+
+          await customerRef.update({
+            status_code: '계약완료(선불)',
+            deposit_paid_date: dateStr,
+            updated_at: now.toISOString(),
+            memo_history: FieldValue.arrayUnion(memoEntry),
+            recent_memo: memoContent,
+            latest_memo: memoContent,
+            last_memo_date: dateStr,
+          });
+
+          await firestore.collection('status_logs').add({
+            customer_id: customerId,
+            customer_name: paymentData.customer_name || '',
+            previous_status: previousStatus,
+            new_status: '계약완료(선불)',
+            changed_by: 'system',
+            changed_by_name: '시스템(결제선생)',
+            changed_at: now.toISOString(),
+            memo: `결제완료 - 자동 상태 변경 (결제금액: ${Number(data.appr_price || 0).toLocaleString()}원)`,
+          });
+
+          await firestore.collection('payments_paymint').doc(paymentDoc.id).update({
+            payment_completed_notified: false,
+          });
+
+          console.log(`[PayMint Callback] 고객 상태 변경: ${customerId} → 계약완료(선불)`);
+        }
+      }
+
+      res.json({ code: "0000", msg: "성공하였습니다." });
+    } catch (error: any) {
+      console.error('[PayMint Callback] 오류:', error.message);
+      res.json({ code: "0000", msg: "성공하였습니다." });
+    }
+  });
+
+  app.post("/api/paymint/cancel", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { payment_id, bill_id, price } = req.body;
+
+      if (!bill_id || !price) {
+        return res.status(400).json({ error: '필수 값이 누락되었습니다.' });
+      }
+
+      const result = await cancelBill({ billId: bill_id, price: Number(price) });
+
+      if (result.code !== '0000') {
+        return res.status(400).json({ error: result.msg, code: result.code });
+      }
+
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const now = new Date();
+
+      if (payment_id) {
+        await firestore.collection('payments_paymint').doc(payment_id).update({
+          state: 'C',
+          cancel_dt: result.appr_cancel_dt || now.toISOString(),
+          cancel_num: result.appr_num || '',
+          updated_at: now.toISOString(),
+        });
+
+        const payDoc = await firestore.collection('payments_paymint').doc(payment_id).get();
+        const payData = payDoc.data();
+        if (payData?.customer_id) {
+          const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          const memoContent = `[결제취소] 취소일: ${dateStr} | 금액: ${Number(price).toLocaleString()}원 | 처리자: ${req.user!.name || '관리자'}`;
+          const memoEntry = {
+            content: memoContent,
+            author_id: req.user!.uid,
+            author_name: req.user!.name || '관리자',
+            created_at: now.toISOString(),
+          };
+          await firestore.collection('customers').doc(payData.customer_id).update({
+            memo_history: FieldValue.arrayUnion(memoEntry),
+            recent_memo: memoContent,
+            latest_memo: memoContent,
+            updated_at: now.toISOString(),
+          });
+        }
+      }
+
+      console.log(`[PayMint Cancel] 결제 취소 성공: bill_id=${bill_id}`);
+      res.json({ result: 'success', ...result });
+    } catch (error: any) {
+      console.error('[PayMint Cancel] 오류:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/paymint/destroy", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { payment_id, bill_id, price } = req.body;
+
+      if (!bill_id || !price) {
+        return res.status(400).json({ error: '필수 값이 누락되었습니다.' });
+      }
+
+      const result = await destroyBill({ billId: bill_id, price: Number(price) });
+
+      if (result.code !== '0000') {
+        return res.status(400).json({ error: result.msg, code: result.code });
+      }
+
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const now = new Date();
+
+      if (payment_id) {
+        await firestore.collection('payments_paymint').doc(payment_id).update({
+          state: 'D',
+          updated_at: now.toISOString(),
+        });
+      }
+
+      console.log(`[PayMint Destroy] 청구서 파기 성공: bill_id=${bill_id}`);
+      res.json({ result: 'success', ...result });
+    } catch (error: any) {
+      console.error('[PayMint Destroy] 오류:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/paymint/status", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { bill_id, payment_id } = req.body;
+
+      if (!bill_id) {
+        return res.status(400).json({ error: 'bill_id가 필요합니다.' });
+      }
+
+      const result = await readBill({ billId: bill_id });
+
+      if (result.appr_state && payment_id) {
+        const adminApp = getAdminApp();
+        const firestore = adminApp.firestore();
+        await firestore.collection('payments_paymint').doc(payment_id).update({
+          state: result.appr_state,
+          appr_pay_type: result.appr_pay_type || '',
+          appr_dt: result.appr_dt || '',
+          appr_price: result.appr_price || '',
+          appr_issuer: result.appr_issuer || '',
+          appr_num: result.appr_num || '',
+          appr_monthly: result.appr_monthly || '',
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      res.json({ result: 'success', ...result });
+    } catch (error: any) {
+      console.error('[PayMint Status] 오류:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/paymint/resend", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { bill_id } = req.body;
+
+      if (!bill_id) {
+        return res.status(400).json({ error: 'bill_id가 필요합니다.' });
+      }
+
+      const result = await resendBill({ billId: bill_id });
+
+      if (result.code !== '0000') {
+        return res.status(400).json({ error: result.msg, code: result.code });
+      }
+
+      console.log(`[PayMint Resend] 재발송 성공: bill_id=${bill_id}`);
+      res.json({ result: 'success', ...result });
+    } catch (error: any) {
+      console.error('[PayMint Resend] 오류:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/paymint/balance", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const result = await getBalance();
+      res.json(result);
+    } catch (error: any) {
+      console.error('[PayMint Balance] 오류:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/paymint/payments", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const role = req.user!.role;
+      const uid = req.user!.uid;
+
+      const paymentsQuery = firestore.collection('payments_paymint').orderBy('created_at', 'desc');
+      const snapshot = await paymentsQuery.get();
+
+      let payments = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const stateFilter = req.query.state as string | undefined;
+      if (stateFilter) {
+        payments = payments.filter((p: any) => p.state === stateFilter);
+      }
+      const queryLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : 0;
+      if (queryLimit > 0) {
+        payments = payments.slice(0, queryLimit);
+      }
+
+      if (role === 'staff') {
+        payments = payments.filter((p: any) => p.manager_id === uid || p.sent_by === uid);
+      } else if (role === 'team_leader') {
+        const teamId = req.user!.team_id;
+        if (teamId) {
+          const teamSnap = await firestore.collection('teams').doc(teamId).get();
+          const teamMembers = teamSnap.exists ? (teamSnap.data()?.members || []) : [];
+          payments = payments.filter((p: any) => teamMembers.includes(p.manager_id) || p.sent_by === uid);
+        }
+      }
+
+      res.json(payments);
+    } catch (error: any) {
+      console.error('[PayMint Payments] 오류:', error.message);
       res.status(500).json({ error: error.message });
     }
   });

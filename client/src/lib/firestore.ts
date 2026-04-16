@@ -52,6 +52,8 @@ import type {
   Contract,
   InsertContract,
   ContractStatus,
+  PaymentRecord,
+  PaymintState,
 } from '@shared/types';
 // STATUS_LABELS removed - using Korean status names directly
 
@@ -3397,4 +3399,39 @@ export const updateContractStatus = async (
     updateData.document_id = additionalData.document_id;
   }
   await updateDoc(doc(db, 'contracts_eformsign', contractId), updateData);
+};
+
+export const getPaymentsByCustomer = async (customerId: string): Promise<PaymentRecord[]> => {
+  const q = query(
+    collection(db, 'payments_paymint'),
+    where('customer_id', '==', customerId),
+    orderBy('created_at', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(d => {
+    const data = d.data();
+    return {
+      ...data,
+      id: d.id,
+      created_at: data.created_at ? toDate(data.created_at) : new Date(),
+      updated_at: data.updated_at ? toDate(data.updated_at) : undefined,
+    } as PaymentRecord;
+  });
+};
+
+export const getAllPayments = async (): Promise<PaymentRecord[]> => {
+  const q = query(
+    collection(db, 'payments_paymint'),
+    orderBy('created_at', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(d => {
+    const data = d.data();
+    return {
+      ...data,
+      id: d.id,
+      created_at: data.created_at ? toDate(data.created_at) : new Date(),
+      updated_at: data.updated_at ? toDate(data.updated_at) : undefined,
+    } as PaymentRecord;
+  });
 };

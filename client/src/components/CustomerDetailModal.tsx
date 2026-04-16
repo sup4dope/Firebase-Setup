@@ -81,6 +81,7 @@ import {
   ProcessingOrg,
   Contract,
   ContractStatus,
+  PaymentRecord,
 } from "@shared/types";
 import { FinancialAnalysisTab } from "@/components/FinancialAnalysisTab";
 import { ReviewSummaryTab } from "@/components/ReviewSummaryTab";
@@ -91,6 +92,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CreditCard, FileSignature } from "lucide-react";
 import { TodoForm } from "@/components/TodoForm";
 import { ContractSendModal } from "@/components/ContractSendModal";
+import PaymentSendModal from "@/components/PaymentSendModal";
 import { storage, db, getCustomerHistoryLogs } from "@/lib/firebase";
 import { 
   getConsultationByCustomerId, 
@@ -99,6 +101,7 @@ import {
   syncSingleCustomerSettlement,
   getUsers,
   getContractsByCustomer,
+  getPaymentsByCustomer,
 } from "@/lib/firestore";
 import {
   ref,
@@ -257,6 +260,10 @@ export function CustomerDetailModal({
   const [todoModalOpen, setTodoModalOpen] = useState(false);
   const [reservationTodoOpen, setReservationTodoOpen] = useState(false);
   const [contractSendModalOpen, setContractSendModalOpen] = useState(false);
+  const [paymentSendModalOpen, setPaymentSendModalOpen] = useState(false);
+  const [customerPayments, setCustomerPayments] = useState<PaymentRecord[]>([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
+  const [syncingPaymentId, setSyncingPaymentId] = useState<string | null>(null);
   const [proposalModalOpen, setProposalModalOpen] = useState(false);
   const [proposalPreviewOpen, setProposalPreviewOpen] = useState(false);
   const [proposalAgencies, setProposalAgencies] = useState<{
@@ -741,7 +748,43 @@ export function CustomerDetailModal({
       }
     };
     loadContracts();
+
+    const loadPayments = async () => {
+      if (customer?.id && isOpen && activeBottomTab === "contracts") {
+        setIsLoadingPayments(true);
+        try {
+          const payments = await getPaymentsByCustomer(customer.id);
+          setCustomerPayments(payments);
+        } catch (error) {
+          console.error("Error loading payments:", error);
+          setCustomerPayments([]);
+        } finally {
+          setIsLoadingPayments(false);
+        }
+      }
+    };
+    loadPayments();
   }, [activeBottomTab, customer?.id, isOpen]);
+
+  const getPaymentStateBadge = (state: string) => {
+    const styles: Record<string, string> = {
+      'W': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      'F': 'bg-green-500/20 text-green-400 border-green-500/30',
+      'C': 'bg-red-500/20 text-red-400 border-red-500/30',
+      'D': 'bg-gray-500/20 text-gray-500 border-gray-500/30',
+    };
+    return styles[state] || 'bg-gray-500/20 text-gray-400';
+  };
+
+  const getPaymentStateLabel = (state: string) => {
+    const labels: Record<string, string> = {
+      'W': '미결제',
+      'F': '결제완료',
+      'C': '취소',
+      'D': '파기',
+    };
+    return labels[state] || state;
+  };
 
   const getContractStatusBadge = (status: ContractStatus) => {
     const displayStatus = (status === '서명대기' || status === '거부') ? '발송완료' : status;
@@ -4323,6 +4366,181 @@ export function CustomerDetailModal({
                         </div>
                       ))
                     )}
+
+                    {/* 결제 내역 섹션 */}
+                    <div className="border-t border-border/50 mt-3 pt-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <CreditCard className="w-4 h-4 text-blue-400" />
+                          <span className="text-sm font-medium">결제 내역</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPaymentSendModalOpen(true)}
+                          className="h-6 px-2 text-[10px] gap-1"
+                          data-testid="button-send-payment"
+                        >
+                          <CreditCard className="w-3 h-3" />
+                          결제 청구서 발송
+                        </Button>
+                      </div>
+
+                      {isLoadingPayments ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          <span className="ml-2 text-xs text-muted-foreground">결제 내역 로딩 중...</span>
+                        </div>
+                      ) : customerPayments.length === 0 ? (
+                        <div className="text-center text-muted-foreground py-4">
+                          <p className="text-xs">결제 내역이 없습니다</p>
+                        </div>
+                      ) : (
+                        customerPayments.map((payment) => (
+                          <div
+                            key={payment.id}
+                            className="rounded-lg border border-border/50 bg-card/50 p-2.5 space-y-1.5 mb-2"
+                            data-testid={`payment-item-${payment.id}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-foreground">
+                                {Number(payment.amount).toLocaleString()}원
+                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Badge
+                                  variant="outline"
+                                  className={cn("text-[10px] px-1.5", getPaymentStateBadge(payment.state))}
+                                >
+                                  {getPaymentStateLabel(payment.state)}
+                                </Badge>
+                                {payment.state === 'W' && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={syncingPaymentId === payment.id}
+                                      onClick={async () => {
+                                        setSyncingPaymentId(payment.id);
+                                        try {
+                                          const { authFetch } = await import('@/lib/firebase');
+                                          const res = await authFetch('/api/paymint/status', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ bill_id: payment.bill_id, payment_id: payment.id }),
+                                          });
+                                          const data = await res.json();
+                                          if (data.appr_state) {
+                                            const newLabel = getPaymentStateLabel(data.appr_state);
+                                            toast({ title: '상태 확인', description: `결제 상태: ${newLabel}` });
+                                            const payments = await getPaymentsByCustomer(customer!.id);
+                                            setCustomerPayments(payments);
+                                            if (data.appr_state === 'F') {
+                                              window.location.reload();
+                                            }
+                                          }
+                                        } catch (error: any) {
+                                          toast({ title: '오류', description: error.message, variant: 'destructive' });
+                                        } finally {
+                                          setSyncingPaymentId(null);
+                                        }
+                                      }}
+                                      className="h-5 px-1.5 text-[10px] gap-0.5"
+                                      data-testid={`button-sync-payment-${payment.id}`}
+                                    >
+                                      {syncingPaymentId === payment.id ? (
+                                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                      ) : (
+                                        <RefreshCw className="w-2.5 h-2.5" />
+                                      )}
+                                      상태확인
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={async () => {
+                                        try {
+                                          const { authFetch } = await import('@/lib/firebase');
+                                          const res = await authFetch('/api/paymint/resend', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ bill_id: payment.bill_id }),
+                                          });
+                                          const data = await res.json();
+                                          if (data.result === 'success') {
+                                            toast({ title: '재발송 완료', description: '결제 청구서가 재발송되었습니다.' });
+                                          } else {
+                                            toast({ title: '재발송 실패', description: data.error || '재발송에 실패했습니다.', variant: 'destructive' });
+                                          }
+                                        } catch (error: any) {
+                                          toast({ title: '오류', description: error.message, variant: 'destructive' });
+                                        }
+                                      }}
+                                      className="h-5 px-1.5 text-[10px] gap-0.5"
+                                      data-testid={`button-resend-payment-${payment.id}`}
+                                    >
+                                      <Send className="w-2.5 h-2.5" />
+                                      재발송
+                                    </Button>
+                                  </>
+                                )}
+                                {(payment.state === 'W' || payment.state === 'F') && currentUser?.role === 'super_admin' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      if (!confirm(payment.state === 'F' ? '결제를 취소하시겠습니까? 고객에게 환불됩니다.' : '청구서를 파기하시겠습니까?')) return;
+                                      try {
+                                        const { authFetch } = await import('@/lib/firebase');
+                                        const endpoint = payment.state === 'F' ? '/api/paymint/cancel' : '/api/paymint/destroy';
+                                        const res = await authFetch(endpoint, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            payment_id: payment.id,
+                                            bill_id: payment.bill_id,
+                                            price: payment.amount,
+                                          }),
+                                        });
+                                        const data = await res.json();
+                                        if (data.result === 'success') {
+                                          toast({ title: '성공', description: payment.state === 'F' ? '결제가 취소되었습니다.' : '청구서가 파기되었습니다.' });
+                                          const payments = await getPaymentsByCustomer(customer!.id);
+                                          setCustomerPayments(payments);
+                                        } else {
+                                          toast({ title: '실패', description: data.error || '처리에 실패했습니다.', variant: 'destructive' });
+                                        }
+                                      } catch (error: any) {
+                                        toast({ title: '오류', description: error.message, variant: 'destructive' });
+                                      }
+                                    }}
+                                    className="h-5 px-1.5 text-[10px] gap-0.5 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                                    data-testid={`button-cancel-payment-${payment.id}`}
+                                  >
+                                    <XCircle className="w-2.5 h-2.5" />
+                                    {payment.state === 'F' ? '취소' : '파기'}
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                              <span>계약금: {payment.contract_amount_manwon}만원</span>
+                              <span>발송: {payment.created_at ? new Date(payment.created_at).toLocaleDateString('ko-KR') : '-'}</span>
+                              {payment.appr_dt && (
+                                <span>결제: {payment.appr_dt.replace(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1-$2-$3 $4:$5')}</span>
+                              )}
+                            </div>
+                            {payment.appr_issuer && (
+                              <div className="text-[10px] text-muted-foreground/70">
+                                {payment.appr_issuer} {payment.appr_issuer_num ? `(${payment.appr_issuer_num})` : ''} {payment.appr_monthly && payment.appr_monthly !== '00' ? `${payment.appr_monthly}개월` : '일시불'}
+                              </div>
+                            )}
+                            <div className="text-[10px] text-muted-foreground/70 truncate">
+                              청구서ID: {payment.bill_id} {payment.sent_by_name ? `| 발송: ${payment.sent_by_name}` : ''}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 ) : activeBottomTab === "memo" || currentUser?.role === "staff" ? (
                   <div className="flex flex-col h-full">
@@ -5111,6 +5329,20 @@ export function CustomerDetailModal({
           }}
         />
       )}
+
+      {/* 결제 청구서 발송 모달 */}
+      <PaymentSendModal
+        open={paymentSendModalOpen}
+        onClose={() => setPaymentSendModalOpen(false)}
+        customer={customer}
+        onSuccess={async (billId, amount) => {
+          if (customer?.id) {
+            const payments = await getPaymentsByCustomer(customer.id);
+            setCustomerPayments(payments);
+            setActiveBottomTab("contracts");
+          }
+        }}
+      />
 
       {/* 제안서 입력 모달 */}
       <ProposalModal

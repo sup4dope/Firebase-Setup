@@ -28,10 +28,11 @@
 - **외부 스프레드시트 Webhook**: `POST /api/webhook/consultation` 엔드포인트를 통해 구글 스프레드시트 상담 데이터를 실시간 수신하여 Firestore 저장 및 Solapi 알림톡 발송 (중복 방지 로직 포함).
 - **광고통계 페이지**: `super_admin` 전용 유입경로별 광고 분석 대시보드 (`/ad-stats`). 유입→상담→계약→집행 전환 퍼널, 쓰레기통·희망타겟 하위 카테고리별 비율, DB 등급 분류 기능 제공.
 - **eformsign 전자계약 시스템**: eformsign API v2.0 연동을 통해 전자계약 발송 및 상태 추적. 서버 측 프록시(`server/eformsignService.ts`)를 통한 인증, 템플릿/문서 관리, 상태 조회. 고객 데이터 기반 필드 자동 기입, Webhook을 통한 실시간 상태 업데이트, 고객 상세 모달 내 계약 이력 조회 기능 제공. 계약 유형별 처리 (선불/후불/외주) 및 자동 메모, 금액 동기화, 수동 상태 동기화, 재발송 기능 포함.
+- **결제선생(PayMint) 결제 시스템**: PayMint Partner API v2 연동을 통한 카드 결제 청구서 발송 및 자동 수금. `server/paymintService.ts`에서 SHA-256 해시 인증, 청구서 발송/취소/파기/재발송/상태조회/잔액조회 API 구현. 결제 완료 시 콜백(`/api/paymint/callback`)을 통해 자동으로 '계약완료(선불)' 상태 전환 및 메모 기록. 금액 계산: 계약금(만원) × 10,000 × 1.1(VAT 포함). RBAC: 발송은 모든 역할, 취소/파기는 `super_admin`만 가능. `payments_paymint` Firestore 컬렉션에 결제 이력 저장. 전자계약 관리 페이지(`Contracts.tsx`)에 결제 내역 탭 통합. Dashboard에서 30초 간격 폴링을 통한 결제 완료 실시간 알림 (persistent toast).
 
 **데이터 모델 및 저장소:**
 - **데이터베이스**: Firebase Firestore를 메인 데이터베이스로 사용.
-- **컬렉션**: `users`, `teams`, `customers`, `status_logs`, `todos`, `holidays`, `meta`, `settlements`, `consultations`, `leave_requests`, `contracts_eformsign` 등.
+- **컬렉션**: `users`, `teams`, `customers`, `status_logs`, `todos`, `holidays`, `meta`, `settlements`, `consultations`, `leave_requests`, `contracts_eformsign`, `payments_paymint` 등.
 - **공유 타입**: `shared/types.ts`에서 시스템 전반의 데이터 타입 정의.
 - **보안 규칙**: Firebase Security Rules를 통해 데이터 접근 권한 제어.
 - **Firestore 인덱스**: `settlements`, `customers`, `customer_history_logs`, `contracts_eformsign` 컬렉션에 대한 복합 인덱스 필수 설정.
@@ -45,3 +46,4 @@
 - **Recharts**: 금융 분석 대시보드 내 차트 시각화.
 - **한국천문연구원 공휴일 API**: 연차 관리 시스템에서 한국 공휴일 정보 연동.
 - **eformsign API v2.0**: 전자계약 발송 및 상태 추적 (SHA256withECDSA 인증, API Key, Secret Key, Company ID 필요).
+- **결제선생(PayMint) Partner API v2**: 카드 결제 청구서 발송 및 자동 수금 (SHA-256 해시 인증, PAYMINT_API_KEY, PAYMINT_MEMBER, PAYMINT_MERCHANT 필요).
