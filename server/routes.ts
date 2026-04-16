@@ -1861,6 +1861,11 @@ export async function registerRoutes(
 
       let payments = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
+      const customerIdFilter = req.query.customer_id as string | undefined;
+      if (customerIdFilter) {
+        payments = payments.filter((p: any) => p.customer_id === customerIdFilter);
+      }
+
       const stateFilter = req.query.state as string | undefined;
       if (stateFilter) {
         payments = payments.filter((p: any) => p.state === stateFilter);
