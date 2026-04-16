@@ -1529,7 +1529,7 @@ export async function registerRoutes(
       const callbackURL = `${baseUrl}/api/paymint/callback`;
 
       const result = await sendBill({
-        productName: '정책자금 컨설팅 계약금',
+        productName: '경영컨설팅 계약금',
         message: `${customer_name}님, 계약금 결제 청구서입니다. (${contract_amount_manwon}만원 + VAT)`,
         memberName: customer_name,
         phone: phone.replace(/-/g, ''),
