@@ -2481,34 +2481,35 @@ export const markConsultationProcessed = async (consultationId: string): Promise
 // 전화번호로 기존 고객 조회
 export const getCustomerByPhone = async (phone: string): Promise<Customer | null> => {
   try {
+    const raw = phone.replace(/[-\s]/g, '').trim();
+    if (raw.length < 10) return null;
+
+    const variants = new Set<string>();
+    variants.add(raw);
+    if (raw.length === 11) {
+      variants.add(`${raw.slice(0,3)}-${raw.slice(3,7)}-${raw.slice(7)}`);
+      variants.add(`${raw.slice(0,3)}-${raw.slice(3,6)}-${raw.slice(6)}`);
+    } else if (raw.length === 10) {
+      variants.add(`${raw.slice(0,3)}-${raw.slice(3,6)}-${raw.slice(6)}`);
+      variants.add(`${raw.slice(0,2)}-${raw.slice(2,6)}-${raw.slice(6)}`);
+    }
+
     const customersRef = collection(db, 'customers');
-    const q = query(customersRef, where('phone', '==', phone), limit(1));
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) return null;
-    
-    const docSnap = snapshot.docs[0];
-    return {
-      id: docSnap.id,
-      ...docSnap.data(),
-    } as Customer;
+    const phoneArray = Array.from(variants);
+
+    for (let i = 0; i < phoneArray.length; i += 10) {
+      const batch = phoneArray.slice(i, i + 10);
+      const q = query(customersRef, where('phone', 'in', batch), limit(1));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Customer;
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error('Error fetching customer by phone:', error);
     return null;
-  }
-};
-
-export const getCustomersByName = async (name: string): Promise<Customer[]> => {
-  try {
-    if (!name || name.trim() === '') return [];
-    const trimmed = name.trim();
-    const customersRef = collection(db, 'customers');
-    const q = query(customersRef, where('name', '==', trimmed));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Customer));
-  } catch (error) {
-    console.error('Error fetching customers by name:', error);
-    return [];
   }
 };
 
@@ -2516,18 +2517,28 @@ export const getCustomersByName = async (name: string): Promise<Customer[]> => {
 export const getCustomerByBusinessNumber = async (businessNumber: string): Promise<Customer | null> => {
   try {
     if (!businessNumber || businessNumber.trim() === '') return null;
-    
+
+    const raw = businessNumber.replace(/[-\s]/g, '').trim();
+    const variants = new Set<string>();
+    variants.add(raw);
+    variants.add(businessNumber.trim());
+    if (raw.length === 10) {
+      variants.add(`${raw.slice(0,3)}-${raw.slice(3,5)}-${raw.slice(5)}`);
+    }
+
     const customersRef = collection(db, 'customers');
-    const q = query(customersRef, where('business_registration_number', '==', businessNumber), limit(1));
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) return null;
-    
-    const docSnap = snapshot.docs[0];
-    return {
-      id: docSnap.id,
-      ...docSnap.data(),
-    } as Customer;
+    const bizArray = Array.from(variants);
+
+    for (let i = 0; i < bizArray.length; i += 10) {
+      const batch = bizArray.slice(i, i + 10);
+      const q = query(customersRef, where('business_registration_number', 'in', batch), limit(1));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Customer;
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error('Error fetching customer by business number:', error);
     return null;

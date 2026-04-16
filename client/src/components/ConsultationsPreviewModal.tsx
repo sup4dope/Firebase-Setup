@@ -91,6 +91,8 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
         })
       );
 
+      const normalizeBiz = (biz: string) => biz.replace(/[-\s]/g, '').trim();
+
       const phoneMap = new Map<string, string[]>();
       const bizNumMap = new Map<string, string[]>();
       for (const c of consultationsWithDuplicate) {
@@ -102,7 +104,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
           }
         }
         if (c.data.businessNumber) {
-          const bn = c.data.businessNumber.trim();
+          const bn = normalizeBiz(c.data.businessNumber);
           if (bn) {
             if (!bizNumMap.has(bn)) bizNumMap.set(bn, []);
             bizNumMap.get(bn)!.push(c.id);
@@ -120,7 +122,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
           }
         }
         if (c.data.businessNumber) {
-          const bn = c.data.businessNumber.trim();
+          const bn = normalizeBiz(c.data.businessNumber);
           const group = bizNumMap.get(bn);
           if (group && group.length > 1) {
             c.duplicateReasons.push(`대기목록 내 사업자번호 중복 (${group.length}건)`);
