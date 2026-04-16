@@ -2498,6 +2498,20 @@ export const getCustomerByPhone = async (phone: string): Promise<Customer | null
   }
 };
 
+export const getCustomersByName = async (name: string): Promise<Customer[]> => {
+  try {
+    if (!name || name.trim() === '') return [];
+    const trimmed = name.trim();
+    const customersRef = collection(db, 'customers');
+    const q = query(customersRef, where('name', '==', trimmed));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Customer));
+  } catch (error) {
+    console.error('Error fetching customers by name:', error);
+    return [];
+  }
+};
+
 // 사업자등록번호로 기존 고객 조회
 export const getCustomerByBusinessNumber = async (businessNumber: string): Promise<Customer | null> => {
   try {
