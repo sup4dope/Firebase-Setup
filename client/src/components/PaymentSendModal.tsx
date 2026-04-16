@@ -61,7 +61,7 @@ export default function PaymentSendModal({ open, onClose, customer, onSuccess }:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customer_id: customer.id,
-          customer_name: customer.company_name || customer.representative_name || '',
+          customer_name: customer.representative_name || customer.company_name || '',
           phone,
           contract_amount_manwon: contractAmount,
           manager_id: customer.manager_id || '',
