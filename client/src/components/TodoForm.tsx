@@ -35,8 +35,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar as CalendarIcon, Search, Clock, AlertCircle, AlertTriangle, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { createTodoItem, hasActiveTodoForCustomer, updateCustomerStatus } from '@/lib/firestore';
-import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { createTodoItem, hasActiveTodoForCustomer, updateCustomerStatus, updateCustomer } from '@/lib/firestore';
+import { doc, updateDoc, addDoc, collection, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Customer, UserRole, TodoPriority, InsertTodoItem, StatusCode } from '@shared/types';
@@ -168,6 +168,32 @@ export function TodoForm({
       };
 
       await createTodoItem(todoData);
+
+      if (customer && data.customer_id) {
+        const dueDateStr = format(dueDateTime, 'yyyy-MM-dd HH:mm', { locale: ko });
+        const priorityLabel = data.priority === 'urgent' ? '긴급' : data.priority === 'normal' ? '보통' : '낮음';
+        const autoMemoContent = `[시스템] 예약(TODO) 등록: "${data.title}" (마감: ${dueDateStr}, 우선순위: ${priorityLabel})${data.memo ? ` - ${data.memo}` : ''}`;
+        const autoMemo = {
+          content: autoMemoContent,
+          author_id: currentUser.uid,
+          author_name: '시스템',
+          created_at: new Date(),
+        };
+        await updateDoc(doc(db, 'customers', data.customer_id), {
+          memo_history: arrayUnion(autoMemo),
+          recent_memo: autoMemoContent,
+          latest_memo: autoMemoContent,
+          last_memo_date: new Date(),
+          updated_at: new Date(),
+        });
+        await addDoc(collection(db, "counseling_logs"), {
+          customer_id: data.customer_id,
+          content: autoMemoContent,
+          author_name: '시스템',
+          created_at: new Date(),
+          type: "memo",
+        });
+      }
 
       if (customer && data.customer_id && customer.status_code !== '예약') {
         const oldStatus = customer.status_code;

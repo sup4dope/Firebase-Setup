@@ -44,7 +44,7 @@ import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-f
 import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { db, addCustomerHistoryLog, authFetch } from '@/lib/firebase';
-import { addDoc, collection, doc, updateDoc, getDocs, query, where } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, getDocs, query, where, arrayUnion } from 'firebase/firestore';
 import { FUNNEL_GROUPS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -360,6 +360,29 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [user, users, isSuperAdmin, isTeamLeader]);
 
+  const writeOverdueExitMemo = async (customerId: string, memoContent: string) => {
+    const autoMemo = {
+      content: memoContent,
+      author_id: user?.uid || '',
+      author_name: '시스템',
+      created_at: new Date(),
+    };
+    await updateDoc(doc(db, 'customers', customerId), {
+      memo_history: arrayUnion(autoMemo),
+      recent_memo: memoContent,
+      latest_memo: memoContent,
+      last_memo_date: new Date(),
+      updated_at: new Date(),
+    });
+    await addDoc(collection(db, "counseling_logs"), {
+      customer_id: customerId,
+      content: memoContent,
+      author_name: '시스템',
+      created_at: new Date(),
+      type: "memo",
+    });
+  };
+
   const handleOverdueTodoAction = async (customerId: string, actionDesc: string = '', skipRestore = false) => {
     try {
       const wasOverdue = overdueTodoCustomerIds.has(customerId);
@@ -387,18 +410,21 @@ export default function Dashboard() {
           );
 
           if (wasOverdue && actionDesc) {
+            await writeOverdueExitMemo(customerId, `[시스템] 예약경과 해제: "${actionDesc}" 사유로 예약경과 상태에서 해제 → "${restoreStatus}"(으)로 복원`);
             toast({
               title: '경과 고정 해제',
               description: `${actionDesc} → 예약에서 "${restoreStatus}"(으)로 복원되었습니다.`,
             });
           }
         } else if (wasOverdue && actionDesc) {
+          await writeOverdueExitMemo(customerId, `[시스템] 예약경과 해제: "${actionDesc}" 사유로 경과 고정 해제`);
           toast({
             title: '경과 고정 해제',
             description: `${actionDesc}(으)로 경과 고정이 해제되었습니다.`,
           });
         }
       } else if (wasOverdue && actionDesc) {
+        await writeOverdueExitMemo(customerId, `[시스템] 예약경과 해제: "${actionDesc}" 사유로 경과 고정 해제`);
         toast({
           title: '경과 고정 해제',
           description: `${actionDesc}(으)로 경과 고정이 해제되었습니다.`,
