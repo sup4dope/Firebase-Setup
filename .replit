@@ -53,6 +53,6 @@ timeoutMs = 20000
 
 [userenv.shared]
 PAYMINT_API_KEY = "TEST-API-KEY-TALK"
+PAYMINT_API_URL = "https://stg.paymint.co.kr/partner"
 PAYMINT_MEMBER = "TEST-MEMBER-FOR-API"
 PAYMINT_MERCHANT = "TEST-MERCHANT-FOR-API"
-PAYMINT_API_URL = "https://stg.paymint.co.kr/partner"
