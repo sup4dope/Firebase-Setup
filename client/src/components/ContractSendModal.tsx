@@ -137,11 +137,14 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
           data.data.forms ? data.data.forms :
           data.data.templates ? data.data.templates : [];
 
-        const mapped: EformsignTemplate[] = templateList.map((t: any) => ({
-          id: t.template_id || t.id || t.form_id,
-          name: t.template_name || t.name || t.form_name || '이름없는 템플릿',
-          description: t.description || '',
-        }));
+        const INTERNAL_KEYWORDS = ['근로계약서'];
+        const mapped: EformsignTemplate[] = templateList
+          .map((t: any) => ({
+            id: t.template_id || t.id || t.form_id,
+            name: t.template_name || t.name || t.form_name || '이름없는 템플릿',
+            description: t.description || '',
+          }))
+          .filter((t: EformsignTemplate) => !INTERNAL_KEYWORDS.some(kw => t.name.includes(kw)));
         setTemplates(mapped);
       } else {
         toast({ title: '템플릿 조회 실패', description: data.error || '템플릿을 가져올 수 없습니다.', variant: 'destructive' });
