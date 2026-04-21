@@ -1185,11 +1185,14 @@ export function CustomerDetailModal({
   };
 
   // [신규] OCR 병렬 처리 함수 - 여러 파일을 동시에 분석하고 결과를 병합
+  // ⚠️ 모달이 닫혀도 OCR이 끝까지 진행되어 Firestore에 저장되도록 customerId를 클로저에 캡처
   const processAllOCRFilesParallel = async (tasks: { file: File; type: 'business' | 'vat' | 'credit' }[]) => {
+    // 모달 lifecycle 독립을 위해 customer id를 즉시 캡처
+    const capturedCustomerId = formData.id;
     setIsProcessingOCR(true);
     const allHighlightedFields = new Set<string>();
     
-    console.log(`🚀 OCR 병렬 처리 시작: ${tasks.length}개 파일`);
+    console.log(`🚀 OCR 병렬 처리 시작: ${tasks.length}개 파일 (customerId=${capturedCustomerId || '신규'})`);
     
     try {
       // 모든 OCR 작업을 병렬로 실행
@@ -1304,83 +1307,116 @@ export function CustomerDetailModal({
         }
       }
       
-      // 업종 리스트 업데이트 (외부에서 한 번만)
+      // 업종 리스트 업데이트 (외부에서 한 번만) - 모달이 열려있을 때만 의미 있음
       if (lastBusinessTypeList) {
-        setOcrBusinessTypes(lastBusinessTypeList);
+        try { setOcrBusinessTypes(lastBusinessTypeList); } catch {}
       }
-      
-      // 모든 formData 업데이트를 한 번에 적용
-      if (Object.keys(mergedFormUpdates).length > 0) {
-        setFormData(prev => {
-          const updatedData = { ...prev, ...mergedFormUpdates };
-          debouncedSave(updatedData);
-          return updatedData;
-        });
-      }
-      
-      // 신용공여 내역 일괄 추가
-      if (allNewObligations.length > 0) {
-        setFinancialObligations(prev => {
-          const merged = [...prev];
-          let addedCount = 0;
-          
-          allNewObligations.forEach(newOb => {
-            const isDuplicate = merged.some(
-              existing => 
-                existing.institution === newOb.institution &&
-                existing.product_name === newOb.product_name &&
-                existing.balance === newOb.balance &&
-                existing.occurred_at === newOb.occurred_at
-            );
-            if (!isDuplicate) {
-              merged.push(newOb);
-              addedCount++;
-            }
-          });
-          
-          if (addedCount > 0) {
-            setOcrExtractedCount(addedCount);
-            setTimeout(() => setOcrExtractedCount(0), 5000);
+
+      // ====== Firestore 직접 저장 (모달 lifecycle 독립) ======
+      // 이 블록은 모달이 닫혀도 끝까지 실행되어 결과가 손실되지 않도록 보장
+      if (capturedCustomerId && (Object.keys(mergedFormUpdates).length > 0 || allNewObligations.length > 0)) {
+        try {
+          const customerRef = doc(db, "customers", capturedCustomerId);
+          const snap = await getDoc(customerRef);
+          const latest: any = snap.exists() ? snap.data() : {};
+
+          const directUpdate: any = { ...mergedFormUpdates };
+
+          // 신용공여 내역 병합 (Firestore 최신 데이터 기준)
+          if (allNewObligations.length > 0) {
+            const existing: FinancialObligation[] = Array.isArray(latest.financial_obligations) ? latest.financial_obligations : [];
+            const merged = [...existing];
+            allNewObligations.forEach(newOb => {
+              const isDup = merged.some(
+                ex =>
+                  ex.institution === newOb.institution &&
+                  ex.product_name === newOb.product_name &&
+                  ex.balance === newOb.balance &&
+                  ex.occurred_at === newOb.occurred_at
+              );
+              if (!isDup) merged.push(newOb);
+            });
+            directUpdate.financial_obligations = merged;
           }
-          
-          return merged;
-        });
-        
-        setFormData(prev => {
-          const existingObligations = prev.financial_obligations || [];
-          const mergedObligations = [...existingObligations];
-          
-          allNewObligations.forEach(newOb => {
-            const isDuplicate = mergedObligations.some(
-              existing => 
-                existing.institution === newOb.institution &&
-                existing.product_name === newOb.product_name &&
-                existing.balance === newOb.balance &&
-                existing.occurred_at === newOb.occurred_at
-            );
-            if (!isDuplicate) {
-              mergedObligations.push(newOb);
+
+          directUpdate.updated_at = Timestamp.now();
+          await updateDoc(customerRef, directUpdate);
+          console.log("💾 OCR 결과 Firestore 직접 저장 완료 (모달 상태 무관)");
+
+          // 부모(대시보드)에도 알림 (best-effort)
+          try {
+            if (onSave) {
+              onSave({ id: capturedCustomerId, ...directUpdate });
             }
-          });
-          
-          const updatedData = { ...prev, financial_obligations: mergedObligations };
-          debouncedSave(updatedData);
-          return updatedData;
-        });
-        
-        setActiveCenterTab("financial");
+          } catch {}
+        } catch (persistErr) {
+          console.error("❌ OCR 결과 Firestore 직접 저장 실패:", persistErr);
+        }
       }
-      
-      // 하이라이트 적용
-      setHighlightedFields(allHighlightedFields);
-      setTimeout(() => setHighlightedFields(new Set()), 2000);
+
+      // ====== UI state 업데이트 (모달이 열려있을 때만 효과) ======
+      // unmount 후 setState는 no-op이지만 안전하게 try/catch로 감쌈
+      try {
+        if (Object.keys(mergedFormUpdates).length > 0) {
+          setFormData(prev => ({ ...prev, ...mergedFormUpdates }));
+        }
+
+        if (allNewObligations.length > 0) {
+          setFinancialObligations(prev => {
+            const merged = [...prev];
+            let addedCount = 0;
+            allNewObligations.forEach(newOb => {
+              const isDup = merged.some(
+                ex =>
+                  ex.institution === newOb.institution &&
+                  ex.product_name === newOb.product_name &&
+                  ex.balance === newOb.balance &&
+                  ex.occurred_at === newOb.occurred_at
+              );
+              if (!isDup) {
+                merged.push(newOb);
+                addedCount++;
+              }
+            });
+            if (addedCount > 0) {
+              setOcrExtractedCount(addedCount);
+              setTimeout(() => setOcrExtractedCount(0), 5000);
+            }
+            return merged;
+          });
+
+          setFormData(prev => {
+            const existingObligations = prev.financial_obligations || [];
+            const mergedObligations = [...existingObligations];
+            allNewObligations.forEach(newOb => {
+              const isDup = mergedObligations.some(
+                ex =>
+                  ex.institution === newOb.institution &&
+                  ex.product_name === newOb.product_name &&
+                  ex.balance === newOb.balance &&
+                  ex.occurred_at === newOb.occurred_at
+              );
+              if (!isDup) mergedObligations.push(newOb);
+            });
+            return { ...prev, financial_obligations: mergedObligations };
+          });
+
+          setActiveCenterTab("financial");
+        }
+
+        // 하이라이트 적용
+        setHighlightedFields(allHighlightedFields);
+        setTimeout(() => setHighlightedFields(new Set()), 2000);
+      } catch {
+        // 모달이 이미 unmount된 경우 무시
+      }
       
       console.log(`\n✅ 전체 OCR 병렬 처리 완료: ${tasks.length}개 파일`);
       
     } catch (error) {
       console.error("❌ OCR 병렬 처리 중 오류:", error);
     } finally {
-      setIsProcessingOCR(false);
+      try { setIsProcessingOCR(false); } catch {}
     }
   };
 
