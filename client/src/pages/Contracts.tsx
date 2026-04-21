@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ContractSendModal } from '@/components/ContractSendModal';
 import { useToast } from '@/hooks/use-toast';
-import { FileSignature, Search, Plus, RefreshCw, Trash2, Loader2, XCircle, CreditCard, Send, User } from 'lucide-react';
+import { FileSignature, Search, Plus, RefreshCw, Trash2, Loader2, XCircle, CreditCard, Send, User, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Contract, ContractStatus, PaymentRecord } from '@shared/types';
 
@@ -56,6 +56,7 @@ export default function Contracts() {
   const [syncing, setSyncing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [checkingReadId, setCheckingReadId] = useState<string | null>(null);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
 
   const isSuperAdmin = user?.role === 'super_admin';
@@ -112,11 +113,17 @@ export default function Contracts() {
   };
 
   const handleCancel = async (contractId: string, contractName: string) => {
-    if (!confirm(`"${contractName}" 계약서 발송을 취소하시겠습니까? eformsign에서도 취소됩니다.`)) return;
+    if (!confirm(`"${contractName}" 계약서 발송을 취소하시겠습니까?\neformsign에서도 함께 취소됩니다.`)) return;
+
+    const reason = prompt('취소 사유를 입력해주세요 (선택):', '계약서 취소') || '계약서 취소';
 
     setCancellingId(contractId);
     try {
-      const res = await authFetch(`/api/eformsign/contracts/${contractId}/cancel`, { method: 'POST' });
+      const res = await authFetch(`/api/eformsign/contracts/${contractId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
       const data = await res.json();
       if (data.success) {
         toast({ title: '발송취소 완료', description: '계약서가 취소되었습니다.' });
@@ -128,6 +135,38 @@ export default function Contracts() {
       toast({ title: '오류', description: error.message, variant: 'destructive' });
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleCheckReadStatus = async (contractId: string, contractName: string) => {
+    setCheckingReadId(contractId);
+    try {
+      const res = await authFetch(`/api/eformsign/contracts/${contractId}/read-status`);
+      const data = await res.json();
+      if (data.success) {
+        const s = data.data;
+        if (s.opened) {
+          const lastOpened = s.last_opened_at ? new Date(s.last_opened_at).toLocaleString('ko-KR') : '-';
+          const firstOpened = s.first_opened_at ? new Date(s.first_opened_at).toLocaleString('ko-KR') : '-';
+          toast({
+            title: '✅ 열람 확인됨',
+            description: `${contractName}\n· 열람 횟수: ${s.open_count}회\n· 최초 열람: ${firstOpened}\n· 최근 열람: ${lastOpened}`,
+          });
+        } else {
+          toast({
+            title: '아직 열람되지 않았습니다',
+            description: `${contractName} - 수신자가 아직 계약서를 열어보지 않았습니다.`,
+          });
+        }
+        // 캐시된 열람 정보를 즉시 화면에 반영
+        fetchContracts();
+      } else {
+        toast({ title: '조회 실패', description: data.error || '열람 정보를 가져올 수 없습니다.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      toast({ title: '오류', description: error.message, variant: 'destructive' });
+    } finally {
+      setCheckingReadId(null);
     }
   };
 
@@ -554,23 +593,53 @@ export default function Contracts() {
                             {contract.created_by}
                           </TableCell>
                           <TableCell className="text-center">
-                            {(contract.status === '발송완료' || contract.status === '서명대기' || contract.status === '거부') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-orange-500 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950 text-xs gap-1"
-                                onClick={() => handleCancel(contract.id, contract.template_name)}
-                                disabled={cancellingId === contract.id}
-                                data-testid={`button-cancel-contract-${contract.id}`}
-                              >
-                                {cancellingId === contract.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <XCircle className="w-3.5 h-3.5" />
-                                )}
-                                취소
-                              </Button>
-                            )}
+                            <div className="flex items-center justify-center gap-1">
+                              {(contract.status === '발송완료' || contract.status === '서명대기') && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className={`text-xs gap-1 ${(contract as any).opened
+                                        ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950'
+                                        : 'text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950'}`}
+                                      onClick={() => handleCheckReadStatus(contract.id, contract.template_name)}
+                                      disabled={checkingReadId === contract.id}
+                                      data-testid={`button-check-read-${contract.id}`}
+                                    >
+                                      {checkingReadId === contract.id ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      ) : (
+                                        <Eye className="w-3.5 h-3.5" />
+                                      )}
+                                      {(contract as any).opened ? '열람' : '열람확인'}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {(contract as any).opened
+                                      ? `열람 ${(contract as any).open_count || 1}회 · 최근 ${(contract as any).last_opened_at ? new Date((contract as any).last_opened_at).toLocaleString('ko-KR') : ''}`
+                                      : '수신자의 계약서 열람여부를 확인합니다'}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              {(contract.status === '발송완료' || contract.status === '서명대기' || contract.status === '거부') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-orange-500 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950 text-xs gap-1"
+                                  onClick={() => handleCancel(contract.id, contract.template_name)}
+                                  disabled={cancellingId === contract.id}
+                                  data-testid={`button-cancel-contract-${contract.id}`}
+                                >
+                                  {cancellingId === contract.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <XCircle className="w-3.5 h-3.5" />
+                                  )}
+                                  취소
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                           {isSuperAdmin && (
                             <TableCell className="text-center">

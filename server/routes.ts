@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { extractBusinessRegistrationFromBase64, extractVatCertificateFromBase64, extractCreditReportFromBase64 } from "./geminiOCR";
 import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAuth, requireSuperAdmin, getAdminApp, type AuthenticatedRequest } from "./firebaseAdmin";
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
-import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, downloadDocument, checkEformsignConfig, mapEformsignStatus, extractEformsignStatus, cancelDocument } from "./eformsignService";
+import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, downloadDocument, checkEformsignConfig, mapEformsignStatus, extractEformsignStatus, cancelDocument, getDocumentReadStatus } from "./eformsignService";
 import { sendBill, cancelBill, destroyBill, readBill, resendBill, getBalance, checkPaymintConfig, getPaymintStateLabel, type ApprovalCallbackData } from "./paymintService";
 
 const FieldValue = admin.firestore.FieldValue;
@@ -911,6 +911,12 @@ export async function registerRoutes(
         formattedFieldsRecord['계약일자'] = dateStr;
       }
 
+      // 유효기간: body로 전달받은 valid_day 우선, 없으면 기본값 14일(2주)
+      const validDayRaw = (req.body as any)?.valid_day;
+      const validDay = (typeof validDayRaw === 'number' && validDayRaw > 0 && validDayRaw <= 365)
+        ? Math.floor(validDayRaw)
+        : 14;
+
       const recipients = [{
         step_type: '05',
         use_mail: false,
@@ -920,7 +926,7 @@ export async function registerRoutes(
           id: phone ? `${phone}@guest.eformsign.com` : `guest_${customer_id}@guest.eformsign.com`,
           sms: { country_code: '+82', phone_number: phone },
         },
-        auth: { valid: { day: 7, hour: 0 } },
+        auth: { valid: { day: validDay, hour: 0 } },
       }];
 
       const documentName = `${customer_name || recipientName}_경영지원자문 계약서`;
@@ -1013,7 +1019,9 @@ export async function registerRoutes(
   app.post("/api/eformsign/contracts/:contractId/cancel", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { contractId } = req.params;
-      console.log(`[eformsign] 계약서 발송취소 시작: contractId=${contractId}`);
+      const { reason } = (req.body || {}) as { reason?: string };
+      const cancelComment = (typeof reason === 'string' && reason.trim()) ? reason.trim() : '계약서 취소';
+      console.log(`[eformsign] 계약서 발송취소 시작: contractId=${contractId}, reason=${cancelComment}`);
 
       const adminApp = getAdminApp();
       const firestore = adminApp.firestore();
@@ -1032,7 +1040,7 @@ export async function registerRoutes(
 
       if (document_id) {
         try {
-          await cancelDocument(document_id);
+          await cancelDocument(document_id, cancelComment);
           console.log(`[eformsign] eformsign 문서 취소 성공: ${document_id}`);
         } catch (eformsignError: any) {
           console.error(`[eformsign] eformsign 문서 취소 실패:`, eformsignError.message);
@@ -1042,14 +1050,57 @@ export async function registerRoutes(
 
       await firestore.collection('contracts_eformsign').doc(contractId).update({
         status: '무효',
-        cancelled_at: new Date(),
-        cancelled_reason: '취소',
+        cancelled_at: new Date().toISOString(),
+        cancelled_reason: cancelComment,
+        cancelled_by: req.user?.email || req.user?.uid || '',
       });
 
       console.log(`[eformsign] 계약서 발송취소 완료: contractId=${contractId}`);
       res.json({ success: true });
     } catch (error: any) {
       console.error("[eformsign] 계약서 발송취소 오류:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // [신규] 계약서 열람여부 확인
+  app.get("/api/eformsign/contracts/:contractId/read-status", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { contractId } = req.params;
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+
+      const contractDoc = await firestore.collection('contracts_eformsign').doc(contractId).get();
+      if (!contractDoc.exists) {
+        return res.status(404).json({ success: false, error: '계약 레코드를 찾을 수 없습니다.' });
+      }
+
+      const contractData = contractDoc.data()!;
+      const documentId = contractData.document_id;
+      if (!documentId) {
+        return res.status(400).json({ success: false, error: 'document_id가 없습니다.' });
+      }
+
+      const status = await getDocumentReadStatus(documentId);
+      console.log(`[eformsign] 열람여부 조회 완료: contractId=${contractId}, opened=${status.opened}, count=${status.open_count}`);
+
+      // Firestore에 열람 정보 캐싱 (best-effort)
+      try {
+        const updateData: Record<string, any> = {
+          opened: status.opened,
+          open_count: status.open_count,
+          read_status_checked_at: new Date().toISOString(),
+        };
+        if (status.first_opened_at) updateData.first_opened_at = status.first_opened_at;
+        if (status.last_opened_at) updateData.last_opened_at = status.last_opened_at;
+        await contractDoc.ref.update(updateData);
+      } catch (cacheErr: any) {
+        console.warn(`[eformsign] 열람정보 캐싱 실패: ${cacheErr.message}`);
+      }
+
+      res.json({ success: true, data: status });
+    } catch (error: any) {
+      console.error("[eformsign] 열람여부 조회 오류:", error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });

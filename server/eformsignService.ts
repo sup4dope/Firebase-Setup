@@ -343,7 +343,46 @@ export async function deleteDocument(documentId: string): Promise<any> {
   return apiRequest('DELETE', `/documents/${documentId}`);
 }
 
-export async function cancelDocument(documentId: string): Promise<any> {
+/**
+ * 문서 취소 (공식 API: POST /v2.0/api/documents/cancel)
+ * Body: { input: { document_ids: [id], comment } }
+ * - 4000166: 이미 취소된 문서
+ * - 4000169: 취소 권한 없음
+ * 실패 시 구버전 엔드포인트로 fallback
+ */
+export async function cancelDocument(documentId: string, comment?: string): Promise<any> {
+  // 공식 API 우선 시도
+  try {
+    const result = await apiRequest('POST', '/documents/cancel', {
+      input: {
+        document_ids: [documentId],
+        comment: comment || '계약서 취소',
+      },
+    });
+    console.log(`[eformsign] 공식 취소 API 성공: ${documentId}`, JSON.stringify(result).substring(0, 300));
+
+    // 공식 API는 success_result / fail_result 배열을 반환
+    const successIds: string[] = result?.success_result?.map?.((r: any) => r?.document_id || r) || [];
+    const failItems: any[] = result?.fail_result || [];
+    if (successIds.includes(documentId) || successIds.length > 0) {
+      return { success: true, ...result };
+    }
+    if (failItems.length > 0) {
+      const failItem = failItems.find((f: any) => f.document_id === documentId) || failItems[0];
+      const errCode = failItem?.error_code || failItem?.code;
+      // 4000166: 이미 취소된 문서 → 성공으로 처리
+      if (String(errCode) === '4000166') {
+        console.log(`[eformsign] 문서 ${documentId}는 이미 취소된 상태`);
+        return { already_cancelled: true };
+      }
+      throw new Error(`eformsign 취소 실패 (${errCode}): ${failItem?.message || '알 수 없는 오류'}`);
+    }
+    return result;
+  } catch (officialErr: any) {
+    console.log(`[eformsign] 공식 취소 API 실패, fallback 시도: ${officialErr.message?.substring(0, 200)}`);
+  }
+
+  // Fallback: 구버전 엔드포인트
   const endpoints = [
     { method: 'DELETE' as const, path: `/documents/${documentId}/cancel` },
     { method: 'DELETE' as const, path: `/documents/${documentId}` },
@@ -373,6 +412,63 @@ export async function cancelDocument(documentId: string): Promise<any> {
   }
 
   throw lastError;
+}
+
+/**
+ * 문서 열람 이력 조회 (열람여부 확인)
+ * GET /v2.0/api/documents/{id}?include_histories=true
+ *
+ * action_type 코드:
+ *   034: 외부자 열람 (doc_open_outsider)
+ *   064: 참여자 문서 열람 (doc_open_participant)
+ *   074: 검토자 문서 열람 (doc_open_review)
+ *   076: 열람자 열람 (doc_read)
+ */
+export async function getDocumentReadStatus(documentId: string): Promise<{
+  opened: boolean;
+  first_opened_at: number | null;
+  last_opened_at: number | null;
+  open_count: number;
+  events: Array<{ action_type: string; executed_date: number; user_name?: string; user_email?: string }>;
+  raw?: any;
+}> {
+  const docInfo = await apiRequest(
+    'GET',
+    `/documents/${documentId}?include_histories=true&include_next_status=true&include_previous_status=true`
+  );
+
+  // histories는 응답 최상위 또는 document 객체 안쪽에 위치할 수 있음
+  const histories: any[] =
+    docInfo?.histories ||
+    docInfo?.document?.histories ||
+    [];
+
+  const OPEN_ACTION_CODES = new Set(['034', '064', '074', '076', '34', '64', '74', '76']);
+
+  const openEvents = histories
+    .filter((h: any) => {
+      const at = String(h?.action_type ?? '').padStart(3, '0');
+      return OPEN_ACTION_CODES.has(at) || OPEN_ACTION_CODES.has(String(h?.action_type ?? ''));
+    })
+    .map((h: any) => ({
+      action_type: String(h.action_type ?? ''),
+      executed_date: Number(h.executed_date) || 0,
+      user_name: h.user_name || h.member_name || h.recipient_name || '',
+      user_email: h.user_email || h.member_id || h.recipient_email || '',
+    }))
+    .sort((a, b) => a.executed_date - b.executed_date);
+
+  console.log(
+    `[eformsign] 열람여부 조회: doc=${documentId}, total_history=${histories.length}, open_events=${openEvents.length}`
+  );
+
+  return {
+    opened: openEvents.length > 0,
+    first_opened_at: openEvents[0]?.executed_date || null,
+    last_opened_at: openEvents[openEvents.length - 1]?.executed_date || null,
+    open_count: openEvents.length,
+    events: openEvents,
+  };
 }
 
 export function checkEformsignConfig(): { configured: boolean; missing: string[] } {

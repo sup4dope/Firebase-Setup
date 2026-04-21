@@ -1,0 +1,158 @@
+안녕하세요 경영지원그룹 이음 한지성 대표님
+포시에스 이재혁 프로입니다.
+
+문의 주신 4가지 기능에 대한 eformsign API 가이드를 아래와 같이 정리하여 회신드립니다.
+
+공통 사항
+- HOST (국내): https://kr-api.eformsign.com
+- 모든 API 호출 시 헤더에 Access Token을 Bearer 토큰 형식으로 포함해야 합니다.
+  Authorization: Bearer {access_token}
+──────────────────────────────────────
+
+1. 계약서 열람여부 확인 기능
+
+문서 정보 조회 API를 통해 수신자의 열람 이력을 확인하실 수 있습니다.
+
+■ API URL: GET /v2.0/api/documents/{DOCUMENT_ID}
+■ Query String
+  - include_histories=true (필수, 문서 이력 포함)
+  - include_next_status=true (선택, 다음 단계 정보 포함)
+  - include_previous_status=true (선택, 이전 단계 정보 포함)
+
+■ 호출 예시
+  GET /v2.0/api/documents/{DOCUMENT_ID}?include_histories=true
+
+■ 응답 확인 포인트
+응답 Body의 histories 배열에서 action_type 값으로 열람 여부를 판별합니다.
+  - 034: 외부자 열람 (doc_open_outsider)
+  - 064: 참여자 문서 열람 (doc_open_participant)
+  - 074: 검토자 문서 열람 (doc_open_review)
+  - 076: 열람자 열람 (doc_read)
+
+executed_date 필드로 열람 일시(Epoch Time)를 확인하실 수 있으며, 실시간 수신이 필요하신 경우 Webhook(event_type: document_action, 외부자 문서 열람 이벤트)을 함께 활용하시는 것을 권장드립니다.
+
+──────────────────────────────────────
+
+2. 계약서 취소 기능
+
+진행 중인 문서를 취소하는 API입니다.
+
+■ API URL: POST /v2.0/api/documents/cancel
+■ 취소 권한 보유자
+  1) 대표 관리자
+  2) 권한 관리 > 문서 관리자에서 취소 권한이 부여된 사용자
+  3) 문서 작성자
+
+■ Request Body 예시
+{
+  "input": {
+    "document_ids": [
+      "b882835f98ba46918600ae4c837a7a3c",
+      "28bb1afefe7943c195c5b26f7de13e1c"
+    ],
+    "comment": "문서 취소 사유"
+  }
+}
+
+■ 응답
+  - success_result: 취소 완료된 document_id 배열
+  - fail_result: 실패한 문서의 document_id, 에러 코드, 메시지
+
+■ 주요 에러 코드
+  - 4000166: 이미 취소된 문서
+  - 4000169: 취소 권한 없음
+
+──────────────────────────────────────
+
+3. 계약서 재발송 기능
+
+기존에 수신자에게 요청한 문서를 재요청(재발송)하는 API입니다.
+
+■ API URL: POST /v2.0/api/documents/{document_id}/re_request_outsider
+
+■ Request Body 주요 필드
+  - input.next_steps[].step_type: 재요청할 단계 종류 (현재 단계와 동일하게 입력)
+    · "03": 외부 수신자 (구형 워크플로우)
+    · "05": 참여자
+    · "06": 검토자
+  - input.next_steps[].recipients[]: 신형 워크플로우 수신자 정보
+    (recipients[]가 없는 경우 이전 수신자 정보로 재전송)
+
+■ Request Body 예시 (참여자 재발송)
+{
+  "input": {
+    "next_steps": [
+      {
+        "step_type": "05",
+        "step_seq": "3",
+        "recipients": [
+          {
+            "member": {
+              "name": "홍길동",
+              "id": "test@forcs.com",
+              "sms": {
+                "country_code": "+82",
+                "phone_number": "01012345678"
+              }
+            },
+            "use_mail": true,
+            "use_sms": true,
+            "auth": {
+              "password": "aaaa",
+              "password_hint": "aaaa",
+              "valid": {
+                "day": 3,
+                "hour": 0
+              }
+            }
+          }
+        ],
+        "comment": "재요청 드립니다."
+      }
+    ]
+  }
+}
+
+※ recipients.member를 생략하면 이전 수신자 정보 그대로 재전송되며, auth.valid 값만 수정하여 유효기간 연장도 가능합니다.
+──────────────────────────────────────
+
+4. 계약서 유효기간 설정 기능
+
+문서의 유효기간은 수신자별로 별도 지정 가능하며, 문서 작성 API 및 재요청 API 호출 시 auth.valid 객체에 설정합니다.
+
+■ 설정 필드
+  - auth.valid.day: 문서 전송 기한 (일, Integer)
+  - auth.valid.hour: 문서 전송 기한 (시간, Integer)
+  - 미입력 시 기본값: 7일 0시간
+
+■ 설정 예시 (새 문서 작성 시)
+{
+  "document": {
+    "recipients": [
+      {
+        "step_type": "05",
+        "use_mail": true,
+        "use_sms": true,
+        "member": {
+          "name": "홍길동",
+          "id": "gdhong@forcs.com"
+        },
+        "auth": {
+          "valid": {
+            "day": 7,
+            "hour": 0
+          }
+        }
+      }
+    ]
+  }
+}
+
+■ 재요청 시 유효기간 설정
+재요청 API에서는 동일하게 auth.valid.day / auth.valid.hour를 사용하며, 구형 워크플로우(외부 수신자, step_type: 03)의 경우 approvers[].auth_valid_time 필드에 시간 단위(Integer)로 입력합니다.
+
+──────────────────────────────────────
+
+첨부된 eformsign API 가이드(1), Webhook 가이드 v1.1에서 각 API의 상세 파라미터와 응답 구조를 확인하실 수 있습니다. 
+
+감사합니다

@@ -93,6 +93,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
   const [recipientPhone, setRecipientPhone] = useState('');
   const [documentName, setDocumentName] = useState('');
   const [comment, setComment] = useState('');
+  const [validDay, setValidDay] = useState<number>(14); // 유효기간(일) - 기본 2주
 
   useEffect(() => {
     if (open) {
@@ -262,6 +263,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
         });
 
       const phoneClean = recipientPhone.replace(/-/g, '');
+      const safeValidDay = (validDay && validDay > 0 && validDay <= 365) ? Math.floor(validDay) : 14;
       const recipients: any[] = [{
         step_type: '05',
         use_mail: false,
@@ -272,7 +274,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
           sms: { country_code: '+82', phone_number: phoneClean },
         },
         auth: {
-          valid: { day: 7, hour: 0 },
+          valid: { day: safeValidDay, hour: 0 },
         },
       }];
 
@@ -293,6 +295,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
           created_by: user.name || user.email || '',
           amount_man_won: rawAmountManWon || 0,
           commission_rate_raw: rawCommissionRate || 0,
+          valid_day: safeValidDay,
         }),
       });
 
@@ -543,6 +546,28 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
                       data-testid="input-recipient-phone"
                     />
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="valid-day">유효기간 (일) — 기본 14일 (2주)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="valid-day"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={validDay}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setValidDay(isNaN(v) ? 14 : v);
+                    }}
+                    className="w-32"
+                    data-testid="input-valid-day"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    수신자가 서명을 완료해야 하는 기한입니다.
+                  </span>
                 </div>
               </div>
 
