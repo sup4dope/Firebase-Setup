@@ -1,6 +1,6 @@
 /**
  * Gemini 2.0 Flash API를 사용한 사업자등록증 OCR 서비스 (서버 측)
- * v1 API 경로 + gemini-2.5-flash 모델 고정 (Tier 1)
+ * v1beta API 경로 + gemini-3.1-flash-lite-preview 모델 고정 (Tier 1)
  */
 
 export interface BusinessRegistrationData {
@@ -130,7 +130,7 @@ export async function extractBusinessRegistrationFromBase64(
   const pureBase64 = stripBase64Header(base64Data);
   console.log(`   - 순수 Base64 길이: ${pureBase64.length}`);
   
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`;
   
   console.log("Final Request URL:", url.replace(apiKey, "MASKED"));
   
@@ -160,7 +160,7 @@ export async function extractBusinessRegistrationFromBase64(
 
   try {
     console.log("📡 [서버] Gemini API 호출...");
-    console.log(`   - 모델: gemini-2.5-flash (Tier 1)`);
+    console.log(`   - 모델: gemini-3.1-flash-lite-preview (Tier 1)`);
     console.log(`   - MIME: ${mimeType}`);
     console.log(`   - 데이터 크기: ${pureBase64.length} bytes`);
 
@@ -355,7 +355,7 @@ export async function extractVatCertificateFromBase64(
   };
 
   try {
-    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`;
     
     console.log("📡 [서버] Gemini API 호출 (부가세 과세표준증명)...");
     
@@ -528,7 +528,7 @@ IMPORTANT:
   };
 
   try {
-    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`;
     
     console.log("📡 [서버] Gemini API 호출 (신용공여내역)...");
     
