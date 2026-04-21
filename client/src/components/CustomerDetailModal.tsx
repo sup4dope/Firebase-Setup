@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Pencil,
   RefreshCw,
+  Eye,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -237,6 +238,7 @@ export function CustomerDetailModal({
   const [isLoadingContracts, setIsLoadingContracts] = useState(false);
   const [resendingContractId, setResendingContractId] = useState<string | null>(null);
   const [syncingContractId, setSyncingContractId] = useState<string | null>(null);
+  const [checkingReadContractId, setCheckingReadContractId] = useState<string | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [downloadingContractId, setDownloadingContractId] = useState<string | null>(null);
   
@@ -4301,6 +4303,57 @@ export function CustomerDetailModal({
                                   <Button
                                     variant="outline"
                                     size="sm"
+                                    disabled={checkingReadContractId === contract.id}
+                                    onClick={async () => {
+                                      setCheckingReadContractId(contract.id);
+                                      try {
+                                        const { authFetch } = await import('@/lib/firebase');
+                                        const res = await authFetch(`/api/eformsign/contracts/${contract.id}/read-status`);
+                                        const data = await res.json();
+                                        if (data.success) {
+                                          const s = data.data;
+                                          if (s.opened) {
+                                            const last = s.last_opened_at ? new Date(s.last_opened_at).toLocaleString('ko-KR') : '-';
+                                            const first = s.first_opened_at ? new Date(s.first_opened_at).toLocaleString('ko-KR') : '-';
+                                            toast({
+                                              title: '✅ 열람 확인됨',
+                                              description: `열람 ${s.open_count}회 · 최초: ${first} · 최근: ${last}`,
+                                            });
+                                          } else {
+                                            toast({
+                                              title: '아직 열람되지 않음',
+                                              description: '수신자가 아직 계약서를 열어보지 않았습니다.',
+                                            });
+                                          }
+                                          if (customer?.id) {
+                                            const contractsRes = await authFetch(`/api/contracts?customer_id=${customer.id}`);
+                                            const contractsData = await contractsRes.json();
+                                            if (contractsData.success) {
+                                              setCustomerContracts(contractsData.data);
+                                            }
+                                          }
+                                        } else {
+                                          toast({ title: '조회 실패', description: data.error || '열람 정보를 가져올 수 없습니다.', variant: 'destructive' });
+                                        }
+                                      } catch (error: any) {
+                                        toast({ title: '오류', description: error.message || '열람 확인 중 오류가 발생했습니다.', variant: 'destructive' });
+                                      } finally {
+                                        setCheckingReadContractId(null);
+                                      }
+                                    }}
+                                    className={`h-5 px-1.5 text-[10px] gap-0.5 ${(contract as any).opened ? 'text-green-600 border-green-300' : ''}`}
+                                    data-testid={`button-check-read-modal-${contract.id}`}
+                                  >
+                                    {checkingReadContractId === contract.id ? (
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                    ) : (
+                                      <Eye className="w-2.5 h-2.5" />
+                                    )}
+                                    {(contract as any).opened ? `열람 ${(contract as any).open_count || 1}회` : '열람확인'}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
                                     disabled={syncingContractId === contract.id}
                                     onClick={async () => {
                                       setSyncingContractId(contract.id);
@@ -4356,7 +4409,7 @@ export function CustomerDetailModal({
                                         });
                                         const data = await res.json();
                                         if (data.success) {
-                                          toast({ title: '재발송 완료', description: '동일한 내용으로 새 계약서가 발송되었습니다.' });
+                                          toast({ title: '재발송 완료', description: `기존 계약서 알림이 재발송되었습니다 (유효기간 ${data.valid_day || 14}일 갱신).` });
                                           if (customer?.id) {
                                             const contractsRes = await authFetch(`/api/contracts?customer_id=${customer.id}`);
                                             const contractsData = await contractsRes.json();

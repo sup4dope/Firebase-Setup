@@ -254,74 +254,59 @@ export async function getDocuments(queryParams?: {
   return apiRequest('GET', path);
 }
 
-export async function resendDocument(documentId: string): Promise<any> {
+/**
+ * 기존 문서에 대한 재요청 (재발송).
+ * eformsign 가이드:
+ *   POST /v2.0/api/documents/{document_id}/re_request_outsider
+ *   - recipients[].member 생략 시 이전 수신자 정보 그대로 재전송
+ *   - auth.valid 값만 수정하여 유효기간 연장 가능
+ *   - step_type: "03"(외부수신자/구형), "05"(참여자), "06"(검토자)
+ */
+export async function resendDocument(documentId: string, validDay: number = 14): Promise<any> {
   const docInfo = await apiRequest('GET', `/documents/${documentId}?include_detail=true`);
-  console.log('[eformsign] 문서 상세 조회 결과:', JSON.stringify(docInfo).substring(0, 3000));
-
   const currentStatus = docInfo?.current_status;
-  console.log('[eformsign] current_status:', JSON.stringify(currentStatus));
-
   const stepType = currentStatus?.step_type || '05';
   const stepGroup = currentStatus?.step_group;
-  const stepIndex = currentStatus?.step_index;
-  console.log('[eformsign] stepType:', stepType, 'stepGroup:', stepGroup, 'stepIndex:', stepIndex);
+  console.log(`[eformsign] 재요청(알림 재발송): stepType=${stepType}, stepGroup=${stepGroup}, validDay=${validDay}`);
 
-  const stepRecipients = currentStatus?.step_recipients || [];
-  const recipientInfo = stepRecipients[0];
+  // 핵심 body: member 생략 → 기존 수신자에게 알림 재발송, auth.valid로 유효기간 연장
+  const recipientBlock: any = {
+    auth: {
+      valid: { day: validDay, hour: 0 },
+    },
+  };
 
-  const tryBodies = [];
-
-  if (recipientInfo) {
-    const recipientBlock = {
-      member: {
-        name: recipientInfo.name,
-        id: recipientInfo.email,
-        ...(recipientInfo.sms ? { sms: recipientInfo.sms } : {})
-      },
-      use_mail: false,
-      use_sms: true
-    };
-
+  const tryBodies: any[] = [];
+  if (stepGroup !== undefined && stepGroup !== null) {
     tryBodies.push({
       input: {
         next_steps: [{
           step_type: stepType,
           step_seq: String(stepGroup),
           recipients: [recipientBlock],
-          comment: '계약서 재요청입니다.'
-        }]
-      }
-    });
-
-    tryBodies.push({
-      input: {
-        next_steps: [{
-          step_type: stepType,
-          step_seq: String(stepIndex),
-          recipients: [recipientBlock],
-          comment: '계약서 재요청입니다.'
-        }]
-      }
-    });
-
-    tryBodies.push({
-      input: {
-        next_steps: [{
-          step_type: stepType,
-          recipients: [recipientBlock],
-          comment: '계약서 재요청입니다.'
-        }]
-      }
+          comment: `계약서 재요청 드립니다. (유효기간 ${validDay}일)`,
+        }],
+      },
     });
   }
-
+  // step_seq 없이도 시도
   tryBodies.push({
     input: {
       next_steps: [{
         step_type: stepType,
-        comment: '계약서 재요청입니다.'
-      }]
-    }
+        recipients: [recipientBlock],
+        comment: `계약서 재요청 드립니다. (유효기간 ${validDay}일)`,
+      }],
+    },
+  });
+  // recipients 없이 최소 body 시도
+  tryBodies.push({
+    input: {
+      next_steps: [{
+        step_type: stepType,
+        comment: `계약서 재요청 드립니다.`,
+      }],
+    },
   });
 
   for (let i = 0; i < tryBodies.length; i++) {

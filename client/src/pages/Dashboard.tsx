@@ -44,7 +44,7 @@ import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-f
 import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { db, addCustomerHistoryLog, authFetch } from '@/lib/firebase';
-import { addDoc, collection, doc, updateDoc, getDocs, query, where, arrayUnion } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, getDocs, query, where, arrayUnion, onSnapshot, orderBy, limit as fsLimit } from 'firebase/firestore';
 import { FUNNEL_GROUPS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -164,6 +164,20 @@ export default function Dashboard() {
   const seenPaymentIdsRef = useRef<Set<string>>(new Set());
   const isInitialPaymentLoadRef = useRef(true);
 
+  // 계약서 상태 변동 알림 (열람·서명·만료·취소·거부)
+  type ContractNotif = {
+    key: string;
+    contractId: string;
+    customerId: string;
+    customerName: string;
+    title: string;
+    description: string;
+    color: 'blue' | 'green' | 'red' | 'orange';
+  };
+  const [contractNotifications, setContractNotifications] = useState<ContractNotif[]>([]);
+  const contractStateRef = useRef<Map<string, { status: string; opened: boolean; open_count: number }>>(new Map());
+  const isInitialContractLoadRef = useRef(true);
+
   useEffect(() => {
     let cancelled = false;
     const pollPayments = async () => {
@@ -203,6 +217,95 @@ export default function Dashboard() {
     const interval = setInterval(pollPayments, 30000);
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
+
+  // 활성 계약(발송완료/서명대기) 30초마다 폴링 → 상태 변동 / 열람 발생 시 토스트
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    const pollContracts = async () => {
+      try {
+        const res = await authFetch('/api/eformsign/contracts/poll-active', { method: 'POST' });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!data.success || !Array.isArray(data.contracts)) return;
+
+        const newNotifs: ContractNotif[] = [];
+        data.contracts.forEach((c: any) => {
+          const id = c.contractId;
+          const status = c.status || '';
+          const opened = !!c.opened;
+          const openCount = Number(c.open_count || 0);
+          const prev = contractStateRef.current.get(id);
+          contractStateRef.current.set(id, { status, opened, open_count: openCount });
+
+          if (isInitialContractLoadRef.current) return;
+          if (!prev) return; // 새로 등장한 계약은 본인 발송이므로 알림 X
+
+          // 상태 변경 감지
+          if (prev.status !== status) {
+            let title = '';
+            let color: ContractNotif['color'] = 'blue';
+            if (status === '서명완료') { title = '✅ 계약서 서명 완료'; color = 'green'; }
+            else if (status === '거부') { title = '⚠️ 계약서 서명 거부'; color = 'red'; }
+            else if (status === '취소') { title = '🚫 계약서 발송 취소'; color = 'orange'; }
+            else if (status === '만료' || status === '무효') { title = '⏰ 계약서 유효기간 만료'; color = 'orange'; }
+            else if (status === '서명대기') { title = '✍️ 계약서 작성 시작'; color = 'blue'; }
+            if (title) {
+              newNotifs.push({
+                key: `status-${id}-${status}-${Date.now()}`,
+                contractId: id,
+                customerId: c.customerId || '',
+                customerName: c.customerName || '알 수 없는 고객',
+                title,
+                description: `${c.customerName || ''} · ${prev.status} → ${status}`,
+                color,
+              });
+            }
+          }
+
+          // 열람 발생 감지
+          if (!prev.opened && opened) {
+            newNotifs.push({
+              key: `read-${id}-${openCount}-${Date.now()}`,
+              contractId: id,
+              customerId: c.customerId || '',
+              customerName: c.customerName || '알 수 없는 고객',
+              title: '👁 계약서 열람됨',
+              description: `${c.customerName || ''} · 수신자가 계약서를 처음 열람했습니다.`,
+              color: 'blue',
+            });
+          } else if (prev.opened && opened && openCount > prev.open_count) {
+            newNotifs.push({
+              key: `read-${id}-${openCount}-${Date.now()}`,
+              contractId: id,
+              customerId: c.customerId || '',
+              customerName: c.customerName || '알 수 없는 고객',
+              title: '👁 계약서 재열람',
+              description: `${c.customerName || ''} · 누적 열람 ${openCount}회`,
+              color: 'blue',
+            });
+          }
+        });
+
+        if (isInitialContractLoadRef.current) {
+          isInitialContractLoadRef.current = false;
+        } else if (newNotifs.length > 0) {
+          setContractNotifications(prev => [...prev, ...newNotifs]);
+        }
+      } catch (err) {
+        // silent
+      }
+    };
+
+    pollContracts();
+    const interval = setInterval(pollContracts, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [user]);
+
+  const dismissContractNotification = (key: string) => {
+    setContractNotifications(prev => prev.filter(n => n.key !== key));
+  };
 
   const dismissPaymentNotification = (paymentId: string) => {
     setPaymentNotifications(prev => prev.filter(n => n.id !== paymentId));
@@ -2135,8 +2238,48 @@ export default function Dashboard() {
         onImportComplete={handleImportComplete}
       />
 
+      {contractNotifications.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm" data-testid="contract-notifications" style={{ marginBottom: paymentNotifications.length > 0 ? '0' : '0' }}>
+          {contractNotifications.map((notif) => {
+            const colorClass = {
+              green: 'bg-green-600',
+              blue: 'bg-blue-600',
+              red: 'bg-red-600',
+              orange: 'bg-orange-500',
+            }[notif.color];
+            return (
+              <div
+                key={notif.key}
+                className={`${colorClass} text-white rounded-lg shadow-lg p-4 flex items-start gap-3 animate-in slide-in-from-right-5 duration-300 cursor-pointer hover:opacity-95`}
+                data-testid={`contract-notification-${notif.key}`}
+                onClick={() => {
+                  const target = customers.find(c => c.id === notif.customerId);
+                  if (target) {
+                    handleCustomerClick(target);
+                  }
+                  dismissContractNotification(notif.key);
+                }}
+              >
+                <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm">{notif.title}</p>
+                  <p className="text-sm opacity-90 truncate">{notif.description}</p>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); dismissContractNotification(notif.key); }}
+                  className="text-white/80 hover:text-white flex-shrink-0 mt-0.5"
+                  data-testid={`dismiss-contract-notification-${notif.key}`}
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {paymentNotifications.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm" data-testid="payment-notifications">
+        <div className={`fixed right-4 z-50 flex flex-col gap-2 max-w-sm ${contractNotifications.length > 0 ? 'bottom-4' : 'bottom-4'}`} style={{ bottom: contractNotifications.length > 0 ? `${4 + contractNotifications.length * 80 + 8}px` : '1rem' }} data-testid="payment-notifications">
           {paymentNotifications.map((notif) => (
             <div
               key={notif.id}
