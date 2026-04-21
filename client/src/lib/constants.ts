@@ -244,11 +244,11 @@ export function getStatusTransitionAllowed(currentStatus: string, targetStatus: 
   }
 
   if (currentStatus.includes('계약서발송완료')) {
-    return !isTargetPreContract;
+    return targetStatus === '계약금미동의(선불)' || targetStatus === '계약금미동의(후불)';
   }
 
   if (currentStatus === '수납대기') {
-    return HOPE_TARGET_STATUSES.includes(targetStatus);
+    return targetStatus === '계약금미동의(선불)' || targetStatus === '계약금미동의(후불)';
   }
 
   if (currentStatus.includes('계약완료')) {
