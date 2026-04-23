@@ -542,6 +542,38 @@ export default function Stats() {
     return { stackedBarData, pieData, scatterData, scatterAvg: { avgX, avgY } };
   }, [selectedCustomers, dateFilteredCustomers]);
 
+  // 수납일 기준 직원별 계약 건수 집계 (선택된 기간 내)
+  const staffPaymentBreakdown = useMemo(() => {
+    const rangeFrom = dateRange.from || startOfMonth(new Date());
+    const rangeTo = dateRange.to || endOfMonth(new Date());
+    const fromStr = format(rangeFrom, 'yyyy-MM-dd');
+    const toStr = format(rangeTo, 'yyyy-MM-dd');
+
+    const tally = new Map<string, { managerId: string; name: string; teamName: string; count: number; customers: Customer[] }>();
+
+    selectedCustomers.forEach(c => {
+      if (!CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)) return;
+      const paymentDate = c.deposit_paid_date || c.contract_completion_date;
+      if (!paymentDate) return;
+      if (paymentDate < fromStr || paymentDate > toStr) return;
+
+      const key = c.manager_id || 'unassigned';
+      const name = c.manager_name || '미배정';
+      const teamName = c.team_name || '';
+      const entry = tally.get(key) || { managerId: key, name, teamName, count: 0, customers: [] };
+      entry.count += 1;
+      entry.customers.push(c);
+      tally.set(key, entry);
+    });
+
+    return Array.from(tally.values()).sort((a, b) => b.count - a.count);
+  }, [selectedCustomers, dateRange]);
+
+  const totalPaymentCount = useMemo(
+    () => staffPaymentBreakdown.reduce((sum, s) => sum + s.count, 0),
+    [staffPaymentBreakdown]
+  );
+
   const trendData = useMemo(() => {
     const rangeFrom = dateRange.from || startOfMonth(new Date());
     const rangeTo = dateRange.to || endOfMonth(new Date());
@@ -1117,6 +1149,63 @@ export default function Stats() {
                   <Line type="monotone" dataKey="수납일 기준(x10)" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+
+            {/* 수납일 기준 직원별 계약 건수 */}
+            <div className="mt-6 pt-6 border-t" data-testid="section-staff-payment-breakdown">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="text-sm font-semibold">수납일 기준 직원별 계약 내역</h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    선택된 기간 내 수납이 완료된 계약을 담당자별로 집계
+                  </p>
+                </div>
+                <Badge variant="secondary" data-testid="badge-staff-total-count">
+                  전체 {totalPaymentCount}건
+                </Badge>
+              </div>
+              {staffPaymentBreakdown.length === 0 ? (
+                <div className="text-center py-6 text-sm text-muted-foreground" data-testid="text-no-staff-payment">
+                  해당 기간에 수납 완료된 계약이 없습니다.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {staffPaymentBreakdown.map((staff, idx) => {
+                    const percentage = totalPaymentCount > 0 ? (staff.count / totalPaymentCount) * 100 : 0;
+                    return (
+                      <div
+                        key={staff.managerId}
+                        className="flex items-center justify-between px-3 py-2 rounded-md border bg-muted/30 hover-elevate"
+                        data-testid={`row-staff-payment-${staff.managerId}`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-xs text-muted-foreground tabular-nums w-5">
+                            {idx + 1}.
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate" data-testid={`text-staff-name-${staff.managerId}`}>
+                              {staff.name}
+                            </div>
+                            {staff.teamName && (
+                              <div className="text-[11px] text-muted-foreground truncate">
+                                {staff.teamName}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-2">
+                          <div className="text-sm font-semibold tabular-nums" data-testid={`text-staff-count-${staff.managerId}`}>
+                            {staff.count}건
+                          </div>
+                          <div className="text-[11px] text-muted-foreground tabular-nums">
+                            {percentage.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
