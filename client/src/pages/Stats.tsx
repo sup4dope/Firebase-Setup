@@ -588,10 +588,23 @@ export default function Stats() {
         c.contract_completion_date === dayStr &&
         CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
       ).length;
-      const depositByDate = selectedCustomers.filter(c =>
+      const depositCustomers = selectedCustomers.filter(c =>
         (c.deposit_paid_date || c.contract_completion_date) === dayStr &&
         CONTRACT_AND_BEYOND_STATUSES.includes(c.status_code)
-      ).length;
+      );
+      const depositByDate = depositCustomers.length;
+
+      // 수납일 기준 직원별 집계
+      const staffTally = new Map<string, { name: string; count: number }>();
+      depositCustomers.forEach(c => {
+        const key = c.manager_id || 'unassigned';
+        const name = c.manager_name || '미배정';
+        const entry = staffTally.get(key) || { name, count: 0 };
+        entry.count += 1;
+        staffTally.set(key, entry);
+      });
+      const 수납일_직원별 = Array.from(staffTally.values()).sort((a, b) => b.count - a.count);
+
       return {
         date: format(day, 'MM/dd'),
         유입: inflowCount,
@@ -599,6 +612,7 @@ export default function Stats() {
         '당일계약(x10)': sameDayContract * SCALE,
         수납일기준_raw: depositByDate,
         '수납일 기준(x10)': depositByDate * SCALE,
+        수납일_직원별,
       };
     });
   }, [selectedCustomers, dateRange]);
@@ -1137,6 +1151,21 @@ export default function Stats() {
                             <p style={{ color: '#6366f1' }}>유입: {data['유입']}건</p>
                             <p style={{ color: '#22c55e' }}>당일유입 → 당일계약: {data['당일계약_raw']}건</p>
                             <p style={{ color: '#f59e0b' }}>수납일 기준 전체: {data['수납일기준_raw']}건</p>
+                            {Array.isArray(data['수납일_직원별']) && data['수납일_직원별'].length > 0 && (
+                              <div style={{
+                                marginTop: '4px',
+                                paddingTop: '4px',
+                                paddingLeft: '10px',
+                                borderTop: '1px dashed hsl(var(--border))',
+                                fontSize: '12px',
+                              }}>
+                                {data['수납일_직원별'].map((s: { name: string; count: number }, i: number) => (
+                                  <p key={i} style={{ color: 'hsl(var(--muted-foreground))', margin: '2px 0' }}>
+                                    └ {s.name}: {s.count}건
+                                  </p>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       }
