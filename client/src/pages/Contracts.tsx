@@ -293,6 +293,22 @@ export default function Contracts() {
       });
     }
 
+    // 미서명(발송완료/서명대기) 항목을 최상단으로 그룹화 → 그 다음 거부 → 나머지는 기존 순서 유지
+    const pendingPriority = (status: string): number => {
+      if (status === '발송완료' || status === '서명대기') return 0;
+      if (status === '거부') return 1;
+      return 2;
+    };
+    result = [...result].sort((a, b) => {
+      const pa = pendingPriority(a.status);
+      const pb = pendingPriority(b.status);
+      if (pa !== pb) return pa - pb;
+      // 같은 그룹 내에서는 발송일 최신순
+      const ta = a.sent_at ? new Date(a.sent_at as any).getTime() : 0;
+      const tb = b.sent_at ? new Date(b.sent_at as any).getTime() : 0;
+      return tb - ta;
+    });
+
     return result;
   }, [contracts, statusFilter, senderFilter, searchQuery]);
 
@@ -315,6 +331,22 @@ export default function Contracts() {
         (p.sent_by_name || '').toLowerCase().includes(q)
       );
     }
+
+    // 미결제(W) 항목을 최상단으로 그룹화 → 결제완료(F) → 취소(C)/파기(D) 순
+    const paymentPriority = (state: string): number => {
+      if (state === 'W') return 0;
+      if (state === 'F') return 1;
+      return 2;
+    };
+    result = [...result].sort((a, b) => {
+      const pa = paymentPriority(a.state);
+      const pb = paymentPriority(b.state);
+      if (pa !== pb) return pa - pb;
+      // 같은 그룹 내에서는 발송일 최신순
+      const ta = a.created_at ? new Date(a.created_at as any).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at as any).getTime() : 0;
+      return tb - ta;
+    });
 
     return result;
   }, [payments, paymentFilter, senderFilter, searchQuery]);
@@ -550,7 +582,12 @@ export default function Contracts() {
                           <TableCell className="text-center text-muted-foreground text-sm hidden md:table-cell">
                             {idx + 1}
                           </TableCell>
-                          <TableCell className="font-medium" data-testid={`text-customer-name-${contract.id}`}>
+                          <TableCell
+                            className="font-medium cursor-pointer select-none"
+                            data-testid={`text-customer-name-${contract.id}`}
+                            data-customer-detail-name={contract.customer_name || ''}
+                            title="더블클릭으로 상세 보기"
+                          >
                             {(contract as any).fields?.['대표자명'] || (contract as any).fields?.['성명'] || '-'}
                           </TableCell>
                           <TableCell
