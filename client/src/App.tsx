@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { CustomerDetailProvider } from '@/contexts/CustomerDetailContext';
 import { AppSidebar } from '@/components/AppSidebar';
 import { TodoForm } from '@/components/TodoForm';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -283,8 +284,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <AppContent />
-          <Toaster />
+          <CustomerDetailProvider>
+            <AppContent />
+            <Toaster />
+          </CustomerDetailProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

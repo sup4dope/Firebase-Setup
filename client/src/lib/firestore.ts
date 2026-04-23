@@ -239,6 +239,25 @@ export const deleteTeam = async (id: string): Promise<void> => {
 };
 
 // Customers
+// 고객 ID 단건 조회
+export const getCustomerById = async (id: string): Promise<Customer | null> => {
+  try {
+    const snap = await getDoc(doc(db, 'customers', id));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return {
+      ...data,
+      id: snap.id,
+      created_at: toDate(data.created_at),
+      updated_at: data.updated_at ? toDate(data.updated_at) : toDate(data.created_at),
+      daily_no: data.daily_no || null,
+    } as Customer;
+  } catch (err) {
+    console.error('getCustomerById error:', err);
+    return null;
+  }
+};
+
 export const getCustomers = async (): Promise<Customer[]> => {
   // created_at 기준 내림차순 정렬 (최근 생성순 - 관리적 변경 시 순서 유지)
   const q = query(collection(db, 'customers'), orderBy('created_at', 'desc'));

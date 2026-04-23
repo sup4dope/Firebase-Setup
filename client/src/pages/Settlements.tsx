@@ -911,7 +911,11 @@ export default function Settlements() {
                                 <Badge variant="outline">{item.entry_source}</Badge>
                               </TableCell>
                               <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
-                              <TableCell className="font-medium">{customerName}</TableCell>
+                              <TableCell
+                                  className="font-medium cursor-pointer select-none"
+                                  data-customer-detail-id={item.customer_id || customer?.id || ''}
+                                  title="더블클릭으로 상세 보기"
+                                >{customerName}</TableCell>
                               <TableCell>
                                 <Badge className="bg-red-500 hover:bg-red-600 text-white border-none">환수</Badge>
                               </TableCell>
@@ -940,7 +944,11 @@ export default function Settlements() {
                                   <Badge variant="outline">{item.entry_source}</Badge>
                                 </TableCell>
                                 <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
-                                <TableCell className="font-medium">{customerName}</TableCell>
+                                <TableCell
+                                  className="font-medium cursor-pointer select-none"
+                                  data-customer-detail-id={item.customer_id || customer?.id || ''}
+                                  title="더블클릭으로 상세 보기"
+                                >{customerName}</TableCell>
                                 <TableCell>
                                   <Badge variant="default">계약금</Badge>
                                 </TableCell>
@@ -971,7 +979,11 @@ export default function Settlements() {
                                   <Badge variant="outline">{item.entry_source}</Badge>
                                 </TableCell>
                                 <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
-                                <TableCell className="font-medium">{customerName}</TableCell>
+                                <TableCell
+                                  className="font-medium cursor-pointer select-none"
+                                  data-customer-detail-id={item.customer_id || customer?.id || ''}
+                                  title="더블클릭으로 상세 보기"
+                                >{customerName}</TableCell>
                                 <TableCell>
                                   <Badge className="bg-lime-500 hover:bg-lime-600 text-white border-none">{item.org_name || '자문료'}</Badge>
                                 </TableCell>

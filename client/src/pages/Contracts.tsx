@@ -553,7 +553,12 @@ export default function Contracts() {
                           <TableCell className="font-medium" data-testid={`text-customer-name-${contract.id}`}>
                             {(contract as any).fields?.['대표자명'] || (contract as any).fields?.['성명'] || '-'}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell" data-testid={`text-company-name-${contract.id}`}>
+                          <TableCell
+                            className="hidden md:table-cell cursor-pointer select-none"
+                            data-testid={`text-company-name-${contract.id}`}
+                            data-customer-detail-name={contract.customer_name || ''}
+                            title="더블클릭으로 상세 보기"
+                          >
                             {contract.customer_name}
                           </TableCell>
                           <TableCell className="hidden lg:table-cell" data-testid={`text-template-name-${contract.id}`}>
@@ -710,7 +715,12 @@ export default function Contracts() {
                           <TableCell className="text-center text-muted-foreground text-sm hidden md:table-cell">
                             {idx + 1}
                           </TableCell>
-                          <TableCell className="font-medium" data-testid={`text-payment-customer-${payment.id}`}>
+                          <TableCell
+                            className="font-medium cursor-pointer select-none"
+                            data-testid={`text-payment-customer-${payment.id}`}
+                            data-customer-detail-name={payment.customer_name || ''}
+                            title="더블클릭으로 상세 보기"
+                          >
                             {payment.customer_name}
                           </TableCell>
                           <TableCell className="text-right font-medium">

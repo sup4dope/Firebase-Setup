@@ -1299,7 +1299,11 @@ export default function CompanySettlement() {
                               <TableCell>
                                 <Badge variant="outline">{item.entry_source || '-'}</Badge>
                               </TableCell>
-                              <TableCell className="font-medium">{customer?.name || item.customer_name || '-'}</TableCell>
+                              <TableCell
+                                  className="font-medium cursor-pointer select-none"
+                                  data-customer-detail-id={item.customer_id || customer?.id || ''}
+                                  title="더블클릭으로 상세 보기"
+                                >{customer?.name || item.customer_name || '-'}</TableCell>
                               <TableCell className="text-right tabular-nums">{contractWon > 0 ? `${contractWon.toLocaleString()}원` : '-'}</TableCell>
                               <TableCell className="text-right tabular-nums">{(item.fee_rate || 0) > 0 ? `${item.fee_rate}%` : '-'}</TableCell>
                               <TableCell className="text-right tabular-nums">{execWon > 0 ? `${execWon.toLocaleString()}원` : '-'}</TableCell>

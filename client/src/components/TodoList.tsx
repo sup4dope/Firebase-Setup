@@ -74,7 +74,13 @@ export function TodoList({
               {todo.content}
             </p>
             {todo.customer_name && (
-              <p className="text-xs text-muted-foreground mt-1">
+              <p
+                className="text-xs text-muted-foreground mt-1 cursor-pointer select-none"
+                {...(todo.customer_id
+                  ? { 'data-customer-detail-id': todo.customer_id }
+                  : { 'data-customer-detail-name': todo.customer_name })}
+                title="더블클릭으로 상세 보기"
+              >
                 고객: {todo.customer_name}
               </p>
             )}

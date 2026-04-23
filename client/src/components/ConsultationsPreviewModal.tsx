@@ -500,7 +500,11 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                               <Badge variant="outline" className="text-xs font-mono shrink-0">
                                 #{index + 1}
                               </Badge>
-                              <h3 className="font-semibold text-foreground">{data.name || '이름 없음'}</h3>
+                              <h3
+                                className="font-semibold text-foreground cursor-pointer select-none"
+                                data-customer-detail-name={data.name || ''}
+                                title="더블클릭으로 상세 보기"
+                              >{data.name || '이름 없음'}</h3>
                               {data.businessName && (
                                 <span className="text-sm text-muted-foreground">({data.businessName})</span>
                               )}
