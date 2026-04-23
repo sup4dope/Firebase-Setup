@@ -2684,8 +2684,8 @@ export const processConsultationToCustomer = async (
     };
 
     if (existingCustomer) {
-      // 기존 고객: 메모만 추가
-      console.log(`📝 기존 고객 발견 (${existingCustomer.name}): 메모 추가`);
+      // 기존 고객: 메모 추가 + 유입경로/유입일자(DB분배일)을 최신 상담 기준으로 갱신
+      console.log(`📝 기존 고객 발견 (${existingCustomer.name}): 메모 추가 + 유입정보 갱신`);
       
       // counseling_logs에 저장
       await addDoc(collection(db, 'counseling_logs'), {
@@ -2696,14 +2696,49 @@ export const processConsultationToCustomer = async (
         created_at: now,
         type: 'system',
       });
+
+      // 최신 유입경로 매핑
+      const newEntrySource = mapUtmToEntrySource(consultation.utm_source, consultation.source, consultation.utm_campaign);
+      const newEntryDate = new Date().toISOString().split('T')[0]; // DB분배 기준일 = 오늘
+      const prevEntrySource = existingCustomer.entry_source || '기타';
+      const prevEntryDate = existingCustomer.entry_date || '';
+
+      // 유입경로 변경 이력 메모 (변경된 경우에만)
+      const entryChangeMemo = (prevEntrySource !== newEntrySource)
+        ? {
+            content: `[유입정보 갱신] 유입경로: ${prevEntrySource} → ${newEntrySource} / 유입일자: ${prevEntryDate || '없음'} → ${newEntryDate}`,
+            author_id: 'system',
+            author_name: '시스템',
+            created_at: now,
+          }
+        : null;
       
       // 고객 문서의 memo_history 필드도 업데이트 (모달 재오픈 시 즉시 표시되도록)
       const existingMemoHistory = existingCustomer.memo_history || [];
+      const updatedMemoHistory = entryChangeMemo
+        ? [...existingMemoHistory, memoEntry, entryChangeMemo]
+        : [...existingMemoHistory, memoEntry];
       await updateDoc(doc(db, 'customers', existingCustomer.id), {
-        memo_history: [...existingMemoHistory, memoEntry],
+        memo_history: updatedMemoHistory,
         recent_memo: memoSummary,
+        entry_source: newEntrySource,
+        entry_date: newEntryDate,
+        utm_source: consultation.utm_source || existingCustomer.utm_source || 'direct',
+        utm_medium: consultation.utm_medium || existingCustomer.utm_medium || 'direct',
+        utm_campaign: consultation.utm_campaign || existingCustomer.utm_campaign || 'direct',
         updated_at: Timestamp.now(),
       });
+
+      if (entryChangeMemo) {
+        await addDoc(collection(db, 'counseling_logs'), {
+          customer_id: existingCustomer.id,
+          content: entryChangeMemo.content,
+          author_name: '시스템',
+          author_id: 'system',
+          created_at: now,
+          type: 'system',
+        });
+      }
       
       // 상담 처리 완료 및 연결
       await markConsultationProcessed(consultationId);
