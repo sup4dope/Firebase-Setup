@@ -2202,6 +2202,7 @@ export const mapUtmToEntrySource = (utmSource?: string, source?: string, utmCamp
   if (utmCampaign === 'policy_funds_cashnote') return '캐시노트 인앱광고';
   if (utmCampaign === 'policy_funds_qs_easy') return '구글애즈(QSe)';
   if (utmCampaign === 'policy_funds_easy') return '구글애즈(e)';
+  if (utmCampaign === 'policy_funds_detail') return '구글애즈(D)';
   if (!utmSource || utmSource === 'direct' || utmSource === 'organic') return '광고';
   const mapped = UTM_SOURCE_MAP[utmSource.toLowerCase()];
   return mapped || '광고';
@@ -2217,6 +2218,7 @@ export const getCommissionRate = (rates: CommissionRates | undefined, entrySourc
     case '구글애즈(QS)':
     case '구글애즈(QSe)':
     case '구글애즈(e)':
+    case '구글애즈(D)':
       return rates.ad || 0;
     case '고객소개':
       return rates.referral || 0;
@@ -2239,6 +2241,7 @@ export const getDepositCommissionRate = (rates: CommissionRates | undefined, ent
     case '구글애즈(QS)':
     case '구글애즈(QSe)':
     case '구글애즈(e)':
+    case '구글애즈(D)':
       return rates.adDeposit || rates.ad || 0;
     case '고객소개':
       return rates.referralDeposit || rates.referral || 0;
