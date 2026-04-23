@@ -93,14 +93,10 @@ export default function Contracts() {
   };
 
   useEffect(() => {
+    // 페이지 진입 시 계약/결제 모두 미리 로딩 (탭 배지 개수 정확히 표시)
     fetchContracts();
+    fetchPayments();
   }, []);
-
-  useEffect(() => {
-    if (activeTab === 'payments' && payments.length === 0) {
-      fetchPayments();
-    }
-  }, [activeTab]);
 
   const handleRefresh = () => {
     setRefreshing(true);
