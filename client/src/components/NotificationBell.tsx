@@ -64,6 +64,22 @@ export function NotificationBell({ customers, users, onAddTodo, todoRefreshTrigg
     fetchTodoItems();
   }, [todoRefreshTrigger, user, users]);
 
+  // 고객목록의 경과 표시(30초 폴링)와 항상 동기화되도록 동일 주기로 폴링
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      fetchTodoItems();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user, users, isSuperAdmin, isTeamLeader]);
+
+  // 팝오버 열 때 즉시 최신 데이터 반영
+  useEffect(() => {
+    if (open) {
+      fetchTodoItems();
+    }
+  }, [open]);
+
   useEffect(() => {
     const handleTodoCreated = () => {
       fetchTodoItems();
