@@ -1576,9 +1576,11 @@ export const syncCustomerSettlements = async (month: string, users: User[]): Pro
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
         (status.includes('계약완료') || status.includes('집행'));
       const isReservation = status === '예약';
+      // 최종부결: 환수 처리 후 원본 정산 보존 필수 (Point-in-time 정확성)
+      const isFinalRejection = status === '최종부결';
       
       if (settlement.status === '정상' && !settlement.is_clawback) {
-        if (!isTargetStatus && !isReservation) {
+        if (!isTargetStatus && !isReservation && !isFinalRejection) {
           await deleteDoc(doc(db, 'settlements', settlement.id));
           deletedCount++;
           continue;
@@ -1626,8 +1628,10 @@ export const cleanupInvalidSettlements = async (): Promise<{ deleted: number; de
       const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
         (status.includes('계약완료') || status.includes('집행'));
       const isPaymentPending = status === '수납대기';
+      // 최종부결: 환수 처리된 고객의 원본 정산은 절대 삭제하지 않음 (Point-in-time 정확성)
+      const isFinalRejection = status === '최종부결';
       
-      if (!isTargetStatus || isPaymentPending) {
+      if ((!isTargetStatus || isPaymentPending) && !isFinalRejection) {
         details.push(`삭제: ${customerData.name || customerData.company_name} (${status}) - 정산ID: ${settlementDoc.id}`);
         await deleteDoc(doc(db, 'settlements', settlementDoc.id));
         deleted++;
@@ -1694,9 +1698,15 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     } as SettlementItem));
     
     const isReservation = status === '예약';
+    // 최종부결: 환수 처리된 고객의 정산(원본 정상 + 환수)은 절대 삭제하지 않음 (Point-in-time 정확성)
+    const isFinalRejection = status === '최종부결';
     if (!isTargetStatus || isPaymentPending) {
       if (isReservation && existingSettlements.length > 0) {
         console.log(`[Settlement Sync] 예약 상태이지만 기존 정산 ${existingSettlements.length}건 유지: ${customer.company_name || customer.name}`);
+        return;
+      }
+      if (isFinalRejection && existingSettlements.length > 0) {
+        console.log(`[Settlement Sync] 최종부결 상태 - 기존 정산(원본+환수) ${existingSettlements.length}건 보존: ${customer.company_name || customer.name}`);
         return;
       }
       if (existingSettlements.length > 0) {
@@ -1710,7 +1720,25 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       return;
     }
     
-    // 4. 승인된 진행기관 목록 확인
+    // 4. 최종부결에서 정상 상태로 복구된 경우: 기존 환수 항목 삭제 (이중 차감 방지)
+    // - syncSingleCustomerSettlement은 정상 상태(계약완료/집행 등)에서만 여기까지 도달
+    // - 따라서 status가 정상 상태인데 환수 항목이 남아있다면 이는 최종부결 → 복구된 케이스
+    const lingeringClawbacks = existingSettlements.filter(s => s.is_clawback);
+    if (lingeringClawbacks.length > 0) {
+      for (const clawback of lingeringClawbacks) {
+        await deleteDoc(doc(db, 'settlements', clawback.id));
+      }
+      console.log(`[Settlement Sync] 상태 복구 감지 - 기존 환수 ${lingeringClawbacks.length}건 삭제: ${customer.company_name || customer.name}, 상태: ${status}`);
+      // existingSettlements에서도 제거하여 이후 로직에 영향 없도록 함
+      const clawbackIds = new Set(lingeringClawbacks.map(c => c.id));
+      for (let i = existingSettlements.length - 1; i >= 0; i--) {
+        if (clawbackIds.has(existingSettlements[i].id)) {
+          existingSettlements.splice(i, 1);
+        }
+      }
+    }
+    
+    // 5. 승인된 진행기관 목록 확인
     const approvedOrgs = (customer.processing_orgs || [])
       .filter((org: { status: string }) => org.status === '승인');
     
