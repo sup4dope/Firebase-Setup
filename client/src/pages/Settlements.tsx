@@ -906,7 +906,42 @@ export default function Settlements() {
                       const advisoryCommission = Math.round(advisoryFee * (item.commission_rate / 100));
                       const contractNet = Math.round(contractCommission * 0.967);
                       const advisoryNet = Math.round(advisoryCommission * 0.967);
-                      
+
+                      // 채무조정 항목: 총수당/직원수당이 만원 단위로 별도 저장됨
+                      if (item.is_debt_adjustment && !item.is_clawback) {
+                        const debtTotalRevenueWon = toWon(item.total_revenue);
+                        const debtGrossWon = toWon(item.gross_commission);
+                        const debtNetWon = toWon(item.net_commission);
+                        const debtDate = item.execution_date || item.contract_date || '';
+                        allRows.push({
+                          date: debtDate,
+                          element: (
+                            <TableRow key={`${item.id}-debt`} data-testid={`modal-row-settlement-${item.id}-debt`}>
+                              <TableCell>{debtDate}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{item.entry_source}</Badge>
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
+                              <TableCell
+                                className="font-medium cursor-pointer select-none"
+                                data-customer-detail-id={item.customer_id || customer?.id || ''}
+                                title="더블클릭으로 상세 보기"
+                              >{customerName}</TableCell>
+                              <TableCell>
+                                <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white border-none">채무조정</Badge>
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">-</TableCell>
+                              <TableCell className="text-right text-muted-foreground">-</TableCell>
+                              <TableCell className="text-right text-muted-foreground">-</TableCell>
+                              <TableCell className="text-right">{debtTotalRevenueWon.toLocaleString()}원</TableCell>
+                              <TableCell className="text-right">{debtGrossWon.toLocaleString()}원</TableCell>
+                              <TableCell className="text-right">{debtNetWon.toLocaleString()}원</TableCell>
+                            </TableRow>
+                          )
+                        });
+                        return;
+                      }
+
                       // 환수 항목 (별도 처리 - 음수 값 표시)
                       if (item.is_clawback) {
                         allRows.push({
