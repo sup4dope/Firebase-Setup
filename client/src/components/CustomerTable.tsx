@@ -730,17 +730,26 @@ export function CustomerTable({
                           )}
 
                           {/* 희망타겟 그룹 */}
-                          {canSelectStatus('업력미달') && (
+                          {(
+                            canSelectStatus('업력미달') ||
+                            canSelectStatus('최근대출') ||
+                            canSelectStatus('인증미동의(국세청)') ||
+                            canSelectStatus('인증미동의(공여내역)') ||
+                            canSelectStatus('진행기간 미동의') ||
+                            canSelectStatus('자문료 미동의') ||
+                            canSelectStatus('계약금미동의(선불)') ||
+                            canSelectStatus('계약금미동의(후불)')
+                          ) && (
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs font-normal px-2 py-1 mt-1">희망타겟</SelectLabel>
-                            <SelectItem value="업력미달" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">업력미달</SelectItem>
-                            <SelectItem value="최근대출" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">최근대출</SelectItem>
-                            <SelectItem value="인증미동의(국세청)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">인증미동의(국세청)</SelectItem>
-                            <SelectItem value="인증미동의(공여내역)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">인증미동의(공여내역)</SelectItem>
-                            <SelectItem value="진행기간 미동의" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">진행기간 미동의</SelectItem>
-                            <SelectItem value="자문료 미동의" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">자문료 미동의</SelectItem>
-                            <SelectItem value="계약금미동의(선불)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">계약금미동의(선불)</SelectItem>
-                            <SelectItem value="계약금미동의(후불)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">계약금미동의(후불)</SelectItem>
+                            {canSelectStatus('업력미달') && <SelectItem value="업력미달" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">업력미달</SelectItem>}
+                            {canSelectStatus('최근대출') && <SelectItem value="최근대출" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">최근대출</SelectItem>}
+                            {canSelectStatus('인증미동의(국세청)') && <SelectItem value="인증미동의(국세청)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">인증미동의(국세청)</SelectItem>}
+                            {canSelectStatus('인증미동의(공여내역)') && <SelectItem value="인증미동의(공여내역)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">인증미동의(공여내역)</SelectItem>}
+                            {canSelectStatus('진행기간 미동의') && <SelectItem value="진행기간 미동의" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">진행기간 미동의</SelectItem>}
+                            {canSelectStatus('자문료 미동의') && <SelectItem value="자문료 미동의" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">자문료 미동의</SelectItem>}
+                            {canSelectStatus('계약금미동의(선불)') && <SelectItem value="계약금미동의(선불)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">계약금미동의(선불)</SelectItem>}
+                            {canSelectStatus('계약금미동의(후불)') && <SelectItem value="계약금미동의(후불)" className="text-amber-600 dark:text-yellow-400 focus:bg-accent cursor-pointer pl-4">계약금미동의(후불)</SelectItem>}
                           </SelectGroup>
                           )}
 
