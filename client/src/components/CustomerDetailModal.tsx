@@ -103,6 +103,7 @@ import {
   getUsers,
   getContractsByCustomer,
   getPaymentsByCustomer,
+  normalizeEntrySource,
 } from "@/lib/firestore";
 import {
   ref,
@@ -197,6 +198,16 @@ function safeFormatDate(date: any, formatStr: string): string {
 }
 
 const ENTRY_SOURCES = ["광고", "캐시노트 인앱광고", "구글애즈(dm)", "구글애즈(QS)", "구글애즈(QSe)", "구글애즈(dm-e)", "구글애즈(dm-d)", "구글애즈(dp-e)", "외주", "고객소개"];
+
+// 메모 텍스트 내의 옛 유입경로 라벨을 새 라벨로 치환 (소급 표시용, DB는 변경하지 않음)
+function normalizeEntrySourceInText(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/구글애즈\(D\)/g, '구글애즈(dm-d)')
+    .replace(/구글애즈\(e\)/g, '구글애즈(dm-e)')
+    // '구글애즈' 단독 (뒤에 '(' 가 오지 않을 때만) → '구글애즈(dm)'
+    .replace(/구글애즈(?!\()/g, '구글애즈(dm)');
+}
 const CARRIERS = ["SKT", "KT", "LG", "SKT알뜰폰", "KT알뜰폰", "LG알뜰폰"];
 const BUSINESS_TYPES = [
   "음식점",
@@ -413,7 +424,7 @@ export function CustomerDetailModal({
       };
       setFormData({
         ...customer,
-        entry_source: customer.entry_source || "광고",
+        entry_source: customer.entry_source ? normalizeEntrySource(customer.entry_source) : "광고",
         ssn_front: customer.ssn_front || "",
         ssn_back: customer.ssn_back || "",
         phone_part1: phoneParts[0] || "010",
@@ -546,6 +557,7 @@ export function CustomerDetailModal({
           setFormData(prev => ({
             ...prev,
             ...freshData,
+            entry_source: freshData.entry_source ? normalizeEntrySource(freshData.entry_source) : (prev.entry_source || "광고"),
             phone_part1: phoneParts[0] || "010",
             phone_part2: phoneParts[1] || "",
             phone_part3: phoneParts[2] || "",
@@ -1916,7 +1928,7 @@ export function CustomerDetailModal({
         home_address_detail: dataToSave.home_address_detail || "",
         is_home_owned: dataToSave.is_home_owned || false,
         is_same_as_business: dataToSave.is_same_as_business || false,
-        entry_source: dataToSave.entry_source || "광고",
+        entry_source: dataToSave.entry_source ? normalizeEntrySource(dataToSave.entry_source) : "광고",
         business_type: dataToSave.business_type || "기타",
         business_item: dataToSave.business_item || "",
         retry_type: dataToSave.retry_type || "해당없음",
@@ -4698,7 +4710,7 @@ export function CustomerDetailModal({
                               currentUser?.role === 'super_admin' ? (
                                 <div className="bg-red-600/10 border border-red-600/20 rounded-lg px-2 py-1.5 max-w-[90%]">
                                   <p className="text-sm text-muted-foreground line-through whitespace-pre-wrap">
-                                    {memo.content}
+                                    {normalizeEntrySourceInText(memo.content)}
                                   </p>
                                   <p className="text-xs text-red-400 mt-1">
                                     삭제: {memo.deleted_by_name} ({safeFormatDate(memo.deleted_at, "MM/dd HH:mm")})
@@ -4714,7 +4726,7 @@ export function CustomerDetailModal({
                             ) : (
                               <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg px-2 py-1.5 max-w-[90%]">
                                 <p className="text-sm text-foreground whitespace-pre-wrap">
-                                  {memo.content}
+                                  {normalizeEntrySourceInText(memo.content)}
                                 </p>
                               </div>
                             )}
@@ -4805,7 +4817,7 @@ export function CustomerDetailModal({
                               </div>
                               <div className="bg-muted/50 border rounded-lg px-2 py-1.5">
                                 <p className="text-xs text-foreground">
-                                  {log.description}
+                                  {normalizeEntrySourceInText(log.description || '')}
                                 </p>
                                 {log.old_value && log.new_value && (
                                   <div className="flex items-center gap-1 mt-1 text-xs">
@@ -4813,14 +4825,14 @@ export function CustomerDetailModal({
                                       variant="outline"
                                       className="bg-muted/50 text-muted-foreground border-border text-[10px] px-1"
                                     >
-                                      {log.old_value}
+                                      {normalizeEntrySourceInText(log.old_value)}
                                     </Badge>
                                     <ArrowRight className="w-2.5 h-2.5 text-muted-foreground" />
                                     <Badge
                                       variant="outline"
                                       className="bg-blue-600/20 text-blue-400 border-blue-600/30 text-[10px] px-1"
                                     >
-                                      {log.new_value}
+                                      {normalizeEntrySourceInText(log.new_value)}
                                     </Badge>
                                   </div>
                                 )}
