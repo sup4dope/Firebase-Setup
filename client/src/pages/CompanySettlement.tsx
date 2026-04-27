@@ -1291,8 +1291,11 @@ export default function CompanySettlement() {
                           const customer = customers.find(c => c.id === item.customer_id);
                           const contractWon = Math.round((item.contract_amount || 0) * 10000);
                           const execWon = Math.round((item.execution_amount || 0) * 10000);
-                          const advisoryFee = Math.round(execWon * ((item.fee_rate || 0) / 100));
                           const totalRevWon = Math.round((item.total_revenue || 0) * 10000);
+                          // 채무조정: 자문료액 = total_revenue (수기 입력된 총수당), 일반: 집행금액 × 자문료율%
+                          const advisoryFee = item.is_debt_adjustment
+                            ? totalRevWon
+                            : Math.round(execWon * ((item.fee_rate || 0) / 100));
                           return (
                             <TableRow key={item.id} data-testid={`row-detail-${item.id}`}>
                               <TableCell className="whitespace-nowrap">{item.settlement_month}</TableCell>
@@ -1304,7 +1307,12 @@ export default function CompanySettlement() {
                                   className="font-medium cursor-pointer select-none"
                                   data-customer-detail-id={item.customer_id || customer?.id || ''}
                                   title="더블클릭으로 상세 보기"
-                                >{customer?.name || item.customer_name || '-'}</TableCell>
+                                >
+                                  {customer?.name || item.customer_name || '-'}
+                                  {item.is_debt_adjustment && (
+                                    <Badge className="ml-2 bg-emerald-600 hover:bg-emerald-700 text-white border-none text-[10px] py-0">채무조정</Badge>
+                                  )}
+                                </TableCell>
                               <TableCell className="text-right tabular-nums">{contractWon > 0 ? `${contractWon.toLocaleString()}원` : '-'}</TableCell>
                               <TableCell className="text-right tabular-nums">{(item.fee_rate || 0) > 0 ? `${item.fee_rate}%` : '-'}</TableCell>
                               <TableCell className="text-right tabular-nums">{execWon > 0 ? `${execWon.toLocaleString()}원` : '-'}</TableCell>
@@ -1324,6 +1332,10 @@ export default function CompanySettlement() {
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {Math.round(detailModalItems.reduce((s, i) => {
+                            // 채무조정: total_revenue 그대로, 일반: 집행금액 × 자문료율%
+                            if (i.is_debt_adjustment) {
+                              return s + (i.total_revenue || 0) * 10000;
+                            }
                             const execWon = (i.execution_amount || 0) * 10000;
                             return s + execWon * ((i.fee_rate || 0) / 100);
                           }, 0)).toLocaleString()}원
