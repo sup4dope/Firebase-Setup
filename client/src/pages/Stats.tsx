@@ -25,7 +25,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCustomers, getTeams, getUsers } from '@/lib/firestore';
+import { getCustomers, getTeams, getUsers, normalizeEntrySource } from '@/lib/firestore';
 import type { Customer, Team, User } from '@shared/types';
 import {
   BarChart,
@@ -60,7 +60,7 @@ const CONTRACT_AND_BEYOND_STATUSES = [
 
 const EXECUTION_STATUSES = ['집행완료', '집행완료(선불)', '집행완료(후불)', '집행완료(외주)'];
 
-const ENTRY_SOURCES = ['광고', '캐시노트 인앱광고', '구글애즈', '구글애즈(QS)', '구글애즈(QSe)', '구글애즈(e)', '구글애즈(D)', '외주', '고객소개', '승인복제', '기타'];
+const ENTRY_SOURCES = ['광고', '캐시노트 인앱광고', '구글애즈(dm)', '구글애즈(QS)', '구글애즈(QSe)', '구글애즈(dm-e)', '구글애즈(dm-d)', '구글애즈(dp-e)', '외주', '고객소개', '승인복제', '기타'];
 
 const NEGATIVE_GROUPS = {
   A: { name: '스킬부족', reasons: ['거절사유 미파악', '단박거절', '인증미동의(국세청)', '인증미동의(공여내역)'] },
@@ -177,7 +177,7 @@ function calcMetrics(custs: Customer[]): StatsMetrics {
 
   const entrySourceStats: Record<string, number> = {};
   ENTRY_SOURCES.forEach(src => {
-    entrySourceStats[src] = custs.filter(c => c.entry_source === src).length;
+    entrySourceStats[src] = custs.filter(c => normalizeEntrySource(c.entry_source) === src).length;
   });
 
   return {

@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { BarChart3, TrendingUp, AlertTriangle, Target, Trash2, FileCheck, Users, ChevronRight, Star, X, CalendarDays, Check, Filter } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, CartesianGrid } from 'recharts';
-import { getCustomers } from '@/lib/firestore';
+import { getCustomers, normalizeEntrySource } from '@/lib/firestore';
 import { useEffect } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -20,7 +20,7 @@ import type { EntrySourceType } from '@shared/types';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const ENTRY_SOURCES: EntrySourceType[] = ['캐시노트 인앱광고', '구글애즈', '구글애즈(QS)', '구글애즈(QSe)', '구글애즈(e)', '구글애즈(D)', '광고', '외주', '고객소개', '승인복제'];
+const ENTRY_SOURCES: EntrySourceType[] = ['캐시노트 인앱광고', '구글애즈(dm)', '구글애즈(QS)', '구글애즈(QSe)', '구글애즈(dm-e)', '구글애즈(dm-d)', '구글애즈(dp-e)', '광고', '외주', '고객소개', '승인복제'];
 
 const TRASH_STATUSES = [
   '잘못 신청', '단박거절', '본인아님', '사업자아님', '정체성 의심',
@@ -49,11 +49,12 @@ const PIE_COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4
 
 const SOURCE_LINE_COLORS: Record<string, string> = {
   '캐시노트 인앱광고': '#3b82f6',
-  '구글애즈': '#ef4444',
+  '구글애즈(dm)': '#ef4444',
   '구글애즈(QS)': '#f97316',
   '구글애즈(QSe)': '#e11d48',
-  '구글애즈(e)': '#a855f7',
-  '구글애즈(D)': '#14b8a6',
+  '구글애즈(dm-e)': '#a855f7',
+  '구글애즈(dm-d)': '#14b8a6',
+  '구글애즈(dp-e)': '#0ea5e9',
   '광고': '#8b5cf6',
   '외주': '#06b6d4',
   '고객소개': '#10b981',
@@ -181,7 +182,7 @@ export default function AdStats() {
 
   const dailySourceData = useMemo(() => {
     const sources = activeSourcesToFilter;
-    const relevantCustomers = customers.filter(c => sources.includes(c.entry_source as EntrySourceType));
+    const relevantCustomers = customers.filter(c => sources.includes(normalizeEntrySource(c.entry_source) as EntrySourceType));
 
     const dateMap: Record<string, Record<string, number>> = {};
     for (let i = 0; i < chartDays; i++) {
@@ -199,8 +200,9 @@ export default function AdStats() {
       if (isNaN(d.getTime()) || d < chartStartDate || d > chartEndDate) return;
       const key = `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}`;
       if (dateMap[key] && c.entry_source) {
-        if (dateMap[key][c.entry_source] !== undefined) {
-          dateMap[key][c.entry_source]++;
+        const normSrc = normalizeEntrySource(c.entry_source);
+        if (dateMap[key][normSrc] !== undefined) {
+          dateMap[key][normSrc]++;
         }
         dateMap[key]['합계']++;
       }
@@ -255,7 +257,7 @@ export default function AdStats() {
 
     settlements.forEach(s => {
       if (!s.customer_id || !dateFilteredCustomerIds.has(s.customer_id)) return;
-      const src = s.entry_source;
+      const src = s.entry_source ? normalizeEntrySource(s.entry_source) : undefined;
       if (!src || revenue[src] === undefined) return;
 
       if (s.is_clawback) {
@@ -282,7 +284,7 @@ export default function AdStats() {
     });
 
     dateFilteredCustomers.forEach(c => {
-      const src = c.entry_source;
+      const src = c.entry_source ? normalizeEntrySource(c.entry_source) : undefined;
       const hasDeposit = !!(c as any).deposit_paid_date;
       const isContracted = hasDeposit || CONTRACT_AND_BEYOND.includes(c.status_code);
       if (src && contracts[src] !== undefined && isContracted) {
@@ -301,7 +303,7 @@ export default function AdStats() {
     const sources = activeSourcesToFilter;
 
     return sources.map(source => {
-      const filtered = dateFilteredCustomers.filter(c => c.entry_source === source);
+      const filtered = dateFilteredCustomers.filter(c => normalizeEntrySource(c.entry_source) === source);
       const total = filtered.length;
       if (total === 0) return { source, total: 0, consulting: 0, trash: 0, target: 0, contractSent: 0, contract: 0, docs: 0, apply: 0, exec: 0, absence: 0, finalReject: 0, trashDetails: {} as Record<string, number>, targetDetails: {} as Record<string, number>, grades: {} as Record<DbGrade, number>, adInefficiency: 0 };
 
@@ -340,7 +342,7 @@ export default function AdStats() {
   }, [dateFilteredCustomers, activeSourcesToFilter]);
 
   const totalStats = useMemo(() => {
-    const allFiltered = dateFilteredCustomers.filter(c => activeSourcesToFilter.includes(c.entry_source as EntrySourceType));
+    const allFiltered = dateFilteredCustomers.filter(c => activeSourcesToFilter.includes(normalizeEntrySource(c.entry_source) as EntrySourceType));
     const total = allFiltered.length;
     if (total === 0) return null;
 
@@ -361,7 +363,7 @@ export default function AdStats() {
   }, [dateFilteredCustomers, activeSourcesToFilter]);
 
   const openDetailModal = (source: string) => {
-    const filtered = dateFilteredCustomers.filter(c => c.entry_source === source);
+    const filtered = dateFilteredCustomers.filter(c => normalizeEntrySource(c.entry_source) === source);
     setDetailModal({ open: true, source, customers: filtered });
   };
 

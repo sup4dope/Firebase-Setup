@@ -2313,21 +2313,38 @@ export const formatPhoneNumber = (phone: string): string => {
   return phone;
 };
 
-// UTM 소스 → 유입경로 매핑
+// UTM 소스 → 유입경로 매핑 (구글 기본은 dm)
 const UTM_SOURCE_MAP: Record<string, EntrySourceType> = {
   cashnote: '캐시노트 인앱광고',
-  google: '구글애즈',
+  google: '구글애즈(dm)',
 };
 
-export const mapUtmToEntrySource = (utmSource?: string, source?: string, utmCampaign?: string): EntrySourceType => {
+export const mapUtmToEntrySource = (
+  utmSource?: string,
+  source?: string,
+  utmCampaign?: string,
+  utmMedium?: string,
+): EntrySourceType => {
   if (source === 'GoogleAds_Agency_Sheet') return '구글애즈(QS)';
   if (utmCampaign === 'policy_funds_cashnote') return '캐시노트 인앱광고';
   if (utmCampaign === 'policy_funds_qs_easy') return '구글애즈(QSe)';
-  if (utmCampaign === 'policy_funds_easy') return '구글애즈(e)';
-  if (utmCampaign === 'policy_funds_detail') return '구글애즈(D)';
+  // 디스플레이 캠페인 (display medium) → dp-e
+  if (utmCampaign === 'policy_funds_easy' && utmMedium === 'display') return '구글애즈(dp-e)';
+  if (utmCampaign === 'policy_funds_easy') return '구글애즈(dm-e)';
+  if (utmCampaign === 'policy_funds_detail') return '구글애즈(dm-d)';
   if (!utmSource || utmSource === 'direct' || utmSource === 'organic') return '광고';
   const mapped = UTM_SOURCE_MAP[utmSource.toLowerCase()];
   return mapped || '광고';
+};
+
+// 기존 DB에 저장된 구버전 라벨 → 신버전 라벨 정규화 (표시/집계 시 사용)
+// 저장 데이터는 유지하고 화면에서만 신규 명칭으로 보이도록 함
+export const normalizeEntrySource = (value?: string | null): EntrySourceType => {
+  if (!value) return '광고';
+  if (value === '구글애즈') return '구글애즈(dm)';
+  if (value === '구글애즈(e)') return '구글애즈(dm-e)';
+  if (value === '구글애즈(D)') return '구글애즈(dm-d)';
+  return value as EntrySourceType;
 };
 
 // 수당률 조회 (유입경로별)
@@ -2341,6 +2358,10 @@ export const getCommissionRate = (rates: CommissionRates | undefined, entrySourc
     case '구글애즈(QSe)':
     case '구글애즈(e)':
     case '구글애즈(D)':
+    case '구글애즈(dm)':
+    case '구글애즈(dm-e)':
+    case '구글애즈(dm-d)':
+    case '구글애즈(dp-e)':
       return rates.ad || 0;
     case '고객소개':
       return rates.referral || 0;
@@ -2364,6 +2385,10 @@ export const getDepositCommissionRate = (rates: CommissionRates | undefined, ent
     case '구글애즈(QSe)':
     case '구글애즈(e)':
     case '구글애즈(D)':
+    case '구글애즈(dm)':
+    case '구글애즈(dm-e)':
+    case '구글애즈(dm-d)':
+    case '구글애즈(dp-e)':
       return rates.adDeposit || rates.ad || 0;
     case '고객소개':
       return rates.referralDeposit || rates.referral || 0;
@@ -2690,7 +2715,7 @@ export const generateConsultationMemoSummary = (consultation: Consultation): str
   };
 
   const utmInfo = consultation.utm_source && consultation.utm_source !== 'direct'
-    ? `\n- 유입경로: ${mapUtmToEntrySource(consultation.utm_source, consultation.source, consultation.utm_campaign)} (${consultation.utm_source}/${consultation.utm_medium || '-'}/${consultation.utm_campaign || '-'})`
+    ? `\n- 유입경로: ${mapUtmToEntrySource(consultation.utm_source, consultation.source, consultation.utm_campaign, consultation.utm_medium)} (${consultation.utm_source}/${consultation.utm_medium || '-'}/${consultation.utm_campaign || '-'})`
     : '';
 
   return `[상담 신청 요약]
@@ -2820,7 +2845,7 @@ export const processConsultationToCustomer = async (
       });
 
       // 최신 유입경로 매핑
-      const newEntrySource = mapUtmToEntrySource(consultation.utm_source, consultation.source, consultation.utm_campaign);
+      const newEntrySource = mapUtmToEntrySource(consultation.utm_source, consultation.source, consultation.utm_campaign, consultation.utm_medium);
       const newEntryDate = new Date().toISOString().split('T')[0]; // DB분배 기준일 = 오늘
       const prevEntrySource = existingCustomer.entry_source || '기타';
       const prevEntryDate = existingCustomer.entry_date || '';
@@ -2881,7 +2906,7 @@ export const processConsultationToCustomer = async (
         phone: phone,
         business_registration_number: consultation.businessNumber || '',
         credit_score: 0,
-        entry_source: mapUtmToEntrySource(consultation.utm_source, consultation.source, consultation.utm_campaign),
+        entry_source: mapUtmToEntrySource(consultation.utm_source, consultation.source, consultation.utm_campaign, consultation.utm_medium),
         entry_date: new Date().toISOString().split('T')[0],
         status_code: '상담대기' as StatusCode,
         recent_memo: memoSummary,

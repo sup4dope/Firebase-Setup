@@ -355,7 +355,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
   const sourceCountMap = useMemo(() => {
     const map: Record<string, number> = {};
     consultations.forEach(({ data }) => {
-      const source = mapUtmToEntrySource(data.utm_source, data.source, data.utm_campaign);
+      const source = mapUtmToEntrySource(data.utm_source, data.source, data.utm_campaign, data.utm_medium);
       map[source] = (map[source] || 0) + 1;
     });
     const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
@@ -367,7 +367,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
     if (filterMode === 'new') return consultations.filter(c => !c.isDuplicate);
     if (filterMode === 'duplicate') return consultations.filter(c => c.isDuplicate);
     return consultations.filter(c => {
-      const source = mapUtmToEntrySource(c.data.utm_source, c.data.source, c.data.utm_campaign);
+      const source = mapUtmToEntrySource(c.data.utm_source, c.data.source, c.data.utm_campaign, c.data.utm_medium);
       return source === filterMode;
     });
   }, [consultations, filterMode]);
@@ -608,7 +608,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                           <Globe className="w-3.5 h-3.5 text-muted-foreground" />
                           <span className="text-muted-foreground">유입경로:</span>
                           <Badge variant="secondary" className="text-xs font-normal">
-                            {mapUtmToEntrySource(data.utm_source, data.source, data.utm_campaign)}
+                            {mapUtmToEntrySource(data.utm_source, data.source, data.utm_campaign, data.utm_medium)}
                           </Badge>
                           {data.utm_source && data.utm_source !== 'direct' && (
                             <Badge variant="outline" className="text-xs font-normal text-muted-foreground">

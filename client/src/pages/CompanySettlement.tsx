@@ -86,6 +86,7 @@ import {
   getCumulativeSummary,
   getSettlementItems,
   getCustomers,
+  normalizeEntrySource,
 } from '@/lib/firestore';
 import type { Expense, ExpenseCategory, InsertExpense, SettlementItem, Customer } from '@shared/types';
 
@@ -1297,7 +1298,7 @@ export default function CompanySettlement() {
                               <TableCell className="whitespace-nowrap">{item.settlement_month}</TableCell>
                               <TableCell className="whitespace-nowrap">{item.manager_name || '-'}</TableCell>
                               <TableCell>
-                                <Badge variant="outline">{item.entry_source || '-'}</Badge>
+                                <Badge variant="outline">{item.entry_source ? normalizeEntrySource(item.entry_source) : '-'}</Badge>
                               </TableCell>
                               <TableCell
                                   className="font-medium cursor-pointer select-none"

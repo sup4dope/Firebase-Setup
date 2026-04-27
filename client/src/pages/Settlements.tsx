@@ -97,6 +97,7 @@ import {
   getCustomers,
   calculateMonthlySettlementSummary,
   syncCustomerSettlements,
+  normalizeEntrySource,
 } from '@/lib/firestore';
 import type {
   SettlementItem,
@@ -451,7 +452,7 @@ export default function Settlements() {
       if (item.is_clawback) {
         excelData.push({
           수당일자: item.clawback_applied_at || item.contract_date || '',
-          유입경로: item.entry_source,
+          유입경로: normalizeEntrySource(item.entry_source),
           고유번호: customer?.readable_id || '-',
           고객명: customerName,
           수당구분: '환수',
@@ -466,7 +467,7 @@ export default function Settlements() {
         if (item.contract_amount > 0 && detailModalTitle !== '집행 완료 건') {
           excelData.push({
             수당일자: item.contract_date || '',
-            유입경로: item.entry_source,
+            유입경로: normalizeEntrySource(item.entry_source),
             고유번호: customer?.readable_id || '-',
             고객명: customerName,
             수당구분: '계약금',
@@ -483,7 +484,7 @@ export default function Settlements() {
           const advisoryDate = item.execution_date || item.contract_date || '';
           excelData.push({
             수당일자: advisoryDate,
-            유입경로: item.entry_source,
+            유입경로: normalizeEntrySource(item.entry_source),
             고유번호: customer?.readable_id || '-',
             고객명: customerName,
             수당구분: '자문료',
@@ -919,7 +920,7 @@ export default function Settlements() {
                             <TableRow key={`${item.id}-debt`} data-testid={`modal-row-settlement-${item.id}-debt`}>
                               <TableCell>{debtDate}</TableCell>
                               <TableCell>
-                                <Badge variant="outline">{item.entry_source}</Badge>
+                                <Badge variant="outline">{normalizeEntrySource(item.entry_source)}</Badge>
                               </TableCell>
                               <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
                               <TableCell
@@ -950,7 +951,7 @@ export default function Settlements() {
                             <TableRow key={`${item.id}-clawback`} data-testid={`modal-row-settlement-${item.id}-clawback`}>
                               <TableCell>{item.clawback_applied_at || item.contract_date}</TableCell>
                               <TableCell>
-                                <Badge variant="outline">{item.entry_source}</Badge>
+                                <Badge variant="outline">{normalizeEntrySource(item.entry_source)}</Badge>
                               </TableCell>
                               <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
                               <TableCell
@@ -983,7 +984,7 @@ export default function Settlements() {
                               <TableRow key={`${item.id}-contract`} data-testid={`modal-row-settlement-${item.id}-contract`}>
                                 <TableCell>{item.contract_date}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline">{item.entry_source}</Badge>
+                                  <Badge variant="outline">{normalizeEntrySource(item.entry_source)}</Badge>
                                 </TableCell>
                                 <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
                                 <TableCell
@@ -1018,7 +1019,7 @@ export default function Settlements() {
                               <TableRow key={`${item.id}-advisory`} data-testid={`modal-row-settlement-${item.id}-advisory`}>
                                 <TableCell>{advisoryDate}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline">{item.entry_source}</Badge>
+                                  <Badge variant="outline">{normalizeEntrySource(item.entry_source)}</Badge>
                                 </TableCell>
                                 <TableCell className="font-mono text-sm">{customer?.readable_id || '-'}</TableCell>
                                 <TableCell

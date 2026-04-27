@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import type { Customer, User, Team } from '@shared/types';
 import { format } from 'date-fns';
+import { normalizeEntrySource } from '@/lib/firestore';
 
 interface DataExportProps {
   customers: Customer[];
@@ -80,7 +81,7 @@ export function DataExport({ customers, users, teams, isSuperAdmin }: DataExport
           '설립일': customer.founding_date || '',
           '업종': customer.business_type || '',
           '종목': customer.business_item || '',
-          '유입경로': customer.entry_source || '',
+          '유입경로': customer.entry_source ? normalizeEntrySource(customer.entry_source) : '',
           '사업장주소': customer.business_address || '',
           '신용점수': customer.credit_score || '',
           '통신사': customer.carrier || '',

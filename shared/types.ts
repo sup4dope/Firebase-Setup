@@ -366,7 +366,7 @@ export type InsertFinancialObligation = Omit<FinancialObligation, 'id' | 'create
 export type SettlementStatus = '정상' | '취소' | '환수';
 
 // 유입경로 (수당률 결정에 사용)
-export type EntrySourceType = '광고' | '캐시노트 인앱광고' | '구글애즈' | '구글애즈(QS)' | '구글애즈(QSe)' | '구글애즈(e)' | '구글애즈(D)' | '고객소개' | '승인복제' | '외주' | '기타';
+export type EntrySourceType = '광고' | '캐시노트 인앱광고' | '구글애즈' | '구글애즈(QS)' | '구글애즈(QSe)' | '구글애즈(e)' | '구글애즈(D)' | '구글애즈(dm)' | '구글애즈(dm-e)' | '구글애즈(dm-d)' | '구글애즈(dp-e)' | '고객소개' | '승인복제' | '외주' | '기타';
 
 // 정산 항목 (개별 계약/집행 건)
 export interface SettlementItem {
