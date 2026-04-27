@@ -3613,6 +3613,10 @@ export function CustomerDetailModal({
                         if (option.value.includes('집행완료') && !canChangeToExecution) {
                           return false;
                         }
+                        // 채무조정에서 채무조정으로 재선택 허용 (수당 재입력 위해)
+                        if (option.value === '집행완료(채무조정)' && currentStatus === '집행완료(채무조정)' && isSuperAdmin) {
+                          return true;
+                        }
                         
                         return getStatusTransitionAllowed(currentStatus, option.value, isSuperAdmin);
                       });
@@ -3663,9 +3667,13 @@ export function CustomerDetailModal({
                                 <DropdownMenuItem
                                   key={option.value}
                                   onClick={async () => {
+                                    // 채무조정 → 채무조정 재선택은 수당 재입력을 위해 허용
+                                    const isDebtReentry =
+                                      option.value === "집행완료(채무조정)" &&
+                                      formData.status_code === "집행완료(채무조정)";
                                     if (
                                       formData.id &&
-                                      formData.status_code !== option.value
+                                      (formData.status_code !== option.value || isDebtReentry)
                                     ) {
                                       const hasContractInfo = 
                                         (formData.commission_rate && formData.commission_rate > 0) &&
@@ -3687,6 +3695,7 @@ export function CustomerDetailModal({
                                       const requiresModal =
                                         (option.value.includes("계약완료") && !hasContractInfo) ||
                                         (option.value.includes("신청완료") && !hasProcessingOrg) ||
+                                        (option.value === "집행완료(채무조정)") || // 채무조정은 항상 모달 (총수당/직원수당 입력 필수)
                                         (option.value.includes("집행완료") && !hasExecutionInfo) ||
                                         (option.value === "최종부결") || // 최종부결은 항상 모달 표시 (환수 적용일자 입력)
                                         (option.value === "장기부재"); // 장기부재는 확인 모달 표시 및 알림톡 발송

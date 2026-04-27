@@ -73,6 +73,7 @@ const SUB_STATUSES: Record<string, { id: string; label: string }[]> = {
     { id: '집행완료(선불)', label: '집행완료(선불)' },
     { id: '집행완료(외주)', label: '집행완료(외주)' },
     { id: '집행완료(후불)', label: '집행완료(후불)' },
+    { id: '집행완료(채무조정)', label: '집행완료(채무조정)' },
   ],
   '쓰레기통': [
     { id: '잘못 신청', label: '잘못 신청' },
