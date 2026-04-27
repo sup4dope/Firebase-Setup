@@ -933,7 +933,7 @@ export default function Settlements() {
                               <TableCell className="text-right text-muted-foreground">-</TableCell>
                               <TableCell className="text-right text-muted-foreground">-</TableCell>
                               <TableCell className="text-right text-muted-foreground">-</TableCell>
-                              <TableCell className="text-right">{debtTotalRevenueWon.toLocaleString()}원</TableCell>
+                              <TableCell className="text-right">{(isSuperAdmin ? debtTotalRevenueWon : debtGrossWon).toLocaleString()}원</TableCell>
                               <TableCell className="text-right">{debtGrossWon.toLocaleString()}원</TableCell>
                               <TableCell className="text-right">{debtNetWon.toLocaleString()}원</TableCell>
                             </TableRow>
