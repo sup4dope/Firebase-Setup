@@ -143,6 +143,8 @@ export default function Dashboard() {
     clawbackDate: string;
     selectedOrgs: ProcessingOrg[];
     existingOrgs: ProcessingOrg[];
+    debtAdjTotalRevenue: number;
+    debtAdjEmployeeCommission: number;
   }>({
     isOpen: false,
     customerId: '',
@@ -158,6 +160,8 @@ export default function Dashboard() {
     clawbackDate: format(new Date(), 'yyyy-MM-dd'),
     selectedOrgs: [],
     existingOrgs: [],
+    debtAdjTotalRevenue: 0,
+    debtAdjEmployeeCommission: 0,
   });
 
   const [paymentNotifications, setPaymentNotifications] = useState<Array<{ id: string; customerId: string; customerName: string; amount: number }>>([]);
@@ -805,6 +809,8 @@ export default function Dashboard() {
           clawbackDate: format(new Date(), 'yyyy-MM-dd'),
           selectedOrgs: [],
           existingOrgs: customer.processing_orgs || [],
+          debtAdjTotalRevenue: (customer as any).debt_adjustment_total_revenue || 0,
+          debtAdjEmployeeCommission: (customer as any).debt_adjustment_employee_commission || 0,
         });
         return;
       }
@@ -816,6 +822,20 @@ export default function Dashboard() {
       setCustomers(prev =>
         prev.map(c => c.id === customerId ? { ...c, status_code: newStatus } : c)
       );
+
+      // 정산 영향 상태 전환 시 정산 동기화 (채무조정 잔존 정산 정리 포함)
+      const oldAffectsSettlement = !!currentStatus && (
+        currentStatus.includes('계약완료') || currentStatus.includes('집행완료') || currentStatus === '서류취합완료' || currentStatus === '신청완료'
+      );
+      const newAffectsSettlement = newStatus.includes('계약완료') || newStatus.includes('집행완료') || newStatus === '서류취합완료' || newStatus === '신청완료';
+      if (oldAffectsSettlement || newAffectsSettlement) {
+        try {
+          await syncSingleCustomerSettlement(customerId, users);
+        } catch (syncErr) {
+          console.error('Settlement sync error:', syncErr);
+        }
+      }
+
       // Refresh contract logs for current month
       const now = new Date();
       const logs = await getContractLogsForMonth(now.getFullYear(), now.getMonth() + 1);
@@ -838,6 +858,18 @@ export default function Dashboard() {
   // Handle status change with additional info from modal
   const handleStatusChangeConfirm = async () => {
     if (!user || !statusChangeModal.customerId) return;
+
+    // 채무조정 입력값 검증
+    if (statusChangeModal.targetStatus === '집행완료(채무조정)') {
+      if (!(statusChangeModal.debtAdjTotalRevenue > 0) || !(statusChangeModal.debtAdjEmployeeCommission > 0)) {
+        toast({
+          title: '입력 오류',
+          description: '총 수당과 직원 수당을 0보다 큰 값으로 입력해주세요.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
 
     try {
       // First, use updateCustomerStatus to properly create status_logs entries
@@ -876,7 +908,7 @@ export default function Dashboard() {
           }
         }
       }
-      if (statusChangeModal.targetStatus.includes('집행완료')) {
+      if (statusChangeModal.targetStatus.includes('집행완료') && statusChangeModal.targetStatus !== '집행완료(채무조정)') {
         if (statusChangeModal.executionAmount > 0) {
           additionalData.execution_amount = statusChangeModal.executionAmount;
           additionalData.approved_amount = statusChangeModal.executionAmount;
@@ -901,6 +933,15 @@ export default function Dashboard() {
             return o;
           });
           additionalData.processing_org = currentOrgs[0]?.org || '미등록';
+        }
+      }
+
+      // 집행완료(채무조정): 수기 입력된 총 수당 / 직원 수당 저장
+      if (statusChangeModal.targetStatus === '집행완료(채무조정)') {
+        additionalData.debt_adjustment_total_revenue = statusChangeModal.debtAdjTotalRevenue || 0;
+        additionalData.debt_adjustment_employee_commission = statusChangeModal.debtAdjEmployeeCommission || 0;
+        if (statusChangeModal.executionDate) {
+          additionalData.execution_date = statusChangeModal.executionDate;
         }
       }
 
@@ -2148,8 +2189,8 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* 집행완료: 집행일, 집행금액 */}
-            {statusChangeModal.targetStatus.includes('집행완료') && (
+            {/* 집행완료: 집행일, 집행금액 (채무조정은 별도 입력) */}
+            {statusChangeModal.targetStatus.includes('집행완료') && statusChangeModal.targetStatus !== '집행완료(채무조정)' && (
               <>
                 <div className="space-y-2">
                   <Label className="text-sm">집행일</Label>
@@ -2183,6 +2224,79 @@ export default function Dashboard() {
                       className="pr-12"
                       placeholder="예: 10000 (만원 단위로 입력)"
                       data-testid="input-dashboard-execution-amount"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      만원
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 집행완료(채무조정): 집행일, 총 수당, 직원 수당 */}
+            {statusChangeModal.targetStatus === '집행완료(채무조정)' && (
+              <>
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-md">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                    채무조정 건은 총관리자가 총 수당과 직원 수당을 직접 입력합니다. 일반 집행 수당 계산식이 적용되지 않습니다.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">집행일</Label>
+                  <Input
+                    type="date"
+                    value={statusChangeModal.executionDate || ''}
+                    onChange={(e) =>
+                      setStatusChangeModal(prev => ({
+                        ...prev,
+                        executionDate: e.target.value,
+                      }))
+                    }
+                    data-testid="input-dashboard-debt-adj-date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">
+                    총 수당 <span className="text-muted-foreground text-xs">(단위: 만원)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={statusChangeModal.debtAdjTotalRevenue || ''}
+                      onChange={(e) =>
+                        setStatusChangeModal(prev => ({
+                          ...prev,
+                          debtAdjTotalRevenue: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      className="pr-12"
+                      placeholder="예: 500"
+                      data-testid="input-dashboard-debt-adj-total-revenue"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      만원
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">
+                    직원 수당 <span className="text-muted-foreground text-xs">(단위: 만원)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={statusChangeModal.debtAdjEmployeeCommission || ''}
+                      onChange={(e) =>
+                        setStatusChangeModal(prev => ({
+                          ...prev,
+                          debtAdjEmployeeCommission: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      className="pr-12"
+                      placeholder="예: 200"
+                      data-testid="input-dashboard-debt-adj-employee-commission"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                       만원

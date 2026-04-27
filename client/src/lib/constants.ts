@@ -65,6 +65,7 @@ export const ALL_STATUS_VALUES = [
   "집행완료(선불)",
   "집행완료(후불)",
   "집행완료(외주)",
+  "집행완료(채무조정)",
   "최종부결",
   "민원처리",
 ] as const;
@@ -135,6 +136,7 @@ export const STATUS_STYLES: Record<string, { bg: string; text: string; border?: 
   "집행완료(선불)": { bg: "bg-teal-500/20", text: "text-teal-700 dark:text-teal-300", border: "border-teal-500/30" },
   "집행완료(후불)": { bg: "bg-teal-400/20", text: "text-teal-600 dark:text-teal-400", border: "border-teal-400/30" },
   "집행완료(외주)": { bg: "bg-cyan-500/20", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-500/30" },
+  "집행완료(채무조정)": { bg: "bg-emerald-600/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-600/30" },
   
   // 최종부결 - 진한 빨간색
   "최종부결": { bg: "bg-red-700/20", text: "text-red-800 dark:text-red-400", border: "border-red-700/30" },
@@ -207,6 +209,7 @@ export const STATUS_OPTIONS: { value: string; label: string; group?: string }[] 
   { value: "집행완료(선불)", label: "집행완료(선불)", group: "집행" },
   { value: "집행완료(후불)", label: "집행완료(후불)", group: "집행" },
   { value: "집행완료(외주)", label: "집행완료(외주)", group: "집행" },
+  { value: "집행완료(채무조정)", label: "집행완료(채무조정)", group: "집행" },
   { value: "최종부결", label: "최종부결", group: "집행" },
   { value: "민원처리", label: "민원처리", group: "집행" },
 ];
@@ -234,6 +237,8 @@ const getContractCategory = (status: string): string | null => {
 
 export function getStatusTransitionAllowed(currentStatus: string, targetStatus: string, isSuperAdmin: boolean = false): boolean {
   if (currentStatus === targetStatus) return false;
+  // 집행완료(채무조정): 총관리자 전용
+  if (targetStatus === '집행완료(채무조정)' && !isSuperAdmin) return false;
   if (isSuperAdmin) return true;
 
   const isCurrentPreContract = PRE_CONTRACT_STATUSES.includes(currentStatus);
@@ -351,11 +356,12 @@ export const FUNNEL_GROUPS: Record<string, string[]> = {
   "신청완료(후불)": ["신청완료(후불)"],
   
   // 27~32. 집행완료 (상위 그룹 및 개별)
-  "집행완료_그룹": ["집행완료", "집행완료(선불)", "집행완료(후불)", "집행완료(외주)"],
+  "집행완료_그룹": ["집행완료", "집행완료(선불)", "집행완료(후불)", "집행완료(외주)", "집행완료(채무조정)"],
   "집행완료": ["집행완료"],  // 레거시 지원용
   "집행완료(선불)": ["집행완료", "집행완료(선불)"],  // 레거시 포함
   "집행완료(후불)": ["집행완료(후불)"],
   "집행완료(외주)": ["집행완료(외주)"],
+  "집행완료(채무조정)": ["집행완료(채무조정)"],
   "최종부결": ["최종부결"],
   "민원처리": ["민원처리"],
   
@@ -453,6 +459,12 @@ export const FUNNEL_CATEGORIES = [
     label: "집행완료(외주)",
     statuses: ["집행완료(외주)"],
     color: "sky",
+  },
+  {
+    id: "집행완료(채무조정)",
+    label: "집행완료(채무조정)",
+    statuses: ["집행완료(채무조정)"],
+    color: "emerald",
   },
   {
     id: "최종부결",

@@ -835,7 +835,7 @@ export default function CompanySettlement() {
 
             <Card
               className="cursor-pointer hover-elevate bg-gradient-to-br from-teal-500/10 to-teal-600/5 border-teal-500/20"
-              onClick={() => handleShowDetail('총 자문료 상세', (item) => !item.is_clawback && (item.execution_amount || 0) > 0)}
+              onClick={() => handleShowDetail('총 자문료 상세', (item) => !item.is_clawback && ((item.execution_amount || 0) > 0 || !!item.is_debt_adjustment))}
               data-testid="card-total-advisory-fee"
             >
               <CardHeader className="pb-2">

@@ -813,6 +813,7 @@ export function CustomerTable({
                           {/* 집행완료 그룹 - team_leader, super_admin만 선택 가능 */}
                           {(
                             (canChangeToExecution && (canSelectStatus('집행완료(선불)') || canSelectStatus('집행완료(외주)') || canSelectStatus('집행완료(후불)'))) ||
+                            (isSuperAdmin && canSelectStatus('집행완료(채무조정)')) ||
                             canSelectStatus('최종부결') || canSelectStatus('민원처리')
                           ) && (
                           <SelectGroup>
@@ -825,6 +826,9 @@ export function CustomerTable({
                             )}
                             {canChangeToExecution && canSelectStatus('집행완료(후불)') && (
                               <SelectItem value="집행완료(후불)" className="text-teal-600 dark:text-teal-400 focus:bg-accent cursor-pointer pl-4">집행완료(후불)</SelectItem>
+                            )}
+                            {isSuperAdmin && canSelectStatus('집행완료(채무조정)') && (
+                              <SelectItem value="집행완료(채무조정)" className="text-emerald-600 dark:text-emerald-400 focus:bg-accent cursor-pointer pl-4">집행완료(채무조정)</SelectItem>
                             )}
                             {canSelectStatus('최종부결') && <SelectItem value="최종부결" className="text-red-600 dark:text-red-400 focus:bg-accent cursor-pointer pl-4">최종부결</SelectItem>}
                             {canSelectStatus('민원처리') && <SelectItem value="민원처리" className="text-orange-600 dark:text-orange-400 focus:bg-accent cursor-pointer pl-4">민원처리</SelectItem>}

@@ -263,7 +263,8 @@ export default function Settlements() {
         // 계약 건수: 고유 고객 수로 계산 (같은 고객의 중복 승인/재집행은 1건으로 처리)
         const uniqueCustomerIds = new Set(originalItems.map(item => item.customer_id));
         const totalContracts = uniqueCustomerIds.size;
-        const executedItems = originalItems.filter(item => item.execution_amount > 0);
+        // 집행 건수: execution_amount > 0 또는 채무조정 정산 (채무조정은 집행으로 간주)
+        const executedItems = originalItems.filter(item => item.execution_amount > 0 || item.is_debt_adjustment);
         const executionCount = executedItems.length;
         const totalContractAmount = originalItems.reduce((sum, item) => sum + Math.round(toWon(item.contract_amount) * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
         const totalExecutionAmount = originalItems.reduce((sum, item) => sum + toWon(item.execution_amount), 0);
@@ -332,7 +333,8 @@ export default function Settlements() {
     const uniqueCustomerCount = uniqueCustomerIds.size;
     const rawContractAmount = originalItems.reduce((sum, item) => sum + toWon(item.contract_amount), 0);
     const avgContractAmount = uniqueCustomerCount > 0 ? Math.round(rawContractAmount / uniqueCustomerCount) : 0;
-    const executedItems = originalItems.filter(item => item.execution_amount > 0);
+    // 집행 건수: execution_amount > 0 또는 채무조정 정산 (채무조정은 집행으로 간주)
+    const executedItems = originalItems.filter(item => item.execution_amount > 0 || item.is_debt_adjustment);
     const executionCount = executedItems.length;
     const executionAmount = originalItems.reduce((sum, item) => sum + toWon(item.execution_amount), 0);
     const clawbackContractAmount = clawbackItems.reduce((sum, item) => sum + Math.abs(toWon(item.contract_amount)), 0);
@@ -547,6 +549,11 @@ export default function Settlements() {
     let totalConsultingFee = 0;
     
     managerItems.forEach(item => {
+      // 채무조정 정산: 수기 입력된 직원 수당(gross_commission)을 자문료 수당에 그대로 합산
+      if (item.is_debt_adjustment) {
+        totalConsultingFee += toWon(item.gross_commission);
+        return;
+      }
       const depositRate = item.deposit_commission_rate ?? item.commission_rate;
       totalContractPayment += Math.round(toWon(item.contract_amount) * (depositRate / 100));
       const advisoryFee = Math.round(toWon(item.execution_amount) * (item.fee_rate || 0) / 100);
@@ -663,7 +670,7 @@ export default function Settlements() {
 
         <Card
           className="cursor-pointer hover-elevate bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border-cyan-500/20"
-          onClick={() => handleShowDetail('집행 완료 건', (item) => !item.is_clawback && item.execution_amount > 0)}
+          onClick={() => handleShowDetail('집행 완료 건', (item) => !item.is_clawback && (item.execution_amount > 0 || !!item.is_debt_adjustment))}
           data-testid="card-execution"
         >
           <CardHeader className="pb-2">

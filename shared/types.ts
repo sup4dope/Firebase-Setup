@@ -101,6 +101,9 @@ export interface Customer {
   contract_fee_rate?: number; // 자문료율 (%)
   execution_amount?: number; // 최종 집행 금액 (만원 단위)
   execution_date?: string; // 집행일자 YYYY-MM-DD
+  // 집행완료(채무조정) 전용 - 총관리자가 수기 입력 (만원 단위)
+  debt_adjustment_total_revenue?: number; // 채무조정 총 수당
+  debt_adjustment_employee_commission?: number; // 채무조정 직원 수당
   processing_org?: string; // 신청/진행기관 (deprecated, use processing_orgs)
   processing_orgs?: ProcessingOrg[]; // 진행기관 목록 (다중 기관 지원)
   contract_completion_date?: string; // 최초 계약 도달일
@@ -397,6 +400,7 @@ export interface SettlementItem {
   execution_date?: string; // 집행일 (YYYY-MM-DD) - 자문료 수당일자
   status: SettlementStatus; // 정상/취소/환수
   is_clawback: boolean; // 환수 항목 여부
+  is_debt_adjustment?: boolean; // 채무조정 정산 여부 (수기 입력된 총 수당/직원 수당)
   original_item_id?: string; // 환수 시 원본 정산 항목 ID
   clawback_applied_at?: string; // 환수 적용일 (YYYY-MM-DD)
   

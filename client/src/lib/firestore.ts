@@ -1471,7 +1471,7 @@ const SETTLEMENT_TARGET_STATUSES = [
   '계약', '계약완료', '계약완료(선불)', '계약완료(후불)',
   '서류취합완료', '서류취합완료(선불)', '서류취합완료(후불)',
   '신청완료', '신청완료(선불)', '신청완료(외주)', '신청완료(후불)',
-  '집행', '집행완료', '집행대기', '집행중',
+  '집행', '집행완료', '집행대기', '집행중', '집행완료(채무조정)',
   '민원처리',
 ];
 
@@ -1737,7 +1737,82 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         }
       }
     }
-    
+
+    // 4-0. 채무조정에서 다른 정상 상태로 복구된 경우: 잔존하는 채무조정 정산 삭제 (이중 차감 방지)
+    if (status !== '집행완료(채무조정)') {
+      const lingeringDebt = existingSettlements.filter(s => s.is_debt_adjustment);
+      if (lingeringDebt.length > 0) {
+        for (const debt of lingeringDebt) {
+          await deleteDoc(doc(db, 'settlements', debt.id));
+        }
+        console.log(`[Settlement Sync] 채무조정 → 일반 상태 전환 감지 - 기존 채무조정 정산 ${lingeringDebt.length}건 삭제: ${customer.company_name || customer.name}, 상태: ${status}`);
+        const debtIds = new Set(lingeringDebt.map(d => d.id));
+        for (let i = existingSettlements.length - 1; i >= 0; i--) {
+          if (debtIds.has(existingSettlements[i].id)) {
+            existingSettlements.splice(i, 1);
+          }
+        }
+      }
+    }
+
+    // 4-1. 집행완료(채무조정) 특수 처리: 총관리자가 수기로 입력한 총 수당/직원 수당 사용
+    // - 일반 집행 수당 계산식(commissionRate, fee_rate 등)을 적용하지 않음
+    // - 단일 정산 항목 생성 (기관별 분리 없음)
+    if (status === '집행완료(채무조정)') {
+      const debtMgr = users.find(u => u.uid === customer.manager_id);
+      const debtEntrySource = (customer.entry_source as EntrySourceType) || '기타';
+      const totalRevenueManwon = (customer as any).debt_adjustment_total_revenue || 0;
+      const grossCommissionManwon = (customer as any).debt_adjustment_employee_commission || 0;
+      const taxAmount = Math.round(grossCommissionManwon * 0.033 * 100) / 100;
+      const netCommission = Math.round((grossCommissionManwon - taxAmount) * 100) / 100;
+      const debtExecDate = customer.execution_date || customer.contract_completion_date || customer.entry_date || '';
+      const debtSettlementMonth = debtExecDate ? debtExecDate.slice(0, 7) : new Date().toISOString().slice(0, 7);
+
+      const debtSettlementData: InsertSettlementItem = {
+        customer_id: customer.id,
+        customer_name: customer.company_name || customer.name,
+        manager_id: customer.manager_id,
+        manager_name: customer.manager_name || debtMgr?.name || '',
+        team_id: customer.team_id,
+        team_name: customer.team_name || '',
+        entry_source: debtEntrySource,
+        contract_amount: 0,
+        execution_amount: 0,
+        fee_rate: 0,
+        total_revenue: totalRevenueManwon,
+        commission_rate: 0,
+        deposit_commission_rate: 0,
+        gross_commission: grossCommissionManwon,
+        tax_amount: taxAmount,
+        net_commission: netCommission,
+        settlement_month: debtSettlementMonth,
+        contract_date: (customer as any).contract_date || customer.contract_completion_date || '',
+        execution_date: debtExecDate,
+        status: '정상',
+        is_clawback: false,
+        is_debt_adjustment: true,
+      };
+
+      // 기존 채무조정 정산이 있으면 업데이트, 없으면 신규 생성
+      const existingDebtSettlement = existingSettlements.find(s => s.is_debt_adjustment);
+      if (existingDebtSettlement) {
+        await updateSettlementItem(existingDebtSettlement.id, debtSettlementData);
+        console.log(`[Settlement Sync] 채무조정 정산 업데이트: ${customer.company_name || customer.name}, 총수당=${totalRevenueManwon}만원, 직원수당=${grossCommissionManwon}만원`);
+      } else {
+        await createSettlementItem(debtSettlementData);
+        console.log(`[Settlement Sync] 채무조정 정산 신규 생성: ${customer.company_name || customer.name}, 총수당=${totalRevenueManwon}만원, 직원수당=${grossCommissionManwon}만원`);
+      }
+
+      // 채무조정 외 다른 기존 정산(이전 상태에서 생성된)은 정리
+      const nonDebtSettlements = existingSettlements.filter(s => !s.is_debt_adjustment && !s.is_clawback);
+      for (const stale of nonDebtSettlements) {
+        await deleteDoc(doc(db, 'settlements', stale.id));
+        console.log(`[Settlement Sync] 채무조정 전환으로 기존 정산 삭제: ${customer.company_name || customer.name}, ID=${stale.id}`);
+      }
+
+      return;
+    }
+
     // 5. 승인된 진행기관 목록 확인
     const approvedOrgs = (customer.processing_orgs || [])
       .filter((org: { status: string }) => org.status === '승인');
@@ -2351,8 +2426,8 @@ export const calculateMonthlySettlementSummary = (
   const totalContracts = uniqueCustomerIds.size;
   // 계약금 수당: 계약금 * 계약금 수당율 적용 (deposit_commission_rate 우선, 없으면 commission_rate 사용)
   const totalContractAmount = originalItems.reduce((sum, item) => sum + (item.contract_amount * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
-  // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트)
-  const executedItems = originalItems.filter(item => item.execution_amount > 0);
+  // 집행 건수: 실제 집행된 기관 수 (각 기관별 집행을 개별 건수로 카운트) + 채무조정 건
+  const executedItems = originalItems.filter(item => item.execution_amount > 0 || item.is_debt_adjustment);
   const executionCount = executedItems.length;
   const totalExecutionAmount = originalItems.reduce((sum, item) => sum + item.execution_amount, 0);
   const totalRevenue = originalItems.reduce((sum, item) => sum + item.total_revenue, 0);
@@ -3137,6 +3212,10 @@ export const getRevenueDataByMonth = async (month: string): Promise<{
         executionCount++;
         const advisoryFee = (data.execution_amount || 0) * ((data.fee_rate || 0) / 100);
         totalAdvisoryFee += advisoryFee;
+      } else if (data.is_debt_adjustment) {
+        // 채무조정 정산: 집행 건수에 포함 (총 자문료에는 total_revenue를 그대로 합산)
+        executionCount++;
+        totalAdvisoryFee += data.total_revenue || 0;
       }
     }
   });
