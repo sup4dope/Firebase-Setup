@@ -1755,6 +1755,77 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       }
     }
 
+    // 4-0.5 정상 정산 중복 제거 (race condition으로 인한 동일 그룹 다중 생성 방지/자가치유)
+    // - 그룹 키: org_name(있으면) | settlement_month + 채무조정 여부(없으면)
+    // - 같은 그룹에 status='정상' && !is_clawback 레코드가 2건 이상이면 가장 오래된 것만 남기고 나머지 삭제
+    const dedupeSettlements = async (items: SettlementItem[]): Promise<Set<string>> => {
+      const dedupeGroups = new Map<string, SettlementItem[]>();
+      for (const s of items) {
+        if (s.status !== '정상' || s.is_clawback) continue;
+        const orgKey = s.org_name || `__nolegacy__${s.settlement_month || ''}`;
+        const debtKey = s.is_debt_adjustment ? 'debt' : 'normal';
+        const key = `${orgKey}::${debtKey}`;
+        const arr = dedupeGroups.get(key) || [];
+        arr.push(s);
+        dedupeGroups.set(key, arr);
+      }
+      const toDeleteIds = new Set<string>();
+      const tsToMillis = (t: any): number => {
+        if (!t) return 0;
+        if (typeof t.toMillis === 'function') return t.toMillis();
+        if (typeof t.toDate === 'function') return t.toDate().getTime();
+        if (t instanceof Date) return t.getTime();
+        if (typeof t === 'object' && typeof t.seconds === 'number') {
+          return t.seconds * 1000 + Math.floor((t.nanoseconds || 0) / 1e6);
+        }
+        const parsed = new Date(t).getTime();
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+      Array.from(dedupeGroups.values()).forEach((arr: SettlementItem[]) => {
+        if (arr.length <= 1) return;
+        arr.sort((a: SettlementItem, b: SettlementItem) => tsToMillis(a.created_at) - tsToMillis(b.created_at));
+        for (let i = 1; i < arr.length; i++) {
+          toDeleteIds.add(arr[i].id);
+        }
+      });
+      if (toDeleteIds.size > 0) {
+        const idsArr = Array.from(toDeleteIds);
+        for (const id of idsArr) {
+          await deleteDoc(doc(db, 'settlements', id));
+        }
+        console.log(`[Settlement Sync] 중복 정산 ${toDeleteIds.size}건 자동 정리: ${customer.company_name || customer.name}`);
+      }
+      return toDeleteIds;
+    };
+
+    // 사후 자가치유 헬퍼: 모든 쓰기 종료 후 다시 조회하여 중복 점검
+    const runFinalDedupe = async (cid: string): Promise<void> => {
+      try {
+        const finalSnapshot = await getDocs(query(
+          collection(db, 'settlements'),
+          where('customer_id', '==', cid)
+        ));
+        const finalSettlements = finalSnapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data(),
+        } as SettlementItem));
+        await dedupeSettlements(finalSettlements);
+      } catch (cleanupErr) {
+        console.error(`[Settlement Sync] 사후 중복 점검 실패 (${cid}):`, cleanupErr);
+      }
+    };
+
+    {
+      const removed = await dedupeSettlements(existingSettlements);
+      if (removed.size > 0) {
+        for (let i = existingSettlements.length - 1; i >= 0; i--) {
+          if (removed.has(existingSettlements[i].id)) {
+            existingSettlements.splice(i, 1);
+          }
+        }
+      }
+    }
+
     // 4-1. 집행완료(채무조정) 특수 처리: 총관리자가 수기로 입력한 총 수당/직원 수당 사용
     // - 일반 집행 수당 계산식(commissionRate, fee_rate 등)을 적용하지 않음
     // - 단일 정산 항목 생성 (기관별 분리 없음)
@@ -1810,6 +1881,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         console.log(`[Settlement Sync] 채무조정 전환으로 기존 정산 삭제: ${customer.company_name || customer.name}, ID=${stale.id}`);
       }
 
+      await runFinalDedupe(customerId);
       return;
     }
 
@@ -2090,6 +2162,9 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
         console.log(`[Settlement Sync] 단일 고객 생성: ${customer.company_name || customer.name}`);
       }
     }
+
+    // 6. 마지막 안전장치: 쓰기 직후 다시 한번 중복 정산 점검 (동시 실행 race condition 자가치유)
+    await runFinalDedupe(customerId);
   } catch (error: any) {
     console.error(`Error syncing single customer settlement (${customerId}):`, error?.message || error?.code || JSON.stringify(error) || error);
   }
