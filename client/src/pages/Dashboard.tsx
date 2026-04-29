@@ -34,6 +34,7 @@ import {
   deleteOverdueTodosForCustomer,
   getPreviousStatusForCustomer,
   getSettlementItems,
+  normalizeEntrySource,
 } from '@/lib/firestore';
 import { Plus, Search, RefreshCw, CalendarIcon, Download, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -585,11 +586,14 @@ export default function Dashboard() {
   }, [users, selectedTeam, isSuperAdmin, isTeamLeader, user?.team_id, user?.uid]);
 
   // 유입경로 옵션: 실제 고객 데이터에서 동적 생성 (없는 경로는 표시 안 함)
+  // normalizeEntrySource로 옛 라벨(구글애즈, 구글애즈(e)/(D))을 신규 라벨(구글애즈(dm), (dm-e), (dm-d))로 통합 → 광고통계 페이지와 일관됨
   const entrySourceOptions = useMemo(() => {
     const set = new Set<string>();
     customers.forEach(c => {
-      const src = (c as any).entry_source;
-      if (src && typeof src === 'string' && src.trim()) set.add(src.trim());
+      const raw = (c as any).entry_source;
+      if (raw && typeof raw === 'string' && raw.trim()) {
+        set.add(normalizeEntrySource(raw.trim()));
+      }
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'));
   }, [customers]);
@@ -649,9 +653,9 @@ export default function Dashboard() {
       }
     }
 
-    // Filter by entry_source (유입경로)
-    if (selectedEntrySource !== 'all') {
-      result = result.filter(c => ((c as any).entry_source || '').trim() === selectedEntrySource);
+    // Filter by entry_source (유입경로) — super_admin 전용. 옛 라벨도 정규화 후 매칭하여 광고통계 페이지와 동일하게 적용
+    if (isSuperAdmin && selectedEntrySource !== 'all') {
+      result = result.filter(c => normalizeEntrySource(((c as any).entry_source || '').trim()) === selectedEntrySource);
     }
 
     // Filter by stage using FUNNEL_GROUPS
@@ -732,9 +736,9 @@ export default function Dashboard() {
       }
     }
 
-    // Filter by entry_source (유입경로)
-    if (selectedEntrySource !== 'all') {
-      result = result.filter(c => ((c as any).entry_source || '').trim() === selectedEntrySource);
+    // Filter by entry_source (유입경로) — super_admin 전용. 옛 라벨도 정규화 후 매칭
+    if (isSuperAdmin && selectedEntrySource !== 'all') {
+      result = result.filter(c => normalizeEntrySource(((c as any).entry_source || '').trim()) === selectedEntrySource);
     }
 
     return result;
@@ -752,9 +756,9 @@ export default function Dashboard() {
         result = result.filter(c => c.manager_id === selectedStaff);
       }
     }
-    // Filter by entry_source (유입경로)
-    if (selectedEntrySource !== 'all') {
-      result = result.filter(c => ((c as any).entry_source || '').trim() === selectedEntrySource);
+    // Filter by entry_source (유입경로) — super_admin 전용. 옛 라벨도 정규화 후 매칭
+    if (isSuperAdmin && selectedEntrySource !== 'all') {
+      result = result.filter(c => normalizeEntrySource(((c as any).entry_source || '').trim()) === selectedEntrySource);
     }
     return result;
   }, [customers, selectedTeam, selectedStaff, selectedEntrySource, isSuperAdmin, isTeamLeader]);
@@ -1855,22 +1859,24 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* 유입경로 필터 (모든 역할) */}
-            <div className="flex items-center gap-2">
-              <Select value={selectedEntrySource} onValueChange={setSelectedEntrySource}>
-                <SelectTrigger className="w-[140px]" data-testid="select-entry-source-dashboard">
-                  <SelectValue placeholder="전체 유입경로" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체 유입경로</SelectItem>
-                  {entrySourceOptions.map(src => (
-                    <SelectItem key={src} value={src} data-testid={`option-entry-source-${src}`}>
-                      {src}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* 유입경로 필터 (super_admin 전용) */}
+            {isSuperAdmin && (
+              <div className="flex items-center gap-2">
+                <Select value={selectedEntrySource} onValueChange={setSelectedEntrySource}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-entry-source-dashboard">
+                    <SelectValue placeholder="전체 유입경로" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 유입경로</SelectItem>
+                    {entrySourceOptions.map(src => (
+                      <SelectItem key={src} value={src} data-testid={`option-entry-source-${src}`}>
+                        {src}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* 검색창 */}
             <div className="relative w-64">
