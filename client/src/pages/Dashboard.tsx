@@ -454,7 +454,10 @@ export default function Dashboard() {
         if (newOverdueIds.length > 0) {
           const names = newOverdueIds.map(cid => {
             const c = customersRef.current.find(x => x.id === cid);
-            return c?.company_name || c?.name || '알 수 없음';
+            const customerName = c?.name?.trim();
+            const companyName = c?.company_name?.trim();
+            if (customerName && companyName) return `${customerName}(${companyName})`;
+            return customerName || companyName || '알 수 없음';
           });
           toast({
             title: '⏰ TODO 기한 경과',
