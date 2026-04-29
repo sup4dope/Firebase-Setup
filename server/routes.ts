@@ -1948,11 +1948,8 @@ export async function registerRoutes(
       if (stateFilter) {
         payments = payments.filter((p: any) => p.state === stateFilter);
       }
-      const queryLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : 0;
-      if (queryLimit > 0) {
-        payments = payments.slice(0, queryLimit);
-      }
 
+      // 권한 필터를 limit보다 먼저 적용 (limit 후 권한 필터링하면 staff/team_leader가 자기 결제를 누락할 수 있음)
       if (role === 'staff') {
         payments = payments.filter((p: any) => p.manager_id === uid || p.sent_by === uid);
       } else if (role === 'team_leader') {
@@ -1961,7 +1958,15 @@ export async function registerRoutes(
           const teamSnap = await firestore.collection('teams').doc(teamId).get();
           const teamMembers = teamSnap.exists ? (teamSnap.data()?.members || []) : [];
           payments = payments.filter((p: any) => teamMembers.includes(p.manager_id) || p.sent_by === uid);
+        } else {
+          // team_id 누락된 team_leader는 super_admin과 동일한 노출이 발생하지 않도록 본인 발송 건만 허용 (deny-by-default)
+          payments = payments.filter((p: any) => p.sent_by === uid || p.manager_id === uid);
         }
+      }
+
+      const queryLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : 0;
+      if (queryLimit > 0) {
+        payments = payments.slice(0, queryLimit);
       }
 
       res.json(payments);

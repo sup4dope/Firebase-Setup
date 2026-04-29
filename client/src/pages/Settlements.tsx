@@ -248,6 +248,36 @@ export default function Settlements() {
     }
   }, [selectedMonth, user, authLoading]);
 
+  // 결제선생(PayMint) 결제완료 이벤트 → 정산 항목 즉시 새로고침 (loading 표시 없이 조용히)
+  useEffect(() => {
+    if (!user || authLoading) return;
+
+    const handlePaymentCompleted = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      // 한 폴 사이클의 결제가 모두 동기화되어 단일 이벤트로 발행됨 — 한 번만 새로고침
+      if (!detail?.payments || detail.payments.length === 0) return;
+      try {
+        const months = getMonthsForPeriod(selectedMonth);
+        const isSummary = isPeriodSummary(selectedMonth);
+        const managerId = isStaff ? user.uid : undefined;
+        const teamId = isTeamLeader && user.team_id ? user.team_id : undefined;
+
+        if (isSummary) {
+          const itemsArr = await Promise.all(months.map(m => getSettlementItems(m, managerId, teamId)));
+          setItems(itemsArr.flat());
+        } else {
+          const refreshed = await getSettlementItems(selectedMonth, managerId, teamId);
+          setItems(refreshed);
+        }
+      } catch (e) {
+        console.error('[Settlements] 결제완료 후 정산 새로고침 실패:', e);
+      }
+    };
+
+    window.addEventListener('paymintPaymentCompleted', handlePaymentCompleted);
+    return () => window.removeEventListener('paymintPaymentCompleted', handlePaymentCompleted);
+  }, [user, authLoading, selectedMonth, isStaff, isTeamLeader]);
+
   const summaries = useMemo(() => {
     if (!user) return [];
     const managerIds = Array.from(new Set(items.map(item => item.manager_id)));

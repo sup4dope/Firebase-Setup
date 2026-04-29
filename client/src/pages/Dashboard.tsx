@@ -166,7 +166,6 @@ export default function Dashboard() {
 
   const [paymentNotifications, setPaymentNotifications] = useState<Array<{ id: string; customerId: string; customerName: string; amount: number }>>([]);
   const seenPaymentIdsRef = useRef<Set<string>>(new Set());
-  const isInitialPaymentLoadRef = useRef(true);
 
   // 계약서 상태 변동 알림 (열람·서명·만료·취소·거부)
   type ContractNotif = {
@@ -182,45 +181,54 @@ export default function Dashboard() {
   const contractStateRef = useRef<Map<string, { status: string; opened: boolean; open_count: number }>>(new Map());
   const isInitialContractLoadRef = useRef(true);
 
+  // 결제선생(PayMint) 결제완료 → 토스트 알림 + 고객/정산 데이터 즉시 새로고침
+  // 결제 감지/정산 동기화는 App.tsx 글로벌 폴러가 담당하고, Dashboard는 이벤트만 수신
   useEffect(() => {
-    let cancelled = false;
-    const pollPayments = async () => {
+    if (!user) return;
+
+    const handlePaymentCompleted = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const payments: Array<{ paymentId: string; customerId: string; customerName: string; amount: number }> | undefined = detail?.payments;
+      if (!payments || payments.length === 0) return;
+
+      // 중복 방지 + 새로운 결제만 토스트 큐에 추가
+      const fresh = payments.filter(p => !seenPaymentIdsRef.current.has(p.paymentId));
+      if (fresh.length === 0) return;
+      fresh.forEach(p => seenPaymentIdsRef.current.add(p.paymentId));
+
+      setPaymentNotifications(prev => [
+        ...prev,
+        ...fresh.map(p => ({
+          id: p.paymentId,
+          customerId: p.customerId,
+          customerName: p.customerName,
+          amount: p.amount,
+        })),
+      ]);
+
+      // 정산 동기화는 이미 글로벌 폴러가 수행 — 여기서는 로컬 화면 데이터만 한 번 조용히 새로고침
       try {
-        const res = await authFetch('/api/paymint/payments?state=F&limit=20');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled || !Array.isArray(data)) return;
-
-        if (isInitialPaymentLoadRef.current) {
-          data.forEach((p: any) => seenPaymentIdsRef.current.add(p.id));
-          isInitialPaymentLoadRef.current = false;
-          return;
-        }
-
-        const newPayments: Array<{ id: string; customerId: string; customerName: string; amount: number }> = [];
-        data.forEach((p: any) => {
-          if (!seenPaymentIdsRef.current.has(p.id)) {
-            seenPaymentIdsRef.current.add(p.id);
-            newPayments.push({
-              id: p.id,
-              customerId: p.customer_id,
-              customerName: p.customer_name || '알 수 없는 고객',
-              amount: Number(p.appr_price || p.amount || 0),
-            });
-          }
-        });
-        if (newPayments.length > 0) {
-          setPaymentNotifications(prev => [...prev, ...newPayments]);
-        }
+        const now = new Date();
+        const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const fetchCustomersByRole = () => {
+          if (isSuperAdmin) return getCustomers();
+          if (isTeamLeader && user.team_id) return getCustomersByTeam(user.team_id);
+          return getCustomersByManager(user.uid);
+        };
+        const [refreshedCustomers, refreshedSettlements] = await Promise.all([
+          fetchCustomersByRole(),
+          getSettlementItems(currentMonthStr),
+        ]);
+        setCustomers(refreshedCustomers);
+        setSettlements(refreshedSettlements);
       } catch (err) {
-        // silent
+        console.error('[Dashboard] 결제완료 후 화면 새로고침 실패:', err);
       }
     };
 
-    pollPayments();
-    const interval = setInterval(pollPayments, 30000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+    window.addEventListener('paymintPaymentCompleted', handlePaymentCompleted);
+    return () => window.removeEventListener('paymintPaymentCompleted', handlePaymentCompleted);
+  }, [user, isSuperAdmin, isTeamLeader]);
 
   // 활성 계약(발송완료/서명대기) 30초마다 폴링 → 상태 변동 / 열람 발생 시 토스트
   useEffect(() => {

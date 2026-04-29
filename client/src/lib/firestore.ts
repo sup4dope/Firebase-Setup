@@ -1648,13 +1648,16 @@ export const cleanupInvalidSettlements = async (): Promise<{ deleted: number; de
 
 // 단일 고객 정산 동기화 (고객 정보 변경 시 실시간 반영)
 // 다중 진행기관 지원: 각 승인된 기관별로 별도의 정산 항목 생성
-export const syncSingleCustomerSettlement = async (customerId: string, users: User[]): Promise<void> => {
+export const syncSingleCustomerSettlement = async (customerId: string, users: User[]): Promise<boolean> => {
+  // 정상 흐름(정산 대상 아님 등 early return 포함) → true 반환, 실제 예외 발생 시에만 false 반환
+  // 호출자(글로벌 폴러)가 실패한 경우에만 재시도하도록 함
+  let threwError = false;
   try {
     // 1. 해당 고객 정보 가져오기
     const customerDoc = await getDoc(doc(db, 'customers', customerId));
     if (!customerDoc.exists()) {
       console.log(`[Settlement Sync] 고객 ${customerId} 없음`);
-      return;
+      return true;
     }
     
     const data = customerDoc.data();
@@ -1679,7 +1682,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
 
     if ((isPostContract || isOutContract) && !hasExecution) {
       console.log(`[Settlement Sync] ${isPostContract ? '후불' : '외주'}계약 - 집행 전이므로 정산 대상 제외: ${customer.company_name || customer.name}`);
-      return;
+      return true;
     }
 
     const isTargetStatus = SETTLEMENT_TARGET_STATUSES.includes(status) ||
@@ -1703,11 +1706,11 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     if (!isTargetStatus || isPaymentPending) {
       if (isReservation && existingSettlements.length > 0) {
         console.log(`[Settlement Sync] 예약 상태이지만 기존 정산 ${existingSettlements.length}건 유지: ${customer.company_name || customer.name}`);
-        return;
+        return true;
       }
       if (isFinalRejection && existingSettlements.length > 0) {
         console.log(`[Settlement Sync] 최종부결 상태 - 기존 정산(원본+환수) ${existingSettlements.length}건 보존: ${customer.company_name || customer.name}`);
-        return;
+        return true;
       }
       if (existingSettlements.length > 0) {
         for (const settlement of existingSettlements) {
@@ -1717,7 +1720,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       } else {
         console.log(`[Settlement Sync] 정산 대상 아님: ${customer.company_name || customer.name}, 상태: ${status}`);
       }
-      return;
+      return true;
     }
     
     // 4. 최종부결에서 정상 상태로 복구된 경우: 기존 환수 항목 삭제 (이중 차감 방지)
@@ -1882,7 +1885,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       }
 
       await runFinalDedupe(customerId);
-      return;
+      return true;
     }
 
     // 5. 승인된 진행기관 목록 확인
@@ -2102,7 +2105,7 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
       
       if (!settlementMonth) {
         console.log(`[Settlement Sync] 정산월 결정 불가: ${customer.company_name || customer.name}`);
-        return;
+        return true;
       }
       
       const calc = calculateSettlement(contractAmount, executionAmount, feeRate, commissionRate, depositCommissionRate);
@@ -2166,8 +2169,10 @@ export const syncSingleCustomerSettlement = async (customerId: string, users: Us
     // 6. 마지막 안전장치: 쓰기 직후 다시 한번 중복 정산 점검 (동시 실행 race condition 자가치유)
     await runFinalDedupe(customerId);
   } catch (error: any) {
+    threwError = true;
     console.error(`Error syncing single customer settlement (${customerId}):`, error?.message || error?.code || JSON.stringify(error) || error);
   }
+  return !threwError;
 };
 
 // 정산 항목 조회 (월별, 선택적으로 담당자별/팀별 필터링)

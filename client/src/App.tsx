@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Switch, Route, useLocation } from 'wouter';
 import { queryClient } from './lib/queryClient';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -43,7 +43,9 @@ import {
   createTodo,
   updateTodo,
   deleteTodo,
+  syncSingleCustomerSettlement,
 } from '@/lib/firestore';
+import { authFetch } from '@/lib/firebase';
 import type { Todo, User, Team, Customer, InsertTodo } from '@shared/types';
 
 function AuthenticatedApp() {
@@ -103,6 +105,91 @@ function AuthenticatedApp() {
 
     fetchData();
   }, [user, isSuperAdmin, isTeamLeader]);
+
+  // users는 ref로 보관해 폴러 useEffect를 재시작시키지 않음 (재시작 시 seenIds 리셋·isInitial 스킵으로 신규 결제 누락 방지)
+  const usersRef = useRef<User[]>([]);
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
+
+  // 결제선생(PayMint) 결제완료 글로벌 폴링 → 정산 즉시 동기화 + 이벤트 디스패치
+  // 모든 페이지에서 동작하므로 Settlements/Dashboard 등 어떤 화면을 보고 있어도 즉시 반영됨
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    let inFlight = false; // 폴 사이클 중복 실행 방지 (느린 네트워크에서 setInterval이 겹치는 것 방지)
+    const seenIds = new Set<string>();
+    let isInitial = true;
+
+    const pollAndSync = async () => {
+      if (inFlight || cancelled) return;
+      inFlight = true;
+      try {
+        const res = await authFetch('/api/paymint/payments?state=F&limit=20');
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!Array.isArray(data) || cancelled) return;
+
+        if (isInitial) {
+          data.forEach((p: any) => seenIds.add(p.id));
+          isInitial = false;
+          return;
+        }
+
+        const newOnes: any[] = data.filter((p: any) => !seenIds.has(p.id));
+        if (newOnes.length === 0) return;
+
+        // users 캐시 (sidebar에서 받아온 users 우선, 없으면 조회) — 폴러 재시작 없이 ref로 접근
+        const usersForSync = usersRef.current.length > 0 ? usersRef.current : await getUsers();
+
+        // 동기화에 성공한 결제만 한 번에 모아서 단일 이벤트로 발행 (UI 새로고침 폭주/race 방지)
+        // 실패한 결제는 seenIds에 추가하지 않아 다음 폴 사이클에 자동 재시도됨
+        const syncedPayments: Array<{ paymentId: string; customerId: string; customerName: string; amount: number }> = [];
+        for (const p of newOnes) {
+          if (!p.customer_id) {
+            // customer_id 없는 결제는 동기화 불가 → 재시도 의미 없음, seen 처리
+            seenIds.add(p.id);
+            continue;
+          }
+          try {
+            // syncSingleCustomerSettlement은 내부 catch가 있어 throw하지 않음 → 반환값(boolean)으로 성공 여부 판단
+            const ok = await syncSingleCustomerSettlement(p.customer_id, usersForSync);
+            if (!ok) {
+              console.error(`[Global PayMint Sync] 정산 동기화 실패 (다음 사이클 재시도): ${p.id}`);
+              continue; // seenIds에 추가하지 않음 → 다음 30초 후 재시도
+            }
+            seenIds.add(p.id);
+            syncedPayments.push({
+              paymentId: p.id,
+              customerId: p.customer_id,
+              customerName: p.customer_name || '알 수 없는 고객',
+              amount: Number(p.appr_price || p.amount || 0),
+            });
+            console.log(`[Global PayMint Sync] 정산 동기화 완료: ${p.customer_name || p.customer_id} (${p.id})`);
+          } catch (e) {
+            // 이중 안전장치: 만약 sync가 throw하더라도 재시도 가능하게 둠
+            console.error(`[Global PayMint Sync] 정산 동기화 예외 (다음 사이클 재시도): ${p.id}`, e);
+          }
+        }
+
+        if (cancelled) return;
+        if (syncedPayments.length > 0) {
+          // 한 폴 사이클의 모든 동기화 결과를 단일 이벤트로 발행 (리스너 디스패치 폭주 방지)
+          window.dispatchEvent(new CustomEvent('paymintPaymentCompleted', {
+            detail: { payments: syncedPayments },
+          }));
+        }
+      } catch (err) {
+        // silent — 일시적 네트워크 오류 등
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    pollAndSync();
+    const interval = setInterval(pollAndSync, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [user]);
 
   const handleToggleTodo = async (todoId: string, completed: boolean) => {
     try {
