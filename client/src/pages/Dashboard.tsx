@@ -97,6 +97,7 @@ export default function Dashboard() {
   });
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [selectedStaff, setSelectedStaff] = useState<string>('all');
+  const [selectedEntrySource, setSelectedEntrySource] = useState<string>('all');
   const [lastInitUid, setLastInitUid] = useState<string | null>(null);
   
   const [refreshing, setRefreshing] = useState(false);
@@ -583,11 +584,22 @@ export default function Dashboard() {
     return filtered.filter(u => u.team_id === selectedTeam);
   }, [users, selectedTeam, isSuperAdmin, isTeamLeader, user?.team_id, user?.uid]);
 
+  // 유입경로 옵션: 실제 고객 데이터에서 동적 생성 (없는 경로는 표시 안 함)
+  const entrySourceOptions = useMemo(() => {
+    const set = new Set<string>();
+    customers.forEach(c => {
+      const src = (c as any).entry_source;
+      if (src && typeof src === 'string' && src.trim()) set.add(src.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [customers]);
+
   // 필터 리셋
   const resetFilters = () => {
     setDateRange({ from: undefined, to: undefined });
     setSelectedTeam('all');
     setSelectedStaff(isTeamLeader && user ? user.uid : 'all');
+    setSelectedEntrySource('all');
     setSearchQuery('');
   };
 
@@ -635,6 +647,11 @@ export default function Dashboard() {
       if (selectedStaff !== 'all') {
         result = result.filter(c => c.manager_id === selectedStaff);
       }
+    }
+
+    // Filter by entry_source (유입경로)
+    if (selectedEntrySource !== 'all') {
+      result = result.filter(c => ((c as any).entry_source || '').trim() === selectedEntrySource);
     }
 
     // Filter by stage using FUNNEL_GROUPS
@@ -686,7 +703,7 @@ export default function Dashboard() {
     }
 
     return result;
-  }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader, overdueTodoCustomerIds, sortMode]);
+  }, [customers, selectedStage, searchQuery, dateRange, selectedTeam, selectedStaff, selectedEntrySource, isSuperAdmin, isTeamLeader, overdueTodoCustomerIds, sortMode]);
 
   // 퍼널 차트용 필터 (날짜/팀/담당자만 적용, 상태/검색어 제외)
   const funnelFilteredCustomers = useMemo(() => {
@@ -715,8 +732,13 @@ export default function Dashboard() {
       }
     }
 
+    // Filter by entry_source (유입경로)
+    if (selectedEntrySource !== 'all') {
+      result = result.filter(c => ((c as any).entry_source || '').trim() === selectedEntrySource);
+    }
+
     return result;
-  }, [customers, dateRange, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader]);
+  }, [customers, dateRange, selectedTeam, selectedStaff, selectedEntrySource, isSuperAdmin, isTeamLeader]);
 
   const contractCandidateCustomers = useMemo(() => {
     let result = customers;
@@ -730,8 +752,12 @@ export default function Dashboard() {
         result = result.filter(c => c.manager_id === selectedStaff);
       }
     }
+    // Filter by entry_source (유입경로)
+    if (selectedEntrySource !== 'all') {
+      result = result.filter(c => ((c as any).entry_source || '').trim() === selectedEntrySource);
+    }
     return result;
-  }, [customers, selectedTeam, selectedStaff, isSuperAdmin, isTeamLeader]);
+  }, [customers, selectedTeam, selectedStaff, selectedEntrySource, isSuperAdmin, isTeamLeader]);
 
   // Calculate KPI (팀/담당자/기간 필터 적용)
   const kpi = useMemo(() => {
@@ -1828,6 +1854,23 @@ export default function Dashboard() {
                 </Select>
               </div>
             )}
+
+            {/* 유입경로 필터 (모든 역할) */}
+            <div className="flex items-center gap-2">
+              <Select value={selectedEntrySource} onValueChange={setSelectedEntrySource}>
+                <SelectTrigger className="w-[140px]" data-testid="select-entry-source-dashboard">
+                  <SelectValue placeholder="전체 유입경로" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체 유입경로</SelectItem>
+                  {entrySourceOptions.map(src => (
+                    <SelectItem key={src} value={src} data-testid={`option-entry-source-${src}`}>
+                      {src}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* 검색창 */}
             <div className="relative w-64">
