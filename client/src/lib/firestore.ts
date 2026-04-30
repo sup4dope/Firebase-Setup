@@ -2454,7 +2454,10 @@ export const getCommissionRate = (rates: CommissionRates | undefined, entrySourc
   }
 };
 
-// 계약금(선수금) 수당율 조회 - 광고, 지인소개만 해당
+// 계약금(선수금) 수당율 조회
+// - 광고/고객소개: 별도 deposit 수당율(있으면), 없으면 일반 수당율
+// - 외주: 단일 outsource 수당율을 계약금/자문료 모두에 동일 적용
+// - 승인복제: 계약금 수당 없음(0)
 export const getDepositCommissionRate = (rates: CommissionRates | undefined, entrySource: EntrySourceType): number => {
   if (!rates) return 0;
   switch (entrySource) {
@@ -2472,8 +2475,9 @@ export const getDepositCommissionRate = (rates: CommissionRates | undefined, ent
       return rates.adDeposit || rates.ad || 0;
     case '고객소개':
       return rates.referralDeposit || rates.referral || 0;
-    case '승인복제':
     case '외주':
+      return rates.outsource || 0;
+    case '승인복제':
       return 0;
     default:
       return 0;
