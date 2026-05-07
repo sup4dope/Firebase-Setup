@@ -14,7 +14,8 @@ import {
   getCustomerByBusinessNumber, 
   getCustomerByPhone,
   importAllPendingConsultations, 
-  processConsultationToCustomer, 
+  processConsultationToCustomer,
+  NoManagerAvailableError,
   deleteConsultation, 
   getActiveStaffForAssignment,
   getCustomersSince,
@@ -25,7 +26,7 @@ import type { Consultation, User, Customer } from '@shared/types';
 interface ConsultationsPreviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImportComplete: (result: { success: number; failed: number; newCustomers: number; existingCustomers: number }) => void;
+  onImportComplete: (result: { success: number; failed: number; newCustomers: number; existingCustomers: number; noManagerAvailable?: number }) => void;
 }
 
 interface ConsultationWithDuplicate {
@@ -254,11 +255,21 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
       });
     } catch (error) {
       console.error(`Failed to import consultation ${id}:`, error);
-      toast({
-        title: '유입 실패',
-        description: `${data.name || '이름 없음'} 유입 중 오류가 발생했습니다.`,
-        variant: 'destructive',
-      });
+      if (error instanceof NoManagerAvailableError) {
+        toast({
+          title: '분배 보류',
+          description: error.reason === 'ALL_LIMITS_REACHED'
+            ? `${data.name || '이름 없음'}: 모든 직원의 일일 분배 한도가 초과되어 분배할 수 없습니다. 한도를 늘리거나 직원을 활성화한 뒤 다시 시도해주세요.`
+            : `${data.name || '이름 없음'}: 현재 배정 가능한 활성 직원이 없습니다.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: '유입 실패',
+          description: `${data.name || '이름 없음'} 유입 중 오류가 발생했습니다.`,
+          variant: 'destructive',
+        });
+      }
     } finally {
       setImportingIds(prev => {
         const next = new Set(prev);

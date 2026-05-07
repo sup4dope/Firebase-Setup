@@ -556,10 +556,16 @@ export default function Dashboard() {
   };
 
   // 상담 유입 완료 콜백
-  const handleImportComplete = async (result: { success: number; failed: number; newCustomers: number; existingCustomers: number }) => {
+  const handleImportComplete = async (result: { success: number; failed: number; newCustomers: number; existingCustomers: number; noManagerAvailable?: number }) => {
+    const heldOver = result.noManagerAvailable ?? 0;
     toast({
-      title: 'DB 유입 완료',
-      description: `총 ${result.success}건 처리 (신규: ${result.newCustomers}건, 기존 고객 메모 추가: ${result.existingCustomers}건${result.failed > 0 ? `, 실패: ${result.failed}건` : ''})`,
+      title: heldOver > 0 ? 'DB 유입 일부 보류' : 'DB 유입 완료',
+      description:
+        `총 ${result.success}건 처리 (신규: ${result.newCustomers}건, 기존 고객 메모 추가: ${result.existingCustomers}건` +
+        (result.failed > 0 ? `, 실패: ${result.failed}건` : '') +
+        (heldOver > 0 ? `, 분배 보류: ${heldOver}건 (직원 일일 한도 초과 — 한도 늘리거나 분배 ON 후 재시도)` : '') +
+        ')',
+      variant: heldOver > 0 ? 'destructive' : 'default',
     });
 
     // 카운트 새로고침 및 고객 목록 새로고침

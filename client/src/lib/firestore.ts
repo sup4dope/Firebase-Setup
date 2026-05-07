@@ -804,31 +804,31 @@ export const getActiveStaffForAssignment = async (): Promise<User[]> => {
   return filtered;
 };
 
-// 마지막 배정 인덱스 조회
-export const getLastAssignmentIndex = async (): Promise<number> => {
+// 마지막 배정자 UID 조회 (라운드로빈 기준점)
+// - 동적 필터(연차/OFF/퇴사)에 견딜 수 있도록 인덱스가 아닌 UID로 저장.
+// - 과거 lastIndex(정수) 방식은 직원 목록이 바뀌면 의미가 달라져 분배 편향을 일으켰음.
+export const getLastAssignedUid = async (): Promise<string | null> => {
   const docRef = doc(db, 'meta', 'assignment_rotation');
   const docSnap = await getDoc(docRef);
-  
   if (docSnap.exists()) {
-    return docSnap.data().lastIndex || 0;
+    return (docSnap.data().lastAssignedUid as string) || null;
   }
-  return 0;
+  return null;
 };
 
-// 마지막 배정 인덱스 업데이트
-export const updateLastAssignmentIndex = async (index: number): Promise<void> => {
+export const updateLastAssignedUid = async (uid: string): Promise<void> => {
   const docRef = doc(db, 'meta', 'assignment_rotation');
   await setDoc(docRef, {
-    lastIndex: index,
+    lastAssignedUid: uid,
     updatedAt: Timestamp.now(),
   }, { merge: true });
 };
 
-// 특정 직원의 오늘 배정된 DB 수 조회
+// 특정 직원의 오늘 배정된 DB 수 조회 (KST 기준)
+// - 과거에는 브라우저 로컬 시간으로 todayStr를 만들어, KST 새벽에 entry_date가 UTC로 잘못 저장되면
+//   카운트가 0으로 잡혀 일일 한도가 무력화되는 버그가 있었음. → getTodayKst()로 통일.
 const getTodayAssignmentCount = async (managerId: string): Promise<number> => {
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  
+  const todayStr = getTodayKst();
   const q = query(
     collection(db, 'customers'),
     where('manager_id', '==', managerId),
@@ -838,26 +838,42 @@ const getTodayAssignmentCount = async (managerId: string): Promise<number> => {
   return snapshot.size;
 };
 
+// 한도 초과/미배정 등 분배 불가 케이스를 호출부에 명시적으로 전달하기 위한 에러
+export class NoManagerAvailableError extends Error {
+  reason: 'NO_ACTIVE_STAFF' | 'ALL_LIMITS_REACHED';
+  constructor(reason: 'NO_ACTIVE_STAFF' | 'ALL_LIMITS_REACHED') {
+    super(reason === 'NO_ACTIVE_STAFF'
+      ? '배정 가능한 활성 직원이 없습니다.'
+      : '모든 직원이 일일 한도를 초과했습니다.');
+    this.name = 'NoManagerAvailableError';
+    this.reason = reason;
+  }
+}
+
 // 다음 담당자 조회 및 배정 (라운드로빈 + 분배설정 반영)
+// - UID 기반 라운드로빈: 동적 필터(연차/OFF/퇴사)로 활성 직원 목록이 바뀌어도 공정성 유지.
+// - lastUid가 현재 활성 목록에 없으면 시작점 = -1 → 첫 후보는 index 0.
+// - 한도 초과로 건너뛴 경우 lastAssignedUid를 갱신하지 않음 → 다음 차례에 그 직원이 다시 후보가 됨.
 export const getNextManagerForAssignment = async (): Promise<{ 
   managerId: string; 
   managerName: string; 
   managerPhone: string;
   teamId: string; 
   teamName: string;
-} | null> => {
+}> => {
   const activeStaff = await getActiveStaffForAssignment();
   
   if (activeStaff.length === 0) {
     console.log('⚠️ 배정 가능한 활성 직원이 없습니다.');
-    return null;
+    throw new NoManagerAvailableError('NO_ACTIVE_STAFF');
   }
   
-  let lastIndex = await getLastAssignmentIndex();
+  const lastUid = await getLastAssignedUid();
+  const lastIdx = lastUid ? activeStaff.findIndex(s => s.uid === lastUid) : -1;
+  // lastUid가 현재 활성 목록에 없으면 (-1) → 첫 후보는 index 0
   
-  // 일일 한도를 초과하지 않은 직원을 찾을 때까지 순환
   for (let attempt = 0; attempt < activeStaff.length; attempt++) {
-    const nextIndex = (lastIndex + 1 + attempt) % activeStaff.length;
+    const nextIndex = (lastIdx + 1 + attempt) % activeStaff.length;
     const candidate = activeStaff[nextIndex];
     
     const dailyLimit = (candidate as any).daily_db_limit || 0;
@@ -869,8 +885,8 @@ export const getNextManagerForAssignment = async (): Promise<{
       }
     }
     
-    await updateLastAssignmentIndex(nextIndex);
-    console.log(`✅ 담당자 배정: ${candidate.name} (${nextIndex + 1}/${activeStaff.length}번째)`);
+    await updateLastAssignedUid(candidate.uid);
+    console.log(`✅ 담당자 배정: ${candidate.name} (활성 ${activeStaff.length}명 중 ${nextIndex + 1}번째)`);
     
     return {
       managerId: candidate.uid,
@@ -882,7 +898,7 @@ export const getNextManagerForAssignment = async (): Promise<{
   }
   
   console.log('⚠️ 모든 직원이 일일 한도를 초과했습니다.');
-  return null;
+  throw new NoManagerAvailableError('ALL_LIMITS_REACHED');
 };
 
 // ============================================
@@ -3060,6 +3076,7 @@ export const importAllPendingConsultations = async (): Promise<{
   failed: number;
   newCustomers: number;
   existingCustomers: number;
+  noManagerAvailable: number; // 한도 초과/활성 직원 없음으로 분배 불가한 건수
 }> => {
   const pending = await getPendingConsultations();
   
@@ -3067,8 +3084,10 @@ export const importAllPendingConsultations = async (): Promise<{
   let failed = 0;
   let newCustomers = 0;
   let existingCustomers = 0;
+  let noManagerAvailable = 0;
   
-  for (const { id, data } of pending) {
+  for (let i = 0; i < pending.length; i++) {
+    const { id, data } = pending[i];
     try {
       const businessNumber = data.businessNumber || '';
       const phone = data.phone ? data.phone.replace(/[-\s]/g, '').trim() : '';
@@ -3092,12 +3111,25 @@ export const importAllPendingConsultations = async (): Promise<{
         newCustomers++;
       }
     } catch (error) {
-      console.error(`Failed to process consultation ${id}:`, error);
-      failed++;
+      if (error instanceof NoManagerAvailableError) {
+        // 분배 한도 초과/활성 직원 없음 → 미배정 고객을 만들지 않고 미처리 상태로 보존.
+        // 이후 한도가 풀리거나 직원이 활성화되면 다시 일괄 처리 가능.
+        console.warn(`⚠️ 상담 ${id} 분배 보류: ${error.message}`);
+        if (error.reason === 'ALL_LIMITS_REACHED' || error.reason === 'NO_ACTIVE_STAFF') {
+          // 같은 트랜잭션에서 더 시도해봐야 무의미하므로 중단하되,
+          // 이번 건 + 남은 건수 전체를 '분배 보류'로 카운트해야 운영자가 정확한 보류 백로그를 인지 가능.
+          noManagerAvailable += (pending.length - i);
+          break;
+        }
+        noManagerAvailable++;
+      } else {
+        console.error(`Failed to process consultation ${id}:`, error);
+        failed++;
+      }
     }
   }
   
-  return { success, failed, newCustomers, existingCustomers };
+  return { success, failed, newCustomers, existingCustomers, noManagerAvailable };
 };
 
 // ========== 회사 정산 관련 함수 (Expenses) ==========
