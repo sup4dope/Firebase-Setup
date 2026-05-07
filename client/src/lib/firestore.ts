@@ -17,6 +17,7 @@ import {
   QueryConstraint,
 } from 'firebase/firestore';
 import { db, addCustomerHistoryLog } from './firebase';
+import { getTodayKst } from './utils';
 import type {
   User,
   Team,
@@ -2930,7 +2931,7 @@ export const processConsultationToCustomer = async (
 
       // 최신 유입경로 매핑
       const newEntrySource = mapUtmToEntrySource(consultation.utm_source, consultation.source, consultation.utm_campaign, consultation.utm_medium);
-      const newEntryDate = new Date().toISOString().split('T')[0]; // DB분배 기준일 = 오늘
+      const newEntryDate = getTodayKst(); // DB분배 기준일 = 오늘 (KST)
       const prevEntrySource = existingCustomer.entry_source || '기타';
       const prevEntryDate = existingCustomer.entry_date || '';
 
@@ -2991,7 +2992,7 @@ export const processConsultationToCustomer = async (
         business_registration_number: consultation.businessNumber || '',
         credit_score: 0,
         entry_source: mapUtmToEntrySource(consultation.utm_source, consultation.source, consultation.utm_campaign, consultation.utm_medium),
-        entry_date: new Date().toISOString().split('T')[0],
+        entry_date: getTodayKst(),
         status_code: '상담대기' as StatusCode,
         recent_memo: memoSummary,
         memo_history: [memoEntry], // 메모 이력에도 저장

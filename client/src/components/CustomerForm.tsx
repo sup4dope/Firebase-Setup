@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { STATUS_OPTIONS } from '@/lib/constants';
+import { getTodayKst } from '@/lib/utils';
 import type { Customer, User, Team, StatusCode, UserRole } from '@shared/types';
 
 const customerSchema = z.object({
@@ -84,7 +85,7 @@ export function CustomerForm({
       status_code: customer?.status_code || '상담대기',
       manager_id: customer?.manager_id || currentUser.uid,
       team_id: customer?.team_id || currentUser.team_id || '',
-      entry_date: customer?.entry_date || new Date().toISOString().split('T')[0],
+      entry_date: customer?.entry_date || getTodayKst(),
       approved_amount: customer?.approved_amount || 0,
       commission_rate: customer?.commission_rate || 0,
       notes: customer?.notes || '',
