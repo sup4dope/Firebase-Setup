@@ -71,10 +71,19 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
         pending.map(async ({ id, data }) => {
           const reasons: string[] = [];
 
+          // 기존 고객 식별 라벨: 동명이인 구분을 위해 이름+회사명+ID 일부를 함께 표시
+          const formatExisting = (e: any) => {
+            const nm = (e.name || '').trim();
+            const co = (e.company_name || '').trim();
+            const rid = e.readable_id ? ` #${e.readable_id}` : '';
+            if (nm && co && nm !== co) return `${nm}/${co}${rid}`;
+            return `${nm || co}${rid}`;
+          };
+
           if (data.businessNumber) {
             const existing = await getCustomerByBusinessNumber(data.businessNumber);
             if (existing) {
-              reasons.push(`사업자번호 중복 (기존 고객: ${existing.name || existing.company_name})`);
+              reasons.push(`사업자번호 중복 (기존 고객: ${formatExisting(existing)})`);
             }
           }
 
@@ -83,7 +92,7 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
             if (normalizedPhone.length >= 10) {
               const existing = await getCustomerByPhone(normalizedPhone);
               if (existing) {
-                reasons.push(`연락처 중복 (기존 고객: ${existing.name || existing.company_name})`);
+                reasons.push(`연락처 중복 (기존 고객: ${formatExisting(existing)})`);
               }
             }
           }
@@ -514,6 +523,8 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
                               <h3
                                 className="font-semibold text-foreground cursor-pointer select-none"
                                 data-customer-detail-name={data.name || ''}
+                                data-customer-detail-phone={data.phone || ''}
+                                data-customer-detail-biz={data.businessNumber || ''}
                                 title="더블클릭으로 상세 보기"
                               >{data.name || '이름 없음'}</h3>
                               {data.businessName && (

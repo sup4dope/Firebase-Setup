@@ -7,8 +7,10 @@ import type { Customer, User } from '@shared/types';
 
 interface CustomerDetailContextValue {
   openCustomerDetailById: (customerId: string) => Promise<void>;
-  openCustomerDetailByName: (name: string) => Promise<void>;
+  openCustomerDetailByName: (name: string, hints?: { phone?: string; businessNumber?: string }) => Promise<void>;
 }
+
+const normalizeDigits = (v: string | undefined | null) => (v || '').replace(/[-\s]/g, '').trim();
 
 const CustomerDetailContext = createContext<CustomerDetailContextValue | null>(null);
 
@@ -63,7 +65,7 @@ export function CustomerDetailProvider({ children }: { children: ReactNode }) {
     }
   }, [ensureRefData, toast]);
 
-  const openCustomerDetailByName = useCallback(async (name: string) => {
+  const openCustomerDetailByName = useCallback(async (name: string, hints?: { phone?: string; businessNumber?: string }) => {
     const trimmed = (name || '').trim();
     if (!trimmed) return;
     await ensureRefData();
@@ -72,24 +74,40 @@ export function CustomerDetailProvider({ children }: { children: ReactNode }) {
     if (pool.length === 0) {
       try { pool = await getCustomers(); setAllCustomers(pool); } catch {}
     }
-    // 이름 또는 회사명 일치 검색 (이름 우선)
+    // 이름/회사명 트림 비교 (저장값에 후행 공백이 있는 경우 대비)
     const matches = pool.filter(c =>
-      (c.name && c.name === trimmed) || (c.company_name && c.company_name === trimmed)
+      (c.name && c.name.trim() === trimmed) || (c.company_name && c.company_name.trim() === trimmed)
     );
     if (matches.length === 0) {
       toast({ title: '안내', description: `"${trimmed}" 고객을 찾을 수 없습니다.`, variant: 'destructive' });
       return;
     }
+
+    // 동명의 고객이 여러 명일 때, phone/biz 힌트가 있으면 정확히 일치하는 건을 우선 선택
+    const phoneHint = normalizeDigits(hints?.phone);
+    const bizHint = normalizeDigits(hints?.businessNumber);
+    let chosen = matches[0];
     if (matches.length > 1) {
-      toast({ title: '안내', description: `동명의 고객이 ${matches.length}명입니다. 가장 최근 등록 건을 표시합니다.` });
+      const exactByPhone = phoneHint
+        ? matches.find(c => normalizeDigits((c as any).phone) === phoneHint)
+        : undefined;
+      const exactByBiz = bizHint
+        ? matches.find(c => normalizeDigits((c as any).business_registration_number) === bizHint)
+        : undefined;
+      if (exactByPhone || exactByBiz) {
+        chosen = exactByPhone || exactByBiz!;
+      } else {
+        // 힌트로 식별 불가 → 가장 최근 등록 건을 표시 (기존 동작)
+        const sorted = [...matches].sort((a, b) => {
+          const ta = (a.created_at instanceof Date) ? a.created_at.getTime() : 0;
+          const tb = (b.created_at instanceof Date) ? b.created_at.getTime() : 0;
+          return tb - ta;
+        });
+        chosen = sorted[0];
+        toast({ title: '안내', description: `동명의 고객이 ${matches.length}명입니다. 가장 최근 등록 건을 표시합니다.` });
+      }
     }
-    // 최근 등록 건 우선
-    const sorted = [...matches].sort((a, b) => {
-      const ta = (a.created_at instanceof Date) ? a.created_at.getTime() : 0;
-      const tb = (b.created_at instanceof Date) ? b.created_at.getTime() : 0;
-      return tb - ta;
-    });
-    await openCustomerDetailById(sorted[0].id);
+    await openCustomerDetailById(chosen.id);
   }, [allCustomers, ensureRefData, openCustomerDetailById, toast]);
 
   // 전역 dblclick 위임: data-customer-detail-id 또는 data-customer-detail-name 속성을 가진 엘리먼트
@@ -101,6 +119,8 @@ export function CustomerDetailProvider({ children }: { children: ReactNode }) {
       if (!el) return;
       const id = el.getAttribute('data-customer-detail-id');
       const name = el.getAttribute('data-customer-detail-name');
+      const phoneHint = el.getAttribute('data-customer-detail-phone') || undefined;
+      const bizHint = el.getAttribute('data-customer-detail-biz') || undefined;
       if (id) {
         e.preventDefault();
         e.stopPropagation();
@@ -108,7 +128,7 @@ export function CustomerDetailProvider({ children }: { children: ReactNode }) {
       } else if (name) {
         e.preventDefault();
         e.stopPropagation();
-        openCustomerDetailByName(name);
+        openCustomerDetailByName(name, { phone: phoneHint, businessNumber: bizHint });
       }
     };
     document.addEventListener('dblclick', handler);
