@@ -52,7 +52,9 @@ import {
   updateCustomersTeamByManager,
   updateSettlementsTeamByManager,
   getTodayApprovedLeaveUserIds,
+  getCustomersSince,
 } from '@/lib/firestore';
+import { startOfDay } from 'date-fns';
 import { authFetch } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Team, UserRole, UserStatus } from '@shared/types';
@@ -110,6 +112,8 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
   }>({});
   const [savingDistribution, setSavingDistribution] = useState(false);
   const [onLeaveUserIds, setOnLeaveUserIds] = useState<Set<string>>(new Set());
+  const [todayAssignmentCounts, setTodayAssignmentCounts] = useState<Record<string, number>>({});
+  const [loadingTodayCounts, setLoadingTodayCounts] = useState(false);
 
   const [newTeamName, setNewTeamName] = useState('');
 
@@ -492,6 +496,23 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       console.error('연차 정보 조회 실패:', e);
     }
     setShowDistributionSettings(true);
+    // 오늘 분배 카운트 로드 (DB유입 프리뷰의 '오늘' 카운트와 동일 로직)
+    setLoadingTodayCounts(true);
+    setTodayAssignmentCounts({});
+    try {
+      const todayStart = startOfDay(new Date());
+      const todays = await getCustomersSince(todayStart);
+      const counts: Record<string, number> = {};
+      for (const c of todays) {
+        if (!c.manager_id) continue;
+        counts[c.manager_id] = (counts[c.manager_id] || 0) + 1;
+      }
+      setTodayAssignmentCounts(counts);
+    } catch (e) {
+      console.error('오늘 분배 카운트 조회 실패:', e);
+    } finally {
+      setLoadingTodayCounts(false);
+    }
   };
 
   const handleSaveDistributionSettings = async () => {
@@ -1696,6 +1717,7 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                     <TableHead className="text-muted-foreground py-2">직원명</TableHead>
                     <TableHead className="text-muted-foreground py-2">소속팀</TableHead>
                     <TableHead className="text-muted-foreground py-2 text-center">DB 분배</TableHead>
+                    <TableHead className="text-muted-foreground py-2 text-center">오늘 분배</TableHead>
                     <TableHead className="text-muted-foreground py-2 text-center">일일 최대 DB</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1747,6 +1769,27 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
                                 <span className="text-[10px] text-orange-500">자동 OFF</span>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell className="py-2 text-center" data-testid={`text-today-count-${userId}`}>
+                            {(() => {
+                              const count = todayAssignmentCounts[user.uid] || 0;
+                              const limit = settings.limit;
+                              const overLimit = limit > 0 && count >= limit;
+                              const reachedAny = count > 0;
+                              return (
+                                <span
+                                  className={cn(
+                                    "text-sm font-semibold",
+                                    loadingTodayCounts && "text-muted-foreground animate-pulse",
+                                    !loadingTodayCounts && overLimit && "text-red-600 dark:text-red-400",
+                                    !loadingTodayCounts && !overLimit && reachedAny && "text-blue-600 dark:text-blue-400",
+                                    !loadingTodayCounts && !reachedAny && "text-muted-foreground",
+                                  )}
+                                >
+                                  {loadingTodayCounts ? '…' : (limit > 0 ? `${count}/${limit}` : `${count}`)}
+                                </span>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell className="py-2 text-center">
                             <Input
