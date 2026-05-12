@@ -51,6 +51,7 @@ import {
   updateTeamAdmin,
   updateCustomersTeamByManager,
   updateSettlementsTeamByManager,
+  updateLeaveRequestsTeamByUser,
   getTodayApprovedLeaveUserIds,
   getTodayAssignmentCountsByManager,
 } from '@/lib/firestore';
@@ -317,11 +318,16 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
 
       const customerCount = await updateCustomersTeamByManager(user.uid, effectiveTeamId, effectiveTeamName);
       const settlementCount = await updateSettlementsTeamByManager(user.uid, effectiveTeamId, effectiveTeamName);
+      const leaveCount = await updateLeaveRequestsTeamByUser(
+        user.uid,
+        effectiveTeamId || null,
+        effectiveTeamName || null,
+      );
       await syncCustomClaims(user.uid, user.role || 'staff', effectiveTeamId);
 
       toast({
         title: '성공',
-        description: `${user.name}님의 소속팀이 변경되었습니다. (고객 ${customerCount}건, 정산 ${settlementCount}건 소급 적용)`,
+        description: `${user.name}님의 소속팀이 변경되었습니다. (고객 ${customerCount}건, 정산 ${settlementCount}건, 대기 연차 ${leaveCount}건 소급 적용)`,
       });
       await loadData();
     } catch (error) {
@@ -416,7 +422,12 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         const effectiveTeamName = newTeamName || '';
         const customerCount = await updateCustomersTeamByManager(editTargetUser.uid, effectiveTeamId, effectiveTeamName);
         const settlementCount = await updateSettlementsTeamByManager(editTargetUser.uid, effectiveTeamId, effectiveTeamName);
-        messages.push(`고객 ${customerCount}건, 정산 ${settlementCount}건 소급 적용`);
+        const leaveCount = await updateLeaveRequestsTeamByUser(
+          editTargetUser.uid,
+          effectiveTeamId || null,
+          effectiveTeamName || null,
+        );
+        messages.push(`고객 ${customerCount}건, 정산 ${settlementCount}건, 대기 연차 ${leaveCount}건 소급 적용`);
       }
 
       if (roleChanged || teamChanged) {

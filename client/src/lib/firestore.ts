@@ -156,6 +156,48 @@ export const updateSettlementsTeamByManager = async (
   return snapshot.size;
 };
 
+// 직원의 팀이 바뀔 때, 본인이 신청한 연차 중 '승인 대기' 상태(pending_leader / pending_admin)의
+// team_id/team_name을 새 팀으로 갱신한다.
+// - 이미 approved/rejected/cancelled 된 건은 이력 보존을 위해 그대로 둔다.
+// - 그렇지 않으면 옛 팀장이 새 직원 연차를 승인하거나, 새 팀장이 자기 팀원의 대기 연차를 못 보게 된다.
+export const updateLeaveRequestsTeamByUser = async (
+  userId: string,
+  newTeamId: string | null,
+  newTeamName: string | null
+): Promise<number> => {
+  const q = query(collection(db, 'leave_requests'), where('user_id', '==', userId));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return 0;
+
+  const targets = snapshot.docs.filter(d => {
+    const s = (d.data() as any).status;
+    return s === 'pending_leader' || s === 'pending_admin';
+  });
+  if (targets.length === 0) return 0;
+
+  const batch = writeBatch(db);
+  targets.forEach(docSnap => {
+    batch.update(doc(db, 'leave_requests', docSnap.id), {
+      team_id: newTeamId,
+      team_name: newTeamName,
+      updated_at: Timestamp.now(),
+    });
+  });
+  try {
+    await batch.commit();
+  } catch (e: any) {
+    const code = e?.code || '';
+    if (code === 'permission-denied') {
+      throw new Error(
+        '대기 연차의 소속팀 갱신이 Firestore Rules에 의해 거부되었습니다. ' +
+        'firebase-rules.txt의 leave_requests 규칙(isValidTeamReassignment)을 Firebase Console에 게시해 주세요.'
+      );
+    }
+    throw e;
+  }
+  return targets.length;
+};
+
 // 로그인 이력 업데이트 (최근 5개 유지)
 export const updateLoginHistory = async (
   userDocId: string,

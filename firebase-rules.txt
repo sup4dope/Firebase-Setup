@@ -206,6 +206,15 @@ service cloud.firestore {
           && request.resource.data.status == 'cancelled';
       }
       
+      // 헬퍼: 소속팀 재배치 검증 (super_admin 전용)
+      // - 신청자가 팀을 옮길 때 본인이 신청한 '대기' 상태 건의 team_id/team_name만 갱신
+      // - 변경 가능 키를 team_id/team_name/updated_at 으로만 제한 (그 외 필드 변조 차단)
+      function isValidTeamReassignment() {
+        return (resource.data.status == 'pending_leader' || resource.data.status == 'pending_admin')
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['team_id', 'team_name', 'updated_at']);
+      }
+      
       // 읽기: 인증된 사용자
       allow read: if isAuthenticated();
       
@@ -219,11 +228,13 @@ service cloud.firestore {
       // - pending_admin → approved: 관리자만
       // - approved → cancelled: 관리자만 (연차 복원)
       // - 반려: 팀장 또는 관리자
+      // - 소속팀 재배치: super_admin만 (인사관리 팀 이동 시 호출)
       allow update: if isTeamLeaderOrAbove() && (
         isValidLeaderApproval() || 
         isValidRejection() || 
         (isSuperAdmin() && isValidAdminApproval()) ||
-        (isSuperAdmin() && isValidCancellation())
+        (isSuperAdmin() && isValidCancellation()) ||
+        (isSuperAdmin() && isValidTeamReassignment())
       );
       
       // 삭제: 본인 (대기 상태에서만) 또는 관리자
