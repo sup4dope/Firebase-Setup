@@ -344,6 +344,133 @@ export async function registerRoutes(
     }
   });
 
+  // 직원 이름 변경 시 운영 데이터의 표시 이름 일괄 동기화 (super_admin 전용)
+  // 대상: customers.manager_name, settlements.manager_name,
+  //       todos.assigned_to_name, todo_list.assigned_to_name,
+  //       leave_requests.user_name, payments_paymint.{manager_name, sent_by_name}
+  // 이력성 로그(status_logs, customer_history_logs, customer_info_logs, counseling_logs, memo_history)는
+  // 시점 기록이므로 의도적으로 제외한다.
+  app.post("/api/admin/sync-user-name", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { uid, newName } = req.body || {};
+      if (!uid || typeof uid !== 'string' || typeof newName !== 'string' || !newName.trim()) {
+        return res.status(400).json({ success: false, error: 'uid와 newName(비어있지 않음)이 필요합니다.' });
+      }
+      const trimmed = newName.trim();
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+
+      // Firestore의 batch는 500 op 제한이 있어 청크 단위로 commit 한다.
+      // 청크 commit 성공 시마다 onCommit 콜백으로 누적 카운트를 외부에 즉시 반영해
+      // stage 도중 실패해도 실제 반영된 건수를 정확히 보고할 수 있게 한다.
+      const COMMIT_CHUNK = 400;
+      const commitInChunks = async (
+        snap: FirebaseFirestore.QuerySnapshot,
+        buildPatch: (data: any) => Record<string, any> | null,
+        onCommit?: (delta: number) => void,
+      ): Promise<number> => {
+        let updated = 0;
+        let batch = firestore.batch();
+        let opsInBatch = 0;
+        for (const docSnap of snap.docs) {
+          const patch = buildPatch(docSnap.data() as any);
+          if (!patch) continue;
+          batch.update(docSnap.ref, patch);
+          opsInBatch += 1;
+          if (opsInBatch >= COMMIT_CHUNK) {
+            await batch.commit();
+            updated += opsInBatch;
+            onCommit?.(opsInBatch);
+            batch = firestore.batch();
+            opsInBatch = 0;
+          }
+        }
+        if (opsInBatch > 0) {
+          await batch.commit();
+          updated += opsInBatch;
+          onCommit?.(opsInBatch);
+        }
+        return updated;
+      };
+
+      const [customersSnap, settlementsSnap, todosSnap, todoListSnap, leaveSnap, paymintMgrSnap, paymintSentSnap] =
+        await Promise.all([
+          firestore.collection('customers').where('manager_id', '==', uid).get(),
+          firestore.collection('settlements').where('manager_id', '==', uid).get(),
+          firestore.collection('todos').where('assigned_to', '==', uid).get(),
+          firestore.collection('todo_list').where('assigned_to', '==', uid).get(),
+          firestore.collection('leave_requests').where('user_id', '==', uid).get(),
+          firestore.collection('payments_paymint').where('manager_id', '==', uid).get(),
+          firestore.collection('payments_paymint').where('sent_by', '==', uid).get(),
+        ]);
+
+      const skipIfSame = (cur: any, key: string) => (cur && cur[key] === trimmed ? null : { [key]: trimmed });
+
+      // 단계별 순차 커밋 — 한 단계 실패 시 이전 단계는 이미 반영(non-transactional).
+      // 운영자에게 부분 반영 사실을 알릴 수 있도록 stage별 카운트를 누적하며 진행한다.
+      const stages: Array<{ key: string; label: string; snap: FirebaseFirestore.QuerySnapshot; field: string }> = [
+        { key: 'customers', label: '고객', snap: customersSnap, field: 'manager_name' },
+        { key: 'settlements', label: '정산', snap: settlementsSnap, field: 'manager_name' },
+        { key: 'todos', label: '할 일(todos)', snap: todosSnap, field: 'assigned_to_name' },
+        { key: 'todo_list', label: '할 일(todo_list)', snap: todoListSnap, field: 'assigned_to_name' },
+        { key: 'leave_requests', label: '연차', snap: leaveSnap, field: 'user_name' },
+        { key: 'payments_manager', label: '결제(담당자)', snap: paymintMgrSnap, field: 'manager_name' },
+        { key: 'payments_sent', label: '결제(발송자)', snap: paymintSentSnap, field: 'sent_by_name' },
+      ];
+
+      // stage 단위 카운트를 청크 commit 콜백으로 누적 — 실패 stage 내 부분 commit도 정확히 집계.
+      const stageCounts: Record<string, number> = {};
+      let anyCommitted = 0;
+      for (const stage of stages) {
+        stageCounts[stage.key] = stageCounts[stage.key] || 0;
+        try {
+          await commitInChunks(
+            stage.snap,
+            d => skipIfSame(d, stage.field),
+            delta => {
+              stageCounts[stage.key] += delta;
+              anyCommitted += delta;
+            },
+          );
+        } catch (stageErr: any) {
+          const completedStages = stages.slice(0, stages.indexOf(stage)).map(s => s.label);
+          console.error(`❌ [SyncUserName] 단계 실패: ${stage.label} (${stage.key}) — uid=${uid}, msg=${stageErr?.message || stageErr}, committedSoFar=${anyCommitted}`);
+          return res.status(500).json({
+            success: false,
+            error: stageErr?.message || String(stageErr),
+            // chunk 단위로도 이미 commit된 건이 있으면 partial로 본다.
+            partialApplied: anyCommitted > 0,
+            failedStage: stage.label,
+            completedStages,
+            countsSoFar: {
+              customers: stageCounts.customers || 0,
+              settlements: stageCounts.settlements || 0,
+              todos: (stageCounts.todos || 0) + (stageCounts.todo_list || 0),
+              leave_requests: stageCounts.leave_requests || 0,
+              payments: (stageCounts.payments_manager || 0) + (stageCounts.payments_sent || 0),
+            },
+          });
+        }
+      }
+
+      console.log(`✅ [SyncUserName] uid=${uid} → "${trimmed}" | customers=${stageCounts.customers}, settlements=${stageCounts.settlements}, todos=${stageCounts.todos}, todo_list=${stageCounts.todo_list}, leave=${stageCounts.leave_requests}, paymint(mgr)=${stageCounts.payments_manager}, paymint(sent)=${stageCounts.payments_sent}`);
+
+      res.json({
+        success: true,
+        counts: {
+          customers: stageCounts.customers,
+          settlements: stageCounts.settlements,
+          todos: stageCounts.todos + stageCounts.todo_list,
+          leave_requests: stageCounts.leave_requests,
+          payments: stageCounts.payments_manager + stageCounts.payments_sent,
+        },
+      });
+    } catch (error: any) {
+      console.error('❌ [SyncUserName] 실패:', error?.message || error);
+      res.status(500).json({ success: false, error: error?.message || String(error) });
+    }
+  });
+
   // 사용자 Custom Claims 조회 (super_admin 전용)
   app.get("/api/admin/get-custom-claims/:uid", requireAuth, requireSuperAdmin, async (req, res) => {
     console.log("📥 [Admin] Custom Claims 조회 요청");

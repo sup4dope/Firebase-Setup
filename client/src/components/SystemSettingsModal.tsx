@@ -415,7 +415,43 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
 
       const roleChanged = editEmployee.role !== editTargetUser.role;
       const teamChanged = (editEmployee.team_id || '') !== (editTargetUser.team_id || '');
+      const nameChanged = (editEmployee.name || '').trim() !== (editTargetUser.name || '').trim()
+        && !!(editEmployee.name || '').trim();
       const messages: string[] = [];
+
+      let nameSyncFailed = false;
+      if (nameChanged) {
+        try {
+          const res = await authFetch('/api/admin/sync-user-name', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: editTargetUser.uid, newName: editEmployee.name.trim() }),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) {
+            // 부분 반영 가능성 명시 — 서버가 stage별 진행 상태를 함께 반환한다.
+            const partial = json?.partialApplied;
+            const failedStage = json?.failedStage || '알 수 없음';
+            const so = json?.countsSoFar || {};
+            const partialNote = partial
+              ? ` 일부 컬렉션(고객 ${so.customers || 0}건, 정산 ${so.settlements || 0}건, 할 일 ${so.todos || 0}건, 연차 ${so.leave_requests || 0}건, 결제 ${so.payments || 0}건)은 이미 반영됐을 수 있습니다. 재실행 전 데이터 정합성을 확인하세요.`
+              : '';
+            throw new Error(`'${failedStage}' 단계에서 실패: ${json?.error || '알 수 없는 오류'}.${partialNote}`);
+          }
+          const c = json.counts || {};
+          messages.push(
+            `이름 소급: 고객 ${c.customers || 0}건, 정산 ${c.settlements || 0}건, 할 일 ${c.todos || 0}건, 연차 ${c.leave_requests || 0}건, 결제 ${c.payments || 0}건`
+          );
+        } catch (err: any) {
+          console.error('이름 소급 동기화 오류:', err);
+          nameSyncFailed = true;
+          toast({
+            title: '이름 소급 동기화 실패',
+            description: err?.message || '운영 데이터의 표시 이름 일괄 갱신에 실패했습니다. 관리자에게 문의하세요.',
+            variant: 'destructive',
+          });
+        }
+      }
 
       if (teamChanged) {
         const effectiveTeamId = editEmployee.team_id || '';
@@ -435,10 +471,19 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
         if (roleChanged) messages.push(`직급 ${ROLE_LABELS[editEmployee.role as UserRole]}(으)로 변경`);
       }
 
-      toast({
-        title: '성공',
-        description: `${editEmployee.name}님의 정보가 수정되었습니다.${messages.length > 0 ? ` (${messages.join(', ')})` : ''}`,
-      });
+      // 이름 소급 실패 시 성공 토스트가 함께 떠 운영자가 혼동하지 않도록 경고성 토스트로 대체한다.
+      if (nameSyncFailed) {
+        toast({
+          title: '부분 적용됨',
+          description: `${editEmployee.name}님의 기본 정보는 저장되었지만 이름 소급 동기화는 실패했습니다. 위 오류 안내를 확인하고 재실행하세요.${messages.length > 0 ? ` (${messages.join(', ')})` : ''}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: '성공',
+          description: `${editEmployee.name}님의 정보가 수정되었습니다.${messages.length > 0 ? ` (${messages.join(', ')})` : ''}`,
+        });
+      }
 
       setShowEditEmployee(false);
       setEditTargetUser(null);
