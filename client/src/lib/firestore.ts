@@ -838,6 +838,27 @@ const getTodayAssignmentCount = async (managerId: string): Promise<number> => {
   return snapshot.size;
 };
 
+// 전 직원의 오늘 배정 수 일괄 조회 (KST 기준, entry_date 기반)
+// - 분배 한도 체크에 쓰이는 getTodayAssignmentCount와 동일 기준이므로,
+//   UI 표기와 실제 한도 카운트가 항상 일치한다.
+// - 신규 생성 + 기존 고객 재유입(재배정) 모두 포함됨.
+export const getTodayAssignmentCountsByManager = async (): Promise<Record<string, number>> => {
+  const todayStr = getTodayKst();
+  const q = query(
+    collection(db, 'customers'),
+    where('entry_date', '==', todayStr)
+  );
+  const snapshot = await getDocs(q);
+  const counts: Record<string, number> = {};
+  snapshot.forEach(docSnap => {
+    const data = docSnap.data() as any;
+    const mid = data.manager_id;
+    if (!mid) return;
+    counts[mid] = (counts[mid] || 0) + 1;
+  });
+  return counts;
+};
+
 // 한도 초과/미배정 등 분배 불가 케이스를 호출부에 명시적으로 전달하기 위한 에러
 export class NoManagerAvailableError extends Error {
   reason: 'NO_ACTIVE_STAFF' | 'ALL_LIMITS_REACHED';

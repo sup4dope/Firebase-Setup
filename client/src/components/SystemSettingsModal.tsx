@@ -52,9 +52,8 @@ import {
   updateCustomersTeamByManager,
   updateSettlementsTeamByManager,
   getTodayApprovedLeaveUserIds,
-  getCustomersSince,
+  getTodayAssignmentCountsByManager,
 } from '@/lib/firestore';
-import { startOfDay, startOfMonth } from 'date-fns';
 import { authFetch } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Team, UserRole, UserStatus } from '@shared/types';
@@ -496,26 +495,13 @@ export function SystemSettingsModal({ isOpen, onClose }: SystemSettingsModalProp
       console.error('연차 정보 조회 실패:', e);
     }
     setShowDistributionSettings(true);
-    // 오늘 분배 카운트 로드 — DB유입 프리뷰의 '배정 현황' 로직과 동일하게 맞춤:
-    //  1) 이번 달 1일부터 customers 조회(getCustomersSince(monthStart))
-    //  2) 클라이언트에서 created_at >= startOfDay(now) 만 카운트
-    //  3) c.manager_id 별 집계
-    // → 두 모달의 '오늘' 카운트가 항상 동일하게 산출됨.
+    // 오늘 분배 카운트 로드 — 실제 분배 한도 체크와 동일 기준(entry_date == 오늘 KST):
+    //  - 신규 생성 + 기존 고객 재유입(재배정) 모두 포함
+    //  - 표기 카운트 = 실제 한도 카운트 → '4/5'가 한도까지 1건 남았다는 의미와 정확히 일치
     setLoadingTodayCounts(true);
     setTodayAssignmentCounts({});
     try {
-      const now = new Date();
-      const todayStart = startOfDay(now);
-      const monthStart = startOfMonth(now);
-      const monthCustomers = await getCustomersSince(monthStart);
-      const counts: Record<string, number> = {};
-      for (const c of monthCustomers) {
-        if (!c.manager_id) continue;
-        const d = c.created_at instanceof Date ? c.created_at : new Date(c.created_at as any);
-        if (d >= todayStart) {
-          counts[c.manager_id] = (counts[c.manager_id] || 0) + 1;
-        }
-      }
+      const counts = await getTodayAssignmentCountsByManager();
       setTodayAssignmentCounts(counts);
     } catch (e) {
       console.error('오늘 분배 카운트 조회 실패:', e);

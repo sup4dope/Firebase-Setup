@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Download, X, Phone, Building2, Calendar, CreditCard, MapPin, FileText, AlertCircle, Clock, Trash2, UserPlus, Users, Globe, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { startOfWeek, startOfMonth, startOfDay } from 'date-fns';
+import { startOfWeek, startOfMonth } from 'date-fns';
 import { 
   getPendingConsultations, 
   getCustomerByBusinessNumber, 
@@ -19,6 +19,7 @@ import {
   deleteConsultation, 
   getActiveStaffForAssignment,
   getCustomersSince,
+  getTodayAssignmentCountsByManager,
   mapUtmToEntrySource 
 } from '@/lib/firestore';
 import type { Consultation, User, Customer } from '@shared/types';
@@ -46,6 +47,9 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
   const [staffList, setStaffList] = useState<User[]>([]);
   const [selectedManagers, setSelectedManagers] = useState<Record<string, string>>({});
   const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
+  // 오늘 분배 카운트는 실제 분배 한도 체크와 동일 기준(entry_date == 오늘 KST)으로 별도 조회.
+  // → 신규 생성 + 기존 고객 재유입 모두 포함되어 한도와 표기가 일치한다.
+  const [todayEntryCounts, setTodayEntryCounts] = useState<Record<string, number>>({});
   const [loadingStats, setLoadingStats] = useState(false);
   const [showAssignmentStats, setShowAssignmentStats] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'new' | 'duplicate' | string>('all');
@@ -162,10 +166,17 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
     setLoadingStats(true);
     try {
       const monthStart = startOfMonth(new Date());
-      const customers = await getCustomersSince(monthStart);
+      // 주/월 카운트는 created_at 기반(고객 생성 흐름), 오늘 카운트는 entry_date 기반(한도 카운트)
+      const [customers, todayCounts] = await Promise.all([
+        getCustomersSince(monthStart),
+        getTodayAssignmentCountsByManager(),
+      ]);
       setRecentCustomers(customers);
+      setTodayEntryCounts(todayCounts);
     } catch (error) {
       console.error('Error fetching customers for stats:', error);
+      // 실패 시 stale 카운트 표시 방지
+      setTodayEntryCounts({});
     } finally {
       setLoadingStats(false);
     }
@@ -175,30 +186,30 @@ export function ConsultationsPreviewModal({ open, onOpenChange, onImportComplete
     if (staffList.length === 0) return [];
 
     const now = new Date();
-    const todayStart = startOfDay(now);
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
 
-    const byManager: Record<string, { today: number; week: number; month: number }> = {};
+    // 주/월: created_at 기반 (고객 생성 흐름)
+    const byManager: Record<string, { week: number; month: number }> = {};
     for (const c of recentCustomers) {
       if (!c.manager_id) continue;
       if (!byManager[c.manager_id]) {
-        byManager[c.manager_id] = { today: 0, week: 0, month: 0 };
+        byManager[c.manager_id] = { week: 0, month: 0 };
       }
       const d = c.created_at instanceof Date ? c.created_at : new Date(c.created_at);
       byManager[c.manager_id].month++;
       if (d >= weekStart) byManager[c.manager_id].week++;
-      if (d >= todayStart) byManager[c.manager_id].today++;
     }
 
     return staffList.map(staff => ({
       uid: staff.uid,
       name: staff.name,
       teamName: staff.team_name || '미배정',
-      todayCount: byManager[staff.uid]?.today || 0,
+      // 오늘: entry_date == 오늘 KST 기준 (실제 분배 한도와 동일)
+      todayCount: todayEntryCounts[staff.uid] || 0,
       weekCount: byManager[staff.uid]?.week || 0,
       monthCount: byManager[staff.uid]?.month || 0,
     })).sort((a, b) => b.todayCount - a.todayCount || b.weekCount - a.weekCount);
-  }, [staffList, recentCustomers]);
+  }, [staffList, recentCustomers, todayEntryCounts]);
 
   const handleImportAll = async () => {
     setImporting(true);
