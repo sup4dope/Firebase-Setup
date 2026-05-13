@@ -252,5 +252,14 @@ service cloud.firestore {
       // 쓰기: super_admin 또는 team_leader만 가능
       allow write: if isTeamLeaderOrAbove();
     }
+
+    // ========================================
+    // 17. AI 채팅 대화 (서버 전용)
+    // ========================================
+    // 모든 입출력이 백엔드 Admin SDK(/api/ai/*) 경유로만 이뤄지므로
+    // 클라이언트의 직접 접근은 차단합니다.
+    match /ai_conversations/{conversationId} {
+      allow read, write: if false;
+    }
   }
 }

@@ -32,6 +32,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
 import { compressImage, validateFileSize, formatFileSize } from "@/lib/imageCompressor";
+import { startAIConversation, streamAIChat } from "@/lib/aiClient";
 import { 
   extractBusinessRegistration, 
   isBusinessRegistrationFile, 
@@ -366,6 +367,11 @@ export function CustomerDetailModal({
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([]);
   const [aiInput, setAiInput] = useState("");
   const aiScrollRef = useRef<HTMLDivElement>(null);
+  const [aiConversationId, setAiConversationId] = useState<string | null>(null);
+  const [aiIsStreaming, setAiIsStreaming] = useState(false);
+  const [aiInitError, setAiInitError] = useState<string | null>(null);
+  const aiStartedForCustomerRef = useRef<string | null>(null);
+  const aiAbortRef = useRef<AbortController | null>(null);
 
   // OCR 자동 입력 하이라이트 상태
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
@@ -1863,36 +1869,131 @@ export function CustomerDetailModal({
     }
   };
 
-  // Handle AI query submit
-  const handleAISubmit = () => {
-    if (!aiInput.trim()) return;
+  // Handle AI query submit (실제 로컬 Ollama 연동, SSE 스트리밍)
+  const handleAISubmit = async () => {
+    const trimmed = aiInput.trim();
+    if (!trimmed || aiIsStreaming) return;
+
+    if (!aiConversationId) {
+      toast({
+        title: "AI 준비 중",
+        description: aiInitError || "AI 대화를 초기화하는 중입니다. 잠시 후 다시 시도해주세요.",
+        variant: aiInitError ? "destructive" : "default",
+      });
+      return;
+    }
 
     const userMsg: AIMessage = {
-      id: `ai_${Date.now()}`,
+      id: `ai_user_${Date.now()}`,
       role: "user",
-      content: aiInput.trim(),
+      content: trimmed,
       created_at: new Date(),
     };
-
-    setAiMessages((prev) => [...prev, userMsg]);
+    const assistantId = `ai_asst_${Date.now()}`;
+    const assistantMsg: AIMessage = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      created_at: new Date(),
+    };
+    setAiMessages((prev) => [...prev, userMsg, assistantMsg]);
     setAiInput("");
+    setAiIsStreaming(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: AIMessage = {
-        id: `ai_${Date.now()}`,
-        role: "assistant",
-        content:
-          "AI 기능은 현재 개발 중입니다. 추후 고객 분석 및 추천 기능이 제공될 예정입니다.",
-        created_at: new Date(),
-      };
-      setAiMessages((prev) => [...prev, aiResponse]);
+    requestAnimationFrame(() => {
       aiScrollRef.current?.scrollTo({
         top: aiScrollRef.current.scrollHeight,
         behavior: "smooth",
       });
-    }, 500);
+    });
+
+    aiAbortRef.current?.abort();
+    const ac = new AbortController();
+    aiAbortRef.current = ac;
+
+    try {
+      await streamAIChat({
+        conversationId: aiConversationId,
+        message: trimmed,
+        signal: ac.signal,
+        onToken: (token) => {
+          setAiMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: m.content + token } : m,
+            ),
+          );
+          aiScrollRef.current?.scrollTo({
+            top: aiScrollRef.current.scrollHeight,
+          });
+        },
+        onDone: () => {
+          setAiIsStreaming(false);
+        },
+        onError: (err) => {
+          setAiIsStreaming(false);
+          setAiMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: `⚠️ 오류: ${err.message}` }
+                : m,
+            ),
+          );
+          toast({
+            title: "AI 응답 실패",
+            description: err.message,
+            variant: "destructive",
+          });
+        },
+      });
+    } catch (err: any) {
+      setAiIsStreaming(false);
+      toast({
+        title: "AI 호출 실패",
+        description: err?.message || String(err),
+        variant: "destructive",
+      });
+    }
   };
+
+  // 모달 오픈 시 AI 대화 시작/재개 (기존 고객만)
+  useEffect(() => {
+    const customerId = formData.id;
+    if (!isOpen || !customerId || isNewCustomer) {
+      return;
+    }
+    if (aiStartedForCustomerRef.current === customerId) {
+      return; // 이미 시작함
+    }
+    aiStartedForCustomerRef.current = customerId;
+    setAiInitError(null);
+    setAiConversationId(null);
+    setAiMessages([]);
+
+    (async () => {
+      try {
+        const { conversationId, messages } = await startAIConversation(customerId);
+        setAiConversationId(conversationId);
+        setAiMessages(messages);
+      } catch (err: any) {
+        const msg = err?.message || "AI 대화 초기화 실패";
+        setAiInitError(msg);
+        console.error("[AI] 대화 초기화 실패:", err);
+      }
+    })();
+  }, [isOpen, formData.id, isNewCustomer]);
+
+  // 모달 닫을 때 상태 초기화 + 진행 중인 스트리밍 중단
+  useEffect(() => {
+    if (!isOpen) {
+      aiAbortRef.current?.abort();
+      aiAbortRef.current = null;
+      aiStartedForCustomerRef.current = null;
+      setAiConversationId(null);
+      setAiMessages([]);
+      setAiInitError(null);
+      setAiIsStreaming(false);
+    }
+  }, [isOpen]);
 
   // 1. 실제 저장 로직 (매번 재생성되어도 됨 - 최신 상태 참조)
   const runSaveLogic = async (dataToSave: any) => {
@@ -4865,7 +4966,15 @@ export function CustomerDetailModal({
                 {aiMessages.length === 0 ? (
                   <div className="text-center text-muted-foreground py-3">
                     <Bot className="w-7 h-7 mx-auto mb-1 text-purple-600/50" />
-                    <p className="text-sm">AI에게 질문하세요</p>
+                    {aiInitError ? (
+                      <p className="text-sm text-red-500">⚠️ {aiInitError}</p>
+                    ) : !aiConversationId && !isNewCustomer ? (
+                      <p className="text-sm">AI 컨텍스트 준비 중...</p>
+                    ) : isNewCustomer ? (
+                      <p className="text-sm">고객 저장 후 AI 채팅이 활성화됩니다</p>
+                    ) : (
+                      <p className="text-sm">고객 정보 + 공문 기반 자금 예측 / Q&A</p>
+                    )}
                   </div>
                 ) : (
                   aiMessages.map((msg) => (
@@ -4901,7 +5010,14 @@ export function CustomerDetailModal({
                 <Input
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
-                  placeholder="AI에게 질문하기..."
+                  placeholder={
+                    aiIsStreaming
+                      ? "AI가 답변 중..."
+                      : !aiConversationId
+                        ? "AI 준비 중..."
+                        : "AI에게 질문하기..."
+                  }
+                  disabled={aiIsStreaming || !aiConversationId}
                   className="bg-white/80 dark:bg-transparent border-purple-300 dark:border-border text-foreground h-9 text-sm flex-1"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -4909,14 +5025,20 @@ export function CustomerDetailModal({
                       handleAISubmit();
                     }
                   }}
+                  data-testid="input-ai-chat"
                 />
                 <Button
                   onClick={handleAISubmit}
-                  disabled={!aiInput.trim()}
+                  disabled={!aiInput.trim() || aiIsStreaming || !aiConversationId}
                   size="icon"
                   className="shrink-0 bg-purple-600 hover:bg-purple-700"
+                  data-testid="button-ai-send"
                 >
-                  <Send className="w-4 h-4" />
+                  {aiIsStreaming ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
                 </Button>
               </div>
             </div>

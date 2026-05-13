@@ -7,6 +7,7 @@ import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAut
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
 import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, downloadDocument, checkEformsignConfig, mapEformsignStatus, extractEformsignStatus, cancelDocument, getDocumentReadStatus, resendDocument } from "./eformsignService";
 import { sendBill, cancelBill, destroyBill, readBill, resendBill, getBalance, checkPaymintConfig, getPaymintStateLabel, type ApprovalCallbackData } from "./paymintService";
+import { streamChat, buildSystemPrompt, summarizeCustomer, checkAiConfig, loadGongmunContext, trimHistory, type ChatMessage } from "./aiService";
 
 const FieldValue = admin.firestore.FieldValue;
 
@@ -2122,6 +2123,212 @@ export async function registerRoutes(
       console.error('[PayMint Delete] 오류:', error.message);
       res.status(500).json({ error: error.message });
     }
+  });
+
+  // ============================================================
+  // AI 채팅 (로컬 Ollama 연동)
+  // ============================================================
+
+  // 대화 시작/재개: 고객 ID로 기존 대화를 찾거나 새로 만든 후 conversationId 반환
+  app.post("/api/ai/conversation/start", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { customerId } = req.body || {};
+      if (!customerId || typeof customerId !== 'string') {
+        return res.status(400).json({ error: 'customerId가 필요합니다.' });
+      }
+
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+
+      const customerSnap = await firestore.collection('customers').doc(customerId).get();
+      if (!customerSnap.exists) {
+        return res.status(404).json({ error: '고객을 찾을 수 없습니다.' });
+      }
+      const customerData = customerSnap.data() as any;
+      const customer = { id: customerSnap.id, ...customerData };
+
+      const customerSummary = summarizeCustomer(customer);
+      const systemPrompt = buildSystemPrompt(customerSummary);
+
+      // 같은 사용자 + 같은 고객의 가장 최근 대화 재사용
+      // 복합 인덱스 필요: ai_conversations (customer_id ASC, user_id ASC, updated_at DESC)
+      let existingSnap;
+      try {
+        existingSnap = await firestore.collection('ai_conversations')
+          .where('customer_id', '==', customerId)
+          .where('user_id', '==', req.user!.uid)
+          .orderBy('updated_at', 'desc')
+          .limit(1)
+          .get();
+      } catch (err: any) {
+        console.error('[AI] 기존 대화 조회 실패:', err?.message);
+        return res.status(500).json({
+          error: 'AI 대화 조회 실패. Firestore 복합 인덱스(ai_conversations: customer_id, user_id, updated_at desc)를 생성해주세요.',
+          detail: err?.message,
+        });
+      }
+
+      if (existingSnap && !existingSnap.empty) {
+        const docRef = existingSnap.docs[0].ref;
+        const existing = existingSnap.docs[0].data() as any;
+        // 고객 정보가 변경됐을 수 있으므로 system prompt만 갱신
+        await docRef.update({ system_prompt: systemPrompt, updated_at: new Date() });
+        return res.json({
+          conversationId: docRef.id,
+          messages: existing.messages || [],
+        });
+      }
+
+      const docRef = await firestore.collection('ai_conversations').add({
+        customer_id: customerId,
+        user_id: req.user!.uid,
+        user_email: req.user!.email || '',
+        system_prompt: systemPrompt,
+        messages: [],
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      res.json({ conversationId: docRef.id, messages: [] });
+    } catch (err: any) {
+      console.error('[AI Start] 오류:', err);
+      res.status(500).json({ error: err?.message || String(err) });
+    }
+  });
+
+  // 채팅: SSE 스트리밍으로 토큰 전송, 완료 시 Firestore에 저장
+  app.post("/api/ai/chat", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { conversationId, message } = req.body || {};
+      if (!conversationId || typeof message !== 'string' || !message.trim()) {
+        return res.status(400).json({ error: 'conversationId와 message가 필요합니다.' });
+      }
+
+      const cfg = checkAiConfig();
+      if (!cfg.configured) {
+        return res.status(503).json({
+          error: `AI 서버 미설정: ${cfg.missing.join(', ')}. Replit Secrets에 등록해주세요.`,
+        });
+      }
+
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const convRef = firestore.collection('ai_conversations').doc(conversationId);
+      const convSnap = await convRef.get();
+      if (!convSnap.exists) {
+        return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+      }
+      const conv = convSnap.data() as any;
+      if (conv.user_id !== req.user!.uid) {
+        return res.status(403).json({ error: '본인의 대화만 사용할 수 있습니다.' });
+      }
+
+      const userMsg = { role: 'user' as const, content: message.trim(), created_at: new Date() };
+      const history = (conv.messages || []) as Array<{ role: string; content: string; created_at: any }>;
+      const trimmedHistory = trimHistory(history);
+
+      // SSE 헤더
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      (res as any).flushHeaders?.();
+
+      const messages: ChatMessage[] = [
+        { role: 'system', content: conv.system_prompt },
+        ...trimmedHistory.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        { role: 'user', content: userMsg.content },
+      ];
+
+      const ac = new AbortController();
+      let clientGone = false;
+      req.on('close', () => { clientGone = true; ac.abort(); });
+
+      await streamChat({
+        messages,
+        signal: ac.signal,
+        onToken: (t) => {
+          if (clientGone) return;
+          res.write(`data: ${JSON.stringify({ type: 'token', token: t })}\n\n`);
+        },
+        onDone: async (fullText) => {
+          // 트랜잭션으로 동시성 안전하게 메시지 append (last-write-wins 방지)
+          try {
+            await firestore.runTransaction(async (tx) => {
+              const fresh = await tx.get(convRef);
+              if (!fresh.exists) throw new Error('대화가 삭제되었습니다.');
+              const freshData = fresh.data() as any;
+              const freshMessages = (freshData.messages || []) as any[];
+              const assistantMsg = { role: 'assistant', content: fullText, created_at: new Date() };
+              tx.update(convRef, {
+                messages: [...freshMessages, userMsg, assistantMsg],
+                updated_at: new Date(),
+              });
+            });
+            if (!clientGone) {
+              res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+              res.end();
+            }
+          } catch (saveErr: any) {
+            console.error('[AI Chat] 저장 실패:', saveErr);
+            if (!clientGone) {
+              res.write(`data: ${JSON.stringify({ type: 'error', error: `저장 실패: ${saveErr?.message || saveErr}` })}\n\n`);
+              res.end();
+            }
+          }
+        },
+        onError: (err) => {
+          console.error('[AI Chat] 스트리밍 오류:', err);
+          try {
+            res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+          } catch {}
+          res.end();
+        },
+      });
+    } catch (err: any) {
+      console.error('[AI Chat] 오류:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: err?.message || String(err) });
+      } else {
+        try {
+          res.write(`data: ${JSON.stringify({ type: 'error', error: err?.message || String(err) })}\n\n`);
+        } catch {}
+        res.end();
+      }
+    }
+  });
+
+  // 대화 초기화 (해당 고객+사용자 대화 삭제 후 새로 시작)
+  app.delete("/api/ai/conversation/:conversationId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { conversationId } = req.params;
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const docRef = firestore.collection('ai_conversations').doc(conversationId);
+      const snap = await docRef.get();
+      if (!snap.exists) return res.status(404).json({ error: '대화 없음' });
+      const data = snap.data() as any;
+      if (data.user_id !== req.user!.uid) {
+        return res.status(403).json({ error: '본인의 대화만 삭제 가능합니다.' });
+      }
+      await docRef.delete();
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('[AI Delete] 오류:', err);
+      res.status(500).json({ error: err?.message || String(err) });
+    }
+  });
+
+  // AI 설정 상태 확인 (디버깅용)
+  app.get("/api/ai/status", requireAuth, async (_req, res) => {
+    const cfg = checkAiConfig();
+    const gongmun = loadGongmunContext();
+    res.json({
+      configured: cfg.configured,
+      missing: cfg.missing,
+      gongmun_loaded_chars: gongmun.length,
+      model: process.env.OLLAMA_MODEL || 'qwen2.5:14b-instruct (default)',
+    });
   });
 
   return httpServer;
