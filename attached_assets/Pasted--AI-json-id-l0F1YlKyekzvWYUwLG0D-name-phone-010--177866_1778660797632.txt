@@ -1,0 +1,135 @@
+[AI 자동 자금 예측]
+
+```json
+{
+  "id": "l0F1YlKyekzvWYUwLG0D",
+  "name": "정종수",
+  "phone": "010--",
+  "status_code": "상담대기",
+  "manager_id": "pIAE7a8ZC5Nxeps8J2OLywwjbOB2",
+  "manager_name": "한지성 대표",
+  "team_id": "LjgxRC0uywVasoCfDObM",
+  "team_name": "관리자팀",
+  "entry_date": "2026-05-13",
+  "carrier": "SKT",
+  "is_home_owned": false,
+  "is_same_as_business": false,
+  "entry_source": "광고",
+  "retry_type": "해당없음",
+  "innovation_type": "해당없음",
+  "over_7_years": false,
+  "is_business_owned": false,
+  "recent_sales": 0,
+  "avg_revenue_3y": 0,
+  "approved_amount": 0,
+  "commission_rate": 0,
+  "processing_org": "미등록",
+  "readable_id": "260513-084",
+  "daily_no": 84,
+  "created_at": {
+    "_seconds": 1778660576,
+    "_nanoseconds": 637000000
+  },
+  "credit_score": 760,
+  "documents": [
+    {
+      "id": "doc_1778660582014_x8fbvqrtg",
+      "customer_id": "l0F1YlKyekzvWYUwLG0D",
+      "file_name": "사업자등록증명 (정종수 대표님).pdf",
+      "file_url": "https://firebasestorage.googleapis.com/v0/b/policyfund-crm.firebasestorage.app/o/customers%2Fl0F1YlKyekzvWYUwLG0D%2F1778660579683_%EC%82%AC%EC%97%85%EC%9E%90%EB%93%B1%EB%A1%9D%EC%A6%9D%EB%AA%85%20(%EC%A0%95%EC%A2%85%EC%88%98%20%EB%8C%80%ED%91%9C%EB%8B%98).pdf?alt=media&token=8e3d0250-7996-4644-8df3-5d6395c13df7",
+      "file_type": "application/pdf",
+      "uploaded_by": "pIAE7a8ZC5Nxeps8J2OLywwjbOB2",
+      "uploaded_by_name": "한지성 대표",
+      "uploaded_at": {
+        "_seconds": 1778660582,
+        "_nanoseconds": 14000000
+      }
+    },
+    {
+      "id": "doc_1778660581866_jjvuasl77",
+      "customer_id": "l0F1YlKyekzvWYUwLG0D",
+      "file_name": "부가가치세과세표준증명 (정종수 대표님).pdf",
+      "file_url": "https://firebasestorage.googleapis.com/v0/b/policyfund-crm.firebasestorage.app/o/customers%2Fl0F1YlKyekzvWYUwLG0D%2F1778660579684_%EB%B6%80%EA%B0%80%EA%B0%80%EC%B9%98%EC%84%B8%EA%B3%BC%EC%84%B8%ED%91%9C%EC%A4%80%EC%A6%9D%EB%AA%85%20(%EC%A0%95%EC%A2%85%EC%88%98%20%EB%8C%80%ED%91%9C%EB%8B%98).pdf?alt=media&token=8bd4fbec-577b-4091-8483-feadc81479cd",
+      "file_type": "application/pdf",
+      "uploaded_by": "pIAE7a8ZC5Nxeps8J2OLywwjbOB2",
+      "uploaded_by_name": "한지성 대표",
+      "uploaded_at": {
+        "_seconds": 1778660581,
+        "_nanoseconds": 866000000
+      }
+    },
+    {
+      "id": "doc_1778660581743_ihnowp44w",
+      "customer_id": "l0F1YlKyekzvWYUwLG0D",
+      "file_name": "사업자신용정보공여내역 (정종수 대표님).pdf",
+      "file_url": "https://firebasestorage.googleapis.com/v0/b/policyfund-crm.firebasestorage.app/o/customers%2Fl0F1YlKyekzvWYUwLG0D%2F1778660579684_%EC%82%AC%EC%97%85%EC%9E%90%EC%8B%A0%EC%9A%A9%EC%A0%95%EB%B3%B4%EA%B3%B5%EC%97%AC%EB%82%B4%EC%97%AD%20(%EC%A0%95%EC%A2%85%EC%88%98%20%EB%8C%80%ED%91%9C%EB%8B%98).pdf?alt=media&token=b9e11773-3968-40f8-8d38-c3fceb113c42",
+      "file_type": "application/pdf",
+      "uploaded_by": "pIAE7a8ZC5Nxeps8J2OLywwjbOB2",
+      "uploaded_by_name": "한지성 대표",
+      "uploaded_at": {
+        "_seconds": 1778660581,
+        "_nanoseconds": 743000000
+      }
+    }
+  ],
+  "business_address": "경기도 오산시 오산로 378",
+  "ssn_back": "1228321",
+  "founding_date": "2023-11-28",
+  "business_registration_number": "352-46-01010",
+  "financial_obligations": [
+    {
+      "id": "ocr-1778660585712-et58t-0",
+      "type": "guarantee",
+      "institution": "경기신용보증재단 경기<본>",
+      "product_name": "지급보증",
+      "account_type": "지급보증",
+      "balance": 20000000,
+      "occurred_at": "2024-07-12",
+      "maturity_date": "2029-07-11"
+    },
+    {
+      "id": "ocr-1778660585712-1d17u-1",
+      "type": "loan",
+      "institution": "농협은행 본부총괄",
+      "product_name": "기타재정운전자금대출(직대)",
+      "account_type": "운전자금(일반)",
+      "balance": 20000000,
+      "occurred_at": "2024-07-12",
+      "maturity_date": "2029-07-11"
+    },
+    {
+      "id": "ocr-1778660585712-nfvkx-2",
+      "type": "loan",
+      "institution": "소상공인시장진흥공단 <본>",
+      "product_name": "저신용소상공인자금",
+      "account_type": "신용대출(종합통장대출)",
+      "balance": 25000000,
+      "occurred_at": "2024-04-18",
+      "maturity_date": "2029-04-18"
+    },
+    {
+      "id": "ocr-1778660585712-lhsx3-3",
+      "type": "loan",
+      "institution": "한국캐피탈(주) 대전<본>",
+      "product_name": "오토담보_Fresh",
+      "account_type": "기타(대출채권)",
+      "balance": 9360000,
+      "occurred_at": "2025-01-07",
+      "maturity_date": "2030-01-05"
+    }
+  ],
+  "business_type": "운수업",
+  "company_name": "개인",
+  "sales_y1": 0.31,
+  "ssn_front": "681227",
+  "business_item": "용달 화물 자동차 운송업",
+  "business_address_detail": "302호(궐동, 재경연립)",
+  "sales_y3": 0.05,
+  "sales_y2": 0.67,
+  "updated_at": {
+    "_seconds": 1778660585,
+    "_nanoseconds": 765000000
+  },
+  "matching_fund": "저신용소상공인자금"
+}
+```

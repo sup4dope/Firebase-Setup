@@ -254,12 +254,17 @@ service cloud.firestore {
     }
 
     // ========================================
-    // 17. AI 채팅 대화 (서버 전용)
+    // 17. AI 채팅 대화
     // ========================================
-    // 모든 입출력이 백엔드 Admin SDK(/api/ai/*) 경유로만 이뤄지므로
-    // 클라이언트의 직접 접근은 차단합니다.
+    // 쓰기는 백엔드 Admin SDK(/api/ai/*) 전용.
+    // 읽기는 본인 대화(user_id 일치) 또는 super_admin만 허용
+    // (자동 자금 예측 결과 onSnapshot 실시간 수신용).
     match /ai_conversations/{conversationId} {
-      allow read, write: if false;
+      allow read: if isAuthenticated() && (
+        resource.data.user_id == request.auth.uid ||
+        isSuperAdmin()
+      );
+      allow write: if false;
     }
   }
 }
