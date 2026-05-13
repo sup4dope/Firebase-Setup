@@ -1975,9 +1975,9 @@ export function CustomerDetailModal({
         setAiConversationId(conversationId);
         setAiMessages(messages);
       } catch (err: any) {
-        const msg = err?.message || "AI 대화 초기화 실패";
+        const msg = err?.message || (typeof err === "string" ? err : "AI 대화 초기화 실패");
         setAiInitError(msg);
-        console.error("[AI] 대화 초기화 실패:", err);
+        console.error("[AI] 대화 초기화 실패:", msg, err);
       }
     })();
   }, [isOpen, formData.id, isNewCustomer]);
