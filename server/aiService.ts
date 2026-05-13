@@ -15,7 +15,27 @@ const GONGMUN_DIR = path.join(process.cwd(), 'server', 'data', 'gongmun');
 const CACHE_TTL_MS = 60_000;
 
 let cachedGongmun: string | null = null;
+let cachedGongmunFunds: string[] = [];
 let cachedAt = 0;
+
+// 공문 파일명 + 마스터 공고 본문에서 등장하는 정식 자금명 화이트리스트
+const MASTER_DOC_FUNDS = [
+  '일반경영안정자금',
+  '특별경영안정자금',
+  '긴급경영안정자금',
+  '신용취약소상공인자금',
+  '대환대출',
+  '혁신성장촉진자금',
+  '상생성장지원자금',
+  '민간투자연계형매칭융자',
+  '재도전특별자금',
+  '일시적경영애로자금',
+];
+
+export function getGongmunFundList(): string[] {
+  if (cachedGongmunFunds.length === 0) loadGongmunContext();
+  return cachedGongmunFunds;
+}
 
 export function loadGongmunContext(force = false): string {
   const now = Date.now();
@@ -33,11 +53,18 @@ export function loadGongmunContext(force = false): string {
       .filter((f) => /\.(txt|md)$/i.test(f) && !/^README/i.test(f))
       .sort();
     const parts: string[] = [];
+    const fundSet = new Set<string>(MASTER_DOC_FUNDS);
     for (const f of files) {
       const content = fs.readFileSync(path.join(GONGMUN_DIR, f), 'utf-8');
       parts.push(`### 공문: ${f}\n\n${content.trim()}`);
+      // 파일명에서 자금명 추출 (확장자/언더바/날짜 제거)
+      const base = f.replace(/\.(txt|md)$/i, '');
+      if (/자금|융자|대출/.test(base) && !/공고|운용|계획|README/.test(base)) {
+        fundSet.add(base.replace(/_/g, ' ').trim());
+      }
     }
     cachedGongmun = parts.join('\n\n---\n\n');
+    cachedGongmunFunds = Array.from(fundSet);
     cachedAt = now;
     return cachedGongmun;
   } catch (err) {
@@ -218,30 +245,33 @@ export async function predictFunding(customer: any, signal?: AbortSignal): Promi
 
   const summary = summarizeCustomerForPredict(customer);
   const gongmun = loadGongmunContext();
+  const fundList = getGongmunFundList();
+  const fundListText = fundList.map((f) => `- ${f}`).join('\n');
 
   const system = `당신은 한국 정책자금 컨설팅 전문가 AI입니다. 아래 "정책자금 공문"만을 근거로 이 고객이 신청 가능한 정책자금을 가려냅니다.
 
+[허용된 자금명 화이트리스트 — 이 목록 외의 자금명은 절대 출력 금지]
+${fundListText}
+
 [출력 규칙 — 매우 중요]
-- 공문에 명시된 자금만 추천하세요. 공문에 없는 자금은 절대 언급하지 마세요.
-- 설명, 근거, 표, 서론·결론은 모두 생략하세요.
-- 오직 아래 형식의 키워드 리스트만 출력하세요:
+- 위 화이트리스트에 있는 자금명만 출력하세요. 다른 자금명을 만들거나 추측하지 마세요.
+- 같은 자금을 두 번 이상 출력하지 마세요.
+- 설명, 근거, 표, 서론·결론, 마크다운은 모두 금지.
+- 오직 아래 정확한 형식만 출력하세요:
 
 [가능]
-- 자금명1
-- 자금명2
-...
+- 자금명
+- 자금명
 
 [조건부]
-- 자금명 (한 줄 사유, 20자 이내)
-...
+- 자금명 (사유 20자 이내)
 
 [불가]
-- 자금명 (한 줄 사유, 20자 이내)
-...
+- 자금명 (사유 20자 이내)
 
-- 자금명은 공문상의 정식 명칭을 그대로 쓰세요.
 - 각 섹션이 비어 있으면 "- 없음" 한 줄만 적으세요.
-- 그 외의 어떤 추가 텍스트도 출력하지 마세요.
+- 모든 자금을 한 섹션에 한 번씩만 분류하세요. 같은 자금을 여러 섹션에 중복 배치 금지.
+- 출력 끝에는 어떤 추가 텍스트도 붙이지 마세요.
 
 ==================== 정책자금 공문 ====================
 ${gongmun || '※ 공문 없음'}
@@ -264,7 +294,13 @@ ${summary}
       ],
       stream: false,
       think: false,
-      options: { num_ctx: OLLAMA_NUM_CTX },
+      options: {
+        num_ctx: OLLAMA_NUM_CTX,
+        temperature: 0,
+        top_p: 0.1,
+        repeat_penalty: 1.4,
+        num_predict: 600,
+      },
     }),
     signal,
   });
@@ -275,7 +311,55 @@ ${summary}
   const data: any = await response.json();
   const content: string = data?.message?.content || '';
   if (!content.trim()) throw new Error('AI 응답이 비어있습니다.');
-  return content.trim();
+  return sanitizePrediction(content.trim(), fundList);
+}
+
+// 화이트리스트 외 자금명 라인 제거 + 중복 제거 + 섹션 정리
+function sanitizePrediction(raw: string, whitelist: string[]): string {
+  const wl = whitelist.map((w) => w.replace(/\s+/g, ''));
+  const sections: Record<string, string[]> = { '[가능]': [], '[조건부]': [], '[불가]': [] };
+  let cur: string | null = null;
+  const seen = new Set<string>();
+
+  for (const line of raw.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t) continue;
+    if (/^\[가능\]/.test(t)) { cur = '[가능]'; continue; }
+    if (/^\[조건부\]/.test(t)) { cur = '[조건부]'; continue; }
+    if (/^\[불가\]/.test(t)) { cur = '[불가]'; continue; }
+    if (!cur) continue;
+    if (!/^[-•*]/.test(t)) continue;
+
+    const body = t.replace(/^[-•*]\s*/, '');
+    if (/^없음/.test(body)) continue;
+
+    // "자금명 (사유)" 분리
+    const m = body.match(/^([^()（）]+?)(?:\s*[(（](.+)[)）])?\s*$/);
+    if (!m) continue;
+    const fundRaw = m[1].trim();
+    const reason = (m[2] || '').trim();
+    const fundKey = fundRaw.replace(/\s+/g, '');
+
+    // 화이트리스트 부분일치 (양방향 substring)
+    const matched = wl.find((w) => fundKey.includes(w) || w.includes(fundKey));
+    if (!matched) continue;
+
+    const dedupeKey = matched;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    // 원본 화이트리스트 표기로 정규화
+    const original = whitelist.find((w) => w.replace(/\s+/g, '') === matched) || fundRaw;
+    sections[cur].push(reason ? `- ${original} (${reason.slice(0, 30)})` : `- ${original}`);
+  }
+
+  const out: string[] = [];
+  for (const sec of ['[가능]', '[조건부]', '[불가]']) {
+    out.push(sec);
+    out.push(sections[sec].length > 0 ? sections[sec].join('\n') : '- 없음');
+    out.push('');
+  }
+  return out.join('\n').trim();
 }
 
 export function checkAiConfig(): { configured: boolean; missing: string[] } {
