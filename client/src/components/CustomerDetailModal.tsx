@@ -1989,29 +1989,45 @@ export function CustomerDetailModal({
   }, [isOpen, formData.id, isNewCustomer]);
 
   // AI 대화 메시지 실시간 동기화 (자동 자금 예측 결과 자동 반영용)
+  const aiPrevAssistantCountRef = useRef<number>(-1);
   useEffect(() => {
     if (!isOpen || !aiConversationId) return;
+    aiPrevAssistantCountRef.current = -1; // 새 대화 진입 시 초기값 (첫 스냅샷은 baseline)
     const unsub = onSnapshot(
       doc(db, "ai_conversations", aiConversationId),
       (snap) => {
         if (!snap.exists()) return;
         const data: any = snap.data();
         const msgs = Array.isArray(data.messages) ? data.messages : [];
-        setAiMessages(
-          msgs.map((m: any, idx: number) => ({
-            id: `ai_${aiConversationId}_${idx}`,
-            role: m.role,
-            content: m.content,
-            created_at:
-              m.created_at?.toDate?.() ||
-              (m.created_at ? new Date(m.created_at) : new Date()),
-          })),
-        );
+        const mapped = msgs.map((m: any, idx: number) => ({
+          id: `ai_${aiConversationId}_${idx}`,
+          role: m.role,
+          content: m.content,
+          created_at:
+            m.created_at?.toDate?.() ||
+            (m.created_at ? new Date(m.created_at) : new Date()),
+        }));
+        setAiMessages(mapped);
+
+        // 신규 assistant 메시지 감지 → 자금예측 결과면 완료 토스트
+        const assistantCount = mapped.filter((m) => m.role === "assistant").length;
+        if (aiPrevAssistantCountRef.current === -1) {
+          aiPrevAssistantCountRef.current = assistantCount; // 첫 스냅샷은 baseline
+        } else if (assistantCount > aiPrevAssistantCountRef.current) {
+          const last = [...mapped].reverse().find((m) => m.role === "assistant");
+          if (last?.content?.startsWith("[AI 자동 자금 예측]")) {
+            toast({
+              title: "AI 자동 자금 예측 완료",
+              description: "AI 채팅 탭에서 결과를 확인하세요.",
+            });
+          }
+          aiPrevAssistantCountRef.current = assistantCount;
+        }
       },
       (err) => console.warn("[AI] 대화 onSnapshot 오류:", err),
     );
     return () => unsub();
-  }, [isOpen, aiConversationId]);
+  }, [isOpen, aiConversationId, toast]);
 
   // 모달 닫을 때 상태 초기화 + 진행 중인 스트리밍 중단
   useEffect(() => {
