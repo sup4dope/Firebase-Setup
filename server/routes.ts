@@ -2385,36 +2385,82 @@ export async function registerRoutes(
 
       aiPredictInFlight.add(customerId);
       // ⚡ 즉시 응답 (백그라운드 처리)
-      res.status(202).json({ accepted: true, message: 'AI 분석을 백그라운드에서 진행합니다. 완료되면 메모에 자동 표시됩니다.' });
+      res.status(202).json({ accepted: true, message: 'AI 분석을 백그라운드에서 진행합니다. 완료되면 AI 채팅 탭에 자동 표시됩니다.' });
 
       // ===== 백그라운드 처리 =====
+      const triggerUid = userUid;
+      const triggerEmail = req.user?.email || '';
       (async () => {
         const startedAt = Date.now();
         try {
-          console.log(`[AI Predict BG] 시작: customer=${customerId}`);
+          console.log(`[AI Predict BG] 시작: customer=${customerId}, user=${triggerUid}`);
           const content = await predictFunding(customer);
           if (!content) throw new Error('AI 응답 비어있음');
 
           const now = admin.firestore.Timestamp.now();
-          const memoEntry = {
-            id: `ai-funding-${Date.now()}`,
+          const assistantMsg = {
+            role: 'assistant' as const,
             content: `[AI 자동 자금 예측]\n\n${content}`,
-            author_id: 'ai',
-            author_name: 'AI 자동 분석',
-            created_at: now.toDate().toISOString(),
+            created_at: now.toDate(),
           };
 
+          // ===== 트리거한 사용자의 ai_conversations에 메시지 append =====
+          //   - 기존 대화가 있으면 가장 최근 것을 사용
+          //   - 없으면 새로 생성 (system_prompt는 채팅 시작 시 갱신되므로 최소값)
+          const customerSummary = summarizeCustomer(customer);
+          const systemPrompt = buildSystemPrompt(customerSummary);
+
+          let convRef: FirebaseFirestore.DocumentReference;
+          try {
+            const existingSnap = await firestore.collection('ai_conversations')
+              .where('customer_id', '==', customerId)
+              .where('user_id', '==', triggerUid)
+              .orderBy('updated_at', 'desc')
+              .limit(1)
+              .get();
+            if (!existingSnap.empty) {
+              convRef = existingSnap.docs[0].ref;
+            } else {
+              convRef = await firestore.collection('ai_conversations').add({
+                customer_id: customerId,
+                user_id: triggerUid,
+                user_email: triggerEmail,
+                system_prompt: systemPrompt,
+                messages: [],
+                created_at: now.toDate(),
+                updated_at: now.toDate(),
+              });
+            }
+          } catch (convErr: any) {
+            // 인덱스 누락 등 — 그래도 새 대화로 생성
+            console.warn('[AI Predict BG] 기존 대화 조회 실패, 신규 생성:', convErr?.message);
+            convRef = await firestore.collection('ai_conversations').add({
+              customer_id: customerId,
+              user_id: triggerUid,
+              user_email: triggerEmail,
+              system_prompt: systemPrompt,
+              messages: [],
+              created_at: now.toDate(),
+              updated_at: now.toDate(),
+            });
+          }
+
+          // ===== 트랜잭션: 대화 메시지 append + 고객 시그니처 compare-and-set =====
           const txResult = await firestore.runTransaction(async (tx) => {
-            const fresh = await tx.get(customerRef);
-            if (!fresh.exists) throw new Error('고객이 삭제됨');
-            const data: any = fresh.data();
-            if (data.ai_funding_prediction_signature === signature && !force) {
+            const freshCust = await tx.get(customerRef);
+            if (!freshCust.exists) throw new Error('고객이 삭제됨');
+            const custData: any = freshCust.data();
+            if (custData.ai_funding_prediction_signature === signature && !force) {
               return { skipped: true as const };
             }
-            const existing = Array.isArray(data.memo_history) ? data.memo_history : [];
+            const freshConv = await tx.get(convRef);
+            const convData: any = freshConv.exists ? freshConv.data() : { messages: [] };
+            const freshMessages = Array.isArray(convData.messages) ? convData.messages : [];
+            tx.set(convRef, {
+              messages: [...freshMessages, assistantMsg],
+              updated_at: now.toDate(),
+            }, { merge: true });
             tx.update(customerRef, {
-              memo_history: [...existing, memoEntry],
-              recent_memo: `[AI 자동 자금 예측] ${content.slice(0, 200)}`,
               ai_funding_prediction_signature: signature,
               ai_funding_prediction_at: now,
               updated_at: now,
@@ -2422,22 +2468,10 @@ export async function registerRoutes(
             return { skipped: false as const };
           });
 
-          if (!txResult.skipped) {
-            try {
-              await firestore.collection('counseling_logs').add({
-                customer_id: customerId,
-                content: memoEntry.content,
-                author_id: 'ai',
-                author_name: 'AI 자동 분석',
-                created_at: now,
-                type: 'ai_funding_prediction',
-              });
-            } catch (logErr) {
-              console.warn('[AI Predict BG] counseling_logs 저장 실패:', logErr);
-            }
-            console.log(`[AI Predict BG] 완료: customer=${customerId}, 소요=${Date.now() - startedAt}ms`);
-          } else {
+          if (txResult.skipped) {
             console.log(`[AI Predict BG] 스킵(트랜잭션 시점에 이미 처리됨): customer=${customerId}`);
+          } else {
+            console.log(`[AI Predict BG] 완료: customer=${customerId}, conv=${convRef.id}, 소요=${Date.now() - startedAt}ms`);
           }
         } catch (err: any) {
           console.error(`[AI Predict BG] 실패: customer=${customerId}, 소요=${Date.now() - startedAt}ms,`, err?.message || err);

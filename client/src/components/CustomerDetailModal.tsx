@@ -1988,6 +1988,31 @@ export function CustomerDetailModal({
     })();
   }, [isOpen, formData.id, isNewCustomer]);
 
+  // AI 대화 메시지 실시간 동기화 (자동 자금 예측 결과 자동 반영용)
+  useEffect(() => {
+    if (!isOpen || !aiConversationId) return;
+    const unsub = onSnapshot(
+      doc(db, "ai_conversations", aiConversationId),
+      (snap) => {
+        if (!snap.exists()) return;
+        const data: any = snap.data();
+        const msgs = Array.isArray(data.messages) ? data.messages : [];
+        setAiMessages(
+          msgs.map((m: any, idx: number) => ({
+            id: `ai_${aiConversationId}_${idx}`,
+            role: m.role,
+            content: m.content,
+            created_at:
+              m.created_at?.toDate?.() ||
+              (m.created_at ? new Date(m.created_at) : new Date()),
+          })),
+        );
+      },
+      (err) => console.warn("[AI] 대화 onSnapshot 오류:", err),
+    );
+    return () => unsub();
+  }, [isOpen, aiConversationId]);
+
   // 모달 닫을 때 상태 초기화 + 진행 중인 스트리밍 중단
   useEffect(() => {
     if (!isOpen) {
@@ -2056,7 +2081,7 @@ export function CustomerDetailModal({
           console.log("⏳ [AI 자동 자금 예측] 백그라운드 분석 시작");
           toast({
             title: "AI 자동 자금 예측 시작",
-            description: "분석에 1~2분 정도 소요됩니다. 완료되면 메모 탭에 자동 표시됩니다.",
+            description: "분석에 1~2분 정도 소요됩니다. 완료되면 AI 채팅 탭에 자동 표시됩니다.",
           });
         } else if (r?.success) {
           console.log("✅ [AI 자동 자금 예측] 메모 저장 완료");
