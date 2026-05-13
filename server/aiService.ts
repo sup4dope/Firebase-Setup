@@ -117,6 +117,8 @@ export async function streamChat(opts: OllamaChatOptions): Promise<void> {
         model: OLLAMA_MODEL,
         messages: opts.messages,
         stream: true,
+        // thinking 모델(qwen3, deepseek-r1 등)의 reasoning은 숨기고 최종 답변만 스트리밍
+        think: false,
         options: { num_ctx: OLLAMA_NUM_CTX },
       }),
       signal: opts.signal,
