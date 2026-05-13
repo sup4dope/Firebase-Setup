@@ -170,6 +170,61 @@ export async function streamChat(opts: OllamaChatOptions): Promise<void> {
   }
 }
 
+// ===== 자동 자금 예측 (비스트리밍, 1회 호출) =====
+export async function predictFunding(customer: any, signal?: AbortSignal): Promise<string> {
+  if (!OLLAMA_BASE_URL) throw new Error('OLLAMA_BASE_URL이 설정되지 않았습니다.');
+  const url = `${OLLAMA_BASE_URL.replace(/\/$/, '')}/api/chat`;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (OLLAMA_API_KEY) headers.Authorization = `Bearer ${OLLAMA_API_KEY}`;
+
+  const summary = summarizeCustomer(customer);
+  const gongmun = loadGongmunContext();
+
+  const system = `당신은 한국 정책자금 컨설팅 전문가 AI입니다. 아래 "정책자금 공문"만을 근거로 이 고객이 신청 가능한 정책자금을 분석합니다.
+
+[분석 규칙]
+- 공문에 명시된 자금만 추천하세요. 공문에 없는 자금은 절대 언급하지 마세요.
+- 각 자금별로 다음 항목을 표 또는 항목 형태로 정리하세요:
+  1) 자금명 (출처 공문명)
+  2) 신청 가능 여부 (가능 / 조건부 가능 / 불가)
+  3) 예상 한도 (공문 기준 금액)
+  4) 금리 / 상환조건
+  5) 핵심 자격요건 충족 여부 (업력, 매출, 신용점수, 부채 기준)
+  6) 추가 확인 필요 사항
+- 마지막에 "추천 우선순위 TOP 3"를 한 줄 요약으로 제시하세요.
+- 한국어, 간결하게, 사실만 기재.
+
+==================== 정책자금 공문 ====================
+${gongmun || '※ 공문 없음'}
+==================================================`;
+
+  const user = `다음 고객의 신청 가능 정책자금을 분석해주세요.\n\n${summary}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      stream: false,
+      think: false,
+      options: { num_ctx: OLLAMA_NUM_CTX },
+    }),
+    signal,
+  });
+  if (!response.ok) {
+    const txt = await response.text().catch(() => '');
+    throw new Error(`AI 서버 오류 (${response.status}): ${txt.slice(0, 300)}`);
+  }
+  const data: any = await response.json();
+  const content: string = data?.message?.content || '';
+  if (!content.trim()) throw new Error('AI 응답이 비어있습니다.');
+  return content.trim();
+}
+
 export function checkAiConfig(): { configured: boolean; missing: string[] } {
   const missing: string[] = [];
   if (!OLLAMA_BASE_URL) missing.push('OLLAMA_BASE_URL');

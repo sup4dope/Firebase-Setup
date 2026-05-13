@@ -7,7 +7,7 @@ import { setUserCustomClaims, syncAllUserClaims, getUserCustomClaims, requireAut
 import { sendConsultationAlimtalk, sendBulkDelayAlimtalk, sendAssignmentAlimtalk, sendBusinessCardAlimtalk, sendLongAbsenceAlimtalk, getBranchFromRegion, checkSolapiConfig } from "./solapiService";
 import { getTemplates, getTemplateDetail, createDocument, getDocument, getDocuments, downloadDocument, checkEformsignConfig, mapEformsignStatus, extractEformsignStatus, cancelDocument, getDocumentReadStatus, resendDocument } from "./eformsignService";
 import { sendBill, cancelBill, destroyBill, readBill, resendBill, getBalance, checkPaymintConfig, getPaymintStateLabel, type ApprovalCallbackData } from "./paymintService";
-import { streamChat, buildSystemPrompt, summarizeCustomer, checkAiConfig, loadGongmunContext, trimHistory, type ChatMessage } from "./aiService";
+import { streamChat, buildSystemPrompt, summarizeCustomer, checkAiConfig, loadGongmunContext, trimHistory, predictFunding, type ChatMessage } from "./aiService";
 
 const FieldValue = admin.firestore.FieldValue;
 
@@ -2315,6 +2315,123 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err: any) {
       console.error('[AI Delete] 오류:', err);
+      res.status(500).json({ error: err?.message || String(err) });
+    }
+  });
+
+  // 자동 자금 예측 (3종 OCR + 신용점수 완료 시 호출 → AI 메모로 저장)
+  app.post("/api/ai/predict-funding", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { customerId, force } = req.body || {};
+      if (!customerId) return res.status(400).json({ error: 'customerId 필수' });
+
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const customerRef = firestore.collection('customers').doc(customerId);
+      const snap = await customerRef.get();
+      if (!snap.exists) return res.status(404).json({ error: '고객 없음' });
+      const customer: any = { id: customerId, ...(snap.data() as any) };
+
+      // ===== RBAC: super_admin 전체 / team_leader 본인 팀 / staff 본인 담당 =====
+      const userRole = req.user?.role || 'staff';
+      const userUid = req.user?.uid || '';
+      const userTeamId = (req.user as any)?.team_id || '';
+      if (userRole !== 'super_admin') {
+        if (userRole === 'team_leader') {
+          if (!userTeamId || customer.team_id !== userTeamId) {
+            return res.status(403).json({ error: '해당 고객 접근 권한 없음' });
+          }
+        } else {
+          // staff
+          if (customer.manager_id !== userUid) {
+            return res.status(403).json({ error: '본인 담당 고객만 분석 가능합니다.' });
+          }
+        }
+      }
+
+      // ===== 4가지 조건 서버 측 재검증 =====
+      const hasCredit = Number(customer.credit_score) > 0;
+      const hasBiz = !!customer.business_registration_number;
+      const hasSales =
+        Number(customer.recent_sales) > 0 ||
+        Number(customer.sales_y1) > 0 ||
+        Number(customer.sales_y2) > 0 ||
+        Number(customer.sales_y3) > 0;
+      const hasObligations = Array.isArray(customer.financial_obligations) && customer.financial_obligations.length > 0;
+      if (!(hasCredit && hasBiz && hasSales && hasObligations)) {
+        return res.status(400).json({ error: '필수 정보 부족 (신용점수/사업자등록/매출/신용공여)' });
+      }
+
+      // ===== 시그니처 (채무 상세 필드 포함) =====
+      const obligationsForSig = (customer.financial_obligations || []).map((o: any) => ({
+        t: o.type, i: o.institution, p: o.product_name, a: o.account_type,
+        b: o.balance, oc: o.occurred_at, m: o.maturity_date,
+      }));
+      const signature = JSON.stringify({
+        cs: customer.credit_score,
+        brn: customer.business_registration_number,
+        s: [customer.recent_sales, customer.sales_y1, customer.sales_y2, customer.sales_y3],
+        ob: obligationsForSig,
+      });
+      if (customer.ai_funding_prediction_signature === signature && !force) {
+        return res.json({ skipped: true, reason: '동일 데이터로 이미 분석됨' });
+      }
+
+      // ===== AI 호출 (트랜잭션 외부에서 - 시간 소요) =====
+      const content = await predictFunding(customer);
+      if (!content) return res.status(500).json({ error: 'AI 응답 비어있음' });
+
+      // ===== 트랜잭션으로 시그니처 compare-and-set + memo append =====
+      const now = admin.firestore.Timestamp.now();
+      const memoEntry = {
+        id: `ai-funding-${Date.now()}`,
+        content: `[AI 자동 자금 예측]\n\n${content}`,
+        author_id: 'ai',
+        author_name: 'AI 자동 분석',
+        created_at: now.toDate().toISOString(),
+      };
+
+      const txResult = await firestore.runTransaction(async (tx) => {
+        const fresh = await tx.get(customerRef);
+        if (!fresh.exists) throw new Error('고객 없음');
+        const data: any = fresh.data();
+        if (data.ai_funding_prediction_signature === signature && !force) {
+          return { skipped: true as const };
+        }
+        const existing = Array.isArray(data.memo_history) ? data.memo_history : [];
+        tx.update(customerRef, {
+          memo_history: [...existing, memoEntry],
+          recent_memo: `[AI 자동 자금 예측] ${content.slice(0, 200)}`,
+          ai_funding_prediction_signature: signature,
+          ai_funding_prediction_at: now,
+          updated_at: now,
+        });
+        return { skipped: false as const };
+      });
+
+      if (txResult.skipped) {
+        return res.json({ skipped: true, reason: '병행 요청에서 이미 처리됨' });
+      }
+
+      // counseling_logs 기록 (메모 탭 onSnapshot 즉시 반영) — 실패 시 명시적으로 응답에 표기
+      let logSaved = true;
+      try {
+        await firestore.collection('counseling_logs').add({
+          customer_id: customerId,
+          content: memoEntry.content,
+          author_id: 'ai',
+          author_name: 'AI 자동 분석',
+          created_at: now,
+          type: 'ai_funding_prediction',
+        });
+      } catch (logErr) {
+        console.warn('[AI Predict] counseling_logs 저장 실패:', logErr);
+        logSaved = false;
+      }
+
+      res.json({ success: true, memo: memoEntry, logSaved });
+    } catch (err: any) {
+      console.error('[AI Predict] 오류:', err);
       res.status(500).json({ error: err?.message || String(err) });
     }
   });

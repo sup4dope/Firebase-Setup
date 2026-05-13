@@ -50,6 +50,29 @@ export interface StreamAIChatOptions {
   signal?: AbortSignal;
 }
 
+export async function predictFunding(
+  customerId: string,
+  opts?: { force?: boolean; signal?: AbortSignal },
+): Promise<{
+  success?: boolean;
+  skipped?: boolean;
+  reason?: string;
+  logSaved?: boolean;
+  memo?: { id: string; content: string; author_name: string; created_at: string };
+}> {
+  const res = await authFetch('/api/ai/predict-funding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ customerId, force: !!opts?.force }),
+    signal: opts?.signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `자금 예측 실패 (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function streamAIChat(opts: StreamAIChatOptions): Promise<void> {
   let res: Response;
   try {

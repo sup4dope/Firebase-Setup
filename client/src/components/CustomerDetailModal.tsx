@@ -32,7 +32,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
 import { compressImage, validateFileSize, formatFileSize } from "@/lib/imageCompressor";
-import { startAIConversation, streamAIChat } from "@/lib/aiClient";
+import { startAIConversation, streamAIChat, predictFunding as apiPredictFunding } from "@/lib/aiClient";
 import { 
   extractBusinessRegistration, 
   isBusinessRegistrationFile, 
@@ -372,6 +372,12 @@ export function CustomerDetailModal({
   const [aiInitError, setAiInitError] = useState<string | null>(null);
   const aiStartedForCustomerRef = useRef<string | null>(null);
   const aiAbortRef = useRef<AbortController | null>(null);
+
+  // AI 자동 자금 예측 트리거 (마지막 시그니처 추적, 진행 중 플래그)
+  const aiPredictedSignatureRef = useRef<string>("");
+  const aiPredictingRef = useRef<boolean>(false);
+  const aiPredictAbortRef = useRef<AbortController | null>(null);
+  const [aiPredictRunning, setAiPredictRunning] = useState(false);
 
   // OCR 자동 입력 하이라이트 상태
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
@@ -1992,8 +1998,108 @@ export function CustomerDetailModal({
       setAiMessages([]);
       setAiInitError(null);
       setAiIsStreaming(false);
+      aiPredictedSignatureRef.current = "";
+      aiPredictingRef.current = false;
+      aiPredictAbortRef.current?.abort();
+      aiPredictAbortRef.current = null;
+      setAiPredictRunning(false);
     }
   }, [isOpen]);
+
+  // 자동 자금 예측: 신용점수 + 사업자등록번호 + 매출 + 신용공여 4종 모두 충족 시 1회 호출
+  // 데이터가 바뀔 때마다 시그니처가 갱신되어 재호출됨 (서버에서도 시그니처 비교)
+  useEffect(() => {
+    const customerId = formData.id;
+    if (!isOpen || !customerId || isNewCustomer) return;
+
+    const creditScore = Number(formData.credit_score || 0);
+    const brn = (formData.business_registration_number || "").trim();
+    const sales =
+      Number(formData.recent_sales || 0) +
+      Number(formData.sales_y1 || 0) +
+      Number(formData.sales_y2 || 0) +
+      Number(formData.sales_y3 || 0);
+    const obligations = financialObligations || [];
+
+    if (creditScore <= 0) return;
+    if (!brn) return;
+    if (sales <= 0) return;
+    if (obligations.length === 0) return;
+
+    const signature = JSON.stringify({
+      cs: creditScore,
+      brn,
+      s: [formData.recent_sales, formData.sales_y1, formData.sales_y2, formData.sales_y3],
+      ob: obligations.length,
+      obSum: obligations.reduce((a, x) => a + (Number(x.balance) || 0), 0),
+    });
+    if (aiPredictedSignatureRef.current === signature) return;
+    if (aiPredictingRef.current) return;
+
+    aiPredictingRef.current = true;
+    aiPredictedSignatureRef.current = signature;
+    setAiPredictRunning(true);
+
+    // 잦은 입력으로 인한 중복 호출을 막기 위해 약간 디바운스
+    const timer = setTimeout(async () => {
+      // 이전 진행 중 요청 취소
+      aiPredictAbortRef.current?.abort();
+      const ac = new AbortController();
+      aiPredictAbortRef.current = ac;
+      try {
+        console.log("🤖 [AI 자동 자금 예측] 호출 시작");
+        const result = await apiPredictFunding(customerId, { signal: ac.signal });
+        if (result.skipped) {
+          console.log("ℹ️ [AI 자동 자금 예측] 동일 데이터 - 스킵");
+        } else if (result.success) {
+          console.log("✅ [AI 자동 자금 예측] 메모 저장 완료");
+          toast({
+            title: "AI 자동 자금 예측 완료",
+            description: "분석 결과가 메모에 저장되었습니다.",
+          });
+          // formData.memo_history 동기화 (모달 메모 탭 즉시 반영용)
+          try {
+            const customerRef = doc(db, "customers", customerId);
+            const snap = await getDoc(customerRef);
+            if (snap.exists()) {
+              const mh = (snap.data() as any).memo_history || [];
+              setFormData((prev) => ({ ...prev, memo_history: mh }));
+            }
+          } catch {}
+        }
+      } catch (err: any) {
+        if (err?.name === "AbortError") {
+          console.log("⏹️ [AI 자동 자금 예측] 요청 취소됨");
+          return;
+        }
+        console.error("❌ [AI 자동 자금 예측] 실패:", err);
+        // 실패 시 시그니처 초기화하여 재시도 가능
+        aiPredictedSignatureRef.current = "";
+        toast({
+          title: "AI 자동 자금 예측 실패",
+          description: err?.message || "잠시 후 다시 시도됩니다.",
+          variant: "destructive",
+        });
+      } finally {
+        if (aiPredictAbortRef.current === ac) aiPredictAbortRef.current = null;
+        aiPredictingRef.current = false;
+        setAiPredictRunning(false);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [
+    isOpen,
+    isNewCustomer,
+    formData.id,
+    formData.credit_score,
+    formData.business_registration_number,
+    formData.recent_sales,
+    formData.sales_y1,
+    formData.sales_y2,
+    formData.sales_y3,
+    financialObligations,
+  ]);
 
   // 1. 실제 저장 로직 (매번 재생성되어도 됨 - 최신 상태 참조)
   const runSaveLogic = async (dataToSave: any) => {
