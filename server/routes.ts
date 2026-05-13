@@ -2320,6 +2320,10 @@ export async function registerRoutes(
   });
 
   // 자동 자금 예측 (3종 OCR + 신용점수 완료 시 호출 → AI 메모로 저장)
+  // ⚡ AI 호출이 60초+ 걸릴 수 있어 fire-and-forget 패턴으로 처리.
+  //    검증 후 즉시 202 응답 → 백그라운드에서 AI 호출 + 트랜잭션 + 메모/로그 저장.
+  //    클라이언트는 counseling_logs onSnapshot으로 완료 시 자동 반영됨.
+  const aiPredictInFlight = new Set<string>(); // 서버 메모리 lock (customerId)
   app.post("/api/ai/predict-funding", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { customerId, force } = req.body || {};
@@ -2332,7 +2336,7 @@ export async function registerRoutes(
       if (!snap.exists) return res.status(404).json({ error: '고객 없음' });
       const customer: any = { id: customerId, ...(snap.data() as any) };
 
-      // ===== RBAC: super_admin 전체 / team_leader 본인 팀 / staff 본인 담당 =====
+      // ===== RBAC =====
       const userRole = req.user?.role || 'staff';
       const userUid = req.user?.uid || '';
       const userTeamId = (req.user as any)?.team_id || '';
@@ -2342,14 +2346,13 @@ export async function registerRoutes(
             return res.status(403).json({ error: '해당 고객 접근 권한 없음' });
           }
         } else {
-          // staff
           if (customer.manager_id !== userUid) {
             return res.status(403).json({ error: '본인 담당 고객만 분석 가능합니다.' });
           }
         }
       }
 
-      // ===== 4가지 조건 서버 측 재검증 =====
+      // ===== 4조건 검증 =====
       const hasCredit = Number(customer.credit_score) > 0;
       const hasBiz = !!customer.business_registration_number;
       const hasSales =
@@ -2362,7 +2365,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: '필수 정보 부족 (신용점수/사업자등록/매출/신용공여)' });
       }
 
-      // ===== 시그니처 (채무 상세 필드 포함) =====
+      // ===== 시그니처 =====
       const obligationsForSig = (customer.financial_obligations || []).map((o: any) => ({
         t: o.type, i: o.institution, p: o.product_name, a: o.account_type,
         b: o.balance, oc: o.occurred_at, m: o.maturity_date,
@@ -2376,63 +2379,77 @@ export async function registerRoutes(
       if (customer.ai_funding_prediction_signature === signature && !force) {
         return res.json({ skipped: true, reason: '동일 데이터로 이미 분석됨' });
       }
+      if (aiPredictInFlight.has(customerId)) {
+        return res.json({ skipped: true, reason: '이미 백그라운드에서 분석 중' });
+      }
 
-      // ===== AI 호출 (트랜잭션 외부에서 - 시간 소요) =====
-      const content = await predictFunding(customer);
-      if (!content) return res.status(500).json({ error: 'AI 응답 비어있음' });
+      aiPredictInFlight.add(customerId);
+      // ⚡ 즉시 응답 (백그라운드 처리)
+      res.status(202).json({ accepted: true, message: 'AI 분석을 백그라운드에서 진행합니다. 완료되면 메모에 자동 표시됩니다.' });
 
-      // ===== 트랜잭션으로 시그니처 compare-and-set + memo append =====
-      const now = admin.firestore.Timestamp.now();
-      const memoEntry = {
-        id: `ai-funding-${Date.now()}`,
-        content: `[AI 자동 자금 예측]\n\n${content}`,
-        author_id: 'ai',
-        author_name: 'AI 자동 분석',
-        created_at: now.toDate().toISOString(),
-      };
+      // ===== 백그라운드 처리 =====
+      (async () => {
+        const startedAt = Date.now();
+        try {
+          console.log(`[AI Predict BG] 시작: customer=${customerId}`);
+          const content = await predictFunding(customer);
+          if (!content) throw new Error('AI 응답 비어있음');
 
-      const txResult = await firestore.runTransaction(async (tx) => {
-        const fresh = await tx.get(customerRef);
-        if (!fresh.exists) throw new Error('고객 없음');
-        const data: any = fresh.data();
-        if (data.ai_funding_prediction_signature === signature && !force) {
-          return { skipped: true as const };
+          const now = admin.firestore.Timestamp.now();
+          const memoEntry = {
+            id: `ai-funding-${Date.now()}`,
+            content: `[AI 자동 자금 예측]\n\n${content}`,
+            author_id: 'ai',
+            author_name: 'AI 자동 분석',
+            created_at: now.toDate().toISOString(),
+          };
+
+          const txResult = await firestore.runTransaction(async (tx) => {
+            const fresh = await tx.get(customerRef);
+            if (!fresh.exists) throw new Error('고객이 삭제됨');
+            const data: any = fresh.data();
+            if (data.ai_funding_prediction_signature === signature && !force) {
+              return { skipped: true as const };
+            }
+            const existing = Array.isArray(data.memo_history) ? data.memo_history : [];
+            tx.update(customerRef, {
+              memo_history: [...existing, memoEntry],
+              recent_memo: `[AI 자동 자금 예측] ${content.slice(0, 200)}`,
+              ai_funding_prediction_signature: signature,
+              ai_funding_prediction_at: now,
+              updated_at: now,
+            });
+            return { skipped: false as const };
+          });
+
+          if (!txResult.skipped) {
+            try {
+              await firestore.collection('counseling_logs').add({
+                customer_id: customerId,
+                content: memoEntry.content,
+                author_id: 'ai',
+                author_name: 'AI 자동 분석',
+                created_at: now,
+                type: 'ai_funding_prediction',
+              });
+            } catch (logErr) {
+              console.warn('[AI Predict BG] counseling_logs 저장 실패:', logErr);
+            }
+            console.log(`[AI Predict BG] 완료: customer=${customerId}, 소요=${Date.now() - startedAt}ms`);
+          } else {
+            console.log(`[AI Predict BG] 스킵(트랜잭션 시점에 이미 처리됨): customer=${customerId}`);
+          }
+        } catch (err: any) {
+          console.error(`[AI Predict BG] 실패: customer=${customerId}, 소요=${Date.now() - startedAt}ms,`, err?.message || err);
+        } finally {
+          aiPredictInFlight.delete(customerId);
         }
-        const existing = Array.isArray(data.memo_history) ? data.memo_history : [];
-        tx.update(customerRef, {
-          memo_history: [...existing, memoEntry],
-          recent_memo: `[AI 자동 자금 예측] ${content.slice(0, 200)}`,
-          ai_funding_prediction_signature: signature,
-          ai_funding_prediction_at: now,
-          updated_at: now,
-        });
-        return { skipped: false as const };
-      });
-
-      if (txResult.skipped) {
-        return res.json({ skipped: true, reason: '병행 요청에서 이미 처리됨' });
-      }
-
-      // counseling_logs 기록 (메모 탭 onSnapshot 즉시 반영) — 실패 시 명시적으로 응답에 표기
-      let logSaved = true;
-      try {
-        await firestore.collection('counseling_logs').add({
-          customer_id: customerId,
-          content: memoEntry.content,
-          author_id: 'ai',
-          author_name: 'AI 자동 분석',
-          created_at: now,
-          type: 'ai_funding_prediction',
-        });
-      } catch (logErr) {
-        console.warn('[AI Predict] counseling_logs 저장 실패:', logErr);
-        logSaved = false;
-      }
-
-      res.json({ success: true, memo: memoEntry, logSaved });
+      })();
     } catch (err: any) {
-      console.error('[AI Predict] 오류:', err);
-      res.status(500).json({ error: err?.message || String(err) });
+      console.error('[AI Predict] 라우트 오류:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: err?.message || String(err) });
+      }
     }
   });
 

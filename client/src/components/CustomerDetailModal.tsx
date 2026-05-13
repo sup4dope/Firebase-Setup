@@ -2049,23 +2049,21 @@ export function CustomerDetailModal({
       try {
         console.log("🤖 [AI 자동 자금 예측] 호출 시작");
         const result = await apiPredictFunding(customerId, { signal: ac.signal });
-        if (result.skipped) {
-          console.log("ℹ️ [AI 자동 자금 예측] 동일 데이터 - 스킵");
-        } else if (result.success) {
+        const r: any = result;
+        if (r?.skipped) {
+          console.log("ℹ️ [AI 자동 자금 예측] 스킵:", r.reason);
+        } else if (r?.accepted) {
+          console.log("⏳ [AI 자동 자금 예측] 백그라운드 분석 시작");
+          toast({
+            title: "AI 자동 자금 예측 시작",
+            description: "분석에 1~2분 정도 소요됩니다. 완료되면 메모 탭에 자동 표시됩니다.",
+          });
+        } else if (r?.success) {
           console.log("✅ [AI 자동 자금 예측] 메모 저장 완료");
           toast({
             title: "AI 자동 자금 예측 완료",
             description: "분석 결과가 메모에 저장되었습니다.",
           });
-          // formData.memo_history 동기화 (모달 메모 탭 즉시 반영용)
-          try {
-            const customerRef = doc(db, "customers", customerId);
-            const snap = await getDoc(customerRef);
-            if (snap.exists()) {
-              const mh = (snap.data() as any).memo_history || [];
-              setFormData((prev) => ({ ...prev, memo_history: mh }));
-            }
-          } catch {}
         }
       } catch (err: any) {
         if (err?.name === "AbortError") {
