@@ -86,6 +86,7 @@ export async function streamAIChat(opts: StreamAIChatOptions): Promise<void> {
       signal: opts.signal,
     });
   } catch (err: any) {
+    if (err?.name === 'AbortError' || opts.signal?.aborted) return; // 의도적 취소는 무시
     opts.onError(new Error(err?.message || '네트워크 오류'));
     return;
   }
@@ -119,6 +120,7 @@ export async function streamAIChat(opts: StreamAIChatOptions): Promise<void> {
       }
     }
   } catch (err: any) {
+    if (err?.name === 'AbortError' || opts.signal?.aborted) return; // 의도적 취소는 무시 (BodyStreamBuffer was aborted 등)
     opts.onError(new Error(err?.message || '스트리밍 오류'));
   }
 }
