@@ -85,7 +85,7 @@ import {
   getCumulativeTaxReserve,
   getCumulativeSummary,
   getSettlementItems,
-  getCustomers,
+  getCustomersScoped,
   normalizeEntrySource,
 } from '@/lib/firestore';
 import type { Expense, ExpenseCategory, InsertExpense, SettlementItem, Customer } from '@shared/types';
@@ -308,7 +308,7 @@ export default function CompanySettlement() {
       const months = getMonthsForPeriod(selectedMonth);
       const isSummary = isPeriodSummary(selectedMonth);
       
-      const [allCustomers] = await Promise.all([getCustomers()]);
+      const [allCustomers] = await Promise.all([getCustomersScoped(user)]);
       setCustomers(allCustomers);
 
       if (isSummary) {

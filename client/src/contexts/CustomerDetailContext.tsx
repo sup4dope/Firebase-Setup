@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CustomerDetailModal } from '@/components/CustomerDetailModal';
-import { getCustomerById, updateCustomer, deleteCustomer, getCustomers, getUsers } from '@/lib/firestore';
+import { getCustomerById, updateCustomer, deleteCustomer, getCustomersScoped, getUsers } from '@/lib/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Customer, User } from '@shared/types';
@@ -38,15 +38,15 @@ export function CustomerDetailProvider({ children }: { children: ReactNode }) {
         console.warn('[CustomerDetailContext] users 로드 실패', e);
       }
     }
-    if (allCustomers.length === 0) {
+    if (allCustomers.length === 0 && user) {
       try {
-        const c = await getCustomers();
+        const c = await getCustomersScoped(user);
         setAllCustomers(c);
       } catch (e) {
         console.warn('[CustomerDetailContext] customers 로드 실패', e);
       }
     }
-  }, [users.length, allCustomers.length]);
+  }, [users.length, allCustomers.length, user]);
 
   const openCustomerDetailById = useCallback(async (customerId: string) => {
     if (!customerId) return;
@@ -71,8 +71,8 @@ export function CustomerDetailProvider({ children }: { children: ReactNode }) {
     await ensureRefData();
     // 최신 customers 스냅샷
     let pool = allCustomers;
-    if (pool.length === 0) {
-      try { pool = await getCustomers(); setAllCustomers(pool); } catch {}
+    if (pool.length === 0 && user) {
+      try { pool = await getCustomersScoped(user); setAllCustomers(pool); } catch {}
     }
     // 이름/회사명 트림 비교 (저장값에 후행 공백이 있는 경우 대비)
     const matches = pool.filter(c =>

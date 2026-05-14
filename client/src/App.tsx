@@ -37,9 +37,7 @@ import {
   getTodosByTeam,
   getUsers,
   getTeams,
-  getCustomers,
-  getCustomersByManager,
-  getCustomersByTeam,
+  getCustomersScoped,
   createTodo,
   updateTodo,
   deleteTodo,
@@ -86,15 +84,8 @@ function AuthenticatedApp() {
         }
         setTodos(fetchedTodos);
 
-        // Fetch customers for todo form
-        let fetchedCustomers: Customer[];
-        if (isSuperAdmin) {
-          fetchedCustomers = await getCustomers();
-        } else if (isTeamLeader && user.team_id) {
-          fetchedCustomers = await getCustomersByTeam(user.team_id);
-        } else {
-          fetchedCustomers = await getCustomersByManager(user.uid);
-        }
+        // Fetch customers for todo form (역할 기반 스코프)
+        const fetchedCustomers = await getCustomersScoped(user);
         setCustomers(fetchedCustomers);
       } catch (error) {
         console.error('Error fetching sidebar data:', error);

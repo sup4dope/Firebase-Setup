@@ -94,7 +94,7 @@ import { SalaryStatement, type SalaryItem } from '@/components/salary/salary-sta
 import {
   getSettlementItems,
   getUsers,
-  getCustomers,
+  getCustomersScoped,
   calculateMonthlySettlementSummary,
   syncCustomerSettlements,
   normalizeEntrySource,
@@ -194,7 +194,7 @@ export default function Settlements() {
         const [fetchedUsers, allItemsArrays, fetchedCustomers] = await Promise.all([
           getUsers(),
           Promise.all(months.map(m => getSettlementItems(m, managerId, teamId))),
-          getCustomers(),
+          getCustomersScoped(user),
         ]);
         
         setUsers(fetchedUsers);
@@ -205,7 +205,7 @@ export default function Settlements() {
         const [fetchedUsers, fetchedItems, fetchedCustomers] = await Promise.all([
           getUsers(),
           getSettlementItems(selectedMonth, managerId, teamId),
-          getCustomers(),
+          getCustomersScoped(user),
         ]);
         
         setUsers(fetchedUsers);

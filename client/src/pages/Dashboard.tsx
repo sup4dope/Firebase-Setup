@@ -16,9 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { calculateKPI } from '@/lib/kpi';
 import { fetchYearlyHolidays } from '@/lib/publicHolidays';
 import {
-  getCustomers,
-  getCustomersByManager,
-  getCustomersByTeam,
+  getCustomersScoped,
   getUsers,
   getTeams,
   getContractLogsForMonth,
@@ -212,13 +210,8 @@ export default function Dashboard() {
       try {
         const now = new Date();
         const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const fetchCustomersByRole = () => {
-          if (isSuperAdmin) return getCustomers();
-          if (isTeamLeader && user.team_id) return getCustomersByTeam(user.team_id);
-          return getCustomersByManager(user.uid);
-        };
         const [refreshedCustomers, refreshedSettlements] = await Promise.all([
-          fetchCustomersByRole(),
+          getCustomersScoped(user),
           getSettlementItems(currentMonthStr),
         ]);
         setCustomers(refreshedCustomers);
@@ -339,16 +332,8 @@ export default function Dashboard() {
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth() + 1;
       
-      // 고객 데이터 조회 함수 (역할 기반)
-      const fetchCustomersByRole = () => {
-        if (isSuperAdmin) {
-          return getCustomers();
-        } else if (isTeamLeader && user.team_id) {
-          return getCustomersByTeam(user.team_id);
-        } else {
-          return getCustomersByManager(user.uid);
-        }
-      };
+      // 고객 데이터 조회 함수 (역할 기반 - getCustomersScoped 헬퍼 사용)
+      const fetchCustomersByRole = () => getCustomersScoped(user);
 
       // 모든 데이터를 한번에 병렬 로딩 (statusLogs는 현재 월 계약 로그만)
       const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;

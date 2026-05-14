@@ -77,11 +77,21 @@ service cloud.firestore {
     // 4. 고객 정보
     // ========================================
     match /customers/{customerId} {
-      // [보안 강화 TODO] 역할별 read 제한은 별도 작업으로 분리 필요
-      // 현재 다음 호출처가 unscoped getCustomers()를 사용하므로 규칙 강화 시 동시 마이그레이션 필요:
-      //   - Stats.tsx, Settlements.tsx, ContractSendModal.tsx, HeaderRankings.tsx, CustomerDetailContext.tsx
-      // 또한 team_leader가 팀원 manager_id로 조회할 수 있어야 하므로 규칙에 팀원 매핑 또는 별도 인덱스 컬렉션 필요
-      allow read: if isAuthenticated();
+      // 읽기 권한 (역할별):
+      // - super_admin: 전체
+      // - team_leader: customer.team_id == 본인 팀(token.team_id) OR 본인이 담당(manager_id == auth.uid)
+      // - staff: 본인이 담당(manager_id == auth.uid)인 고객만
+      // 단일 문서 조회(getCustomerById)는 위 조건 만족 시 허용. 그 외에는 권한 거부됨.
+      // 호출처는 getCustomersScoped(user) 헬퍼를 통해 동일 정책으로 쿼리해야 함.
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (getRole() == 'team_leader' && (
+          resource.data.team_id == request.auth.token.team_id ||
+          resource.data.manager_id == request.auth.uid
+        )) ||
+        (getRole() == 'staff' && resource.data.manager_id == request.auth.uid)
+      );
+      // 생성/수정: 인증 사용자 (배정·메모·이력 갱신 등 광범위 동작 필요로 유지)
       allow create, update: if isAuthenticated();
       allow delete: if isSuperAdmin();
     }

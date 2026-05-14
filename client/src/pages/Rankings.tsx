@@ -44,7 +44,7 @@ import {
   ChevronRight,
   Search,
 } from 'lucide-react';
-import { getCustomers, getCustomersByManager, getCustomersByTeam, getUsers, getTeams } from '@/lib/firestore';
+import { getCustomersScoped, getUsers, getTeams } from '@/lib/firestore';
 import { useCustomerDetail } from '@/contexts/CustomerDetailContext';
 import type { Customer, User as UserType, Team } from '@shared/types';
 
@@ -260,43 +260,13 @@ export default function Rankings() {
       if (!user) return;
       setLoading(true);
       try {
-        // 역할별 데이터 조회 분리: 다운로드 자체를 최소화
-        // - super_admin: 전체
-        // - team_leader: 본인 팀 + 팀원 담당 고객 (팀 미배정시 본인 담당만)
-        // - staff: 본인 담당만
-        let customersPromise: Promise<Customer[]>;
-        if (user.role === 'super_admin') {
-          customersPromise = getCustomers();
-        } else if (user.role === 'team_leader' && user.team_id) {
-          customersPromise = getCustomersByTeam(user.team_id);
-        } else {
-          customersPromise = getCustomersByManager(user.uid);
-        }
+        // 역할별 데이터 조회: 헬퍼 사용 (Firestore Rules와 동일 정책)
         const [fetchedCustomers, fetchedUsers, fetchedTeams] = await Promise.all([
-          customersPromise,
+          getCustomersScoped(user),
           getUsers(),
           getTeams(),
         ]);
-        // team_leader: 팀원 담당이지만 customer.team_id 미동기화된 케이스도 추가 조회 후 머지
-        let merged = fetchedCustomers;
-        if (user.role === 'team_leader' && user.team_id) {
-          const teammates = fetchedUsers.filter(u => u.team_id === user.team_id && u.uid !== user.uid);
-          if (teammates.length > 0) {
-            const additionalLists = await Promise.all(
-              teammates.map(t => getCustomersByManager(t.uid).catch(() => []))
-            );
-            const seen = new Set(merged.map(c => c.id));
-            for (const list of additionalLists) {
-              for (const c of list) {
-                if (!seen.has(c.id)) {
-                  merged.push(c);
-                  seen.add(c.id);
-                }
-              }
-            }
-          }
-        }
-        setCustomers(merged);
+        setCustomers(fetchedCustomers);
         setUsers(fetchedUsers);
         setTeams(fetchedTeams);
       } catch (error) {

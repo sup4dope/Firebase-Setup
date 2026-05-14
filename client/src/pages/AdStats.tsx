@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { BarChart3, TrendingUp, AlertTriangle, Target, Trash2, FileCheck, Users, ChevronRight, Star, X, CalendarDays, Check, Filter } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, CartesianGrid } from 'recharts';
-import { getCustomers, normalizeEntrySource } from '@/lib/firestore';
+import { getCustomersScoped, normalizeEntrySource } from '@/lib/firestore';
 import { useEffect } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -108,7 +108,7 @@ const GRADE_DESCRIPTIONS: Record<DbGrade, string> = {
 };
 
 export default function AdStats() {
-  const { isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [settlements, setSettlements] = useState<SettlementItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,11 +121,11 @@ export default function AdStats() {
   const [detailModal, setDetailModal] = useState<{ open: boolean; source: string; customers: Customer[] }>({ open: false, source: '', customers: [] });
 
   useEffect(() => {
-    if (!isSuperAdmin) return;
+    if (!isSuperAdmin || !user) return;
     const load = async () => {
       try {
         const [data, settlementSnapshot] = await Promise.all([
-          getCustomers(),
+          getCustomersScoped(user),
           getDocs(collection(db, 'settlements')),
         ]);
         setCustomers(data);
@@ -136,7 +136,7 @@ export default function AdStats() {
       }
     };
     load();
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, user?.uid, user?.role, user?.team_id]);
 
   const isAllSelected = selectedSources.size === ENTRY_SOURCES.length;
   const activeSourcesToFilter = useMemo(() => {

@@ -3,7 +3,8 @@ import { format } from 'date-fns';
 import { Crown, Medal, Award } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
+import { getCustomersScoped, getUsers, getTeams } from '@/lib/firestore';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Customer, User, Team } from '@shared/types';
 
 const CATEGORY_BONUS: Record<string, number> = {
@@ -69,6 +70,7 @@ interface RankingEntry {
 }
 
 export function HeaderRankings() {
+  const { user } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,10 +78,11 @@ export function HeaderRankings() {
   const currentMonth = useMemo(() => format(new Date(), 'yyyy-MM'), []);
 
   useEffect(() => {
+    if (!user) return;
     const fetchData = async () => {
       try {
         const [fetchedCustomers, fetchedUsers] = await Promise.all([
-          getCustomers(),
+          getCustomersScoped(user),
           getUsers(),
         ]);
         setCustomers(fetchedCustomers);
@@ -91,7 +94,7 @@ export function HeaderRankings() {
       }
     };
     fetchData();
-  }, []);
+  }, [user?.uid, user?.role, user?.team_id]);
 
   const top3Rankings = useMemo(() => {
     const userMap = new Map(users.map(u => [u.uid, u]));

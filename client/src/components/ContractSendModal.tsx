@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/lib/firebase';
-import { getCustomers } from '@/lib/firestore';
+import { getCustomersScoped } from '@/lib/firestore';
 import {
   Dialog,
   DialogContent,
@@ -114,10 +114,10 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
   }, [open, preselectedCustomer]);
 
   useEffect(() => {
-    if (open && step === 'customer' && customers.length === 0) {
+    if (open && step === 'customer' && customers.length === 0 && user) {
       const fetchCustomers = async () => {
         try {
-          const data = await getCustomers();
+          const data = await getCustomersScoped(user);
           setCustomers(data);
         } catch (error) {
           console.error('Error fetching customers:', error);
@@ -125,7 +125,7 @@ export function ContractSendModal({ open, onOpenChange, onSuccess, preselectedCu
       };
       fetchCustomers();
     }
-  }, [open, step]);
+  }, [open, step, user]);
 
   const fetchTemplates = async () => {
     setTemplatesLoading(true);

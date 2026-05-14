@@ -336,6 +336,41 @@ export const getCustomersSince = async (sinceDate: Date): Promise<Customer[]> =>
   });
 };
 
+/**
+ * 역할 기반 고객 조회 헬퍼
+ * - super_admin: 전체
+ * - team_leader (team_id 보유): 팀 고객만 (customer.team_id 기준)
+ * - team_leader (team_id 없음) / staff: 본인이 담당하는 고객만
+ *
+ * Firestore Rules와 일치:
+ *   - super_admin: 전체
+ *   - team_leader: customer.team_id == token.team_id OR customer.manager_id == auth.uid
+ *     (stale customer.team_id 케이스를 포함하기 위해 두 쿼리를 병합/dedupe)
+ *   - staff: customer.manager_id == auth.uid
+ */
+export const getCustomersScoped = async (user: { uid: string; role: string; team_id?: string | null }): Promise<Customer[]> => {
+  if (!user) return [];
+  if (user.role === 'super_admin') return getCustomers();
+  if (user.role === 'team_leader' && user.team_id) {
+    const [byTeam, byManager] = await Promise.all([
+      getCustomersByTeam(user.team_id).catch(e => { console.warn('[getCustomersScoped] byTeam failed', e); return [] as Customer[]; }),
+      getCustomersByManager(user.uid).catch(e => { console.warn('[getCustomersScoped] byManager failed', e); return [] as Customer[]; }),
+    ]);
+    const seen = new Set<string>();
+    const merged: Customer[] = [];
+    for (const c of byTeam) { if (!seen.has(c.id)) { seen.add(c.id); merged.push(c); } }
+    for (const c of byManager) { if (!seen.has(c.id)) { seen.add(c.id); merged.push(c); } }
+    // created_at desc 전역 정렬 (단일 쿼리와 동일 순서 보장)
+    merged.sort((a, b) => {
+      const at = (a.created_at as any)?.seconds ?? (a.created_at instanceof Date ? a.created_at.getTime() / 1000 : 0);
+      const bt = (b.created_at as any)?.seconds ?? (b.created_at instanceof Date ? b.created_at.getTime() / 1000 : 0);
+      return bt - at;
+    });
+    return merged;
+  }
+  return getCustomersByManager(user.uid);
+};
+
 export const getCustomersByManager = async (managerId: string): Promise<Customer[]> => {
   try {
     const q = query(

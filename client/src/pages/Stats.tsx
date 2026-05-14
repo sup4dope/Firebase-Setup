@@ -25,7 +25,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCustomers, getTeams, getUsers, normalizeEntrySource } from '@/lib/firestore';
+import { getCustomersScoped, getTeams, getUsers, normalizeEntrySource } from '@/lib/firestore';
 import type { Customer, Team, User } from '@shared/types';
 import {
   BarChart,
@@ -276,7 +276,7 @@ export default function Stats() {
       setLoading(true);
       try {
         const [fetchedCustomers, fetchedTeams, fetchedUsers] = await Promise.all([
-          getCustomers(),
+          getCustomersScoped(user),
           getTeams(),
           getUsers(),
         ]);
