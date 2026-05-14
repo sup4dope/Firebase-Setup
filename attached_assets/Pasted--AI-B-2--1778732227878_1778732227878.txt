@@ -1,0 +1,97 @@
+## AI팀 확장 통합 — 적용 검증 부탁드립니다
+
+옵션 B 마크업 적용해주셔서 감사합니다. 확장 측에서 인식이 안 되는데
+원인 파악을 위해 아래 2가지 확인 부탁드립니다.
+
+---
+
+### 1) 실제 DOM 렌더링 확인
+
+F12 → Elements 탭 → 모달 열기 → 검색(Ctrl+F)으로 `ai-team-data` 찾기.
+**실제 HTML 속성으로** 출력되어야 합니다 (React props 가 아닌):
+
+```html
+<div id="ai-team-data" 
+     data-ai-team-crm="true"
+     data-ceo-name="홍주영"
+     data-ceo-birthdate="19750627"
+     data-ceo-phone="01056943000"
+     ...>
+```
+
+- 만약 `data-ceo-name=""` 처럼 **빈 값**이거나 `"undefined"` 로 나오면
+  → React 값이 undefined 일 때의 fallback 처리 필요:
+  ```jsx
+  data-ceo-name={customer?.name ?? ''}
+  data-ceo-birthdate={
+    customer?.juminFront && customer?.juminBack
+      ? convertJuminToBirth(customer.juminFront, customer.juminBack)
+      : ''
+  }
+  data-ceo-phone={(customer?.phone ?? '').replace(/[^\d]/g, '')}
+  ```
+
+- 만약 `<DialogContent>` 가 React Portal 로 `body` 끝에 별도 노드로 렌더된다면,
+  portal 노드에는 속성이 안 갈 수 있습니다. **포털 wrapper 가 아니라
+  실제 DOM 에 출력되는 노드** 에 속성을 붙여 주세요.
+
+---
+
+### 2) 데이터 로드 타이밍
+
+모달이 열리자마자 한 번 렌더링되고, fetch 완료 후 다시 렌더링되는 구조면
+첫 렌더의 빈 값이 확장에 캡처될 수 있습니다.
+
+다음 중 하나 부탁드립니다:
+- **A안 (권장)**: 데이터 로드 완료 후에만 모달 컨텐츠 렌더링
+  ```jsx
+  <Dialog>
+    <DialogContent>
+      {isLoading ? <Skeleton /> : (
+        <CustomerDetail 
+          id="ai-team-data"
+          data-ai-team-crm="true"
+          data-ceo-name={customer.name}
+          ...
+        />
+      )}
+    </DialogContent>
+  </Dialog>
+  ```
+- **B안**: 데이터 도착하면 ref 로 속성 강제 갱신
+  ```jsx
+  useEffect(() => {
+    if (customer && containerRef.current) {
+      containerRef.current.dataset.ceoName = customer.name ?? '';
+      containerRef.current.dataset.ceoBirthdate = ...;
+    }
+  }, [customer]);
+  ```
+
+---
+
+### 3) 검증 스크립트
+
+위 작업 후 콘솔에서 아래 한 줄 실행해 결과를 회신 부탁드립니다:
+
+```js
+(() => {
+  const el = document.querySelector('#ai-team-data, [data-ai-team-crm="true"]');
+  if (!el) return console.log('❌ 마크업 못찾음');
+  const out = {};
+  for (const a of el.attributes) if (a.name.startsWith('data-')) out[a.name] = a.value;
+  console.table(out);
+  return out;
+})();
+```
+
+기대 결과: 콘솔에 `data-ceo-name`, `data-ceo-birthdate`, `data-ceo-phone` 등이
+**빈 값 없이** 표 형태로 출력되어야 합니다.
+
+---
+
+### 참고
+
+- 확장은 옵션 B 우선, 못찾으면 옵션 A (라벨 기반) 폴백
+- 옵션 B 가 정상이면 입력란 라벨이 어떻든 안정적으로 동작
+- 모달이 열린 직후 ~1초 폴링하므로 약간의 지연은 OK
