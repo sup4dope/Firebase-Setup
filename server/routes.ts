@@ -2130,7 +2130,7 @@ export async function registerRoutes(
   // ============================================================
 
   // 대화 시작/재개: 고객 ID로 기존 대화를 찾거나 새로 만든 후 conversationId 반환
-  app.post("/api/ai/conversation/start", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/ai/conversation/start", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { customerId } = req.body || {};
       if (!customerId || typeof customerId !== 'string') {
@@ -2197,7 +2197,7 @@ export async function registerRoutes(
   });
 
   // 채팅: SSE 스트리밍으로 토큰 전송, 완료 시 Firestore에 저장
-  app.post("/api/ai/chat", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/ai/chat", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { conversationId, message } = req.body || {};
       if (!conversationId || typeof message !== 'string' || !message.trim()) {
@@ -2299,7 +2299,7 @@ export async function registerRoutes(
   });
 
   // 대화 초기화 (해당 고객+사용자 대화 삭제 후 새로 시작)
-  app.delete("/api/ai/conversation/:conversationId", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/ai/conversation/:conversationId", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { conversationId } = req.params;
       const adminApp = getAdminApp();
@@ -2324,7 +2324,7 @@ export async function registerRoutes(
   //    검증 후 즉시 202 응답 → 백그라운드에서 AI 호출 + 트랜잭션 + 메모/로그 저장.
   //    클라이언트는 counseling_logs onSnapshot으로 완료 시 자동 반영됨.
   const aiPredictInFlight = new Set<string>(); // 서버 메모리 lock (customerId)
-  app.post("/api/ai/predict-funding", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/ai/predict-funding", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { customerId, force } = req.body || {};
       if (!customerId) return res.status(400).json({ error: 'customerId 필수' });
@@ -2488,7 +2488,7 @@ export async function registerRoutes(
   });
 
   // AI 설정 상태 확인 (디버깅용)
-  app.get("/api/ai/status", requireAuth, async (_req, res) => {
+  app.get("/api/ai/status", requireAuth, requireSuperAdmin, async (_req, res) => {
     const cfg = checkAiConfig();
     const gongmun = loadGongmunContext();
     res.json({

@@ -1967,6 +1967,7 @@ export function CustomerDetailModal({
     if (!isOpen || !customerId || isNewCustomer) {
       return;
     }
+    if (currentUser?.role !== "super_admin") return; // AI 기능은 super_admin 전용
     if (aiStartedForCustomerRef.current === customerId) {
       return; // 이미 시작함
     }
@@ -1986,7 +1987,7 @@ export function CustomerDetailModal({
         console.error("[AI] 대화 초기화 실패:", msg, err);
       }
     })();
-  }, [isOpen, formData.id, isNewCustomer]);
+  }, [isOpen, formData.id, isNewCustomer, currentUser?.role]);
 
   // AI 대화 메시지 실시간 동기화 (자동 자금 예측 결과 자동 반영용)
   const aiPrevAssistantCountRef = useRef<number>(-1);
@@ -2062,6 +2063,7 @@ export function CustomerDetailModal({
       Number(formData.sales_y3 || 0);
     const obligations = financialObligations || [];
 
+    if (currentUser?.role !== "super_admin") return; // AI 기능은 super_admin 전용
     if (creditScore <= 0) return;
     if (!brn) return;
     if (sales <= 0) return;
@@ -2425,7 +2427,30 @@ export function CustomerDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[90vw] w-[calc(100%-1rem)] md:w-[90vw] h-[95vh] md:h-[90vh] p-0 bg-card flex flex-col overflow-hidden">
+      <DialogContent
+        id="ai-team-data"
+        data-ai-team-crm="true"
+        data-ceo-name={formData.name || ""}
+        data-ceo-birthdate={(() => {
+          const f = (formData.ssn_front || "").replace(/\D/g, "");
+          const b0 = (formData.ssn_back || "").replace(/\D/g, "").charAt(0);
+          if (f.length !== 6 || !b0) return "";
+          const yy = f.slice(0, 2);
+          const mmdd = f.slice(2);
+          let century = "";
+          if (b0 === "1" || b0 === "2" || b0 === "5" || b0 === "6") century = "19";
+          else if (b0 === "3" || b0 === "4" || b0 === "7" || b0 === "8") century = "20";
+          else if (b0 === "9" || b0 === "0") century = "18";
+          return century ? `${century}${yy}${mmdd}` : "";
+        })()}
+        data-ceo-phone={(formData.phone || "").replace(/\D/g, "")}
+        data-company-name={formData.company_name || ""}
+        data-biz-number={(formData.business_registration_number || "").replace(/\D/g, "")}
+        data-industry={formData.business_type || ""}
+        data-region={formData.business_address || ""}
+        data-credit-score={formData.credit_score ?? ""}
+        className="max-w-[90vw] w-[calc(100%-1rem)] md:w-[90vw] h-[95vh] md:h-[90vh] p-0 bg-card flex flex-col overflow-hidden"
+      >
         <VisuallyHidden>
           <DialogTitle>
             {isNewCustomer
@@ -5093,7 +5118,8 @@ export function CustomerDetailModal({
               </div>
             </div>
 
-            {/* 하단 50%: AI 채팅 */}
+            {/* 하단 50%: AI 채팅 (super_admin 전용 — AI 기능 미완성) */}
+            {currentUser?.role === "super_admin" && (
             <div className="h-1/2 flex flex-col bg-muted/20 dark:bg-gray-950/30">
               {/* AI Header */}
               <div className="h-10 shrink-0 border-b px-3 flex items-center">
@@ -5187,6 +5213,7 @@ export function CustomerDetailModal({
                 </Button>
               </div>
             </div>
+            )}
           </div>
         </div>
       </DialogContent>
