@@ -335,6 +335,44 @@ export function CustomerDetailModal({
     }
   >({});
 
+  // AI팀 크롬 확장 캡처용 data-* 속성 (옵션 B) — formData 선언 이후에 정의
+  const aiTeamDataAttrs = useMemo(() => {
+    const f = (formData.ssn_front || "").replace(/\D/g, "");
+    const b0 = (formData.ssn_back || "").replace(/\D/g, "").charAt(0);
+    let ceoBirthdate = "";
+    if (f.length === 6 && b0) {
+      const yy = f.slice(0, 2);
+      const mmdd = f.slice(2);
+      let century = "";
+      if (b0 === "1" || b0 === "2" || b0 === "5" || b0 === "6") century = "19";
+      else if (b0 === "3" || b0 === "4" || b0 === "7" || b0 === "8") century = "20";
+      else if (b0 === "9" || b0 === "0") century = "18";
+      ceoBirthdate = century ? `${century}${yy}${mmdd}` : "";
+    }
+    return {
+      id: "ai-team-data",
+      "data-ai-team-crm": "true",
+      "data-ceo-name": formData.name || "",
+      "data-ceo-birthdate": ceoBirthdate,
+      "data-ceo-phone": (formData.phone || "").replace(/\D/g, ""),
+      "data-company-name": formData.company_name || "",
+      "data-biz-number": (formData.business_registration_number || "").replace(/\D/g, ""),
+      "data-industry": formData.business_type || "",
+      "data-region": formData.business_address || "",
+      "data-credit-score": String(formData.credit_score ?? ""),
+    } as Record<string, string>;
+  }, [
+    formData.name,
+    formData.ssn_front,
+    formData.ssn_back,
+    formData.phone,
+    formData.company_name,
+    formData.business_registration_number,
+    formData.business_type,
+    formData.business_address,
+    formData.credit_score,
+  ]);
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
     "idle",
@@ -2427,38 +2465,28 @@ export function CustomerDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[90vw] w-[calc(100%-1rem)] md:w-[90vw] h-[95vh] md:h-[90vh] p-0 bg-card flex flex-col overflow-hidden">
-        {/* AI팀 크롬 확장 캡처용 마크업 (옵션 B) — 데이터 변경 시 자동 갱신 */}
-        {(() => {
-          const ceoBirthdate = (() => {
-            const f = (formData.ssn_front || "").replace(/\D/g, "");
-            const b0 = (formData.ssn_back || "").replace(/\D/g, "").charAt(0);
-            if (f.length !== 6 || !b0) return "";
-            const yy = f.slice(0, 2);
-            const mmdd = f.slice(2);
-            let century = "";
-            if (b0 === "1" || b0 === "2" || b0 === "5" || b0 === "6") century = "19";
-            else if (b0 === "3" || b0 === "4" || b0 === "7" || b0 === "8") century = "20";
-            else if (b0 === "9" || b0 === "0") century = "18";
-            return century ? `${century}${yy}${mmdd}` : "";
-          })();
-          return (
-            <div
-              id="ai-team-data"
-              data-ai-team-crm="true"
-              data-ceo-name={formData.name || ""}
-              data-ceo-birthdate={ceoBirthdate}
-              data-ceo-phone={(formData.phone || "").replace(/\D/g, "")}
-              data-company-name={formData.company_name || ""}
-              data-biz-number={(formData.business_registration_number || "").replace(/\D/g, "")}
-              data-industry={formData.business_type || ""}
-              data-region={formData.business_address || ""}
-              data-credit-score={formData.credit_score ?? ""}
-              style={{ display: "none" }}
-              aria-hidden="true"
-            />
-          );
-        })()}
+      <DialogContent
+        {...aiTeamDataAttrs}
+        className="max-w-[90vw] w-[calc(100%-1rem)] md:w-[90vw] h-[95vh] md:h-[90vh] p-0 bg-card flex flex-col overflow-hidden"
+      >
+        {/* AI팀 크롬 확장 캡처용 백업 마커 — display:none 회피, 0×0 invisible. id 중복 방지 위해 id 제외 */}
+        <div
+          {...(() => {
+            const { id: _id, ...rest } = aiTeamDataAttrs;
+            return rest;
+          })()}
+          style={{
+            position: "absolute",
+            width: 0,
+            height: 0,
+            overflow: "hidden",
+            opacity: 0,
+            pointerEvents: "none",
+            top: 0,
+            left: 0,
+          }}
+          aria-hidden="true"
+        />
         <VisuallyHidden>
           <DialogTitle>
             {isNewCustomer
