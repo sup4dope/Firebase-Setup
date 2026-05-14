@@ -83,6 +83,112 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // ============================================================
+  // 외부 자격판정 시스템용 고객 단건 조회 API
+  // 인증: x-api-key 헤더 (env CUSTOMER_API_KEY) 또는 Firebase ID 토큰(requireAuth)
+  // 응답: 자격판정에 필요한 최소 필드만 정규화하여 반환
+  // ============================================================
+  app.get("/api/customer/:id", async (req: AuthenticatedRequest, res) => {
+    try {
+      const customerId = req.params.id;
+      if (!customerId) {
+        return res.status(400).json({ success: false, error: "customer id가 필요합니다." });
+      }
+
+      // 인증: API 키 우선, 없으면 Firebase ID 토큰 검증
+      const expectedKey = process.env.CUSTOMER_API_KEY;
+      const providedKey = req.header('x-api-key') || (req.query.api_key as string | undefined);
+      let authorized = false;
+
+      if (expectedKey && providedKey && providedKey === expectedKey) {
+        authorized = true;
+      } else {
+        const authHeader = req.header('authorization') || '';
+        const match = authHeader.match(/^Bearer\s+(.+)$/i);
+        if (match) {
+          try {
+            const decoded = await getAdminApp().auth().verifyIdToken(match[1]);
+            req.user = decoded as any;
+            authorized = true;
+          } catch {
+            // fallthrough
+          }
+        }
+      }
+
+      if (!authorized) {
+        return res.status(401).json({ success: false, error: "인증 실패: x-api-key 또는 Bearer 토큰이 필요합니다." });
+      }
+
+      const adminApp = getAdminApp();
+      const docSnap = await adminApp.firestore().collection('customers').doc(customerId).get();
+      if (!docSnap.exists) {
+        return res.status(404).json({ success: false, error: "해당 ID의 고객을 찾을 수 없습니다." });
+      }
+      const c = docSnap.data() as any;
+
+      // ─ 사업자형태 추론: 사업자등록번호 4-5번째 자리(법인구분코드)
+      //   81/82/83/84/85/86/87/88 → 법인, 그 외 숫자 → 개인
+      const brnDigits = String(c.business_registration_number || '').replace(/\D/g, '');
+      let businessForm: '개인' | '법인' | null = null;
+      if (brnDigits.length === 10) {
+        const code = brnDigits.substring(3, 5);
+        const corporateCodes = new Set(['81', '82', '83', '84', '85', '86', '87', '88']);
+        businessForm = corporateCodes.has(code) ? '법인' : '개인';
+      }
+
+      // ─ 대표자 생년월일 추론: 주민등록번호(앞6+뒤7) 기반
+      //   뒤 첫 자리: 1,2,5,6 → 1900년대 / 3,4,7,8 → 2000년대 / 9,0 → 1800년대
+      let representativeBirthdate: string | null = null;
+      const ssnFront = String(c.ssn_front || '').replace(/\D/g, '');
+      const ssnBackFirst = String(c.ssn_back || '').replace(/\D/g, '').charAt(0);
+      if (ssnFront.length === 6 && ssnBackFirst) {
+        const yy = ssnFront.substring(0, 2);
+        const mm = ssnFront.substring(2, 4);
+        const dd = ssnFront.substring(4, 6);
+        let century: string | null = null;
+        if (['1', '2', '5', '6'].includes(ssnBackFirst)) century = '19';
+        else if (['3', '4', '7', '8'].includes(ssnBackFirst)) century = '20';
+        else if (['9', '0'].includes(ssnBackFirst)) century = '18';
+        if (century) representativeBirthdate = `${century}${yy}-${mm}-${dd}`;
+      }
+
+      // ─ 매출액(억원 단위로 저장) → 원 단위로 변환
+      const okrwToWon = (v: unknown): number | null => {
+        if (v === null || v === undefined || v === '') return null;
+        const n = Number(v);
+        if (!isFinite(n)) return null;
+        return Math.round(n * 100_000_000);
+      };
+
+      const payload = {
+        customer_id: docSnap.id,
+        readable_id: c.readable_id ?? null,
+        company_name: c.company_name ?? null,
+        business_registration_number: c.business_registration_number ?? null,
+        business_type: c.business_type ?? c.industry ?? null,           // 업종명
+        founding_date: c.founding_date ?? null,                          // 개업일 (YYYY-MM-DD)
+        business_form: businessForm,                                     // '개인' | '법인' | null
+        credit_score: typeof c.credit_score === 'number' ? c.credit_score : null, // NICE NCB
+        representative_name: c.name ?? null,
+        representative_birthdate: representativeBirthdate,               // YYYY-MM-DD | null
+        sales_prev_year_won: okrwToWon(c.sales_y1),                      // 직전년도 매출액 (원)
+        sales_two_years_ago_won: okrwToWon(c.sales_y2),                  // 전전년도 매출액 (원)
+        // 참고용 원본 값(억원 단위) — 매핑 검증 편의를 위해 함께 제공
+        _raw: {
+          sales_y1_okrw: c.sales_y1 ?? null,
+          sales_y2_okrw: c.sales_y2 ?? null,
+          ssn_front: c.ssn_front ?? null,
+        },
+      };
+
+      res.json({ success: true, data: payload });
+    } catch (error: any) {
+      console.error("[/api/customer/:id] 조회 실패:", error?.message);
+      res.status(500).json({ success: false, error: error?.message || '서버 오류' });
+    }
+  });
+
   // 디버그: 사용 가능한 Gemini 모델 목록 조회 (인증 필요)
   app.get("/api/debug/gemini-models", requireAuth, async (req, res) => {
     console.log("🔍 [디버그] Gemini 모델 목록 조회...");
