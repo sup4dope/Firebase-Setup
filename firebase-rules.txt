@@ -77,6 +77,10 @@ service cloud.firestore {
     // 4. 고객 정보
     // ========================================
     match /customers/{customerId} {
+      // [보안 강화 TODO] 역할별 read 제한은 별도 작업으로 분리 필요
+      // 현재 다음 호출처가 unscoped getCustomers()를 사용하므로 규칙 강화 시 동시 마이그레이션 필요:
+      //   - Stats.tsx, Settlements.tsx, ContractSendModal.tsx, HeaderRankings.tsx, CustomerDetailContext.tsx
+      // 또한 team_leader가 팀원 manager_id로 조회할 수 있어야 하므로 규칙에 팀원 매핑 또는 별도 인덱스 컬렉션 필요
       allow read: if isAuthenticated();
       allow create, update: if isAuthenticated();
       allow delete: if isSuperAdmin();

@@ -44,7 +44,8 @@ import {
   ChevronRight,
   Search,
 } from 'lucide-react';
-import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
+import { getCustomers, getCustomersByManager, getCustomersByTeam, getUsers, getTeams } from '@/lib/firestore';
+import { useCustomerDetail } from '@/contexts/CustomerDetailContext';
 import type { Customer, User as UserType, Team } from '@shared/types';
 
 type PeriodType = 'month' | 'H1' | 'H2' | 'year';
@@ -199,6 +200,7 @@ export default function Rankings() {
   const [activeTab, setActiveTab] = useState<'individual' | 'team'>('individual');
   const [rankingSearch, setRankingSearch] = useState('');
   const [breakdownEntry, setBreakdownEntry] = useState<RankingEntry | null>(null);
+  const { openCustomerDetailById } = useCustomerDetail();
 
   const monthOptions = useMemo(() => {
     const options: string[] = [];
@@ -255,14 +257,46 @@ export default function Rankings() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user) return;
       setLoading(true);
       try {
+        // 역할별 데이터 조회 분리: 다운로드 자체를 최소화
+        // - super_admin: 전체
+        // - team_leader: 본인 팀 + 팀원 담당 고객 (팀 미배정시 본인 담당만)
+        // - staff: 본인 담당만
+        let customersPromise: Promise<Customer[]>;
+        if (user.role === 'super_admin') {
+          customersPromise = getCustomers();
+        } else if (user.role === 'team_leader' && user.team_id) {
+          customersPromise = getCustomersByTeam(user.team_id);
+        } else {
+          customersPromise = getCustomersByManager(user.uid);
+        }
         const [fetchedCustomers, fetchedUsers, fetchedTeams] = await Promise.all([
-          getCustomers(),
+          customersPromise,
           getUsers(),
           getTeams(),
         ]);
-        setCustomers(fetchedCustomers);
+        // team_leader: 팀원 담당이지만 customer.team_id 미동기화된 케이스도 추가 조회 후 머지
+        let merged = fetchedCustomers;
+        if (user.role === 'team_leader' && user.team_id) {
+          const teammates = fetchedUsers.filter(u => u.team_id === user.team_id && u.uid !== user.uid);
+          if (teammates.length > 0) {
+            const additionalLists = await Promise.all(
+              teammates.map(t => getCustomersByManager(t.uid).catch(() => []))
+            );
+            const seen = new Set(merged.map(c => c.id));
+            for (const list of additionalLists) {
+              for (const c of list) {
+                if (!seen.has(c.id)) {
+                  merged.push(c);
+                  seen.add(c.id);
+                }
+              }
+            }
+          }
+        }
+        setCustomers(merged);
         setUsers(fetchedUsers);
         setTeams(fetchedTeams);
       } catch (error) {
@@ -272,7 +306,7 @@ export default function Rankings() {
       }
     };
     fetchData();
-  }, []);
+  }, [user?.uid, user?.role, user?.team_id]);
 
   const periodDates = useMemo(() => {
     const { type, year, month } = parsePeriod(selectedPeriod);
@@ -944,7 +978,7 @@ export default function Rankings() {
               {' · '}이 점수가 어떤 고객/처리기관 때문에 만들어졌는지 확인할 수 있습니다
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
+          <div className="flex-1 min-h-0 overflow-auto -mx-6 px-6">
             {(() => {
               if (!breakdownEntry) return null;
               // activeTab에 따라 managerId 또는 teamId로 필터
@@ -958,7 +992,7 @@ export default function Rankings() {
               const sorted = [...rows].sort((a, b) => (a.executionDate < b.executionDate ? 1 : -1));
               return (
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 bg-card z-10">
                     <TableRow>
                       <TableHead className="whitespace-nowrap">날짜</TableHead>
                       <TableHead className="whitespace-nowrap">고객 / 회사</TableHead>
@@ -975,7 +1009,17 @@ export default function Rankings() {
                     {sorted.map((s, i) => (
                       <TableRow key={`${s.customerId}-${s.processingOrg}-${s.executionDate}-${i}`}>
                         <TableCell className="text-xs whitespace-nowrap">{s.executionDate}</TableCell>
-                        <TableCell>
+                        <TableCell
+                          className="cursor-pointer hover:bg-muted/50 select-none"
+                          onDoubleClick={() => {
+                            if (s.customerId) {
+                              setBreakdownEntry(null);
+                              openCustomerDetailById(s.customerId);
+                            }
+                          }}
+                          title="더블클릭하여 고객 상세 보기"
+                          data-testid={`cell-breakdown-customer-${s.customerId}`}
+                        >
                           <div className="font-medium text-sm">{s.companyName || '-'}</div>
                           <div className="text-xs text-muted-foreground">{s.customerName}</div>
                         </TableCell>
@@ -1000,7 +1044,7 @@ export default function Rankings() {
                         <TableCell className="text-right font-bold text-sm">{s.totalScore}</TableCell>
                       </TableRow>
                     ))}
-                    <TableRow className="bg-muted/50 font-bold">
+                    <TableRow className="bg-muted/50 font-bold sticky bottom-0">
                       <TableCell colSpan={activeTab === 'team' ? 5 : 4} className="text-right">합계</TableCell>
                       <TableCell className="text-right text-blue-600">+{breakdownEntry.breakdown.baseScore}</TableCell>
                       <TableCell className="text-right text-purple-600">+{breakdownEntry.breakdown.categoryBonus}</TableCell>
@@ -1011,7 +1055,7 @@ export default function Rankings() {
                 </Table>
               );
             })()}
-          </ScrollArea>
+          </div>
           <div className="text-[11px] text-muted-foreground border-t pt-3">
             데이터 출처: <code className="px-1 bg-muted rounded">customers</code> 컬렉션
             (status_code, processing_orgs/processing_org, contract_completion_date, execution_date, execution_amount, deposit_paid_date)
