@@ -77,21 +77,13 @@ service cloud.firestore {
     // 4. 고객 정보
     // ========================================
     match /customers/{customerId} {
-      // 읽기 권한 (역할별):
-      // - super_admin: 전체
-      // - team_leader: customer.team_id == 본인 팀(token.team_id) OR 본인이 담당(manager_id == auth.uid)
-      // - staff: 본인이 담당(manager_id == auth.uid)인 고객만
-      // 단일 문서 조회(getCustomerById)는 위 조건 만족 시 허용. 그 외에는 권한 거부됨.
-      // 호출처는 getCustomersScoped(user) 헬퍼를 통해 동일 정책으로 쿼리해야 함.
-      allow read: if isAuthenticated() && (
-        isSuperAdmin() ||
-        (getRole() == 'team_leader' && (
-          resource.data.team_id == request.auth.token.team_id ||
-          resource.data.manager_id == request.auth.uid
-        )) ||
-        (getRole() == 'staff' && resource.data.manager_id == request.auth.uid)
-      );
-      // 생성/수정: 인증 사용자 (배정·메모·이력 갱신 등 광범위 동작 필요로 유지)
+      // 읽기: 인증 사용자 모두 허용
+      // - 매출랭킹/헤더랭킹은 전사 리더보드 특성상 전 사용자가 모든 고객 데이터를 집계해야 함
+      // - 정산 화면에서 과거 담당자 변경 이력으로 인한 cross-manager customer join도 필요
+      // - 다운로드 최소화는 클라이언트 헬퍼(getCustomersScoped)에서 역할별로 처리하되, 리더보드 등
+      //   교차조회가 필요한 화면은 전체 조회를 허용한다.
+      allow read: if isAuthenticated();
+      // 생성/수정: 인증 사용자 (배정·메모·이력 갱신 등 광범위 동작 필요)
       allow create, update: if isAuthenticated();
       allow delete: if isSuperAdmin();
     }
@@ -104,9 +96,14 @@ service cloud.firestore {
       // - super_admin: 모든 정산 데이터 조회 가능
       // - team_leader: 본인 팀(team_id)의 정산 데이터만 조회 가능
       // - staff: 본인(manager_id)의 정산 데이터만 조회 가능
+      // team_leader는 token.team_id 매칭 OR 본인이 manager인 정산 폴백 허용
+      // (team_id가 비어있는 team_leader도 본인 정산은 조회 가능해야 함)
       allow read: if isAuthenticated() && (
         isSuperAdmin() ||
-        (getRole() == 'team_leader' && resource.data.team_id == request.auth.token.team_id) ||
+        (getRole() == 'team_leader' && (
+          resource.data.team_id == request.auth.token.team_id ||
+          resource.data.manager_id == request.auth.uid
+        )) ||
         (getRole() == 'staff' && resource.data.manager_id == request.auth.uid)
       );
       

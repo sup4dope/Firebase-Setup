@@ -94,7 +94,7 @@ import { SalaryStatement, type SalaryItem } from '@/components/salary/salary-sta
 import {
   getSettlementItems,
   getUsers,
-  getCustomersScoped,
+  getCustomers,
   calculateMonthlySettlementSummary,
   syncCustomerSettlements,
   normalizeEntrySource,
@@ -186,15 +186,18 @@ export default function Settlements() {
       const isSummary = isPeriodSummary(selectedMonth);
       
       // 권한에 따라 필터 결정 (Firebase 보안 규칙 대응)
-      const managerId = isStaff ? user.uid : undefined;
+      // - super_admin: 전체 (필터 없음)
+      // - team_leader + team_id: 팀 단위
+      // - team_leader (team_id 없음) / staff: 본인 단위 (settlements rule이 무필터 쿼리를 거부하므로 필수 폴백)
       const teamId = isTeamLeader && user.team_id ? user.team_id : undefined;
+      const managerId = !isSuperAdmin && !teamId ? user.uid : undefined;
       
       if (isSummary) {
         // 기간 요약 뷰: 모든 데이터 병렬 로딩
         const [fetchedUsers, allItemsArrays, fetchedCustomers] = await Promise.all([
           getUsers(),
           Promise.all(months.map(m => getSettlementItems(m, managerId, teamId))),
-          getCustomersScoped(user),
+          getCustomers(),
         ]);
         
         setUsers(fetchedUsers);
@@ -205,7 +208,7 @@ export default function Settlements() {
         const [fetchedUsers, fetchedItems, fetchedCustomers] = await Promise.all([
           getUsers(),
           getSettlementItems(selectedMonth, managerId, teamId),
-          getCustomersScoped(user),
+          getCustomers(),
         ]);
         
         setUsers(fetchedUsers);
@@ -259,8 +262,9 @@ export default function Settlements() {
       try {
         const months = getMonthsForPeriod(selectedMonth);
         const isSummary = isPeriodSummary(selectedMonth);
-        const managerId = isStaff ? user.uid : undefined;
+        // fetchData()와 동일한 권한 계산 — team_leader without team_id는 staff처럼 본인 단위 폴백
         const teamId = isTeamLeader && user.team_id ? user.team_id : undefined;
+        const managerId = !isSuperAdmin && !teamId ? user.uid : undefined;
 
         if (isSummary) {
           const itemsArr = await Promise.all(months.map(m => getSettlementItems(m, managerId, teamId)));
@@ -276,7 +280,7 @@ export default function Settlements() {
 
     window.addEventListener('paymintPaymentCompleted', handlePaymentCompleted);
     return () => window.removeEventListener('paymintPaymentCompleted', handlePaymentCompleted);
-  }, [user, authLoading, selectedMonth, isStaff, isTeamLeader]);
+  }, [user, authLoading, selectedMonth, isStaff, isTeamLeader, isSuperAdmin]);
 
   const summaries = useMemo(() => {
     if (!user) return [];

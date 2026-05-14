@@ -44,7 +44,7 @@ import {
   ChevronRight,
   Search,
 } from 'lucide-react';
-import { getCustomersScoped, getUsers, getTeams } from '@/lib/firestore';
+import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
 import { useCustomerDetail } from '@/contexts/CustomerDetailContext';
 import type { Customer, User as UserType, Team } from '@shared/types';
 
@@ -260,9 +260,9 @@ export default function Rankings() {
       if (!user) return;
       setLoading(true);
       try {
-        // 역할별 데이터 조회: 헬퍼 사용 (Firestore Rules와 동일 정책)
+        // 매출랭킹은 전사 리더보드 — 모든 사용자가 서로의 실적을 비교하므로 전체 고객 조회 필요
         const [fetchedCustomers, fetchedUsers, fetchedTeams] = await Promise.all([
-          getCustomersScoped(user),
+          getCustomers(),
           getUsers(),
           getTeams(),
         ]);
@@ -308,24 +308,13 @@ export default function Rankings() {
     return { startDate, endDate };
   }, [selectedPeriod]);
 
-  // RBAC: staff는 본인 고객만, team_leader는 팀원 고객까지, super_admin은 전체
-  // team_leader는 customer.team_id 단독 신뢰 대신 users 컬렉션의 team_id와 교차검증
+  // 매출랭킹은 전사 리더보드 — 모든 역할이 동일한 전사 데이터로 순위를 본다.
+  // (역할별 필터링을 적용하면 staff/team_leader가 자기/팀 데이터로만 순위를 매기게 되어
+  //  의도된 "리더보드" 의미와 어긋남. 데이터 가시성 통제는 customers 페이지 등 다른 화면에서 수행.)
   const visibleCustomers = useMemo(() => {
     if (!user) return [];
-    if (user.role === 'super_admin') return customers;
-    if (user.role === 'team_leader') {
-      if (!user.team_id) return customers.filter(c => c.manager_id === user.uid);
-      // 같은 team_id인 모든 사용자(본인 포함)의 uid 집합
-      const teammateUids = new Set(
-        users.filter(u => u.team_id === user.team_id).map(u => u.uid)
-      );
-      // customer.team_id 일치 OR 담당자가 팀원인 경우 (둘 중 하나라도 일치해야 노출)
-      return customers.filter(c =>
-        c.team_id === user.team_id || (c.manager_id && teammateUids.has(c.manager_id))
-      );
-    }
-    return customers.filter(c => c.manager_id === user.uid);
-  }, [customers, users, user]);
+    return customers;
+  }, [customers, user]);
 
   const contractScores = useMemo(() => {
     const { startDate, endDate } = periodDates;

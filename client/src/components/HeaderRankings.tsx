@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { Crown, Medal, Award } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getCustomersScoped, getUsers, getTeams } from '@/lib/firestore';
+import { getCustomers, getUsers, getTeams } from '@/lib/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Customer, User, Team } from '@shared/types';
 
@@ -81,8 +81,9 @@ export function HeaderRankings() {
     if (!user) return;
     const fetchData = async () => {
       try {
+        // 헤더 랭킹은 전사 리더보드 — 모든 사용자가 서로의 실적을 보므로 전체 고객 조회
         const [fetchedCustomers, fetchedUsers] = await Promise.all([
-          getCustomersScoped(user),
+          getCustomers(),
           getUsers(),
         ]);
         setCustomers(fetchedCustomers);
