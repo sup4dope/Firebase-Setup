@@ -198,6 +198,7 @@ export default function Rankings() {
   const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'individual' | 'team'>('individual');
   const [rankingSearch, setRankingSearch] = useState('');
+  const [breakdownEntry, setBreakdownEntry] = useState<RankingEntry | null>(null);
 
   const monthOptions = useMemo(() => {
     const options: string[] = [];
@@ -302,6 +303,25 @@ export default function Rankings() {
 
     return { startDate, endDate };
   }, [selectedPeriod]);
+
+  // RBAC: staff는 본인 고객만, team_leader는 팀원 고객까지, super_admin은 전체
+  // team_leader는 customer.team_id 단독 신뢰 대신 users 컬렉션의 team_id와 교차검증
+  const visibleCustomers = useMemo(() => {
+    if (!user) return [];
+    if (user.role === 'super_admin') return customers;
+    if (user.role === 'team_leader') {
+      if (!user.team_id) return customers.filter(c => c.manager_id === user.uid);
+      // 같은 team_id인 모든 사용자(본인 포함)의 uid 집합
+      const teammateUids = new Set(
+        users.filter(u => u.team_id === user.team_id).map(u => u.uid)
+      );
+      // customer.team_id 일치 OR 담당자가 팀원인 경우 (둘 중 하나라도 일치해야 노출)
+      return customers.filter(c =>
+        c.team_id === user.team_id || (c.manager_id && teammateUids.has(c.manager_id))
+      );
+    }
+    return customers.filter(c => c.manager_id === user.uid);
+  }, [customers, users, user]);
 
   const contractScores = useMemo(() => {
     const { startDate, endDate } = periodDates;
@@ -413,7 +433,7 @@ export default function Rankings() {
       }
     };
 
-    customers.forEach(customer => {
+    visibleCustomers.forEach(customer => {
       const statusCode = customer.status_code || '';
       const depositPaidDate = (customer as any).deposit_paid_date as string | undefined;
 
@@ -461,7 +481,7 @@ export default function Rankings() {
     });
 
     return scores;
-  }, [customers, periodDates]);
+  }, [visibleCustomers, periodDates]);
 
   const individualRankings = useMemo(() => {
     const managerMap = new Map<string, RankingEntry>();
@@ -588,7 +608,12 @@ export default function Rankings() {
                     </span>
                   </TableCell>
                 )}
-                <TableCell className="text-right pr-10">
+                <TableCell
+                  className="text-right pr-10 cursor-pointer hover:bg-muted/50 select-none"
+                  onDoubleClick={() => setBreakdownEntry(entry)}
+                  title="더블클릭하여 점수 산정 내역 보기"
+                  data-testid={`cell-score-${entry.id}`}
+                >
                   <span className="font-bold text-lg">{entry.totalScore.toLocaleString()}</span>
                   <span className="text-muted-foreground text-sm ml-1">점</span>
                 </TableCell>
@@ -904,6 +929,96 @@ export default function Rankings() {
           </Card>
         </div>
       </Tabs>
+
+      <Dialog open={!!breakdownEntry} onOpenChange={(open) => !open && setBreakdownEntry(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {breakdownEntry?.name} · {getPeriodLabel(selectedPeriod)} 점수 산정 내역
+            </DialogTitle>
+            <DialogDescription>
+              총 {breakdownEntry?.totalScore.toLocaleString()}점
+              {' · '}계약 +{breakdownEntry?.breakdown.baseScore}
+              {' · '}카테고리 +{breakdownEntry?.breakdown.categoryBonus}
+              {' · '}금액 +{breakdownEntry?.breakdown.amountBonus}
+              {' · '}이 점수가 어떤 고객/처리기관 때문에 만들어졌는지 확인할 수 있습니다
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
+            {(() => {
+              if (!breakdownEntry) return null;
+              // activeTab에 따라 managerId 또는 teamId로 필터
+              const rows = contractScores.filter(s =>
+                activeTab === 'individual' ? s.managerId === breakdownEntry.id : s.teamId === breakdownEntry.id
+              );
+              if (rows.length === 0) {
+                return <div className="py-8 text-center text-muted-foreground text-sm">해당 기간 산정 내역이 없습니다</div>;
+              }
+              // 날짜 내림차순 정렬
+              const sorted = [...rows].sort((a, b) => (a.executionDate < b.executionDate ? 1 : -1));
+              return (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="whitespace-nowrap">날짜</TableHead>
+                      <TableHead className="whitespace-nowrap">고객 / 회사</TableHead>
+                      {activeTab === 'team' && <TableHead className="whitespace-nowrap">담당자</TableHead>}
+                      <TableHead className="whitespace-nowrap">처리기관</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">집행금액(만원)</TableHead>
+                      <TableHead className="text-right whitespace-nowrap text-blue-600">계약</TableHead>
+                      <TableHead className="text-right whitespace-nowrap text-purple-600">카테고리</TableHead>
+                      <TableHead className="text-right whitespace-nowrap text-emerald-600">금액</TableHead>
+                      <TableHead className="text-right whitespace-nowrap font-bold">합계</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sorted.map((s, i) => (
+                      <TableRow key={`${s.customerId}-${s.processingOrg}-${s.executionDate}-${i}`}>
+                        <TableCell className="text-xs whitespace-nowrap">{s.executionDate}</TableCell>
+                        <TableCell>
+                          <div className="font-medium text-sm">{s.companyName || '-'}</div>
+                          <div className="text-xs text-muted-foreground">{s.customerName}</div>
+                        </TableCell>
+                        {activeTab === 'team' && (
+                          <TableCell className="text-xs whitespace-nowrap">{s.managerName || '-'}</TableCell>
+                        )}
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">{s.processingOrg}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-sm">
+                          {s.executionAmount > 0 ? s.executionAmount.toLocaleString() : '-'}
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-blue-600">
+                          {s.baseScore > 0 ? `+${s.baseScore}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-purple-600">
+                          {s.categoryBonus > 0 ? `+${s.categoryBonus}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-emerald-600">
+                          {s.amountBonus > 0 ? `+${s.amountBonus}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-sm">{s.totalScore}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell colSpan={activeTab === 'team' ? 5 : 4} className="text-right">합계</TableCell>
+                      <TableCell className="text-right text-blue-600">+{breakdownEntry.breakdown.baseScore}</TableCell>
+                      <TableCell className="text-right text-purple-600">+{breakdownEntry.breakdown.categoryBonus}</TableCell>
+                      <TableCell className="text-right text-emerald-600">+{breakdownEntry.breakdown.amountBonus}</TableCell>
+                      <TableCell className="text-right text-base">{breakdownEntry.totalScore}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              );
+            })()}
+          </ScrollArea>
+          <div className="text-[11px] text-muted-foreground border-t pt-3">
+            데이터 출처: <code className="px-1 bg-muted rounded">customers</code> 컬렉션
+            (status_code, processing_orgs/processing_org, contract_completion_date, execution_date, execution_amount, deposit_paid_date)
+            {' · '}같은 고객이라도 승인된 처리기관이 여러 개면 각 기관별로 한 줄씩 누적됩니다.
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={periodPickerOpen} onOpenChange={setPeriodPickerOpen}>
         <DialogContent className="max-w-xs">
