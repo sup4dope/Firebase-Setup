@@ -28,6 +28,7 @@ import {
   Pencil,
   RefreshCw,
   Eye,
+  Stethoscope,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -403,6 +404,10 @@ export function CustomerDetailModal({
 
   // AI Chat state
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([]);
+  const [diagnoseLoading, setDiagnoseLoading] = useState(false);
+  const [diagnoseModalOpen, setDiagnoseModalOpen] = useState(false);
+  const [diagnoseResult, setDiagnoseResult] = useState<any>(null);
+  const [diagnoseError, setDiagnoseError] = useState<string | null>(null);
   const [aiInput, setAiInput] = useState("");
   const aiScrollRef = useRef<HTMLDivElement>(null);
   const [aiConversationId, setAiConversationId] = useState<string | null>(null);
@@ -1999,6 +2004,39 @@ export function CustomerDetailModal({
     }
   };
 
+  // 자격판정 호출 (외부 자금판정 API 프록시)
+  const handleDiagnose = async () => {
+    if (!customer?.id || diagnoseLoading) return;
+    setDiagnoseLoading(true);
+    setDiagnoseError(null);
+    setDiagnoseResult(null);
+    setDiagnoseModalOpen(true);
+    try {
+      const { authFetch } = await import('@/lib/firebase');
+      const res = await authFetch(`/api/diagnose/${encodeURIComponent(customer.id)}`);
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.error || `자격판정 호출 실패 (${res.status})`);
+      }
+      // 응답 언랩: {data:{data:{...}}} / {data:{result:{...}}} / {data:{...}} 변형 대응
+      let data = json.data;
+      for (let i = 0; i < 3 && data && typeof data === "object"; i++) {
+        const hasKnownKey = ["summary", "funds", "report", "followup_questions"].some(
+          (k) => k in data,
+        );
+        if (hasKnownKey) break;
+        if (data.data && typeof data.data === "object") { data = data.data; continue; }
+        if (data.result && typeof data.result === "object") { data = data.result; continue; }
+        break;
+      }
+      setDiagnoseResult(data);
+    } catch (err: any) {
+      setDiagnoseError(err?.message || String(err));
+    } finally {
+      setDiagnoseLoading(false);
+    }
+  };
+
   // 모달 오픈 시 AI 대화 시작/재개 (기존 고객만)
   useEffect(() => {
     const customerId = formData.id;
@@ -2078,6 +2116,10 @@ export function CustomerDetailModal({
       setAiMessages([]);
       setAiInitError(null);
       setAiIsStreaming(false);
+      setDiagnoseModalOpen(false);
+      setDiagnoseResult(null);
+      setDiagnoseError(null);
+      setDiagnoseLoading(false);
       aiPredictedSignatureRef.current = "";
       aiPredictingRef.current = false;
       aiPredictAbortRef.current?.abort();
@@ -5158,11 +5200,28 @@ export function CustomerDetailModal({
             {currentUser?.role === "super_admin" && (
             <div className="h-1/2 flex flex-col bg-muted/20 dark:bg-gray-950/30">
               {/* AI Header */}
-              <div className="h-10 shrink-0 border-b px-3 flex items-center">
+              <div className="h-10 shrink-0 border-b px-3 flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-purple-400 flex items-center gap-1.5">
                   <Bot className="w-3.5 h-3.5" />
                   AI 질의
                 </span>
+                {customer?.id && !isNewCustomer && (
+                  <Button
+                    onClick={handleDiagnose}
+                    disabled={diagnoseLoading}
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs gap-1 border-emerald-500/40 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                    data-testid="button-diagnose"
+                  >
+                    {diagnoseLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Stethoscope className="w-3.5 h-3.5" />
+                    )}
+                    자격판정
+                  </Button>
+                )}
               </div>
 
               {/* AI Messages */}
@@ -5253,6 +5312,142 @@ export function CustomerDetailModal({
           </div>
         </div>
       </DialogContent>
+      {/* 자격판정 결과 모달 */}
+      <Dialog open={diagnoseModalOpen} onOpenChange={setDiagnoseModalOpen}>
+        <DialogContent className="max-w-3xl bg-card text-foreground max-h-[85vh] overflow-y-auto">
+          <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+            <Stethoscope className="w-5 h-5 text-emerald-500" />
+            자격판정 결과
+            {customer?.company_name && (
+              <span className="text-sm text-muted-foreground font-normal">— {customer.company_name}</span>
+            )}
+          </DialogTitle>
+          <div className="space-y-4 mt-2">
+            {diagnoseLoading && (
+              <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>자격판정 분석 중...</span>
+              </div>
+            )}
+            {diagnoseError && !diagnoseLoading && (
+              <div className="p-3 rounded-md border border-red-500/40 bg-red-500/10 text-sm text-red-500" data-testid="text-diagnose-error">
+                ⚠️ {diagnoseError}
+              </div>
+            )}
+            {diagnoseResult && !diagnoseLoading && (
+              <>
+                {/* 종합 요약 */}
+                {diagnoseResult.summary && (
+                  <div className="p-3 rounded-md border bg-muted/30">
+                    <div className="text-xs text-muted-foreground mb-1">종합 판정</div>
+                    <div className="text-base font-semibold whitespace-pre-wrap" data-testid="text-diagnose-summary">
+                      {typeof diagnoseResult.summary === "string"
+                        ? diagnoseResult.summary
+                        : JSON.stringify(diagnoseResult.summary, null, 2)}
+                    </div>
+                  </div>
+                )}
+
+                {/* 자금별 판정 */}
+                {Array.isArray(diagnoseResult.funds) && diagnoseResult.funds.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold">자금별 판정</div>
+                    <div className="space-y-2">
+                      {diagnoseResult.funds.map((fund: any, idx: number) => {
+                        const status: string = String(fund?.status || fund?.result || fund?.judgment || "").trim();
+                        const colorClass = status.includes("불가") || status.includes("불가능")
+                          ? "border-red-500/40 bg-red-500/10 text-red-400"
+                          : status.includes("조건")
+                            ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
+                            : status.includes("가능") || status.includes("적합")
+                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                              : "border-border bg-muted/30 text-foreground";
+                        return (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-md border bg-muted/20"
+                            data-testid={`card-diagnose-fund-${idx}`}
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="font-medium text-sm">
+                                {fund?.name || fund?.fund_name || fund?.title || `자금 ${idx + 1}`}
+                              </div>
+                              {status && (
+                                <Badge variant="outline" className={cn("text-xs shrink-0", colorClass)}>
+                                  {status}
+                                </Badge>
+                              )}
+                            </div>
+                            {(fund?.reason || fund?.description || fund?.detail) && (
+                              <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                                {fund?.reason || fund?.description || fund?.detail}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 분석 리포트 */}
+                {diagnoseResult.report && (
+                  <div className="space-y-1">
+                    <div className="text-sm font-semibold">분석 리포트</div>
+                    <div
+                      className="p-3 rounded-md border bg-muted/30 text-sm whitespace-pre-wrap text-foreground/90"
+                      data-testid="text-diagnose-report"
+                    >
+                      {typeof diagnoseResult.report === "string"
+                        ? diagnoseResult.report
+                        : JSON.stringify(diagnoseResult.report, null, 2)}
+                    </div>
+                  </div>
+                )}
+
+                {/* 추가 확인 질문(역질문) */}
+                {Array.isArray(diagnoseResult.followup_questions) && diagnoseResult.followup_questions.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-sm font-semibold">추가 확인 질문</div>
+                    <ul className="list-disc pl-5 space-y-1 text-sm text-foreground/90">
+                      {diagnoseResult.followup_questions.map((q: any, idx: number) => (
+                        <li key={idx} data-testid={`text-diagnose-followup-${idx}`}>
+                          {typeof q === "string" ? q : q?.question || JSON.stringify(q)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* 그 외 데이터가 있을 때 raw 표시 */}
+                {!diagnoseResult.summary &&
+                  !diagnoseResult.funds &&
+                  !diagnoseResult.report &&
+                  !diagnoseResult.followup_questions && (
+                    <pre className="p-3 rounded-md border bg-muted/30 text-xs whitespace-pre-wrap overflow-x-auto">
+                      {JSON.stringify(diagnoseResult, null, 2)}
+                    </pre>
+                  )}
+              </>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button
+              variant="outline"
+              onClick={handleDiagnose}
+              disabled={diagnoseLoading || !customer?.id}
+              data-testid="button-diagnose-retry"
+            >
+              {diagnoseLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+              다시 판정
+            </Button>
+            <Button onClick={() => setDiagnoseModalOpen(false)} data-testid="button-diagnose-close">
+              닫기
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Status Change Confirmation Modal */}
       <Dialog
         open={statusChangeModal.isOpen}

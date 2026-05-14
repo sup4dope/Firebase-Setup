@@ -189,6 +189,57 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================================
+  // 자격판정(Diagnose) 외부 시스템 프록시
+  // - 외부 URL/키를 클라이언트에 노출하지 않기 위해 서버에서 중계
+  // - 임시 URL은 env DIAGNOSE_API_BASE로 주입(없으면 기본값 사용)
+  // ============================================================
+  const DIAGNOSE_API_BASE_DEFAULT = "https://trembl-lasting-halo-mortgage.trycloudflare.com";
+  const getDiagnoseBase = () => (process.env.DIAGNOSE_API_BASE || DIAGNOSE_API_BASE_DEFAULT).replace(/\/$/, "");
+
+  app.get("/api/diagnose/:customerId", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    const customerId = req.params.customerId;
+    if (!customerId) return res.status(400).json({ success: false, error: "customerId가 필요합니다." });
+    try {
+      const url = `${getDiagnoseBase()}/diagnose/${encodeURIComponent(customerId)}`;
+      const upstream = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      const text = await upstream.text();
+      let body: any = null;
+      try { body = JSON.parse(text); } catch { body = { raw: text }; }
+      if (!upstream.ok) {
+        return res.status(upstream.status).json({ success: false, status: upstream.status, error: body?.error || body?.detail || `자격판정 API 오류 (${upstream.status})`, data: body });
+      }
+      res.json({ success: true, data: body });
+    } catch (error: any) {
+      console.error("[/api/diagnose] 호출 실패:", error?.message);
+      res.status(502).json({ success: false, error: `자격판정 API 호출 실패: ${error?.message || "unknown"}` });
+    }
+  });
+
+  app.post("/api/diagnose", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const url = `${getDiagnoseBase()}/diagnose`;
+      const upstream = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(req.body || {}),
+      });
+      const text = await upstream.text();
+      let body: any = null;
+      try { body = JSON.parse(text); } catch { body = { raw: text }; }
+      if (!upstream.ok) {
+        return res.status(upstream.status).json({ success: false, status: upstream.status, error: body?.error || body?.detail || `자격판정 API 오류 (${upstream.status})`, data: body });
+      }
+      res.json({ success: true, data: body });
+    } catch (error: any) {
+      console.error("[/api/diagnose POST] 호출 실패:", error?.message);
+      res.status(502).json({ success: false, error: `자격판정 API 호출 실패: ${error?.message || "unknown"}` });
+    }
+  });
+
   // 디버그: 사용 가능한 Gemini 모델 목록 조회 (인증 필요)
   app.get("/api/debug/gemini-models", requireAuth, async (req, res) => {
     console.log("🔍 [디버그] Gemini 모델 목록 조회...");
