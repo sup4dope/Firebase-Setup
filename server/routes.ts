@@ -196,16 +196,20 @@ export async function registerRoutes(
   // ============================================================
   const DIAGNOSE_API_BASE_DEFAULT = "https://trembl-lasting-halo-mortgage.trycloudflare.com";
   const getDiagnoseBase = () => (process.env.DIAGNOSE_API_BASE || DIAGNOSE_API_BASE_DEFAULT).replace(/\/$/, "");
+  const getDiagnoseHeaders = (extra?: Record<string, string>) => {
+    const h: Record<string, string> = { Accept: "application/json", ...(extra || {}) };
+    if (process.env.DIAGNOSE_API_KEY) h["x-api-key"] = process.env.DIAGNOSE_API_KEY;
+    return h;
+  };
 
   app.get("/api/diagnose/:customerId", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
     const customerId = req.params.customerId;
     if (!customerId) return res.status(400).json({ success: false, error: "customerId가 필요합니다." });
     try {
-      const url = `${getDiagnoseBase()}/diagnose/${encodeURIComponent(customerId)}`;
-      const upstream = await fetch(url, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
+      // 역질문 답변 등 클라이언트 쿼리스트링을 그대로 자격판정 API에 전달
+      const qs = new URLSearchParams(req.query as Record<string, string>).toString();
+      const url = `${getDiagnoseBase()}/diagnose/${encodeURIComponent(customerId)}${qs ? `?${qs}` : ""}`;
+      const upstream = await fetch(url, { method: "GET", headers: getDiagnoseHeaders() });
       const text = await upstream.text();
       let body: any = null;
       try { body = JSON.parse(text); } catch { body = { raw: text }; }
@@ -224,7 +228,7 @@ export async function registerRoutes(
       const url = `${getDiagnoseBase()}/diagnose`;
       const upstream = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: getDiagnoseHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(req.body || {}),
       });
       const text = await upstream.text();
