@@ -2013,41 +2013,88 @@ export function CustomerDetailModal({
 
   // 자동 응답: 고객 데이터/고정값으로 사전 답변 가능한 역질문은 클라이언트에서 채워서 전송
   // → UI에서는 숨겨서 추가 확인 질문 목록을 간결하게 유지
-  const autoFollowupAnswers = useMemo<Record<string, string>>(() => {
-    const ans: Record<string, string> = {
-      재해확인증: "아니오",
-      직접대출_성실상환: "예",
-      신용관리교육_이수: "예",
-      희망리턴패키지_재기사업화: "아니오",
-    };
-    // 제조업 여부: 사업자등록증 OCR로 받은 업태/업종에 "제조" 포함 여부
-    const bizText = `${formData.business_type || ""} ${formData.business_item || ""} ${(formData as any).industry || ""}`;
-    ans["제조업소공인"] = bizText.includes("제조") ? "예" : "아니오";
-    // 고금리 대출(7%↑): 대출내역 기관/상품명에 '캐피탈' 또는 '저축' 포함시 "예"
-    const obligations = (formData.financial_obligations || []) as any[];
-    const hasHighRate = obligations.some((o) => {
-      const text = `${o?.institution || ""} ${o?.product_name || ""}`;
-      return text.includes("캐피탈") || text.includes("저축");
-    });
-    ans["고금리대출_7퍼센트이상_보유"] = hasHighRate ? "예" : "아니오";
-    // 매출 2년 연속 10% 이상 증가: y3 → y2, y2 → y1 모두 +10% 이상
-    const y1 = Number(formData.sales_y1) || 0;
-    const y2 = Number(formData.sales_y2) || 0;
-    const y3 = Number(formData.sales_y3) || 0;
-    if (y1 > 0 && y2 > 0 && y3 > 0) {
-      const grow1 = (y1 - y2) / y2;
-      const grow2 = (y2 - y3) / y3;
-      ans["매출_2년연속_10퍼센트신장"] = grow1 >= 0.1 && grow2 >= 0.1 ? "예" : "아니오";
-    }
-    return ans;
-  }, [
-    formData.business_type,
-    formData.business_item,
-    formData.financial_obligations,
-    formData.sales_y1,
-    formData.sales_y2,
-    formData.sales_y3,
-  ]);
+  // questions가 있으면 질문 텍스트 패턴까지 매칭하여 동적 키도 자동 응답
+  const computeAutoAnswers = useCallback(
+    (questions: any[] = []): Record<string, string> => {
+      const ans: Record<string, string> = {
+        재해확인증: "아니오",
+        직접대출_성실상환: "예",
+        신용관리교육_이수: "예",
+        희망리턴패키지_재기사업화: "아니오",
+      };
+      // 제조업 여부: 사업자등록증 OCR로 받은 업태/업종에 "제조" 포함 여부
+      const bizText = `${formData.business_type || ""} ${formData.business_item || ""} ${(formData as any).industry || ""}`;
+      ans["제조업소공인"] = bizText.includes("제조") ? "예" : "아니오";
+      // 고금리 대출(7%↑): 대출내역 기관/상품명에 '캐피탈' 또는 '저축' 포함시 "예"
+      const obligations = (formData.financial_obligations || []) as any[];
+      const hasHighRate = obligations.some((o) => {
+        const text = `${o?.institution || ""} ${o?.product_name || ""}`;
+        return text.includes("캐피탈") || text.includes("저축");
+      });
+      ans["고금리대출_7퍼센트이상_보유"] = hasHighRate ? "예" : "아니오";
+      // 매출 데이터 (억원)
+      const y1 = Number(formData.sales_y1) || 0;
+      const y2 = Number(formData.sales_y2) || 0;
+      const y3 = Number(formData.sales_y3) || 0;
+      // 매출 2년 연속 10% 이상 증가
+      const computeGrowth10 = (): string | undefined => {
+        if (!(y1 > 0 && y2 > 0 && y3 > 0)) return undefined;
+        const grow1 = (y1 - y2) / y2;
+        const grow2 = (y2 - y3) / y3;
+        return grow1 >= 0.1 && grow2 >= 0.1 ? "예" : "아니오";
+      };
+      const growth10 = computeGrowth10();
+      if (growth10) ans["매출_2년연속_10퍼센트신장"] = growth10;
+      // 매출 추이 응답 텍스트 (직전년도/전전년도 합산)
+      const salesTrendText = (() => {
+        if (y1 > 0 && y2 > 0) return `직전년도 ${y1}억, 전전년도 ${y2}억`;
+        if (y1 > 0) return `직전년도 ${y1}억`;
+        return undefined;
+      })();
+      // 질문 텍스트 패턴 매칭으로 동적 키 처리
+      for (const q of questions) {
+        const key = extractFollowupKey(q);
+        if (!key || ans[key] != null) continue;
+        const text: string = typeof q === "string" ? q : (q?.question || q?.label || "");
+        if (!text) continue;
+        // "최근 매출 추이..." / "직전년도/전전년도 매출액"
+        if (
+          salesTrendText &&
+          (text.includes("매출 추이") ||
+            text.includes("직전년도") ||
+            text.includes("전전년도"))
+        ) {
+          ans[key] = salesTrendText;
+          continue;
+        }
+        // "최근 2년 연속 매출이 10% 이상..." (field 키 변형 대비 텍스트 매칭)
+        if (
+          growth10 &&
+          text.includes("매출") &&
+          text.includes("2년") &&
+          text.includes("10")
+        ) {
+          ans[key] = growth10;
+          continue;
+        }
+      }
+      return ans;
+    },
+    [
+      formData.business_type,
+      formData.business_item,
+      formData.financial_obligations,
+      formData.sales_y1,
+      formData.sales_y2,
+      formData.sales_y3,
+    ],
+  );
+
+  // 현재 응답에 표시된 질문 목록 기준으로 자동 응답 계산 (UI/재판정 공용)
+  const autoFollowupAnswers = useMemo<Record<string, string>>(
+    () => computeAutoAnswers(diagnoseResult?.followup_questions || []),
+    [computeAutoAnswers, diagnoseResult?.followup_questions],
+  );
 
   // 자격판정 호출 (외부 자금판정 API 프록시)
   // answers: 역질문에 대한 사용자 입력 답변 (auto-answers와 병합되어 쿼리스트링으로 전달)
