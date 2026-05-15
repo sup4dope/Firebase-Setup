@@ -5761,12 +5761,10 @@ export function CustomerDetailModal({
                       if (v != null && String(v).trim() !== "") return false;
                       return true;
                     });
-                  // 예/아니오 질문 판별 (라벨에 "(예/아니오)" 패턴 또는 키 기반 휴리스틱)
-                  const isYesNoQuestion = (label: string, key: string) => {
+                  // 예/아니오 질문 판별 — 라벨에 명시된 "(예/아니오)" 패턴만 사용 (오탐 방지)
+                  const isYesNoQuestion = (label: string) => {
                     if (/\(\s*예\s*\/\s*아니오\s*\)/.test(label)) return true;
                     if (/예\s*또는\s*아니오/.test(label)) return true;
-                    // 키 휴리스틱: "_보유", "_이수", "_있", "_여부" 등으로 끝나는 boolean 류
-                    if (/(_보유|_이수|_여부|_확인|_과반|_성실상환)$/.test(key)) return true;
                     return false;
                   };
                   const renderYesNo = (
@@ -5844,7 +5842,7 @@ export function CustomerDetailModal({
                           const key = extractFollowupKey(q) || `q_${originalIdx}`;
                           const label =
                             typeof q === "string" ? q : q?.question || q?.label || key;
-                          const yesNo = isYesNoQuestion(String(label), key);
+                          const yesNo = isYesNoQuestion(String(label));
                           return (
                             <div
                               key={idx}
