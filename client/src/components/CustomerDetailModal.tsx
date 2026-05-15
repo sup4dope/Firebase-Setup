@@ -2242,18 +2242,20 @@ export function CustomerDetailModal({
         for (const k of Object.keys(next)) if (!newKeys.has(k)) delete next[k];
         return next;
       });
-      // 사용자가 입력한 follow-up 답변 + 수동 확인 응답을 Firestore에 저장 (재오픈 시 복원용)
-      try {
-        const persistedAnswers: Record<string, string> = {};
-        for (const [k, v] of Object.entries(answers || {})) {
-          if (v != null && String(v).trim() !== "") persistedAnswers[k] = String(v);
+      // 사용자가 명시적으로 제출한 답변만 Firestore에 저장 (초기 호출/다시판정에서는 기존 저장값 유지)
+      if (answers) {
+        try {
+          const persistedAnswers: Record<string, string> = {};
+          for (const [k, v] of Object.entries(answers)) {
+            if (v != null && String(v).trim() !== "") persistedAnswers[k] = String(v);
+          }
+          await updateDoc(doc(db, "customers", customer.id), {
+            diagnose_followup_answers: persistedAnswers,
+            diagnose_manual_personal_loan: manualPersonalLoan ?? null,
+          });
+        } catch (saveErr) {
+          console.warn("[자격판정] 추가확인 답변 저장 실패:", saveErr);
         }
-        await updateDoc(doc(db, "customers", customer.id), {
-          diagnose_followup_answers: persistedAnswers,
-          diagnose_manual_personal_loan: manualPersonalLoan ?? null,
-        });
-      } catch (saveErr) {
-        console.warn("[자격판정] 추가확인 답변 저장 실패:", saveErr);
       }
     } catch (err: any) {
       setDiagnoseError(err?.message || String(err));
