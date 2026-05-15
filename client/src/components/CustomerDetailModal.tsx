@@ -5646,16 +5646,94 @@ export function CustomerDetailModal({
             {diagnoseResult && (
               <>
                 {/* 종합 요약 */}
-                {diagnoseResult.summary && (
-                  <div className="p-3 rounded-md border bg-muted/30">
-                    <div className="text-xs text-muted-foreground mb-1">종합 판정</div>
-                    <div className="text-base font-semibold whitespace-pre-wrap" data-testid="text-diagnose-summary">
-                      {typeof diagnoseResult.summary === "string"
-                        ? diagnoseResult.summary
-                        : JSON.stringify(diagnoseResult.summary, null, 2)}
+                {diagnoseResult.summary && (() => {
+                  const summary = diagnoseResult.summary;
+                  // 객체 형태({신청가능, 신청불가, 조건부, ...})면 통계 카드로, 문자열이면 그대로 표시
+                  if (summary && typeof summary === "object" && !Array.isArray(summary)) {
+                    const entries = Object.entries(summary).filter(
+                      ([, v]) => typeof v === "number" || typeof v === "string",
+                    );
+                    const total = entries.reduce(
+                      (sum, [, v]) => sum + (typeof v === "number" ? v : 0),
+                      0,
+                    );
+                    // 키별 색상/아이콘 매핑
+                    const styleFor = (key: string) => {
+                      if (key.includes("가능") || key.includes("적합") || key.includes("승인"))
+                        return {
+                          card: "border-emerald-500/30 bg-emerald-500/5",
+                          text: "text-emerald-600 dark:text-emerald-400",
+                          icon: "✅",
+                        };
+                      if (key.includes("불가") || key.includes("부적합") || key.includes("탈락"))
+                        return {
+                          card: "border-red-500/30 bg-red-500/5",
+                          text: "text-red-600 dark:text-red-400",
+                          icon: "❌",
+                        };
+                      if (key.includes("조건") || key.includes("확인"))
+                        return {
+                          card: "border-amber-500/30 bg-amber-500/5",
+                          text: "text-amber-600 dark:text-amber-400",
+                          icon: "🔶",
+                        };
+                      return {
+                        card: "border-border bg-muted/30",
+                        text: "text-foreground",
+                        icon: "•",
+                      };
+                    };
+                    return (
+                      <div className="space-y-2" data-testid="text-diagnose-summary">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-semibold">종합 판정</div>
+                          {total > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              총 <span className="font-semibold text-foreground">{total}</span>건 검토
+                            </div>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {entries.map(([k, v]) => {
+                            const s = styleFor(k);
+                            return (
+                              <div
+                                key={k}
+                                className={cn("rounded-md border p-3 flex flex-col gap-1", s.card)}
+                                data-testid={`stat-diagnose-${k}`}
+                              >
+                                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <span aria-hidden>{s.icon}</span>
+                                  <span>{k}</span>
+                                </div>
+                                <div className={cn("text-2xl font-bold tabular-nums", s.text)}>
+                                  {String(v)}
+                                  {typeof v === "number" && (
+                                    <span className="text-sm font-normal text-muted-foreground ml-0.5">
+                                      건
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                  // 문자열 또는 그 외 — 기존처럼 텍스트로 표시
+                  return (
+                    <div className="p-3 rounded-md border bg-muted/30">
+                      <div className="text-xs text-muted-foreground mb-1">종합 판정</div>
+                      <div
+                        className="text-base font-semibold whitespace-pre-wrap"
+                        data-testid="text-diagnose-summary"
+                      >
+                        {typeof summary === "string" ? summary : JSON.stringify(summary, null, 2)}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* 자금별 판정 */}
                 {Array.isArray(diagnoseResult.funds) && diagnoseResult.funds.length > 0 && (
