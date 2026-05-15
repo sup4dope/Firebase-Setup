@@ -252,12 +252,42 @@ export async function registerRoutes(
           data: body,
         });
       }
+      // ─── implicit-feedback용 호출 로그 (best-effort, 실패해도 응답은 나감) ───
+      try {
+        const adminApp = getAdminApp();
+        const dbLog = adminApp.firestore();
+        // 한글 키와 영문 키 둘 다 케어 (aiClient가 정규화하기 전 raw 응답)
+        const fundings = (body?.fundings || body?.자금 || []) as any[];
+        const top = Array.isArray(fundings) && fundings.length > 0
+          ? [...fundings].sort((a, b) =>
+              (Number(b?.approval_probability ?? b?.승인확률) || 0) -
+              (Number(a?.approval_probability ?? a?.승인확률) || 0)
+            )[0]
+          : null;
+        await dbLog.collection('ml_predict_logs').add({
+          customer_id: customerId,
+          called_at: new Date().toISOString(),
+          called_by_uid: req.user?.uid || null,
+          called_by_email: req.user?.email || null,
+          model_version: body?.model_version || body?.meta?.model_version || null,
+          predicted_top_org: top?.funding_name || top?.자금 || null,
+          predicted_prob: Number(top?.approval_probability ?? top?.승인확률) || null,
+          predicted_p50_amount_10k: Number(top?.expected_limit ?? top?.예상한도 ?? top?.p50_amount_10k) || null,
+          predicted_full: body, // raw 응답 보존 (재학습용 ground-truth)
+          taken_action: null,    // 컨설턴트 행동 추적 (PATCH로 업데이트)
+          final_status: null,    // 최종 결과 (PATCH로 업데이트)
+          final_amount_10k: null,
+        });
+      } catch (logErr: any) {
+        console.error('[/api/ml-predict] 로그 기록 실패(무시):', logErr?.message);
+      }
       res.json({ success: true, data: body });
     } catch (error: any) {
       console.error("[/api/ml-predict] 호출 실패:", error?.message);
       res.status(502).json({ success: false, error: `예측 API 호출 실패: ${error?.message || "unknown"}` });
     }
   });
+
 
   // ============================================================
   // ML 학습용 데이터 export (super_admin 전용, 1회성/주기적 호출)
@@ -372,6 +402,7 @@ export async function registerRoutes(
           }
           if (hasBurst) stats.customers_with_loans_within_7days++;
         });
+        res.setHeader('X-ML-Schema-Version', 'v2-2026-05-15');
         return res.json({ success: true, exported_at: new Date().toISOString(), stats });
       }
 
@@ -565,9 +596,18 @@ export async function registerRoutes(
         }
       }
 
+      res.setHeader('X-ML-Schema-Version', 'v2-2026-05-15');
       res.json({
         success: true,
         exported_at: new Date().toISOString(),
+        export_schema_version: 'v2-2026-05-15',
+        unit_policy: {
+          balance: 'KRW',           // financial_obligations.balance, total_loan_balance, total_guarantee_balance
+          sales: '100M_KRW',        // sales_y1/y2/y3, recent_sales, avg_revenue_3y (억원)
+          amount: '10K_KRW',        // applied_amount, approved_amount, executed_amount (만원)
+          duration: 'days',         // nearest_maturity_days
+          score: 'NCB_raw',         // credit_score (NCB 원점수)
+        },
         total_records: records.length,
         page_customers: customersSnap.size,
         mode: updatedSinceDate ? 'updated_since' : (sinceStr ? 'since' : 'full'),
@@ -578,6 +618,95 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('[/api/admin/ml-export] 실패:', error);
       res.status(500).json({ success: false, error: error?.message || 'ml-export 실패' });
+    }
+  });
+
+  // ============================================================
+  // ml_predict_logs — implicit feedback 데이터 (AI팀 주간 pull 대상)
+  // GET  /api/admin/predict-logs?since=ISO&limit=N&cursor=...
+  // PATCH /api/admin/predict-logs/:id  body: { taken_action?, final_status?, final_amount_10k? }
+  // ※ Firestore 인덱스 필요: ml_predict_logs (called_at ASC)
+  // ============================================================
+  app.get("/api/admin/predict-logs", requireMlExportAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const adminApp = getAdminApp();
+      const db = adminApp.firestore();
+      const sinceStr = (req.query.since as string | undefined) || null;
+      const limit = req.query.limit ? Math.min(Math.max(Number(req.query.limit), 1), 5000) : 1000;
+      const cursor = (req.query.cursor as string | undefined) || null;
+
+      // 복합 정렬 (called_at, __name__) — 동일 timestamp 다건도 안정 페이지네이션
+      // ※ Firestore 인덱스 필요: ml_predict_logs (called_at ASC, __name__ ASC)
+      let q: FirebaseFirestore.Query = db.collection('ml_predict_logs')
+        .orderBy('called_at', 'asc')
+        .orderBy('__name__', 'asc');
+      if (sinceStr) {
+        const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(sinceStr) ? `${sinceStr}T00:00:00+09:00` : sinceStr);
+        if (isNaN(d.getTime())) {
+          return res.status(400).json({ success: false, error: 'since 형식 오류 (YYYY-MM-DD 또는 ISO 8601)' });
+        }
+        q = q.where('called_at', '>=', d.toISOString());
+      }
+      // cursor 형식: "<ISO called_at>__<docId>" (구버전 단일값도 fallback 호환)
+      if (cursor) {
+        const idx = cursor.lastIndexOf('__');
+        if (idx > 0) {
+          const cTs = cursor.slice(0, idx);
+          const cId = cursor.slice(idx + 2);
+          q = q.startAfter(cTs, cId);
+        } else {
+          q = q.startAfter(cursor);
+        }
+      }
+      q = q.limit(limit);
+
+      const snap = await q.get();
+      const records: any[] = [];
+      let lastCalledAt: string | null = null;
+      let lastDocId: string | null = null;
+      snap.forEach(doc => {
+        const data = doc.data();
+        records.push({ id: doc.id, ...data });
+        if (data.called_at) lastCalledAt = data.called_at;
+        lastDocId = doc.id;
+      });
+      const hasMore = snap.size === limit;
+      const nextCursor = hasMore && lastCalledAt && lastDocId
+        ? `${lastCalledAt}__${lastDocId}`
+        : null;
+      res.setHeader('X-ML-Schema-Version', 'v2-2026-05-15');
+      res.json({
+        success: true,
+        exported_at: new Date().toISOString(),
+        total: records.length,
+        next_cursor: nextCursor,
+        has_more: hasMore,
+        records,
+      });
+    } catch (error: any) {
+      console.error('[/api/admin/predict-logs GET] 실패:', error);
+      res.status(500).json({ success: false, error: error?.message || 'predict-logs GET 실패' });
+    }
+  });
+
+  app.patch("/api/admin/predict-logs/:id", requireMlExportAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = req.params.id;
+      if (!id) return res.status(400).json({ success: false, error: 'id 필요' });
+      const allowed = ['taken_action', 'final_status', 'final_amount_10k'];
+      const update: Record<string, any> = { updated_at: new Date().toISOString() };
+      for (const k of allowed) {
+        if (k in (req.body || {})) update[k] = req.body[k];
+      }
+      if (Object.keys(update).length === 1) {
+        return res.status(400).json({ success: false, error: '업데이트할 필드 없음 (taken_action/final_status/final_amount_10k)' });
+      }
+      const adminApp = getAdminApp();
+      await adminApp.firestore().collection('ml_predict_logs').doc(id).update(update);
+      res.json({ success: true, id, updated: update });
+    } catch (error: any) {
+      console.error('[/api/admin/predict-logs PATCH] 실패:', error);
+      res.status(500).json({ success: false, error: error?.message || 'predict-logs PATCH 실패' });
     }
   });
 
