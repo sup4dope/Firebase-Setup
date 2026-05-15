@@ -234,23 +234,68 @@ export async function registerRoutes(
   // - 한 신청 건당 1 레코드, 자금 종류별 분리
   // - 거절/미진행 사유 포함, 신청 시점 스냅샷 우선 사용
   // ============================================================
-  app.get("/api/admin/ml-export", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+  // 인증: x-admin-key 헤더 (env ML_EXPORT_API_KEY) 또는 Firebase super_admin 토큰
+  const requireMlExportAuth = async (req: any, res: any, next: any) => {
+    const expectedKey = process.env.ML_EXPORT_API_KEY;
+    const providedKey = req.header('x-admin-key');
+    if (expectedKey && providedKey && providedKey === expectedKey) return next();
+    // fallback: Firebase ID token + super_admin
+    return requireAuth(req, res, () => requireSuperAdmin(req, res, next));
+  };
+
+  app.get("/api/admin/ml-export", requireMlExportAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const adminApp = getAdminApp();
       const db = adminApp.firestore();
 
-      // 거절/미진행 사유로 간주할 status_code 목록 (구조화된 거절 사유)
+      // ───── 쿼리 파라미터 ─────
+      // limit: 1~5000 (기본: 무제한). cursor: 마지막 customer doc id (다음 페이지 시작점)
+      // since: YYYY-MM-DD — customers.updated_at >= since 필터 (증분 조회)
+      // stats: 'true' → 레코드 없이 분포 통계만 반환
+      const limitParam = req.query.limit ? Math.min(Math.max(Number(req.query.limit), 1), 5000) : null;
+      const cursor = (req.query.cursor as string | undefined) || null;
+      const sinceStr = (req.query.since as string | undefined) || null;
+      const statsOnly = req.query.stats === 'true';
+
       const REJECTION_STATUSES = new Set([
         '단박거절', '매출없음', '신용점수 미달', '차입금초과', '세금체납',
         '재상담', '쓰레기통', '미진행', '거절',
       ]);
 
-      const [customersSnap, settlementsSnap] = await Promise.all([
-        db.collection('customers').get(),
-        db.collection('settlements').get(),
-      ]);
+      // 통계 모드 — 빠른 분포 집계만 반환
+      if (statsOnly) {
+        const customersSnap = await db.collection('customers').get();
+        const stats = {
+          total_customers: customersSnap.size,
+          customers_with_orgs: 0,
+          total_processing_orgs: 0,
+          customers_with_snapshot: 0,
+          orgs_with_snapshot: 0,
+          orgs_with_applied_amount: 0,
+          by_status: {} as Record<string, number>,
+          by_org: {} as Record<string, number>,
+          by_org_status: {} as Record<string, number>,
+        };
+        customersSnap.forEach((doc: any) => {
+          const c = doc.data();
+          const orgs = Array.isArray(c.processing_orgs) ? c.processing_orgs : [];
+          stats.by_status[c.status_code || '(없음)'] = (stats.by_status[c.status_code || '(없음)'] || 0) + 1;
+          if (orgs.length > 0) stats.customers_with_orgs++;
+          stats.total_processing_orgs += orgs.length;
+          let hasAnySnapshot = false;
+          for (const org of orgs) {
+            stats.by_org[org.org || '(없음)'] = (stats.by_org[org.org || '(없음)'] || 0) + 1;
+            stats.by_org_status[org.status || '(없음)'] = (stats.by_org_status[org.status || '(없음)'] || 0) + 1;
+            if (org.snapshot) { stats.orgs_with_snapshot++; hasAnySnapshot = true; }
+            if (org.applied_amount != null) stats.orgs_with_applied_amount++;
+          }
+          if (hasAnySnapshot) stats.customers_with_snapshot++;
+        });
+        return res.json({ success: true, exported_at: new Date().toISOString(), stats });
+      }
 
-      // settlements: customer_id + org_name → SettlementItem[] 인덱스
+      // settlements 인덱스
+      const settlementsSnap = await db.collection('settlements').get();
       const settlementIndex = new Map<string, any[]>();
       settlementsSnap.forEach((doc: any) => {
         const s = doc.data();
@@ -259,13 +304,27 @@ export async function registerRoutes(
         settlementIndex.get(key)!.push({ id: doc.id, ...s });
       });
 
+      // customers 페이지네이션 — doc id 기준 안정 정렬
+      let q: FirebaseFirestore.Query = db.collection('customers').orderBy('__name__');
+      if (sinceStr) {
+        // since 이후 갱신된 고객만 (updated_at 또는 entry_date 사용)
+        // updated_at 인덱스가 없을 수 있으므로 entry_date 기반 필터 권장
+        q = q.where('entry_date', '>=', sinceStr);
+      }
+      if (cursor) q = q.startAfter(cursor);
+      if (limitParam) q = q.limit(limitParam);
+
+      const customersSnap = await q.get();
+
       const records: any[] = [];
+      let lastCustomerId: string | null = null;
 
       customersSnap.forEach((doc: any) => {
         const c: any = { id: doc.id, ...doc.data() };
+        lastCustomerId = doc.id;
         const orgs: any[] = Array.isArray(c.processing_orgs) ? c.processing_orgs : [];
 
-        // 현재 프로필 (스냅샷 fallback용)
+        // 현재 프로필 (PII 제외) — 스냅샷 없는 레코드의 fallback용
         const currentProfile = {
           credit_score: c.credit_score ?? null,
           founding_date: c.founding_date ?? null,
@@ -283,14 +342,11 @@ export async function registerRoutes(
           financial_obligations_count: Array.isArray(c.financial_obligations) ? c.financial_obligations.length : 0,
         };
 
-        // 거절/미진행 케이스 추정 (processing_orgs가 비어 있고 상태가 거절성일 때)
         const isCustomerRejected = REJECTION_STATUSES.has(String(c.status_code || ''));
 
         if (orgs.length === 0) {
-          // 자금 신청 기록 없음 → 미진행/상담중 케이스
           records.push({
-            customer_id: c.id,
-            readable_id: c.readable_id ?? null,
+            customer_id: c.id,  // PII 제외 — name/phone/email/ssn/사업자번호 모두 미포함
             신청일자: null,
             자금종류: null,
             현재_프로필: currentProfile,
@@ -301,7 +357,6 @@ export async function registerRoutes(
             집행일자: null,
             상태: isCustomerRejected ? '거절' : (c.status_code || '미진행'),
             거절사유: isCustomerRejected ? c.status_code : (c.rejection_reason ?? null),
-            거절사유_메모: c.recent_memo ?? null,
             재집행여부: null,
             정산_건수: 0,
             entry_date: c.entry_date ?? null,
@@ -309,7 +364,6 @@ export async function registerRoutes(
           return;
         }
 
-        // 자금별 1 레코드씩 분리 생성
         for (const org of orgs) {
           const orgName = org.org;
           const settlements = settlementIndex.get(`${c.id}::${orgName}`) || [];
@@ -325,10 +379,8 @@ export async function registerRoutes(
 
           records.push({
             customer_id: c.id,
-            readable_id: c.readable_id ?? null,
             신청일자: org.applied_at ?? null,
             자금종류: orgName,
-            // 신청 시점 스냅샷 우선 — 없으면 null (현재 프로필은 별도 필드로)
             신청시점_스냅샷: org.snapshot ?? null,
             현재_프로필: currentProfile,
             신청한도: org.applied_amount ?? null,
@@ -337,7 +389,6 @@ export async function registerRoutes(
             집행일자: org.execution_date ?? null,
             상태,
             거절사유: org.status === '부결' ? (org.rejection_reason ?? c.status_code ?? null) : null,
-            거절사유_메모: org.status === '부결' ? (c.recent_memo ?? null) : null,
             재집행여부: !!org.is_re_execution,
             정산_건수: settlements.length,
             정산_총집행액: totalSettlementAmount || null,
@@ -346,11 +397,16 @@ export async function registerRoutes(
         }
       });
 
+      // 다음 페이지가 있는지 — limit과 동일하면 더 있을 가능성
+      const hasMore = !!(limitParam && customersSnap.size === limitParam);
+
       res.json({
         success: true,
         exported_at: new Date().toISOString(),
         total_records: records.length,
-        total_customers: customersSnap.size,
+        page_customers: customersSnap.size,
+        next_cursor: hasMore ? lastCustomerId : null,
+        has_more: hasMore,
         records,
       });
     } catch (error: any) {
