@@ -412,6 +412,8 @@ export function CustomerDetailModal({
   // 마지막으로 외부 API에 제출(rerun)한 답변 스냅샷 — UI 필터링 기준
   // (followupAnswers로 필터링하면 타이핑 중간에 질문이 사라져 사용자가 입력을 끝낼 수 없음)
   const [submittedFollowupAnswers, setSubmittedFollowupAnswers] = useState<Record<string, string>>({});
+  // 자금별 판정 카드 펼침 상태
+  const [expandedFunds, setExpandedFunds] = useState<Set<number>>(new Set());
   const [aiInput, setAiInput] = useState("");
   const aiScrollRef = useRef<HTMLDivElement>(null);
   const [aiConversationId, setAiConversationId] = useState<string | null>(null);
@@ -2150,6 +2152,7 @@ export function CustomerDetailModal({
       setDiagnoseResult(null);
       setFollowupAnswers({});
       setSubmittedFollowupAnswers({});
+      setExpandedFunds(new Set());
     }
     try {
       const { authFetch } = await import('@/lib/firebase');
@@ -2302,6 +2305,7 @@ export function CustomerDetailModal({
       setDiagnoseLoading(false);
       setFollowupAnswers({});
       setSubmittedFollowupAnswers({});
+      setExpandedFunds(new Set());
       aiPredictedSignatureRef.current = "";
       aiPredictingRef.current = false;
       aiPredictAbortRef.current?.abort();
@@ -5542,34 +5546,138 @@ export function CustomerDetailModal({
                     <div className="text-sm font-semibold">자금별 판정</div>
                     <div className="space-y-2">
                       {diagnoseResult.funds.map((fund: any, idx: number) => {
-                        const status: string = String(fund?.status || fund?.result || fund?.judgment || "").trim();
-                        const colorClass = status.includes("불가") || status.includes("불가능")
-                          ? "border-red-500/40 bg-red-500/10 text-red-400"
-                          : status.includes("조건")
-                            ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-                            : status.includes("가능") || status.includes("적합")
-                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                        const status: string = String(
+                          fund?.판정 || fund?.status || fund?.result || fund?.judgment || "",
+                        ).trim();
+                        const fundName: string =
+                          fund?.자금명 || fund?.name || fund?.fund_name || fund?.title || `자금 ${idx + 1}`;
+                        const isPass = status.includes("적합") && !status.includes("부적합");
+                        const isCheck = status.includes("확인필요") || status.includes("조건");
+                        const isFail = status.includes("부적합") || status.includes("불가");
+                        const badgeClass = isFail
+                          ? "border-red-500/40 bg-red-500/10 text-red-500 dark:text-red-400"
+                          : isCheck
+                            ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            : isPass
+                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                               : "border-border bg-muted/30 text-foreground";
+                        const cardClass = isFail
+                          ? "border-red-500/30 bg-red-500/5"
+                          : isCheck
+                            ? "border-amber-500/30 bg-amber-500/5"
+                            : isPass
+                              ? "border-emerald-500/30 bg-emerald-500/5"
+                              : "border-border bg-muted/20";
+                        const statusIcon = isFail ? "❌" : isCheck ? "🔶" : isPass ? "✅" : "•";
+                        const reasons: string[] = [
+                          ...(Array.isArray(fund?.탈락사유) ? fund.탈락사유 : []),
+                          ...(Array.isArray(fund?.확인필요) ? fund.확인필요 : []),
+                        ].filter((s) => s && String(s).trim());
+                        const hasDetails =
+                          fund?.한도 ||
+                          fund?.금리 ||
+                          fund?.대출기간 ||
+                          fund?.융자방식 ||
+                          fund?.기관 ||
+                          reasons.length > 0;
+                        const isExpanded = expandedFunds.has(idx);
+                        const toggleExpand = () => {
+                          setExpandedFunds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(idx)) next.delete(idx);
+                            else next.add(idx);
+                            return next;
+                          });
+                        };
                         return (
                           <div
                             key={idx}
-                            className="p-3 rounded-md border bg-muted/20"
+                            className={cn("rounded-md border", cardClass)}
                             data-testid={`card-diagnose-fund-${idx}`}
                           >
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <div className="font-medium text-sm">
-                                {fund?.name || fund?.fund_name || fund?.title || `자금 ${idx + 1}`}
-                              </div>
-                              {status && (
-                                <Badge variant="outline" className={cn("text-xs shrink-0", colorClass)}>
-                                  {status}
-                                </Badge>
+                            <button
+                              type="button"
+                              onClick={hasDetails ? toggleExpand : undefined}
+                              disabled={!hasDetails}
+                              className={cn(
+                                "w-full flex items-center justify-between gap-2 p-3 text-left",
+                                hasDetails && "hover:bg-foreground/5 cursor-pointer",
+                                !hasDetails && "cursor-default",
                               )}
-                            </div>
-                            {(fund?.reason || fund?.description || fund?.detail) && (
-                              <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-                                {fund?.reason || fund?.description || fund?.detail}
-                              </p>
+                              data-testid={`button-diagnose-fund-toggle-${idx}`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-base shrink-0" aria-hidden>
+                                  {statusIcon}
+                                </span>
+                                <div className="font-medium text-sm truncate">{fundName}</div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {status && (
+                                  <Badge variant="outline" className={cn("text-xs", badgeClass)}>
+                                    {status}
+                                  </Badge>
+                                )}
+                                {hasDetails && (
+                                  <ChevronDown
+                                    className={cn(
+                                      "w-4 h-4 text-muted-foreground transition-transform",
+                                      isExpanded && "rotate-180",
+                                    )}
+                                  />
+                                )}
+                              </div>
+                            </button>
+                            {hasDetails && isExpanded && (
+                              <div className="px-3 pb-3 pt-0 border-t border-border/50">
+                                <dl className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-1.5 text-xs pt-2">
+                                  {fund?.기관 && (
+                                    <>
+                                      <dt className="text-muted-foreground">기관</dt>
+                                      <dd className="text-foreground/90 whitespace-pre-wrap">{fund.기관}</dd>
+                                    </>
+                                  )}
+                                  {fund?.한도 && (
+                                    <>
+                                      <dt className="text-muted-foreground">한도</dt>
+                                      <dd className="text-foreground/90 whitespace-pre-wrap">{fund.한도}</dd>
+                                    </>
+                                  )}
+                                  {fund?.금리 && (
+                                    <>
+                                      <dt className="text-muted-foreground">금리</dt>
+                                      <dd className="text-foreground/90 whitespace-pre-wrap">{fund.금리}</dd>
+                                    </>
+                                  )}
+                                  {fund?.대출기간 && (
+                                    <>
+                                      <dt className="text-muted-foreground">대출기간</dt>
+                                      <dd className="text-foreground/90 whitespace-pre-wrap">{fund.대출기간}</dd>
+                                    </>
+                                  )}
+                                  {fund?.융자방식 && (
+                                    <>
+                                      <dt className="text-muted-foreground">융자방식</dt>
+                                      <dd className="text-foreground/90 whitespace-pre-wrap">{fund.융자방식}</dd>
+                                    </>
+                                  )}
+                                  {reasons.length > 0 && (
+                                    <>
+                                      <dt className="text-muted-foreground">사유</dt>
+                                      <dd className="text-foreground/90">
+                                        <ul className="space-y-0.5">
+                                          {reasons.map((r, i) => (
+                                            <li key={i} className="flex gap-1">
+                                              <span className="text-muted-foreground">·</span>
+                                              <span className="whitespace-pre-wrap">{r}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </dd>
+                                    </>
+                                  )}
+                                </dl>
+                              </div>
                             )}
                           </div>
                         );
