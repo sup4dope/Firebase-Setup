@@ -29,7 +29,6 @@ import {
   RefreshCw,
   Eye,
   Stethoscope,
-  FileSearch,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -5745,94 +5744,171 @@ export function CustomerDetailModal({
                   </div>
                 )}
 
-                {/* 수동 확인 질문: 서류로 확인되지 않는 개인대출 (OCR 미반영) */}
+                {/* 추가 확인 질문(역질문) — 직접 확인 질문 + API follow-up 통합 패널.
+                    예/아니오 질문은 토글 버튼으로 자동 변환. 자동 응답되었거나 이미 제출한 항목은 숨김. */}
                 {(() => {
                   const cutoffYear = new Date().getFullYear() - 1;
-                  return (
-                    <div className="space-y-2 p-3 rounded-md border border-blue-500/30 bg-blue-500/5">
-                      <div className="text-sm font-semibold flex items-center gap-1.5">
-                        <FileSearch className="w-4 h-4 text-blue-500" />
-                        직접 확인 질문
-                        <span className="text-xs text-muted-foreground font-normal">
-                          — 서류로 확인이 어려운 항목입니다
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-2 items-center">
-                        <div className="text-sm text-foreground/90">
-                          서류 미반영 개인대출 중 <strong>금리 7% 이상</strong>이면서{" "}
-                          <strong>{cutoffYear}.06.30. 이전</strong> 실행된 대출이 있나요?
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            "예" 선택 시 대환 가능 조건으로 자격판정에 반영됩니다.
-                          </div>
-                        </div>
-                        <div className="flex gap-1.5">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={manualPersonalLoan === "yes" ? "default" : "outline"}
-                            className={cn(
-                              "flex-1 h-8",
-                              manualPersonalLoan === "yes" &&
-                                "bg-blue-600 hover:bg-blue-700 text-white",
-                            )}
-                            onClick={() =>
-                              setManualPersonalLoan((prev) => (prev === "yes" ? null : "yes"))
-                            }
-                            disabled={diagnoseLoading}
-                            data-testid="button-manual-personal-loan-yes"
-                          >
-                            예
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={manualPersonalLoan === "no" ? "default" : "outline"}
-                            className={cn(
-                              "flex-1 h-8",
-                              manualPersonalLoan === "no" &&
-                                "bg-muted-foreground/80 hover:bg-muted-foreground text-white",
-                            )}
-                            onClick={() =>
-                              setManualPersonalLoan((prev) => (prev === "no" ? null : "no"))
-                            }
-                            disabled={diagnoseLoading}
-                            data-testid="button-manual-personal-loan-no"
-                          >
-                            아니오
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* 추가 확인 질문(역질문) — 자동 응답되었거나 이미 사용자가 답한 항목은 숨김 */}
-                {(() => {
                   const allQuestions = Array.isArray(diagnoseResult.followup_questions)
                     ? diagnoseResult.followup_questions
                     : [];
-                  const visibleQuestions = allQuestions.filter((q: any, i: number) => {
-                    const key = extractFollowupKey(q) || `q_${i}`;
-                    if (key in autoFollowupAnswers) return false;
-                    // 마지막 제출에 포함된 답변만 숨김 (타이핑 중인 답변은 계속 표시)
-                    const v = submittedFollowupAnswers[key];
-                    if (v != null && String(v).trim() !== "") return false;
-                    return true;
-                  });
-                  if (visibleQuestions.length === 0) {
-                    // 모든 질문 답변 완료 — 재판정 버튼만 표시
-                    return (
-                      <div className="flex items-center justify-between gap-2 p-3 rounded-md border border-purple-500/30 bg-purple-500/5">
-                        <div className="text-sm text-foreground/90 flex items-center gap-1.5">
-                          <Bot className="w-4 h-4 text-purple-500" />
-                          모든 추가 질문에 대한 답변이 준비되었습니다.
+                  // 원본 인덱스 보존 — 필터링 후에도 키 fallback이 일관되게 매칭되도록
+                  const visibleApiQuestions: Array<{ q: any; originalIdx: number }> = allQuestions
+                    .map((q: any, i: number) => ({ q, originalIdx: i }))
+                    .filter(({ q, originalIdx }: { q: any; originalIdx: number }) => {
+                      const key = extractFollowupKey(q) || `q_${originalIdx}`;
+                      if (key in autoFollowupAnswers) return false;
+                      const v = submittedFollowupAnswers[key];
+                      if (v != null && String(v).trim() !== "") return false;
+                      return true;
+                    });
+                  // 예/아니오 질문 판별 (라벨에 "(예/아니오)" 패턴 또는 키 기반 휴리스틱)
+                  const isYesNoQuestion = (label: string, key: string) => {
+                    if (/\(\s*예\s*\/\s*아니오\s*\)/.test(label)) return true;
+                    if (/예\s*또는\s*아니오/.test(label)) return true;
+                    // 키 휴리스틱: "_보유", "_이수", "_있", "_여부" 등으로 끝나는 boolean 류
+                    if (/(_보유|_이수|_여부|_확인|_과반|_성실상환)$/.test(key)) return true;
+                    return false;
+                  };
+                  const renderYesNo = (
+                    currentValue: string,
+                    onChange: (v: string) => void,
+                    testidBase: string,
+                  ) => (
+                    <div className="flex gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={currentValue === "예" ? "default" : "outline"}
+                        className={cn(
+                          "flex-1 h-8",
+                          currentValue === "예" &&
+                            "bg-purple-600 hover:bg-purple-700 text-white",
+                        )}
+                        onClick={() => onChange(currentValue === "예" ? "" : "예")}
+                        disabled={diagnoseLoading}
+                        data-testid={`${testidBase}-yes`}
+                      >
+                        예
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={currentValue === "아니오" ? "default" : "outline"}
+                        className={cn(
+                          "flex-1 h-8",
+                          currentValue === "아니오" &&
+                            "bg-muted-foreground/80 hover:bg-muted-foreground text-white",
+                        )}
+                        onClick={() => onChange(currentValue === "아니오" ? "" : "아니오")}
+                        disabled={diagnoseLoading}
+                        data-testid={`${testidBase}-no`}
+                      >
+                        아니오
+                      </Button>
+                    </div>
+                  );
+                  return (
+                    <div className="space-y-2 p-3 rounded-md border border-purple-500/30 bg-purple-500/5">
+                      <div className="text-sm font-semibold flex items-center gap-1.5">
+                        <Bot className="w-4 h-4 text-purple-500" />
+                        추가 확인 질문
+                        <span className="text-xs text-muted-foreground font-normal">
+                          — 답변 입력 후 재판정하면 더 정확해집니다
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {/* 직접 확인: 서류 미반영 개인대출 (항상 표시) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-2 items-center">
+                          <div className="text-sm text-foreground/90">
+                            서류 미반영 개인대출 중 <strong>금리 7% 이상</strong>이면서{" "}
+                            <strong>{cutoffYear}.06.30. 이전</strong> 실행된 대출이 있나요?
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              "예" 선택 시 대환 가능 조건으로 자격판정에 반영됩니다.
+                            </div>
+                          </div>
+                          {renderYesNo(
+                            manualPersonalLoan === "yes"
+                              ? "예"
+                              : manualPersonalLoan === "no"
+                                ? "아니오"
+                                : "",
+                            (v) =>
+                              setManualPersonalLoan(
+                                v === "예" ? "yes" : v === "아니오" ? "no" : null,
+                              ),
+                            "button-manual-personal-loan",
+                          )}
                         </div>
+                        {/* API follow-up 질문들 */}
+                        {visibleApiQuestions.map(({ q, originalIdx }, idx: number) => {
+                          const key = extractFollowupKey(q) || `q_${originalIdx}`;
+                          const label =
+                            typeof q === "string" ? q : q?.question || q?.label || key;
+                          const yesNo = isYesNoQuestion(String(label), key);
+                          return (
+                            <div
+                              key={idx}
+                              className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-2 items-center"
+                            >
+                              <label
+                                className="text-sm text-foreground/90"
+                                htmlFor={`followup-${idx}`}
+                                data-testid={`text-diagnose-followup-${idx}`}
+                              >
+                                {label}
+                              </label>
+                              {yesNo ? (
+                                renderYesNo(
+                                  followupAnswers[key] ?? "",
+                                  (v) =>
+                                    setFollowupAnswers((prev) => ({ ...prev, [key]: v })),
+                                  `button-followup-${idx}`,
+                                )
+                              ) : (
+                                <Input
+                                  id={`followup-${idx}`}
+                                  value={followupAnswers[key] ?? ""}
+                                  onChange={(e) =>
+                                    setFollowupAnswers((prev) => ({
+                                      ...prev,
+                                      [key]: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="답변 입력"
+                                  disabled={diagnoseLoading}
+                                  className="h-8 text-sm"
+                                  data-testid={`input-followup-${idx}`}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-end pt-1">
                         <Button
                           size="sm"
-                          onClick={() => handleDiagnose(followupAnswers)}
-                          disabled={diagnoseLoading}
+                          onClick={() => {
+                            // 현재 질문 키에 한정해서만 답변 전송 (stale 키 제거)
+                            const currentKeys = new Set<string>(
+                              allQuestions.map(
+                                (q: any, i: number) => extractFollowupKey(q) || `q_${i}`,
+                              ),
+                            );
+                            const filtered: Record<string, string> = {};
+                            for (const [k, v] of Object.entries(followupAnswers)) {
+                              if (currentKeys.has(k)) filtered[k] = v;
+                            }
+                            handleDiagnose(filtered);
+                          }}
+                          disabled={
+                            diagnoseLoading ||
+                            (manualPersonalLoan == null &&
+                              Object.values(followupAnswers).every(
+                                (v) => !v || !String(v).trim(),
+                              ))
+                          }
                           className="bg-purple-600 hover:bg-purple-700 text-white gap-1"
-                          data-testid="button-diagnose-rerun-all-answered"
+                          data-testid="button-diagnose-rerun-with-answers"
                         >
                           {diagnoseLoading ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -5842,78 +5918,7 @@ export function CustomerDetailModal({
                           답변 적용해서 재판정
                         </Button>
                       </div>
-                    );
-                  }
-                  return (
-                  <div className="space-y-2 p-3 rounded-md border border-purple-500/30 bg-purple-500/5">
-                    <div className="text-sm font-semibold flex items-center gap-1.5">
-                      <Bot className="w-4 h-4 text-purple-500" />
-                      추가 확인 질문
-                      <span className="text-xs text-muted-foreground font-normal">
-                        — 답변 입력 후 재판정하면 더 정확해집니다
-                      </span>
                     </div>
-                    <div className="space-y-2">
-                      {visibleQuestions.map((q: any, idx: number) => {
-                        const key = extractFollowupKey(q) || `q_${idx}`;
-                        const label = typeof q === "string" ? q : q?.question || q?.label || key;
-                        return (
-                          <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-2 items-center">
-                            <label
-                              className="text-sm text-foreground/90"
-                              htmlFor={`followup-${idx}`}
-                              data-testid={`text-diagnose-followup-${idx}`}
-                            >
-                              {label}
-                            </label>
-                            <Input
-                              id={`followup-${idx}`}
-                              value={followupAnswers[key] ?? ""}
-                              onChange={(e) =>
-                                setFollowupAnswers((prev) => ({ ...prev, [key]: e.target.value }))
-                              }
-                              placeholder="답변 입력"
-                              disabled={diagnoseLoading}
-                              className="h-8 text-sm"
-                              data-testid={`input-followup-${idx}`}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex justify-end pt-1">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          // 현재 질문 키에 한정해서만 답변 전송 (stale 키 제거)
-                          const currentKeys = new Set<string>(
-                            diagnoseResult.followup_questions.map(
-                              (q: any, i: number) => extractFollowupKey(q) || `q_${i}`,
-                            ),
-                          );
-                          const filtered: Record<string, string> = {};
-                          for (const [k, v] of Object.entries(followupAnswers)) {
-                            if (currentKeys.has(k)) filtered[k] = v;
-                          }
-                          handleDiagnose(filtered);
-                        }}
-                        disabled={
-                          diagnoseLoading ||
-                          (manualPersonalLoan == null &&
-                            Object.values(followupAnswers).every((v) => !v || !String(v).trim()))
-                        }
-                        className="bg-purple-600 hover:bg-purple-700 text-white gap-1"
-                        data-testid="button-diagnose-rerun-with-answers"
-                      >
-                        {diagnoseLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Send className="w-4 h-4" />
-                        )}
-                        답변 적용해서 재판정
-                      </Button>
-                    </div>
-                  </div>
                   );
                 })()}
 
