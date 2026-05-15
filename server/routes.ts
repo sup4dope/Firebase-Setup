@@ -207,7 +207,12 @@ export async function registerRoutes(
     if (!customerId) return res.status(400).json({ success: false, error: "customerId가 필요합니다." });
     try {
       // 역질문 답변 등 클라이언트 쿼리스트링을 그대로 자격판정 API에 전달
-      const qs = new URLSearchParams(req.query as Record<string, string>).toString();
+      // (배열/객체 파라미터는 제외하고 flat string만 통과)
+      const flatQuery: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.query || {})) {
+        if (typeof v === "string") flatQuery[k] = v;
+      }
+      const qs = new URLSearchParams(flatQuery).toString();
       const url = `${getDiagnoseBase()}/diagnose/${encodeURIComponent(customerId)}${qs ? `?${qs}` : ""}`;
       const upstream = await fetch(url, { method: "GET", headers: getDiagnoseHeaders() });
       const text = await upstream.text();

@@ -408,6 +408,7 @@ export function CustomerDetailModal({
   const [diagnoseModalOpen, setDiagnoseModalOpen] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<any>(null);
   const [diagnoseError, setDiagnoseError] = useState<string | null>(null);
+  const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
   const [aiInput, setAiInput] = useState("");
   const aiScrollRef = useRef<HTMLDivElement>(null);
   const [aiConversationId, setAiConversationId] = useState<string | null>(null);
@@ -2004,16 +2005,35 @@ export function CustomerDetailModal({
     }
   };
 
+  // 역질문 키 추출 (string 또는 {key/question} 형태 모두 지원)
+  const extractFollowupKey = (q: any): string => {
+    if (typeof q === "string") return q;
+    return q?.key || q?.field || q?.name || q?.question || "";
+  };
+
   // 자격판정 호출 (외부 자금판정 API 프록시)
-  const handleDiagnose = async () => {
+  // answers: 역질문에 대한 답변 (있으면 쿼리스트링으로 전달)
+  const handleDiagnose = async (answers?: Record<string, string>) => {
     if (!customer?.id || diagnoseLoading) return;
     setDiagnoseLoading(true);
     setDiagnoseError(null);
-    setDiagnoseResult(null);
     setDiagnoseModalOpen(true);
+    if (!answers) {
+      // 첫 호출일 때만 결과/답변 리셋 (재판정 시에는 기존 결과 유지하다가 응답 받으면 교체)
+      setDiagnoseResult(null);
+      setFollowupAnswers({});
+    }
     try {
       const { authFetch } = await import('@/lib/firebase');
-      const res = await authFetch(`/api/diagnose/${encodeURIComponent(customer.id)}`);
+      const qs = answers
+        ? new URLSearchParams(
+            Object.fromEntries(
+              Object.entries(answers).filter(([, v]) => v != null && String(v).trim() !== ""),
+            ),
+          ).toString()
+        : "";
+      const url = `/api/diagnose/${encodeURIComponent(customer.id)}${qs ? `?${qs}` : ""}`;
+      const res = await authFetch(url);
       const json = await res.json();
       if (!res.ok || !json?.success) {
         throw new Error(json?.error || `자격판정 호출 실패 (${res.status})`);
@@ -2030,6 +2050,17 @@ export function CustomerDetailModal({
         break;
       }
       setDiagnoseResult(data);
+      // 새 follow-up 질문 도착 시, 현재 질문 키에 해당하지 않는 stale 답변 제거
+      const newKeys = new Set<string>(
+        Array.isArray(data?.followup_questions)
+          ? data.followup_questions.map((q: any, i: number) => extractFollowupKey(q) || `q_${i}`)
+          : [],
+      );
+      setFollowupAnswers((prev) => {
+        const next: Record<string, string> = {};
+        for (const k of newKeys) if (prev[k] != null) next[k] = prev[k];
+        return next;
+      });
     } catch (err: any) {
       setDiagnoseError(err?.message || String(err));
     } finally {
@@ -2120,6 +2151,7 @@ export function CustomerDetailModal({
       setDiagnoseResult(null);
       setDiagnoseError(null);
       setDiagnoseLoading(false);
+      setFollowupAnswers({});
       aiPredictedSignatureRef.current = "";
       aiPredictingRef.current = false;
       aiPredictAbortRef.current?.abort();
@@ -5207,7 +5239,7 @@ export function CustomerDetailModal({
                 </span>
                 {customer?.id && !isNewCustomer && (
                   <Button
-                    onClick={handleDiagnose}
+                    onClick={() => handleDiagnose()}
                     disabled={diagnoseLoading}
                     size="sm"
                     variant="outline"
@@ -5323,10 +5355,16 @@ export function CustomerDetailModal({
             )}
           </DialogTitle>
           <div className="space-y-4 mt-2">
-            {diagnoseLoading && (
+            {diagnoseLoading && !diagnoseResult && (
               <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>자격판정 분석 중...</span>
+              </div>
+            )}
+            {diagnoseLoading && diagnoseResult && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-purple-500/30 bg-purple-500/5 text-sm text-purple-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>재판정 중... 기존 결과는 응답이 도착하면 갱신됩니다.</span>
               </div>
             )}
             {diagnoseError && !diagnoseLoading && (
@@ -5334,7 +5372,7 @@ export function CustomerDetailModal({
                 ⚠️ {diagnoseError}
               </div>
             )}
-            {diagnoseResult && !diagnoseLoading && (
+            {diagnoseResult && (
               <>
                 {/* 종합 요약 */}
                 {diagnoseResult.summary && (
@@ -5405,17 +5443,75 @@ export function CustomerDetailModal({
                   </div>
                 )}
 
-                {/* 추가 확인 질문(역질문) */}
+                {/* 추가 확인 질문(역질문) — 답변 입력 후 재판정 */}
                 {Array.isArray(diagnoseResult.followup_questions) && diagnoseResult.followup_questions.length > 0 && (
-                  <div className="space-y-1">
-                    <div className="text-sm font-semibold">추가 확인 질문</div>
-                    <ul className="list-disc pl-5 space-y-1 text-sm text-foreground/90">
-                      {diagnoseResult.followup_questions.map((q: any, idx: number) => (
-                        <li key={idx} data-testid={`text-diagnose-followup-${idx}`}>
-                          {typeof q === "string" ? q : q?.question || JSON.stringify(q)}
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="space-y-2 p-3 rounded-md border border-purple-500/30 bg-purple-500/5">
+                    <div className="text-sm font-semibold flex items-center gap-1.5">
+                      <Bot className="w-4 h-4 text-purple-500" />
+                      추가 확인 질문
+                      <span className="text-xs text-muted-foreground font-normal">
+                        — 답변 입력 후 재판정하면 더 정확해집니다
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {diagnoseResult.followup_questions.map((q: any, idx: number) => {
+                        const key = extractFollowupKey(q) || `q_${idx}`;
+                        const label = typeof q === "string" ? q : q?.question || q?.label || key;
+                        return (
+                          <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-2 items-center">
+                            <label
+                              className="text-sm text-foreground/90"
+                              htmlFor={`followup-${idx}`}
+                              data-testid={`text-diagnose-followup-${idx}`}
+                            >
+                              {label}
+                            </label>
+                            <Input
+                              id={`followup-${idx}`}
+                              value={followupAnswers[key] ?? ""}
+                              onChange={(e) =>
+                                setFollowupAnswers((prev) => ({ ...prev, [key]: e.target.value }))
+                              }
+                              placeholder="답변 입력"
+                              disabled={diagnoseLoading}
+                              className="h-8 text-sm"
+                              data-testid={`input-followup-${idx}`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-end pt-1">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          // 현재 질문 키에 한정해서만 답변 전송 (stale 키 제거)
+                          const currentKeys = new Set<string>(
+                            diagnoseResult.followup_questions.map(
+                              (q: any, i: number) => extractFollowupKey(q) || `q_${i}`,
+                            ),
+                          );
+                          const filtered: Record<string, string> = {};
+                          for (const [k, v] of Object.entries(followupAnswers)) {
+                            if (currentKeys.has(k)) filtered[k] = v;
+                          }
+                          handleDiagnose(filtered);
+                        }}
+                        disabled={
+                          diagnoseLoading ||
+                          Object.values(followupAnswers).every((v) => !v || !String(v).trim())
+                        }
+                        className="bg-purple-600 hover:bg-purple-700 text-white gap-1"
+                        data-testid="button-diagnose-rerun-with-answers"
+                      >
+                        {diagnoseLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                        답변 적용해서 재판정
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -5434,7 +5530,7 @@ export function CustomerDetailModal({
           <div className="flex justify-end gap-2 mt-2">
             <Button
               variant="outline"
-              onClick={handleDiagnose}
+              onClick={() => handleDiagnose()}
               disabled={diagnoseLoading || !customer?.id}
               data-testid="button-diagnose-retry"
             >
