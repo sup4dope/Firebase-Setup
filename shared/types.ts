@@ -159,6 +159,10 @@ export interface Customer {
   financial_obligations?: FinancialObligation[]; // 대출/보증 내역
   credit_summary?: CreditSummary; // 신용 요약
   proposal_summary?: ProposalSummary; // 1초 제안서 요약
+
+  // 자격판정 추가확인 질문 저장 (모달 재오픈 시 복원)
+  diagnose_followup_answers?: Record<string, string>; // 사용자가 입력한 follow-up 답변 (질문 키 → 답변)
+  diagnose_manual_personal_loan?: 'yes' | 'no' | null; // 직접 확인 질문(개인대출 7%↑ + Y-1.06.30 이전 실행) 응답
 }
 
 // 진행기관 상태
