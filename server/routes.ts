@@ -545,7 +545,10 @@ export async function registerRoutes(
 
       // customers 페이지네이션
       // - updated_since 모드: orderBy('updated_at') + cursor=ISO timestamp (재학습용 증분)
-      // - 그 외: orderBy('__name__') + cursor=doc id (전체 dump 기본)
+      // - since 모드: where('entry_date', '>=') + orderBy('entry_date') + orderBy('__name__') (신규 유입 증분)
+      //   ※ Firestore 규칙: 부등호 필터 필드를 반드시 첫 orderBy로 둬야 함
+      //   ※ 복합 인덱스 필요: customers (entry_date ASC, __name__ ASC)
+      // - 그 외(전체 dump): orderBy('__name__') + cursor=doc id
       let q: FirebaseFirestore.Query;
       let lastUpdatedAt: any = null;
       if (updatedSinceDate) {
@@ -560,9 +563,19 @@ export async function registerRoutes(
           const cursorTs = Timestamp.fromDate(new Date(tsStr));
           q = q.startAfter(cursorTs, docId || '');
         }
+      } else if (sinceStr) {
+        // entry_date 부등호 필터 → entry_date를 첫 orderBy로 강제
+        q = db.collection('customers')
+          .where('entry_date', '>=', sinceStr)
+          .orderBy('entry_date', 'asc')
+          .orderBy('__name__', 'asc');
+        if (cursor) {
+          // cursor 형식: "<entry_date>__<doc_id>"
+          const [entryDate, docId] = cursor.split('__');
+          q = q.startAfter(entryDate || sinceStr, docId || '');
+        }
       } else {
         q = db.collection('customers').orderBy('__name__');
-        if (sinceStr) q = q.where('entry_date', '>=', sinceStr);
         if (cursor) q = q.startAfter(cursor);
       }
       if (limitParam) q = q.limit(limitParam);
@@ -571,11 +584,13 @@ export async function registerRoutes(
 
       const records: any[] = [];
       let lastCustomerId: string | null = null;
+      let lastEntryDate: string | null = null;
 
       customersSnap.forEach((doc: any) => {
         const c: any = { id: doc.id, ...doc.data() };
         lastCustomerId = doc.id;
         if (updatedSinceDate && c.updated_at) lastUpdatedAt = c.updated_at;
+        if (sinceStr && !updatedSinceDate && typeof c.entry_date === 'string') lastEntryDate = c.entry_date;
         const orgs: any[] = Array.isArray(c.processing_orgs) ? c.processing_orgs : [];
 
         // ───── financial_obligations 파생 피처 (ML 모델용 — 공유 함수 사용) ─────
@@ -666,6 +681,9 @@ export async function registerRoutes(
             ? lastUpdatedAt.toDate().toISOString()
             : new Date(lastUpdatedAt).toISOString();
           nextCursor = `${tsIso}__${lastCustomerId}`;
+        } else if (sinceStr && lastEntryDate && lastCustomerId) {
+          // since 모드 cursor: "<entry_date>__<doc_id>"
+          nextCursor = `${lastEntryDate}__${lastCustomerId}`;
         } else {
           nextCursor = lastCustomerId;
         }
