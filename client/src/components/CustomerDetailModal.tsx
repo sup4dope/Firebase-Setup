@@ -5643,10 +5643,42 @@ export function CustomerDetailModal({
                 ⚠️ {diagnoseError}
               </div>
             )}
-            {diagnoseResult && (
-              <>
-                {/* 종합 요약 */}
-                {diagnoseResult.summary && (() => {
+            {diagnoseResult && (() => {
+              // 체크리스트(추가 확인 질문) 완료 여부 계산:
+              // - 직접 확인(개인대출): manualPersonalLoan 응답 필요
+              // - API follow-up: 자동응답이 안 된 모든 질문에 답이 있어야 함
+              const allQs = displayedFollowupQuestions.length > 0
+                ? displayedFollowupQuestions
+                : (Array.isArray(diagnoseResult.followup_questions)
+                    ? diagnoseResult.followup_questions
+                    : []);
+              const pendingQs = allQs
+                .map((q: any, i: number) => ({ key: extractFollowupKey(q) || `q_${i}` }))
+                .filter(({ key }: { key: string }) => !(key in autoFollowupAnswers))
+                .filter(({ key }: { key: string }) => {
+                  const v = followupAnswers[key];
+                  return v == null || String(v).trim() === "";
+                });
+              const checklistComplete = manualPersonalLoan != null && pendingQs.length === 0;
+              const pendingCount = pendingQs.length + (manualPersonalLoan == null ? 1 : 0);
+              return (
+                <>
+                {/* 체크리스트 미완료 안내 — 종합/자금별 판정은 체크리스트 완료 후 노출 */}
+                {!checklistComplete && (
+                  <div className="p-3 rounded-md border border-amber-500/30 bg-amber-500/10">
+                    <div className="text-sm font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                      <Bot className="w-4 h-4" />
+                      먼저 추가 확인 질문에 답해 주세요
+                    </div>
+                    <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-1">
+                      체크리스트 <strong>{pendingCount}개</strong>를 완료한 뒤 "답변 적용해서 재판정"을 누르면
+                      종합 판정 및 자금별 판정 결과를 확인할 수 있습니다.
+                    </p>
+                  </div>
+                )}
+
+                {/* 종합 요약 — 체크리스트 완료 후 노출 */}
+                {checklistComplete && diagnoseResult.summary && (() => {
                   const summary = diagnoseResult.summary;
                   // 객체 형태({신청가능, 신청불가, 조건부, ...})면 통계 카드로, 문자열이면 그대로 표시
                   if (summary && typeof summary === "object" && !Array.isArray(summary)) {
@@ -5735,8 +5767,8 @@ export function CustomerDetailModal({
                   );
                 })()}
 
-                {/* 자금별 판정 */}
-                {Array.isArray(diagnoseResult.funds) && diagnoseResult.funds.length > 0 && (
+                {/* 자금별 판정 — 체크리스트 완료 후 노출 */}
+                {checklistComplete && Array.isArray(diagnoseResult.funds) && diagnoseResult.funds.length > 0 && (
                   <div className="space-y-2">
                     <div className="text-sm font-semibold">자금별 판정</div>
                     <div className="space-y-2">
@@ -5881,8 +5913,8 @@ export function CustomerDetailModal({
                   </div>
                 )}
 
-                {/* 분석 리포트 */}
-                {diagnoseResult.report && (
+                {/* 분석 리포트 — 체크리스트 완료 후 노출 */}
+                {checklistComplete && diagnoseResult.report && (
                   <div className="space-y-1">
                     <div className="text-sm font-semibold">분석 리포트</div>
                     <div
@@ -6074,7 +6106,8 @@ export function CustomerDetailModal({
                 })()}
 
                 {/* 그 외 데이터가 있을 때 raw 표시 */}
-                {!diagnoseResult.summary &&
+                {checklistComplete &&
+                  !diagnoseResult.summary &&
                   !diagnoseResult.funds &&
                   !diagnoseResult.report &&
                   !diagnoseResult.followup_questions && (
@@ -6082,8 +6115,9 @@ export function CustomerDetailModal({
                       {JSON.stringify(diagnoseResult, null, 2)}
                     </pre>
                   )}
-              </>
-            )}
+                </>
+              );
+            })()}
           </div>
           <div className="flex justify-end gap-2 mt-2">
             <Button
