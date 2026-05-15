@@ -5566,16 +5566,43 @@ export function CustomerDetailModal({
                   </div>
                 )}
 
-                {/* 추가 확인 질문(역질문) — 자동 응답된 항목은 숨기고, 사용자 입력만 표시 */}
+                {/* 추가 확인 질문(역질문) — 자동 응답되었거나 이미 사용자가 답한 항목은 숨김 */}
                 {(() => {
-                  const visibleQuestions = (Array.isArray(diagnoseResult.followup_questions)
+                  const allQuestions = Array.isArray(diagnoseResult.followup_questions)
                     ? diagnoseResult.followup_questions
-                    : []
-                  ).filter((q: any, i: number) => {
+                    : [];
+                  const visibleQuestions = allQuestions.filter((q: any, i: number) => {
                     const key = extractFollowupKey(q) || `q_${i}`;
-                    return !(key in autoFollowupAnswers);
+                    if (key in autoFollowupAnswers) return false;
+                    const v = followupAnswers[key];
+                    if (v != null && String(v).trim() !== "") return false;
+                    return true;
                   });
-                  if (visibleQuestions.length === 0) return null;
+                  if (visibleQuestions.length === 0) {
+                    // 모든 질문 답변 완료 — 재판정 버튼만 표시
+                    return (
+                      <div className="flex items-center justify-between gap-2 p-3 rounded-md border border-purple-500/30 bg-purple-500/5">
+                        <div className="text-sm text-foreground/90 flex items-center gap-1.5">
+                          <Bot className="w-4 h-4 text-purple-500" />
+                          모든 추가 질문에 대한 답변이 준비되었습니다.
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleDiagnose(followupAnswers)}
+                          disabled={diagnoseLoading}
+                          className="bg-purple-600 hover:bg-purple-700 text-white gap-1"
+                          data-testid="button-diagnose-rerun-all-answered"
+                        >
+                          {diagnoseLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          답변 적용해서 재판정
+                        </Button>
+                      </div>
+                    );
+                  }
                   return (
                   <div className="space-y-2 p-3 rounded-md border border-purple-500/30 bg-purple-500/5">
                     <div className="text-sm font-semibold flex items-center gap-1.5">
