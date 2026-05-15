@@ -5752,13 +5752,12 @@ export function CustomerDetailModal({
                     ? diagnoseResult.followup_questions
                     : [];
                   // 원본 인덱스 보존 — 필터링 후에도 키 fallback이 일관되게 매칭되도록
+                  // 자동 응답된 항목만 숨김. 사용자가 입력/제출한 답변은 계속 표시하여 수정 가능.
                   const visibleApiQuestions: Array<{ q: any; originalIdx: number }> = allQuestions
                     .map((q: any, i: number) => ({ q, originalIdx: i }))
                     .filter(({ q, originalIdx }: { q: any; originalIdx: number }) => {
                       const key = extractFollowupKey(q) || `q_${originalIdx}`;
                       if (key in autoFollowupAnswers) return false;
-                      const v = submittedFollowupAnswers[key];
-                      if (v != null && String(v).trim() !== "") return false;
                       return true;
                     });
                   // 예/아니오 질문 판별 — 라벨에 명시된 "(예/아니오)" 패턴만 사용 (오탐 방지)
