@@ -418,6 +418,8 @@ export function CustomerDetailModal({
   // 수동 확인: 서류 미반영 개인대출(7%↑ + Y-1.06.30 이전 실행) 보유 여부
   // "예" 선택 시 고금리대출_7퍼센트이상_보유 + 대출_25_6_30_이전_실행을 모두 "예"로 오버라이드
   const [manualPersonalLoan, setManualPersonalLoan] = useState<"yes" | "no" | null>(null);
+  // 지금까지 본 follow-up 질문 누적 — API가 빈 배열을 반환해도 이전 질문 유지하여 사용자가 답변을 수정 가능
+  const [displayedFollowupQuestions, setDisplayedFollowupQuestions] = useState<any[]>([]);
   // 자동 저장 가드: Firestore에서 복원 직후의 즉시 저장(불필요한 쓰기) 방지
   const followupHydratedRef = useRef(false);
   const [aiInput, setAiInput] = useState("");
@@ -654,6 +656,14 @@ export function CustomerDetailModal({
             console.log("[자격판정] 💾 저장된 판정 결과 복원 완료");
           } else {
             setDiagnoseResult(null);
+          }
+          if (Array.isArray(freshData.diagnose_displayed_questions)) {
+            setDisplayedFollowupQuestions(freshData.diagnose_displayed_questions);
+          } else if (freshData.diagnose_result && Array.isArray((freshData.diagnose_result as any).followup_questions)) {
+            // 과거 데이터 호환: 누적 필드가 없으면 결과 내 질문으로 시드
+            setDisplayedFollowupQuestions((freshData.diagnose_result as any).followup_questions);
+          } else {
+            setDisplayedFollowupQuestions([]);
           }
           // 다음 tick에서 자동 저장 활성화 (복원 set이 반영된 뒤)
           setTimeout(() => { followupHydratedRef.current = true; }, 0);
@@ -2170,10 +2180,11 @@ export function CustomerDetailModal({
     ],
   );
 
-  // 현재 응답에 표시된 질문 목록 기준으로 자동 응답 계산 (UI/재판정 공용)
+  // 현재까지 표시된 질문 목록 기준으로 자동 응답 계산 (UI/재판정 공용)
+  // 누적된 질문 목록을 사용해 재판정 후에도 자동응답 일관성 유지
   const autoFollowupAnswers = useMemo<Record<string, string>>(
-    () => computeAutoAnswers(diagnoseResult?.followup_questions || []),
-    [computeAutoAnswers, diagnoseResult?.followup_questions],
+    () => computeAutoAnswers(displayedFollowupQuestions),
+    [computeAutoAnswers, displayedFollowupQuestions],
   );
 
   // 자동 저장: followupAnswers / manualPersonalLoan / diagnoseResult 변경 시 디바운스로 Firestore에 저장
@@ -2196,6 +2207,10 @@ export function CustomerDetailModal({
           updatePayload.diagnose_result = diagnoseResult;
           updatePayload.diagnose_result_at = serverTimestamp();
         }
+        // 누적된 질문 목록 저장 (있을 때만)
+        if (displayedFollowupQuestions.length > 0) {
+          updatePayload.diagnose_displayed_questions = displayedFollowupQuestions;
+        }
         await updateDoc(doc(db, "customers", customer.id), updatePayload);
         console.log("[자격판정] ✅ 자동 저장 완료", {
           답변수: Object.keys(persistedAnswers).length,
@@ -2207,7 +2222,7 @@ export function CustomerDetailModal({
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [followupAnswers, manualPersonalLoan, diagnoseResult, customer?.id, isNewCustomer]);
+  }, [followupAnswers, manualPersonalLoan, diagnoseResult, displayedFollowupQuestions, customer?.id, isNewCustomer]);
 
   // 자격판정 호출 (외부 자금판정 API 프록시)
   // answers: 역질문에 대한 사용자 입력 답변 (auto-answers와 병합되어 쿼리스트링으로 전달)
@@ -2270,30 +2285,32 @@ export function CustomerDetailModal({
         break;
       }
       setDiagnoseResult(data);
-      // 새 follow-up 질문 도착 시, 현재 질문 키에 해당하지 않는 stale 답변 제거
-      const newKeys = new Set<string>(
-        Array.isArray(data?.followup_questions)
-          ? data.followup_questions.map((q: any, i: number) => extractFollowupKey(q) || `q_${i}`)
-          : [],
-      );
-      setFollowupAnswers((prev) => {
-        const next: Record<string, string> = {};
-        for (const k of newKeys) if (prev[k] != null) next[k] = prev[k];
-        return next;
+      // 새 follow-up 질문을 누적 목록에 병합 (key로 dedupe, 빈 응답이어도 기존 질문 유지 → 답변 수정 가능)
+      const incomingQuestions: any[] = Array.isArray(data?.followup_questions)
+        ? data.followup_questions
+        : [];
+      setDisplayedFollowupQuestions((prev) => {
+        const seen = new Set<string>(
+          prev.map((q: any, i: number) => extractFollowupKey(q) || `q_${i}`),
+        );
+        const merged = [...prev];
+        incomingQuestions.forEach((q: any, i: number) => {
+          const key = extractFollowupKey(q) || `new_${Date.now()}_${i}`;
+          if (!seen.has(key)) {
+            merged.push(q);
+            seen.add(key);
+          }
+        });
+        return merged;
       });
-      // 제출한 답변 스냅샷도 동일하게 정리 (이번 호출에 사용한 사용자 답변만 보존)
-      const submittedSnapshot: Record<string, string> = {};
-      for (const [k, v] of Object.entries(answers || {})) {
-        if (newKeys.has(k) && v != null && String(v).trim() !== "") {
-          submittedSnapshot[k] = String(v);
+      // 제출한 답변 스냅샷에 이번 호출 답변 누적 (사용자가 입력한 답변 유실 방지)
+      if (answers) {
+        const submittedSnapshot: Record<string, string> = {};
+        for (const [k, v] of Object.entries(answers)) {
+          if (v != null && String(v).trim() !== "") submittedSnapshot[k] = String(v);
         }
+        setSubmittedFollowupAnswers((prev) => ({ ...prev, ...submittedSnapshot }));
       }
-      setSubmittedFollowupAnswers((prev) => {
-        const next: Record<string, string> = { ...prev, ...submittedSnapshot };
-        // 더 이상 존재하지 않는 질문 키 제거
-        for (const k of Object.keys(next)) if (!newKeys.has(k)) delete next[k];
-        return next;
-      });
       // 사용자가 명시적으로 제출한 답변만 Firestore에 저장 (초기 호출/다시판정에서는 기존 저장값 유지)
       if (answers) {
         try {
@@ -2405,6 +2422,7 @@ export function CustomerDetailModal({
       setSubmittedFollowupAnswers({});
       setExpandedFunds(new Set());
       setManualPersonalLoan(null);
+      setDisplayedFollowupQuestions([]);
       aiPredictedSignatureRef.current = "";
       aiPredictingRef.current = false;
       aiPredictAbortRef.current?.abort();
@@ -5804,9 +5822,12 @@ export function CustomerDetailModal({
                     예/아니오 질문은 토글 버튼으로 자동 변환. 자동 응답되었거나 이미 제출한 항목은 숨김. */}
                 {(() => {
                   const cutoffYear = new Date().getFullYear() - 1;
-                  const allQuestions = Array.isArray(diagnoseResult.followup_questions)
-                    ? diagnoseResult.followup_questions
-                    : [];
+                  // 누적된 질문 목록 사용 — API가 빈 배열 반환해도 이전 질문 유지하여 답변 수정 가능
+                  const allQuestions = displayedFollowupQuestions.length > 0
+                    ? displayedFollowupQuestions
+                    : (Array.isArray(diagnoseResult.followup_questions)
+                        ? diagnoseResult.followup_questions
+                        : []);
                   // 원본 인덱스 보존 — 필터링 후에도 키 fallback이 일관되게 매칭되도록.
                   // 자동 응답된 항목만 숨김. 나머지는 항상 표시되어 언제든 수정 가능.
                   const visibleApiQuestions: Array<{ q: any; originalIdx: number }> = allQuestions

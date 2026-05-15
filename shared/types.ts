@@ -165,6 +165,7 @@ export interface Customer {
   diagnose_manual_personal_loan?: 'yes' | 'no' | null; // 직접 확인 질문(개인대출 7%↑ + Y-1.06.30 이전 실행) 응답
   diagnose_result?: any; // 마지막 자격판정 결과 캐시 (적합/부적합 판정 이력 보존)
   diagnose_result_at?: any; // 마지막 자격판정 시각 (Firestore Timestamp)
+  diagnose_displayed_questions?: any[]; // 지금까지 본 follow-up 질문 누적 (재판정 후 사라지지 않도록)
 }
 
 // 진행기관 상태
