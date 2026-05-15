@@ -417,8 +417,6 @@ export function CustomerDetailModal({
   // 수동 확인: 서류 미반영 개인대출(7%↑ + Y-1.06.30 이전 실행) 보유 여부
   // "예" 선택 시 고금리대출_7퍼센트이상_보유 + 대출_25_6_30_이전_실행을 모두 "예"로 오버라이드
   const [manualPersonalLoan, setManualPersonalLoan] = useState<"yes" | "no" | null>(null);
-  // 답변 완료된 추가확인 질문 펼침 상태 (기본 숨김 → "수정" 클릭 시 펼쳐짐)
-  const [showAnsweredFollowups, setShowAnsweredFollowups] = useState(false);
   const [aiInput, setAiInput] = useState("");
   const aiScrollRef = useRef<HTMLDivElement>(null);
   const [aiConversationId, setAiConversationId] = useState<string | null>(null);
@@ -5755,23 +5753,14 @@ export function CustomerDetailModal({
                   const allQuestions = Array.isArray(diagnoseResult.followup_questions)
                     ? diagnoseResult.followup_questions
                     : [];
-                  // 원본 인덱스 보존 — 필터링 후에도 키 fallback이 일관되게 매칭되도록
-                  // 자동 응답된 항목 + 이미 답변 입력된 항목은 기본 숨김 (showAnsweredFollowups=true이면 모두 표시).
-                  const allUnAuto: Array<{ q: any; originalIdx: number }> = allQuestions
+                  // 원본 인덱스 보존 — 필터링 후에도 키 fallback이 일관되게 매칭되도록.
+                  // 자동 응답된 항목만 숨김. 나머지는 항상 표시되어 언제든 수정 가능.
+                  const visibleApiQuestions: Array<{ q: any; originalIdx: number }> = allQuestions
                     .map((q: any, i: number) => ({ q, originalIdx: i }))
                     .filter(({ q, originalIdx }: { q: any; originalIdx: number }) => {
                       const key = extractFollowupKey(q) || `q_${originalIdx}`;
                       return !(key in autoFollowupAnswers);
                     });
-                  const isAnswered = ({ q, originalIdx }: { q: any; originalIdx: number }) => {
-                    const key = extractFollowupKey(q) || `q_${originalIdx}`;
-                    const v = followupAnswers[key];
-                    return v != null && String(v).trim() !== "";
-                  };
-                  const answeredCount = allUnAuto.filter(isAnswered).length;
-                  const visibleApiQuestions = showAnsweredFollowups
-                    ? allUnAuto
-                    : allUnAuto.filter((item) => !isAnswered(item));
                   // 예/아니오 질문 판별 — 라벨에 명시된 "(예/아니오)" 패턴만 사용 (오탐 방지)
                   const isYesNoQuestion = (label: string) => {
                     if (/\(\s*예\s*\/\s*아니오\s*\)/.test(label)) return true;
@@ -5818,28 +5807,12 @@ export function CustomerDetailModal({
                   );
                   return (
                     <div className="space-y-2 p-3 rounded-md border border-purple-500/30 bg-purple-500/5">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-semibold flex items-center gap-1.5">
-                          <Bot className="w-4 h-4 text-purple-500" />
-                          추가 확인 질문
-                          <span className="text-xs text-muted-foreground font-normal">
-                            — 답변 입력 후 재판정하면 더 정확해집니다
-                          </span>
-                        </div>
-                        {answeredCount > 0 && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                            onClick={() => setShowAnsweredFollowups((v) => !v)}
-                            data-testid="button-toggle-answered-followups"
-                          >
-                            {showAnsweredFollowups
-                              ? "답변 완료 항목 숨기기"
-                              : `답변 완료 ${answeredCount}개 수정`}
-                          </Button>
-                        )}
+                      <div className="text-sm font-semibold flex items-center gap-1.5">
+                        <Bot className="w-4 h-4 text-purple-500" />
+                        추가 확인 질문
+                        <span className="text-xs text-muted-foreground font-normal">
+                          — 답변 입력 후 재판정하면 더 정확해집니다
+                        </span>
                       </div>
                       <div className="space-y-2">
                         {/* 직접 확인: 서류 미반영 개인대출 (항상 표시) */}
