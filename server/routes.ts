@@ -320,9 +320,21 @@ export async function registerRoutes(
           customers_with_snapshot: 0,
           orgs_with_snapshot: 0,
           orgs_with_applied_amount: 0,
+          // 신규 5개 파생 필드 보유 통계 (배포/매퍼 검증용)
+          customers_with_loan_balance: 0,
+          customers_with_guarantee_balance: 0,
+          customers_with_institution_count: 0,
+          customers_with_loans_within_7days: 0,
+          customers_with_nearest_maturity: 0,
           by_status: {} as Record<string, number>,
           by_org: {} as Record<string, number>,
           by_org_status: {} as Record<string, number>,
+          export_schema_version: 'v2-2026-05-15',  // 매퍼 버전 (배포 식별용)
+          derived_fields: [
+            'total_loan_balance', 'total_guarantee_balance',
+            'financial_institution_count', 'loans_within_7days_count',
+            'nearest_maturity_days',
+          ],
         };
         customersSnap.forEach((doc: any) => {
           const c = doc.data();
@@ -338,6 +350,27 @@ export async function registerRoutes(
             if (org.applied_amount != null) stats.orgs_with_applied_amount++;
           }
           if (hasAnySnapshot) stats.customers_with_snapshot++;
+          // 채무 파생 필드 보유 여부 (>0 인 고객만 카운트)
+          const obs = Array.isArray(c.financial_obligations) ? c.financial_obligations : [];
+          const lb = obs.filter((o: any) => o?.type === 'loan').reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0);
+          const gb = obs.filter((o: any) => o?.type === 'guarantee').reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0);
+          const inst = new Set(obs.map((o: any) => String(o?.institution ?? '').trim()).filter(Boolean)).size;
+          if (lb > 0) stats.customers_with_loan_balance++;
+          if (gb > 0) stats.customers_with_guarantee_balance++;
+          if (inst > 0) stats.customers_with_institution_count++;
+          if (obs.some((o: any) => typeof o?.maturity_date === 'string')) stats.customers_with_nearest_maturity++;
+          // 7일 burst 체크 (간이)
+          const dates = obs
+            .map((o: any) => o?.occurred_at)
+            .filter((d: any) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+            .map((d: string) => new Date(d + 'T00:00:00+09:00').getTime());
+          let hasBurst = false;
+          for (let i = 0; i < dates.length && !hasBurst; i++) {
+            for (let j = 0; j < dates.length; j++) {
+              if (i !== j && Math.abs(dates[i] - dates[j]) <= 7 * 86400000) { hasBurst = true; break; }
+            }
+          }
+          if (hasBurst) stats.customers_with_loans_within_7days++;
         });
         return res.json({ success: true, exported_at: new Date().toISOString(), stats });
       }
