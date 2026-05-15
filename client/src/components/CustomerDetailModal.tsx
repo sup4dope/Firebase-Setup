@@ -407,6 +407,7 @@ export function CustomerDetailModal({
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([]);
   const [diagnoseLoading, setDiagnoseLoading] = useState(false);
   const [diagnoseModalOpen, setDiagnoseModalOpen] = useState(false);
+  const [forceShowChecklist, setForceShowChecklist] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<any>(null);
   const [diagnoseError, setDiagnoseError] = useState<string | null>(null);
   const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
@@ -2187,6 +2188,37 @@ export function CustomerDetailModal({
     [computeAutoAnswers, displayedFollowupQuestions],
   );
 
+  // 체크리스트(추가확인질문) 완료 여부 — 모달/헤더에서 공통 사용
+  const { checklistComplete, pendingCount } = useMemo(() => {
+    const allQs = displayedFollowupQuestions.length > 0
+      ? displayedFollowupQuestions
+      : (Array.isArray(diagnoseResult?.followup_questions) ? diagnoseResult.followup_questions : []);
+    const pendingQs = allQs
+      .map((q: any, i: number) => ({ key: extractFollowupKey(q) || `q_${i}` }))
+      .filter(({ key }: { key: string }) => !(key in autoFollowupAnswers))
+      .filter(({ key }: { key: string }) => {
+        const v = followupAnswers[key];
+        return v == null || String(v).trim() === "";
+      });
+    const complete = manualPersonalLoan != null && pendingQs.length === 0;
+    const pending = pendingQs.length + (manualPersonalLoan == null ? 1 : 0);
+    return { checklistComplete: complete, pendingCount: pending };
+  }, [displayedFollowupQuestions, diagnoseResult, autoFollowupAnswers, followupAnswers, manualPersonalLoan]);
+
+  // 적합 판정 받은 자금 목록 — 헤더 배지 노출용 (체크리스트 완료 후만)
+  const passedFunds = useMemo<Array<{ name: string }>>(() => {
+    if (!checklistComplete) return [];
+    if (!diagnoseResult || !Array.isArray(diagnoseResult.funds)) return [];
+    return diagnoseResult.funds
+      .filter((f: any) => {
+        const s = String(f?.판정 || f?.status || f?.result || f?.judgment || "").trim();
+        return s.includes("적합") && !s.includes("부적합");
+      })
+      .map((f: any, i: number) => ({
+        name: f?.자금명 || f?.name || f?.fund_name || f?.title || `자금 ${i + 1}`,
+      }));
+  }, [checklistComplete, diagnoseResult]);
+
   // 자동 저장: followupAnswers / manualPersonalLoan / diagnoseResult 변경 시 디바운스로 Firestore에 저장
   // 사용자가 "재판정" 버튼을 누르지 않고 모달을 닫아도 입력값/판정 결과가 유실되지 않도록 보장
   useEffect(() => {
@@ -2231,6 +2263,7 @@ export function CustomerDetailModal({
     if (!customer?.id || diagnoseLoading) return;
     // 캐시된 판정 결과가 있고 사용자가 명시적으로 답변을 제출한 게 아니면 모달만 열고 종료
     if (!answers && diagnoseResult) {
+      setForceShowChecklist(false);
       setDiagnoseModalOpen(true);
       console.log("[자격판정] 💾 캐시된 결과 표시 (API 재호출 없음)");
       return;
@@ -2238,6 +2271,8 @@ export function CustomerDetailModal({
     setDiagnoseLoading(true);
     setDiagnoseError(null);
     setDiagnoseModalOpen(true);
+    // 사용자가 답변 적용해서 재판정한 경우 → 결과 화면으로 자동 복귀
+    if (answers) setForceShowChecklist(false);
     if (!answers) {
       // 캐시 없을 때 첫 호출 — 결과 리셋
       setDiagnoseResult(null);
@@ -2415,6 +2450,7 @@ export function CustomerDetailModal({
       setAiInitError(null);
       setAiIsStreaming(false);
       setDiagnoseModalOpen(false);
+      setForceShowChecklist(false);
       setDiagnoseResult(null);
       setDiagnoseError(null);
       setDiagnoseLoading(false);
@@ -2847,6 +2883,20 @@ export function CustomerDetailModal({
                 ? "신규 고객 등록"
                 : `${customer?.name || "고객"} 상세정보`}
             </h2>
+            {customer?.id && !isNewCustomer && passedFunds.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap" data-testid="container-passed-funds">
+                {passedFunds.map((f, i) => (
+                  <Badge
+                    key={i}
+                    variant="outline"
+                    className="text-xs h-7 border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 whitespace-nowrap"
+                    data-testid={`badge-passed-fund-${i}`}
+                  >
+                    ✅ {f.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
             {customer?.id && !isNewCustomer && (
               <Button
                 variant="outline"
@@ -5616,11 +5666,23 @@ export function CustomerDetailModal({
         </div>
       </DialogContent>
       {/* 자격판정 결과 모달 */}
-      <Dialog open={diagnoseModalOpen} onOpenChange={setDiagnoseModalOpen}>
+      <Dialog open={diagnoseModalOpen} onOpenChange={(open) => {
+        setDiagnoseModalOpen(open);
+        if (!open) setForceShowChecklist(false);
+      }}>
         <DialogContent className="max-w-3xl bg-card text-foreground max-h-[85vh] overflow-y-auto">
           <DialogTitle className="text-lg font-semibold flex items-center gap-2">
-            <Stethoscope className="w-5 h-5 text-emerald-500" />
-            자격판정 결과
+            {diagnoseResult && (!checklistComplete || forceShowChecklist) ? (
+              <>
+                <Bot className="w-5 h-5 text-purple-500" />
+                추가 확인 질문
+              </>
+            ) : (
+              <>
+                <Stethoscope className="w-5 h-5 text-emerald-500" />
+                자격판정 결과
+              </>
+            )}
             {customer?.company_name && (
               <span className="text-sm text-muted-foreground font-normal">— {customer.company_name}</span>
             )}
@@ -5643,42 +5705,20 @@ export function CustomerDetailModal({
                 ⚠️ {diagnoseError}
               </div>
             )}
-            {diagnoseResult && (() => {
-              // 체크리스트(추가 확인 질문) 완료 여부 계산:
-              // - 직접 확인(개인대출): manualPersonalLoan 응답 필요
-              // - API follow-up: 자동응답이 안 된 모든 질문에 답이 있어야 함
-              const allQs = displayedFollowupQuestions.length > 0
-                ? displayedFollowupQuestions
-                : (Array.isArray(diagnoseResult.followup_questions)
-                    ? diagnoseResult.followup_questions
-                    : []);
-              const pendingQs = allQs
-                .map((q: any, i: number) => ({ key: extractFollowupKey(q) || `q_${i}` }))
-                .filter(({ key }: { key: string }) => !(key in autoFollowupAnswers))
-                .filter(({ key }: { key: string }) => {
-                  const v = followupAnswers[key];
-                  return v == null || String(v).trim() === "";
-                });
-              const checklistComplete = manualPersonalLoan != null && pendingQs.length === 0;
-              const pendingCount = pendingQs.length + (manualPersonalLoan == null ? 1 : 0);
-              return (
-                <>
-                {/* 체크리스트 미완료 안내 — 종합/자금별 판정은 체크리스트 완료 후 노출 */}
-                {!checklistComplete && (
+            {diagnoseResult && (
+              <>
+                {/* 1단계 안내 — 체크리스트 미완료 시 상단 안내 */}
+                {!checklistComplete && !forceShowChecklist && (
                   <div className="p-3 rounded-md border border-amber-500/30 bg-amber-500/10">
-                    <div className="text-sm font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-                      <Bot className="w-4 h-4" />
-                      먼저 추가 확인 질문에 답해 주세요
-                    </div>
-                    <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-1">
-                      체크리스트 <strong>{pendingCount}개</strong>를 완료한 뒤 "답변 적용해서 재판정"을 누르면
-                      종합 판정 및 자금별 판정 결과를 확인할 수 있습니다.
+                    <p className="text-xs text-amber-700/90 dark:text-amber-300/90">
+                      아래 <strong>{pendingCount}개</strong> 질문에 답한 뒤 "답변 적용해서 판정"을 누르면
+                      자격판정 결과 화면으로 이동합니다.
                     </p>
                   </div>
                 )}
 
                 {/* 종합 요약 — 체크리스트 완료 후 노출 */}
-                {checklistComplete && diagnoseResult.summary && (() => {
+                {checklistComplete && !forceShowChecklist && diagnoseResult.summary && (() => {
                   const summary = diagnoseResult.summary;
                   // 객체 형태({신청가능, 신청불가, 조건부, ...})면 통계 카드로, 문자열이면 그대로 표시
                   if (summary && typeof summary === "object" && !Array.isArray(summary)) {
@@ -5768,7 +5808,7 @@ export function CustomerDetailModal({
                 })()}
 
                 {/* 자금별 판정 — 체크리스트 완료 후 노출 */}
-                {checklistComplete && Array.isArray(diagnoseResult.funds) && diagnoseResult.funds.length > 0 && (
+                {checklistComplete && !forceShowChecklist && Array.isArray(diagnoseResult.funds) && diagnoseResult.funds.length > 0 && (
                   <div className="space-y-2">
                     <div className="text-sm font-semibold">자금별 판정</div>
                     <div className="space-y-2">
@@ -5914,7 +5954,7 @@ export function CustomerDetailModal({
                 )}
 
                 {/* 분석 리포트 — 체크리스트 완료 후 노출 */}
-                {checklistComplete && diagnoseResult.report && (
+                {checklistComplete && !forceShowChecklist && diagnoseResult.report && (
                   <div className="space-y-1">
                     <div className="text-sm font-semibold">분석 리포트</div>
                     <div
@@ -5928,9 +5968,39 @@ export function CustomerDetailModal({
                   </div>
                 )}
 
-                {/* 추가 확인 질문(역질문) — 직접 확인 질문 + API follow-up 통합 패널.
-                    예/아니오 질문은 토글 버튼으로 자동 변환. 자동 응답되었거나 이미 제출한 항목은 숨김. */}
-                {(() => {
+                {/* 2단계에서 체크리스트로 돌아가는 링크 (답변 보존) */}
+                {checklistComplete && !forceShowChecklist && (
+                  <div className="flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                      onClick={() => setForceShowChecklist(true)}
+                      data-testid="button-edit-checklist"
+                    >
+                      <Bot className="w-3 h-3" />
+                      추가 확인 질문 수정
+                    </Button>
+                  </div>
+                )}
+
+                {/* 결과 화면에서 체크리스트로 복귀했을 때 닫는 링크 */}
+                {checklistComplete && forceShowChecklist && (
+                  <div className="flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                      onClick={() => setForceShowChecklist(false)}
+                      data-testid="button-back-to-result"
+                    >
+                      ← 자격판정 결과로 돌아가기
+                    </Button>
+                  </div>
+                )}
+
+                {/* 추가 확인 질문(역질문) — 체크리스트 미완료 또는 사용자가 수정 모드 진입 시 노출 */}
+                {(!checklistComplete || forceShowChecklist) && (() => {
                   const cutoffYear = new Date().getFullYear() - 1;
                   // 누적된 질문 목록 사용 — API가 빈 배열 반환해도 이전 질문 유지하여 답변 수정 가능
                   const allQuestions = displayedFollowupQuestions.length > 0
@@ -6106,7 +6176,7 @@ export function CustomerDetailModal({
                 })()}
 
                 {/* 그 외 데이터가 있을 때 raw 표시 */}
-                {checklistComplete &&
+                {checklistComplete && !forceShowChecklist &&
                   !diagnoseResult.summary &&
                   !diagnoseResult.funds &&
                   !diagnoseResult.report &&
@@ -6115,9 +6185,8 @@ export function CustomerDetailModal({
                       {JSON.stringify(diagnoseResult, null, 2)}
                     </pre>
                   )}
-                </>
-              );
-            })()}
+              </>
+            )}
           </div>
           <div className="flex justify-end gap-2 mt-2">
             <Button
