@@ -228,6 +228,67 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================================
+  // 외부 챗 API 프록시 — yieumapi.co.kr/chat
+  // 요청 body: { question, customer_id?, extra_answers? }
+  // 응답: { answer, customer_id, context_used }
+  // ============================================================
+  const CHAT_API_BASE_DEFAULT = "https://api.yieumapi.co.kr";
+  const getChatBase = () => (process.env.CHAT_API_BASE || CHAT_API_BASE_DEFAULT).replace(/\/$/, "");
+  const getChatHeaders = (extra?: Record<string, string>) => {
+    const h: Record<string, string> = { Accept: "application/json", ...(extra || {}) };
+    const apiKey = process.env.CHAT_API_KEY || process.env.DIAGNOSE_API_KEY;
+    if (apiKey) h["x-api-key"] = apiKey;
+    return h;
+  };
+
+  app.post("/api/chat", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const { question, customer_id, extra_answers } = req.body || {};
+      if (!question || typeof question !== "string" || !question.trim()) {
+        return res.status(400).json({ success: false, error: "question이 필요합니다." });
+      }
+      const url = `${getChatBase()}/chat`;
+      const payload: Record<string, any> = { question: question.trim() };
+      if (customer_id && typeof customer_id === "string") payload.customer_id = customer_id;
+      if (extra_answers && typeof extra_answers === "object") payload.extra_answers = extra_answers;
+      // 평균 10~15초 응답 → 25초 타임아웃 (장기 hang 방지)
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 25000);
+      let upstream: Response;
+      try {
+        upstream = await fetch(url, {
+          method: "POST",
+          headers: getChatHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload),
+          signal: ac.signal,
+        });
+      } catch (e: any) {
+        clearTimeout(timer);
+        if (e?.name === "AbortError") {
+          return res.status(504).json({ success: false, error: "챗 API 응답 시간 초과 (25초). 잠시 후 다시 시도해주세요." });
+        }
+        throw e;
+      }
+      clearTimeout(timer);
+      const text = await upstream.text();
+      let body: any = null;
+      try { body = JSON.parse(text); } catch { body = { raw: text }; }
+      if (!upstream.ok) {
+        return res.status(upstream.status).json({
+          success: false,
+          status: upstream.status,
+          error: body?.error || body?.detail || `챗 API 오류 (${upstream.status})`,
+          data: body,
+        });
+      }
+      res.json({ success: true, data: body });
+    } catch (error: any) {
+      console.error("[/api/chat] 호출 실패:", error?.message);
+      res.status(502).json({ success: false, error: `챗 API 호출 실패: ${error?.message || "unknown"}` });
+    }
+  });
+
   app.post("/api/diagnose", requireAuth, requireSuperAdmin, async (req, res) => {
     try {
       const url = `${getDiagnoseBase()}/diagnose`;
