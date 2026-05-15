@@ -126,6 +126,7 @@ import {
   onSnapshot,
   arrayUnion,
   Timestamp,
+  serverTimestamp,
 } from "firebase/firestore";
 
 interface MemoItem {
@@ -636,7 +637,7 @@ export function CustomerDetailModal({
             setDocuments(freshData.documents);
           }
 
-          // 자격판정 추가확인 답변 복원 (모달 재오픈 시 이전 입력 유지)
+          // 자격판정 추가확인 답변 + 결과 복원 (모달 재오픈 시 이전 입력/판정 이력 유지)
           followupHydratedRef.current = false; // 복원 중에는 자동 저장 일시 중단
           if (freshData.diagnose_followup_answers && typeof freshData.diagnose_followup_answers === "object") {
             setFollowupAnswers(freshData.diagnose_followup_answers as Record<string, string>);
@@ -647,6 +648,12 @@ export function CustomerDetailModal({
             setManualPersonalLoan(freshData.diagnose_manual_personal_loan);
           } else {
             setManualPersonalLoan(null);
+          }
+          if (freshData.diagnose_result && typeof freshData.diagnose_result === "object") {
+            setDiagnoseResult(freshData.diagnose_result);
+            console.log("[자격판정] 💾 저장된 판정 결과 복원 완료");
+          } else {
+            setDiagnoseResult(null);
           }
           // 다음 tick에서 자동 저장 활성화 (복원 set이 반영된 뒤)
           setTimeout(() => { followupHydratedRef.current = true; }, 0);
@@ -2169,8 +2176,8 @@ export function CustomerDetailModal({
     [computeAutoAnswers, diagnoseResult?.followup_questions],
   );
 
-  // 자동 저장: followupAnswers / manualPersonalLoan 변경 시 디바운스로 Firestore에 저장
-  // 사용자가 "재판정" 버튼을 누르지 않고 모달을 닫아도 입력값이 유실되지 않도록 보장
+  // 자동 저장: followupAnswers / manualPersonalLoan / diagnoseResult 변경 시 디바운스로 Firestore에 저장
+  // 사용자가 "재판정" 버튼을 누르지 않고 모달을 닫아도 입력값/판정 결과가 유실되지 않도록 보장
   useEffect(() => {
     if (!followupHydratedRef.current) return; // 복원 직후 1회 set은 저장 스킵
     if (!customer?.id || isNewCustomer) return;
@@ -2180,26 +2187,44 @@ export function CustomerDetailModal({
         for (const [k, v] of Object.entries(followupAnswers)) {
           if (v != null && String(v).trim() !== "") persistedAnswers[k] = String(v);
         }
-        await updateDoc(doc(db, "customers", customer.id), {
+        const updatePayload: Record<string, any> = {
           diagnose_followup_answers: persistedAnswers,
           diagnose_manual_personal_loan: manualPersonalLoan ?? null,
+        };
+        // 판정 결과가 있으면 함께 저장 (없으면 기존 값 유지 — null 덮어쓰지 않음)
+        if (diagnoseResult && typeof diagnoseResult === "object") {
+          updatePayload.diagnose_result = diagnoseResult;
+          updatePayload.diagnose_result_at = serverTimestamp();
+        }
+        await updateDoc(doc(db, "customers", customer.id), updatePayload);
+        console.log("[자격판정] ✅ 자동 저장 완료", {
+          답변수: Object.keys(persistedAnswers).length,
+          개인대출: manualPersonalLoan,
+          결과있음: !!diagnoseResult,
         });
       } catch (err) {
         console.warn("[자격판정] 답변 자동 저장 실패:", err);
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [followupAnswers, manualPersonalLoan, customer?.id, isNewCustomer]);
+  }, [followupAnswers, manualPersonalLoan, diagnoseResult, customer?.id, isNewCustomer]);
 
   // 자격판정 호출 (외부 자금판정 API 프록시)
   // answers: 역질문에 대한 사용자 입력 답변 (auto-answers와 병합되어 쿼리스트링으로 전달)
+  // 캐시된 결과가 있고 answers가 없으면 (= 단순 모달 오픈) API 호출 없이 캐시만 표시
   const handleDiagnose = async (answers?: Record<string, string>) => {
     if (!customer?.id || diagnoseLoading) return;
+    // 캐시된 판정 결과가 있고 사용자가 명시적으로 답변을 제출한 게 아니면 모달만 열고 종료
+    if (!answers && diagnoseResult) {
+      setDiagnoseModalOpen(true);
+      console.log("[자격판정] 💾 캐시된 결과 표시 (API 재호출 없음)");
+      return;
+    }
     setDiagnoseLoading(true);
     setDiagnoseError(null);
     setDiagnoseModalOpen(true);
     if (!answers) {
-      // 첫 호출일 때만 결과 리셋 (재판정 시에는 기존 결과 유지하다가 응답 받으면 교체)
+      // 캐시 없을 때 첫 호출 — 결과 리셋
       setDiagnoseResult(null);
       setSubmittedFollowupAnswers({});
       setExpandedFunds(new Set());
@@ -2363,6 +2388,8 @@ export function CustomerDetailModal({
   // 모달 닫을 때 상태 초기화 + 진행 중인 스트리밍 중단
   useEffect(() => {
     if (!isOpen) {
+      // 자동 저장 가드: 닫기 시 reset이 Firestore의 저장값을 지우지 않도록 즉시 비활성화
+      followupHydratedRef.current = false;
       aiAbortRef.current?.abort();
       aiAbortRef.current = null;
       aiStartedForCustomerRef.current = null;
