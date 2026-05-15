@@ -2011,8 +2011,46 @@ export function CustomerDetailModal({
     return q?.key || q?.field || q?.name || q?.question || "";
   };
 
+  // 자동 응답: 고객 데이터/고정값으로 사전 답변 가능한 역질문은 클라이언트에서 채워서 전송
+  // → UI에서는 숨겨서 추가 확인 질문 목록을 간결하게 유지
+  const autoFollowupAnswers = useMemo<Record<string, string>>(() => {
+    const ans: Record<string, string> = {
+      재해확인증: "아니오",
+      직접대출_성실상환: "예",
+      신용관리교육_이수: "예",
+      희망리턴패키지_재기사업화: "아니오",
+    };
+    // 제조업 여부: 사업자등록증 OCR로 받은 업태/업종에 "제조" 포함 여부
+    const bizText = `${formData.business_type || ""} ${formData.business_item || ""} ${(formData as any).industry || ""}`;
+    ans["제조업소공인"] = bizText.includes("제조") ? "예" : "아니오";
+    // 고금리 대출(7%↑): 대출내역 기관/상품명에 '캐피탈' 또는 '저축' 포함시 "예"
+    const obligations = (formData.financial_obligations || []) as any[];
+    const hasHighRate = obligations.some((o) => {
+      const text = `${o?.institution || ""} ${o?.product_name || ""}`;
+      return text.includes("캐피탈") || text.includes("저축");
+    });
+    ans["고금리대출_7퍼센트이상_보유"] = hasHighRate ? "예" : "아니오";
+    // 매출 2년 연속 10% 이상 증가: y3 → y2, y2 → y1 모두 +10% 이상
+    const y1 = Number(formData.sales_y1) || 0;
+    const y2 = Number(formData.sales_y2) || 0;
+    const y3 = Number(formData.sales_y3) || 0;
+    if (y1 > 0 && y2 > 0 && y3 > 0) {
+      const grow1 = (y1 - y2) / y2;
+      const grow2 = (y2 - y3) / y3;
+      ans["매출_2년연속_10퍼센트신장"] = grow1 >= 0.1 && grow2 >= 0.1 ? "예" : "아니오";
+    }
+    return ans;
+  }, [
+    formData.business_type,
+    formData.business_item,
+    formData.financial_obligations,
+    formData.sales_y1,
+    formData.sales_y2,
+    formData.sales_y3,
+  ]);
+
   // 자격판정 호출 (외부 자금판정 API 프록시)
-  // answers: 역질문에 대한 답변 (있으면 쿼리스트링으로 전달)
+  // answers: 역질문에 대한 사용자 입력 답변 (auto-answers와 병합되어 쿼리스트링으로 전달)
   const handleDiagnose = async (answers?: Record<string, string>) => {
     if (!customer?.id || diagnoseLoading) return;
     setDiagnoseLoading(true);
@@ -2025,13 +2063,13 @@ export function CustomerDetailModal({
     }
     try {
       const { authFetch } = await import('@/lib/firebase');
-      const qs = answers
-        ? new URLSearchParams(
-            Object.fromEntries(
-              Object.entries(answers).filter(([, v]) => v != null && String(v).trim() !== ""),
-            ),
-          ).toString()
-        : "";
+      // 자동 응답 + 사용자 답변 병합 (사용자 답변 우선)
+      const merged: Record<string, string> = { ...autoFollowupAnswers, ...(answers || {}) };
+      const qs = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(merged).filter(([, v]) => v != null && String(v).trim() !== ""),
+        ),
+      ).toString();
       const url = `/api/diagnose/${encodeURIComponent(customer.id)}${qs ? `?${qs}` : ""}`;
       const res = await authFetch(url);
       const json = await res.json();
@@ -5443,8 +5481,17 @@ export function CustomerDetailModal({
                   </div>
                 )}
 
-                {/* 추가 확인 질문(역질문) — 답변 입력 후 재판정 */}
-                {Array.isArray(diagnoseResult.followup_questions) && diagnoseResult.followup_questions.length > 0 && (
+                {/* 추가 확인 질문(역질문) — 자동 응답된 항목은 숨기고, 사용자 입력만 표시 */}
+                {(() => {
+                  const visibleQuestions = (Array.isArray(diagnoseResult.followup_questions)
+                    ? diagnoseResult.followup_questions
+                    : []
+                  ).filter((q: any, i: number) => {
+                    const key = extractFollowupKey(q) || `q_${i}`;
+                    return !(key in autoFollowupAnswers);
+                  });
+                  if (visibleQuestions.length === 0) return null;
+                  return (
                   <div className="space-y-2 p-3 rounded-md border border-purple-500/30 bg-purple-500/5">
                     <div className="text-sm font-semibold flex items-center gap-1.5">
                       <Bot className="w-4 h-4 text-purple-500" />
@@ -5454,7 +5501,7 @@ export function CustomerDetailModal({
                       </span>
                     </div>
                     <div className="space-y-2">
-                      {diagnoseResult.followup_questions.map((q: any, idx: number) => {
+                      {visibleQuestions.map((q: any, idx: number) => {
                         const key = extractFollowupKey(q) || `q_${idx}`;
                         const label = typeof q === "string" ? q : q?.question || q?.label || key;
                         return (
@@ -5513,7 +5560,8 @@ export function CustomerDetailModal({
                       </Button>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* 그 외 데이터가 있을 때 raw 표시 */}
                 {!diagnoseResult.summary &&
