@@ -417,6 +417,8 @@ export function CustomerDetailModal({
   // 수동 확인: 서류 미반영 개인대출(7%↑ + Y-1.06.30 이전 실행) 보유 여부
   // "예" 선택 시 고금리대출_7퍼센트이상_보유 + 대출_25_6_30_이전_실행을 모두 "예"로 오버라이드
   const [manualPersonalLoan, setManualPersonalLoan] = useState<"yes" | "no" | null>(null);
+  // 자동 저장 가드: Firestore에서 복원 직후의 즉시 저장(불필요한 쓰기) 방지
+  const followupHydratedRef = useRef(false);
   const [aiInput, setAiInput] = useState("");
   const aiScrollRef = useRef<HTMLDivElement>(null);
   const [aiConversationId, setAiConversationId] = useState<string | null>(null);
@@ -635,6 +637,7 @@ export function CustomerDetailModal({
           }
 
           // 자격판정 추가확인 답변 복원 (모달 재오픈 시 이전 입력 유지)
+          followupHydratedRef.current = false; // 복원 중에는 자동 저장 일시 중단
           if (freshData.diagnose_followup_answers && typeof freshData.diagnose_followup_answers === "object") {
             setFollowupAnswers(freshData.diagnose_followup_answers as Record<string, string>);
           } else {
@@ -645,6 +648,8 @@ export function CustomerDetailModal({
           } else {
             setManualPersonalLoan(null);
           }
+          // 다음 tick에서 자동 저장 활성화 (복원 set이 반영된 뒤)
+          setTimeout(() => { followupHydratedRef.current = true; }, 0);
 
           console.log(`[DEBUG] ✅ 전체 데이터 동기화 완료`);
         } else {
@@ -2163,6 +2168,28 @@ export function CustomerDetailModal({
     () => computeAutoAnswers(diagnoseResult?.followup_questions || []),
     [computeAutoAnswers, diagnoseResult?.followup_questions],
   );
+
+  // 자동 저장: followupAnswers / manualPersonalLoan 변경 시 디바운스로 Firestore에 저장
+  // 사용자가 "재판정" 버튼을 누르지 않고 모달을 닫아도 입력값이 유실되지 않도록 보장
+  useEffect(() => {
+    if (!followupHydratedRef.current) return; // 복원 직후 1회 set은 저장 스킵
+    if (!customer?.id || isNewCustomer) return;
+    const timer = setTimeout(async () => {
+      try {
+        const persistedAnswers: Record<string, string> = {};
+        for (const [k, v] of Object.entries(followupAnswers)) {
+          if (v != null && String(v).trim() !== "") persistedAnswers[k] = String(v);
+        }
+        await updateDoc(doc(db, "customers", customer.id), {
+          diagnose_followup_answers: persistedAnswers,
+          diagnose_manual_personal_loan: manualPersonalLoan ?? null,
+        });
+      } catch (err) {
+        console.warn("[자격판정] 답변 자동 저장 실패:", err);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [followupAnswers, manualPersonalLoan, customer?.id, isNewCustomer]);
 
   // 자격판정 호출 (외부 자금판정 API 프록시)
   // answers: 역질문에 대한 사용자 입력 답변 (auto-answers와 병합되어 쿼리스트링으로 전달)
