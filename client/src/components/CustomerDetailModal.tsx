@@ -86,6 +86,7 @@ import {
   ContractStatus,
   PaymentRecord,
 } from "@shared/types";
+import { buildProcessingOrgSnapshot } from "@shared/types";
 import { FinancialAnalysisTab } from "@/components/FinancialAnalysisTab";
 import { ReviewSummaryTab } from "@/components/ReviewSummaryTab";
 import { ProposalModal, ProposalPreview, type ProposalFormData } from "@/components/report";
@@ -3865,7 +3866,47 @@ export function CustomerDetailModal({
                                 {org.applied_at && <span>접수: {org.applied_at}</span>}
                                 {org.rejected_at && <span className="text-red-500">부결: {org.rejected_at}</span>}
                                 {org.approved_at && <span className="text-green-500">승인: {org.approved_at}</span>}
+                                {org.applied_amount != null && <span className="text-blue-500">신청한도: {org.applied_amount.toLocaleString()}만</span>}
                               </div>
+                              {/* 신청한도 입력 - 진행중 상태일 때만 (ML 학습: 신청 vs 승인 갭) */}
+                              {org.status === '진행중' && !isReadOnly && (
+                                <div className="mt-1 flex items-center gap-1">
+                                  <span className="text-[10px] text-muted-foreground shrink-0">신청한도:</span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="만원"
+                                    defaultValue={org.applied_amount ?? ''}
+                                    className="h-5 text-[10px] px-1 py-0 w-20"
+                                    onBlur={async (e) => {
+                                      if (!formData.id) return;
+                                      const raw = e.target.value.trim();
+                                      const newAmount = raw === '' ? null : Number(raw);
+                                      const currentAmount = org.applied_amount ?? null;
+                                      if (newAmount === currentAmount) return;
+                                      if (raw !== '' && (Number.isNaN(newAmount as number) || (newAmount as number) < 0)) return;
+                                      // Firestore는 nested undefined를 거부 — null로 명시 설정 또는 키 제거
+                                      const updatedOrgs = (formData.processing_orgs || []).map(o => {
+                                        if (o.org !== org.org) return o;
+                                        const { applied_amount: _omit, ...rest } = o;
+                                        return newAmount === null ? rest : { ...rest, applied_amount: newAmount };
+                                      });
+                                      try {
+                                        const customerRef = doc(db, 'customers', formData.id);
+                                        await updateDoc(customerRef, {
+                                          processing_orgs: updatedOrgs,
+                                          updated_at: new Date(),
+                                        });
+                                        setFormData(prev => ({ ...prev, processing_orgs: updatedOrgs }));
+                                        onSave?.({ id: formData.id, processing_orgs: updatedOrgs });
+                                      } catch (err) {
+                                        console.error('신청한도 저장 실패:', err);
+                                      }
+                                    }}
+                                    data-testid={`input-applied-amount-${org.org}`}
+                                  />
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-0.5">
                               {org.status === '진행중' && !isReadOnly && (
@@ -4065,6 +4106,7 @@ export function CustomerDetailModal({
                                 status: '진행중',
                                 applied_at: today,
                                 is_re_execution: addAsReExecution,
+                                snapshot: buildProcessingOrgSnapshot(formData),
                               };
                               const updatedOrgs = [...(formData.processing_orgs || []), newOrg];
                               
@@ -6317,6 +6359,7 @@ export function CustomerDetailModal({
                             org,
                             status: '진행중',
                             applied_at: today,
+                            snapshot: buildProcessingOrgSnapshot(formData),
                           };
                           setStatusChangeModal((prev) => ({
                             ...prev,

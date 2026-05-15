@@ -229,6 +229,137 @@ export async function registerRoutes(
   });
 
   // ============================================================
+  // ML 학습용 데이터 export (super_admin 전용, 1회성/주기적 호출)
+  // - customers + processing_orgs + settlements 조인
+  // - 한 신청 건당 1 레코드, 자금 종류별 분리
+  // - 거절/미진행 사유 포함, 신청 시점 스냅샷 우선 사용
+  // ============================================================
+  app.get("/api/admin/ml-export", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const adminApp = getAdminApp();
+      const db = adminApp.firestore();
+
+      // 거절/미진행 사유로 간주할 status_code 목록 (구조화된 거절 사유)
+      const REJECTION_STATUSES = new Set([
+        '단박거절', '매출없음', '신용점수 미달', '차입금초과', '세금체납',
+        '재상담', '쓰레기통', '미진행', '거절',
+      ]);
+
+      const [customersSnap, settlementsSnap] = await Promise.all([
+        db.collection('customers').get(),
+        db.collection('settlements').get(),
+      ]);
+
+      // settlements: customer_id + org_name → SettlementItem[] 인덱스
+      const settlementIndex = new Map<string, any[]>();
+      settlementsSnap.forEach((doc: any) => {
+        const s = doc.data();
+        const key = `${s.customer_id || ''}::${s.org_name || ''}`;
+        if (!settlementIndex.has(key)) settlementIndex.set(key, []);
+        settlementIndex.get(key)!.push({ id: doc.id, ...s });
+      });
+
+      const records: any[] = [];
+
+      customersSnap.forEach((doc: any) => {
+        const c: any = { id: doc.id, ...doc.data() };
+        const orgs: any[] = Array.isArray(c.processing_orgs) ? c.processing_orgs : [];
+
+        // 현재 프로필 (스냅샷 fallback용)
+        const currentProfile = {
+          credit_score: c.credit_score ?? null,
+          founding_date: c.founding_date ?? null,
+          over_7_years: c.over_7_years ?? null,
+          business_type: c.business_type ?? null,
+          business_item: c.business_item ?? null,
+          recent_sales: c.recent_sales ?? null,
+          sales_y1: c.sales_y1 ?? null,
+          sales_y2: c.sales_y2 ?? null,
+          sales_y3: c.sales_y3 ?? null,
+          avg_revenue_3y: c.avg_revenue_3y ?? null,
+          is_home_owned: c.is_home_owned ?? null,
+          is_business_owned: c.is_business_owned ?? null,
+          entry_source: c.entry_source ?? null,
+          financial_obligations_count: Array.isArray(c.financial_obligations) ? c.financial_obligations.length : 0,
+        };
+
+        // 거절/미진행 케이스 추정 (processing_orgs가 비어 있고 상태가 거절성일 때)
+        const isCustomerRejected = REJECTION_STATUSES.has(String(c.status_code || ''));
+
+        if (orgs.length === 0) {
+          // 자금 신청 기록 없음 → 미진행/상담중 케이스
+          records.push({
+            customer_id: c.id,
+            readable_id: c.readable_id ?? null,
+            신청일자: null,
+            자금종류: null,
+            현재_프로필: currentProfile,
+            신청시점_스냅샷: null,
+            신청한도: null,
+            승인한도: null,
+            결정일자: null,
+            집행일자: null,
+            상태: isCustomerRejected ? '거절' : (c.status_code || '미진행'),
+            거절사유: isCustomerRejected ? c.status_code : (c.rejection_reason ?? null),
+            거절사유_메모: c.recent_memo ?? null,
+            재집행여부: null,
+            정산_건수: 0,
+            entry_date: c.entry_date ?? null,
+          });
+          return;
+        }
+
+        // 자금별 1 레코드씩 분리 생성
+        for (const org of orgs) {
+          const orgName = org.org;
+          const settlements = settlementIndex.get(`${c.id}::${orgName}`) || [];
+          const totalSettlementAmount = settlements
+            .filter(s => s.status === '정상')
+            .reduce((sum, s) => sum + (Number(s.execution_amount) || 0), 0);
+
+          let 상태: string;
+          if (org.status === '승인' && org.execution_date) 상태 = '집행완료';
+          else if (org.status === '승인') 상태 = '승인(미집행)';
+          else if (org.status === '부결') 상태 = '거절';
+          else 상태 = '진행중';
+
+          records.push({
+            customer_id: c.id,
+            readable_id: c.readable_id ?? null,
+            신청일자: org.applied_at ?? null,
+            자금종류: orgName,
+            // 신청 시점 스냅샷 우선 — 없으면 null (현재 프로필은 별도 필드로)
+            신청시점_스냅샷: org.snapshot ?? null,
+            현재_프로필: currentProfile,
+            신청한도: org.applied_amount ?? null,
+            승인한도: org.execution_amount ?? null,
+            결정일자: org.approved_at ?? org.rejected_at ?? null,
+            집행일자: org.execution_date ?? null,
+            상태,
+            거절사유: org.status === '부결' ? (org.rejection_reason ?? c.status_code ?? null) : null,
+            거절사유_메모: org.status === '부결' ? (c.recent_memo ?? null) : null,
+            재집행여부: !!org.is_re_execution,
+            정산_건수: settlements.length,
+            정산_총집행액: totalSettlementAmount || null,
+            entry_date: c.entry_date ?? null,
+          });
+        }
+      });
+
+      res.json({
+        success: true,
+        exported_at: new Date().toISOString(),
+        total_records: records.length,
+        total_customers: customersSnap.size,
+        records,
+      });
+    } catch (error: any) {
+      console.error('[/api/admin/ml-export] 실패:', error);
+      res.status(500).json({ success: false, error: error?.message || 'ml-export 실패' });
+    }
+  });
+
+  // ============================================================
   // 외부 챗 API 프록시 — yieumapi.co.kr/chat
   // 요청 body: { question, customer_id?, extra_answers? }
   // 응답: { answer, customer_id, context_used }

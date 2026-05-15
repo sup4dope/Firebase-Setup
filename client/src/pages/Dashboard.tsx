@@ -49,6 +49,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Customer, User, Team, StatusLog, StatusCode, InsertCustomer, ProcessingOrg, TodoItem, SettlementItem } from '@shared/types';
+import { buildProcessingOrgSnapshot } from '@shared/types';
 
 const PROCESSING_ORGS = ['미등록', '신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
@@ -1141,6 +1142,7 @@ export default function Dashboard() {
       status: '진행중',
       applied_at: new Date().toISOString().split('T')[0],
       is_re_execution: isReExecution || false,
+      snapshot: buildProcessingOrgSnapshot(customer),
     };
     const updatedOrgs = [...currentOrgs, newOrg];
     
@@ -2212,10 +2214,14 @@ export default function Dashboard() {
                         className="text-xs cursor-pointer px-2 py-1 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                         onClick={() => {
                           const today = format(new Date(), 'yyyy-MM-dd');
+                          const targetCustomer = customers.find(c => c.id === statusChangeModal.customerId);
                           const newOrg: ProcessingOrg = {
                             org,
                             status: '진행중',
                             applied_at: today,
+                            snapshot: targetCustomer
+                              ? buildProcessingOrgSnapshot(targetCustomer)
+                              : undefined,
                           };
                           setStatusChangeModal(prev => ({
                             ...prev,

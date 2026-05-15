@@ -180,7 +180,64 @@ export interface ProcessingOrg {
   approved_at?: string; // 승인일 YYYY-MM-DD
   execution_date?: string; // 집행일 YYYY-MM-DD
   execution_amount?: number; // 집행금액 (만원)
+  applied_amount?: number; // 신청한도 (만원) - 고객이 신청한 금액. 승인 vs 신청 갭 학습용
   is_re_execution?: boolean; // 재집행 여부 (첫 자금 이후 추가 자금)
+  rejection_reason?: string; // 자금별 거절 사유 (자유 텍스트)
+  snapshot?: ProcessingOrgSnapshot; // 신청 시점 프로필 스냅샷 (ML 학습 정확도 보장)
+}
+
+// 신청 시점 프로필 스냅샷 — ProcessingOrg가 생성될 때 박제 저장
+// (이후 customers 본 필드가 갱신되어도 신청 당시 값은 보존)
+export interface ProcessingOrgSnapshot {
+  captured_at: string; // 스냅샷 캡처 시각 (ISO)
+  // 신용
+  credit_score?: number;
+  // 사업
+  business_type?: string;
+  business_item?: string;
+  founding_date?: string; // 업력 계산용
+  over_7_years?: boolean;
+  // 매출 (억원)
+  recent_sales?: number;
+  sales_y1?: number;
+  sales_y2?: number;
+  sales_y3?: number;
+  avg_revenue_3y?: number;
+  // 부채 요약
+  total_loan_balance?: number; // 대출 잔액 합계 (원)
+  total_guarantee_balance?: number; // 보증 잔액 합계 (원)
+  obligation_count?: number; // 채무 건수
+  // 자가/주거
+  is_home_owned?: boolean;
+  is_business_owned?: boolean;
+  // 유입
+  entry_source?: string;
+}
+
+// 신청 시점 스냅샷 빌더 (Customer → ProcessingOrgSnapshot)
+export function buildProcessingOrgSnapshot(customer: Partial<Customer>): ProcessingOrgSnapshot {
+  const obligations = customer.financial_obligations || [];
+  const loans = obligations.filter((o: any) => o?.type === 'loan');
+  const guarantees = obligations.filter((o: any) => o?.type === 'guarantee');
+  return {
+    captured_at: new Date().toISOString(),
+    credit_score: customer.credit_score,
+    business_type: customer.business_type,
+    business_item: customer.business_item,
+    founding_date: customer.founding_date,
+    over_7_years: customer.over_7_years,
+    recent_sales: customer.recent_sales,
+    sales_y1: customer.sales_y1,
+    sales_y2: customer.sales_y2,
+    sales_y3: customer.sales_y3,
+    avg_revenue_3y: customer.avg_revenue_3y,
+    total_loan_balance: loans.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0) || undefined,
+    total_guarantee_balance: guarantees.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0) || undefined,
+    obligation_count: obligations.length || undefined,
+    is_home_owned: customer.is_home_owned,
+    is_business_owned: customer.is_business_owned,
+    entry_source: customer.entry_source,
+  };
 }
 
 // Customer Memo

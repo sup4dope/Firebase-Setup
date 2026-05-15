@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { Customer, UserRole, StatusCode, CustomerMemo, User, ProcessingOrg } from '@shared/types';
+import { buildProcessingOrgSnapshot } from '@shared/types';
 import { STATUS_OPTIONS, STATUS_STYLES, getStatusStyle, FUNNEL_GROUPS, PROCESSING_ORGS, ORG_STATUS_COLORS, type ProcessingOrgStatus, getStatusTransitionAllowed } from '@/lib/constants';
 
 const CLOSED_STATUSES = new Set([
@@ -385,6 +386,7 @@ export function CustomerTable({
         status: '진행중',
         applied_at: new Date().toISOString().split('T')[0],
         is_re_execution: isReExecution || false,
+        snapshot: buildProcessingOrgSnapshot(customer),
       };
       const updatedOrgs = [...currentOrgs, newOrg];
       onProcessingOrgsChange?.(customerId, updatedOrgs);
