@@ -280,17 +280,30 @@ export async function registerRoutes(
       const db = adminApp.firestore();
 
       // ───── 쿼리 파라미터 ─────
-      // limit: 1~5000 (기본: 무제한). cursor: 마지막 customer doc id (다음 페이지 시작점)
-      // since: YYYY-MM-DD — customers.entry_date >= since 필터 (신규 고객 증분)
-      // TODO(추후 운영): 기존 고객의 상태 변경(진행중→집행완료 등)을 catch하려면
-      //   `updated_since` 파라미터 추가 필요. customers.updated_at 또는
-      //   processing_orgs[].applied_at/approved_at/execution_date 중 max 기준으로 필터.
-      //   현재 since는 entry_date 기준이라 신규 고객만 반영됨.
+      // limit: 1~5000 (기본: 무제한)
+      // cursor: 다음 페이지 시작점 — since 모드에서는 customer doc id, updated_since 모드에서는 ISO timestamp
+      // since: YYYY-MM-DD — customers.entry_date >= since (신규 유입 고객만)
+      // updated_since: ISO 8601 timestamp (예: 2026-04-01T00:00:00Z) 또는 YYYY-MM-DD
+      //   — customers.updated_at >= updated_since (기존 고객의 상태/한도/집행일 등 모든 변경 catch)
+      //   주: status_code, processing_orgs, financial_obligations 등 어떤 필드가 바뀌든
+      //   customer 문서 저장 시 updated_at이 갱신되어야 정상 동작.
+      //   ※ Firestore 복합 인덱스 필요: customers (updated_at ASC, __name__ ASC)
       // stats: 'true' → 레코드 없이 분포 통계만 반환
       const limitParam = req.query.limit ? Math.min(Math.max(Number(req.query.limit), 1), 5000) : null;
       const cursor = (req.query.cursor as string | undefined) || null;
       const sinceStr = (req.query.since as string | undefined) || null;
+      const updatedSinceStr = (req.query.updated_since as string | undefined) || null;
       const statsOnly = req.query.stats === 'true';
+
+      // updated_since 파싱 (YYYY-MM-DD 또는 ISO timestamp 모두 허용)
+      let updatedSinceDate: Date | null = null;
+      if (updatedSinceStr) {
+        const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(updatedSinceStr) ? `${updatedSinceStr}T00:00:00+09:00` : updatedSinceStr);
+        if (isNaN(d.getTime())) {
+          return res.status(400).json({ success: false, error: 'updated_since 형식 오류 (YYYY-MM-DD 또는 ISO 8601)' });
+        }
+        updatedSinceDate = d;
+      }
 
       const REJECTION_STATUSES = new Set([
         '단박거절', '매출없음', '신용점수 미달', '차입금초과', '세금체납',
@@ -339,14 +352,28 @@ export async function registerRoutes(
         settlementIndex.get(key)!.push({ id: doc.id, ...s });
       });
 
-      // customers 페이지네이션 — doc id 기준 안정 정렬
-      let q: FirebaseFirestore.Query = db.collection('customers').orderBy('__name__');
-      if (sinceStr) {
-        // since 이후 갱신된 고객만 (updated_at 또는 entry_date 사용)
-        // updated_at 인덱스가 없을 수 있으므로 entry_date 기반 필터 권장
-        q = q.where('entry_date', '>=', sinceStr);
+      // customers 페이지네이션
+      // - updated_since 모드: orderBy('updated_at') + cursor=ISO timestamp (재학습용 증분)
+      // - 그 외: orderBy('__name__') + cursor=doc id (전체 dump 기본)
+      let q: FirebaseFirestore.Query;
+      let lastUpdatedAt: any = null;
+      if (updatedSinceDate) {
+        const Timestamp = (await import('firebase-admin/firestore')).Timestamp;
+        q = db.collection('customers')
+          .where('updated_at', '>=', Timestamp.fromDate(updatedSinceDate))
+          .orderBy('updated_at', 'asc')
+          .orderBy('__name__', 'asc');
+        if (cursor) {
+          // cursor 형식: "<ISO timestamp>__<doc_id>"
+          const [tsStr, docId] = cursor.split('__');
+          const cursorTs = Timestamp.fromDate(new Date(tsStr));
+          q = q.startAfter(cursorTs, docId || '');
+        }
+      } else {
+        q = db.collection('customers').orderBy('__name__');
+        if (sinceStr) q = q.where('entry_date', '>=', sinceStr);
+        if (cursor) q = q.startAfter(cursor);
       }
-      if (cursor) q = q.startAfter(cursor);
       if (limitParam) q = q.limit(limitParam);
 
       const customersSnap = await q.get();
@@ -357,6 +384,7 @@ export async function registerRoutes(
       customersSnap.forEach((doc: any) => {
         const c: any = { id: doc.id, ...doc.data() };
         lastCustomerId = doc.id;
+        if (updatedSinceDate && c.updated_at) lastUpdatedAt = c.updated_at;
         const orgs: any[] = Array.isArray(c.processing_orgs) ? c.processing_orgs : [];
 
         // 현재 프로필 (PII 제외) — 스냅샷 없는 레코드의 fallback용
@@ -434,13 +462,26 @@ export async function registerRoutes(
 
       // 다음 페이지가 있는지 — limit과 동일하면 더 있을 가능성
       const hasMore = !!(limitParam && customersSnap.size === limitParam);
+      let nextCursor: string | null = null;
+      if (hasMore) {
+        if (updatedSinceDate && lastUpdatedAt) {
+          // Firestore Timestamp → ISO + doc id
+          const tsIso = typeof lastUpdatedAt.toDate === 'function'
+            ? lastUpdatedAt.toDate().toISOString()
+            : new Date(lastUpdatedAt).toISOString();
+          nextCursor = `${tsIso}__${lastCustomerId}`;
+        } else {
+          nextCursor = lastCustomerId;
+        }
+      }
 
       res.json({
         success: true,
         exported_at: new Date().toISOString(),
         total_records: records.length,
         page_customers: customersSnap.size,
-        next_cursor: hasMore ? lastCustomerId : null,
+        mode: updatedSinceDate ? 'updated_since' : (sinceStr ? 'since' : 'full'),
+        next_cursor: nextCursor,
         has_more: hasMore,
         records,
       });
