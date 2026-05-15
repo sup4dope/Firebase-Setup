@@ -2032,6 +2032,33 @@ export function CustomerDetailModal({
         return text.includes("캐피탈") || text.includes("저축");
       });
       ans["고금리대출_7퍼센트이상_보유"] = hasHighRate ? "예" : "아니오";
+      // 대표자 만 39세 이하 (청년대표): 주민번호 앞 6자리(YYMMDD) + 뒷자리 첫 글자(세기 판별)로 만나이 계산
+      const ssnFront = String(formData.ssn_front || "").replace(/\D/g, "");
+      const ssnBackFirst = String(formData.ssn_back || "")[0];
+      if (ssnFront.length === 6 && ssnBackFirst) {
+        const yy = parseInt(ssnFront.slice(0, 2), 10);
+        const mm = parseInt(ssnFront.slice(2, 4), 10);
+        const dd = parseInt(ssnFront.slice(4, 6), 10);
+        // 1·2·5·6 → 1900년대, 3·4·7·8 → 2000년대, 9·0 → 1800년대
+        const century = "12569".includes(ssnBackFirst)
+          ? 1900
+          : "3478".includes(ssnBackFirst)
+            ? 2000
+            : 1800;
+        if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+          const birth = new Date(century + yy, mm - 1, dd);
+          const today = new Date();
+          let age = today.getFullYear() - birth.getFullYear();
+          const m = today.getMonth() - birth.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+          ans["청년대표"] = age <= 39 ? "예" : "아니오";
+        }
+      }
+      // NICE 신용평점(NCB): credit_score가 있으면 "예 (XXX점)" 형태로 자동 응답
+      const cs = Number(formData.credit_score) || 0;
+      if (cs > 0) {
+        ans["ncb"] = `예 (${cs}점)`;
+      }
       // 매출 데이터 (억원)
       const y1 = Number(formData.sales_y1) || 0;
       const y2 = Number(formData.sales_y2) || 0;
@@ -2087,6 +2114,9 @@ export function CustomerDetailModal({
       formData.sales_y1,
       formData.sales_y2,
       formData.sales_y3,
+      formData.ssn_front,
+      formData.ssn_back,
+      formData.credit_score,
     ],
   );
 
