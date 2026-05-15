@@ -2037,6 +2037,17 @@ export function CustomerDetailModal({
         return text.includes("캐피탈") || text.includes("저축");
       });
       ans["고금리대출_7퍼센트이상_보유"] = hasHighRate ? "예" : "아니오";
+      // 대환 대상 대출이 2025.6.30. 이전에 실행되었는지 (occurred_at 기준)
+      // 대출 내역 중 하나라도 2025-06-30 이전 실행분이 있으면 "예", 없으면 "아니오"
+      // 대출 내역 자체가 비어있으면 판정 불가 → 사용자 입력
+      if (obligations.length > 0) {
+        const cutoff = "2025-06-30";
+        const hasPreCutoffLoan = obligations.some((o) => {
+          const d = String(o?.occurred_at || "").trim();
+          return d && d <= cutoff;
+        });
+        ans["대출_25_6_30_이전_실행"] = hasPreCutoffLoan ? "예" : "아니오";
+      }
       // 대표자 만 39세 이하 (청년대표): 주민번호 앞 6자리(YYMMDD) + 뒷자리 첫 글자(세기 판별)로 만나이 계산
       const ssnFront = String(formData.ssn_front || "").replace(/\D/g, "");
       const ssnBackFirst = String(formData.ssn_back || "")[0];
@@ -2070,19 +2081,16 @@ export function CustomerDetailModal({
       const y3 = Number(formData.sales_y3) || 0;
       // 매출 2년 연속 10% 이상 증가
       // y1=직전년도(가장 최근), y2=전전년도, y3=전전전년도
-      // - 3년치 모두 있으면 정확히 판정
-      // - 2년치만 있어도 한 번이라도 10% 미만이면 "아니오" (확실한 부정)
-      // - 데이터가 1개 이하면 판정 불가 → 사용자 입력
+      // "2년 연속 10% 성장"은 3년치 매출 데이터(y1, y2, y3)가 모두 있어야 성립.
+      // 3년치 미만이면 "성장 이력 부족" → "아니오"로 자동 응답 (사용자 추가 입력 불필요)
+      // 매출 데이터가 전혀 없으면 판정 불가 → 사용자에게 질문 노출
       const computeGrowth10 = (): string | undefined => {
-        if (y1 > 0 && y2 > 0 && y3 > 0) {
-          const grow1 = (y1 - y2) / y2;
-          const grow2 = (y2 - y3) / y3;
-          return grow1 >= 0.1 && grow2 >= 0.1 ? "예" : "아니오";
-        }
-        // 부분 데이터: 한 구간이라도 10% 미만 성장이면 2년 연속 성장 불가능 → "아니오"
-        if (y1 > 0 && y2 > 0 && (y1 - y2) / y2 < 0.1) return "아니오";
-        if (y2 > 0 && y3 > 0 && (y2 - y3) / y3 < 0.1) return "아니오";
-        return undefined;
+        const hasAnySales = y1 > 0 || y2 > 0 || y3 > 0;
+        if (!hasAnySales) return undefined;
+        if (!(y1 > 0 && y2 > 0 && y3 > 0)) return "아니오";
+        const grow1 = (y1 - y2) / y2;
+        const grow2 = (y2 - y3) / y3;
+        return grow1 >= 0.1 && grow2 >= 0.1 ? "예" : "아니오";
       };
       const growth10 = computeGrowth10();
       if (growth10) ans["매출_2년연속_10퍼센트신장"] = growth10;
