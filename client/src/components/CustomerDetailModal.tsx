@@ -409,6 +409,9 @@ export function CustomerDetailModal({
   const [diagnoseResult, setDiagnoseResult] = useState<any>(null);
   const [diagnoseError, setDiagnoseError] = useState<string | null>(null);
   const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
+  // 마지막으로 외부 API에 제출(rerun)한 답변 스냅샷 — UI 필터링 기준
+  // (followupAnswers로 필터링하면 타이핑 중간에 질문이 사라져 사용자가 입력을 끝낼 수 없음)
+  const [submittedFollowupAnswers, setSubmittedFollowupAnswers] = useState<Record<string, string>>({});
   const [aiInput, setAiInput] = useState("");
   const aiScrollRef = useRef<HTMLDivElement>(null);
   const [aiConversationId, setAiConversationId] = useState<string | null>(null);
@@ -2137,6 +2140,7 @@ export function CustomerDetailModal({
       // 첫 호출일 때만 결과/답변 리셋 (재판정 시에는 기존 결과 유지하다가 응답 받으면 교체)
       setDiagnoseResult(null);
       setFollowupAnswers({});
+      setSubmittedFollowupAnswers({});
     }
     try {
       const { authFetch } = await import('@/lib/firebase');
@@ -2182,6 +2186,19 @@ export function CustomerDetailModal({
       setFollowupAnswers((prev) => {
         const next: Record<string, string> = {};
         for (const k of newKeys) if (prev[k] != null) next[k] = prev[k];
+        return next;
+      });
+      // 제출한 답변 스냅샷도 동일하게 정리 (이번 호출에 사용한 사용자 답변만 보존)
+      const submittedSnapshot: Record<string, string> = {};
+      for (const [k, v] of Object.entries(answers || {})) {
+        if (newKeys.has(k) && v != null && String(v).trim() !== "") {
+          submittedSnapshot[k] = String(v);
+        }
+      }
+      setSubmittedFollowupAnswers((prev) => {
+        const next: Record<string, string> = { ...prev, ...submittedSnapshot };
+        // 더 이상 존재하지 않는 질문 키 제거
+        for (const k of Object.keys(next)) if (!newKeys.has(k)) delete next[k];
         return next;
       });
     } catch (err: any) {
@@ -2275,6 +2292,7 @@ export function CustomerDetailModal({
       setDiagnoseError(null);
       setDiagnoseLoading(false);
       setFollowupAnswers({});
+      setSubmittedFollowupAnswers({});
       aiPredictedSignatureRef.current = "";
       aiPredictingRef.current = false;
       aiPredictAbortRef.current?.abort();
@@ -5574,7 +5592,8 @@ export function CustomerDetailModal({
                   const visibleQuestions = allQuestions.filter((q: any, i: number) => {
                     const key = extractFollowupKey(q) || `q_${i}`;
                     if (key in autoFollowupAnswers) return false;
-                    const v = followupAnswers[key];
+                    // 마지막 제출에 포함된 답변만 숨김 (타이핑 중인 답변은 계속 표시)
+                    const v = submittedFollowupAnswers[key];
                     if (v != null && String(v).trim() !== "") return false;
                     return true;
                   });
