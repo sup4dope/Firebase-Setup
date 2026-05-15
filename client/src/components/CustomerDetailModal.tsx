@@ -2112,13 +2112,21 @@ export function CustomerDetailModal({
       const { authFetch } = await import('@/lib/firebase');
       // 자동 응답 + 사용자 답변 병합 (사용자 답변 우선)
       const merged: Record<string, string> = { ...autoFollowupAnswers, ...(answers || {}) };
-      const qs = new URLSearchParams(
-        Object.fromEntries(
-          Object.entries(merged).filter(([, v]) => v != null && String(v).trim() !== ""),
-        ),
-      ).toString();
-      const url = `/api/diagnose/${encodeURIComponent(customer.id)}${qs ? `?${qs}` : ""}`;
-      const res = await authFetch(url);
+      // 빈 값 제거
+      const cleanAnswers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(merged)) {
+        if (v != null && String(v).trim() !== "") cleanAnswers[k] = String(v);
+      }
+      const hasAnswers = Object.keys(cleanAnswers).length > 0;
+      // 답변이 있으면 POST(body로 전달), 없으면 초기 GET 호출
+      // 외부 API는 query string으로 답변을 받지 않고 body의 flat 속성만 처리함
+      const res = hasAnswers
+        ? await authFetch(`/api/diagnose`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ customer_id: customer.id, ...cleanAnswers }),
+          })
+        : await authFetch(`/api/diagnose/${encodeURIComponent(customer.id)}`);
       const json = await res.json();
       if (!res.ok || !json?.success) {
         throw new Error(json?.error || `자격판정 호출 실패 (${res.status})`);
