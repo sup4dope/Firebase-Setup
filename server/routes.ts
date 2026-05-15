@@ -229,6 +229,37 @@ export async function registerRoutes(
   });
 
   // ============================================================
+  // ML 한도 예측 프록시 — yieumapi.co.kr/predict/{customer_id}
+  // - DIAGNOSE_API_KEY를 클라이언트에 노출하지 않기 위해 서버 중계
+  // - 응답: { predictions: [{ org, approval_probability, expected_amount, ... }] }
+  // ============================================================
+  app.get("/api/ml-predict/:customerId", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    const customerId = req.params.customerId;
+    if (!customerId) return res.status(400).json({ success: false, error: "customerId가 필요합니다." });
+    try {
+      const base = (process.env.PREDICT_API_BASE || "https://api.yieumapi.co.kr").replace(/\/$/, "");
+      const url = `${base}/predict/${encodeURIComponent(customerId)}`;
+      const headers: Record<string, string> = { Accept: "application/json" };
+      if (process.env.DIAGNOSE_API_KEY) headers["x-api-key"] = process.env.DIAGNOSE_API_KEY;
+      const upstream = await fetch(url, { method: "GET", headers });
+      const text = await upstream.text();
+      let body: any = null;
+      try { body = JSON.parse(text); } catch { body = { raw: text }; }
+      if (!upstream.ok) {
+        return res.status(upstream.status).json({
+          success: false, status: upstream.status,
+          error: body?.error || body?.detail || `예측 API 오류 (${upstream.status})`,
+          data: body,
+        });
+      }
+      res.json({ success: true, data: body });
+    } catch (error: any) {
+      console.error("[/api/ml-predict] 호출 실패:", error?.message);
+      res.status(502).json({ success: false, error: `예측 API 호출 실패: ${error?.message || "unknown"}` });
+    }
+  });
+
+  // ============================================================
   // ML 학습용 데이터 export (super_admin 전용, 1회성/주기적 호출)
   // - customers + processing_orgs + settlements 조인
   // - 한 신청 건당 1 레코드, 자금 종류별 분리

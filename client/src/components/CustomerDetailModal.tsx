@@ -29,11 +29,14 @@ import {
   RefreshCw,
   Eye,
   Stethoscope,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
 import { compressImage, validateFileSize, formatFileSize } from "@/lib/imageCompressor";
-import { startAIConversation, streamAIChat, predictFunding as apiPredictFunding } from "@/lib/aiClient";
+import { startAIConversation, streamAIChat, predictFunding as apiPredictFunding, mlPredictFunding, type MlPredictionItem } from "@/lib/aiClient";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   extractBusinessRegistration, 
   isBusinessRegistrationFile, 
@@ -411,6 +414,12 @@ export function CustomerDetailModal({
   const [forceShowChecklist, setForceShowChecklist] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<any>(null);
   const [diagnoseError, setDiagnoseError] = useState<string | null>(null);
+  // ML 한도 예측 (yieumapi /predict 프록시)
+  const [mlPredictions, setMlPredictions] = useState<MlPredictionItem[] | null>(null);
+  const [mlPredictLoading, setMlPredictLoading] = useState(false);
+  const [mlPredictError, setMlPredictError] = useState<string | null>(null);
+  const [mlPredictOpen, setMlPredictOpen] = useState(false);
+  const [mlExpandedCases, setMlExpandedCases] = useState<Set<number>>(new Set());
   const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
   // 마지막으로 외부 API에 제출(rerun)한 답변 스냅샷 — UI 필터링 기준
   // (followupAnswers로 필터링하면 타이핑 중간에 질문이 사라져 사용자가 입력을 끝낼 수 없음)
@@ -2258,6 +2267,53 @@ export function CustomerDetailModal({
     return () => clearTimeout(timer);
   }, [followupAnswers, manualPersonalLoan, diagnoseResult, displayedFollowupQuestions, customer?.id, isNewCustomer]);
 
+  // 고객 변경 시 ML 예측 상태 초기화 (이전 고객 결과가 잔존하지 않도록)
+  useEffect(() => {
+    setMlPredictions(null);
+    setMlPredictError(null);
+    setMlExpandedCases(new Set());
+    setMlPredictOpen(false);
+  }, [customer?.id]);
+
+  // ML 한도 예측 호출 (yieumapi /predict 프록시)
+  const handleMlPredict = async () => {
+    if (!customer?.id || mlPredictLoading) return;
+    setMlPredictLoading(true);
+    setMlPredictError(null);
+    try {
+      const result = await mlPredictFunding(customer.id);
+      setMlPredictions(result.predictions || []);
+      console.log("[ML 예측] ✅ 결과:", result.predictions);
+    } catch (err: any) {
+      console.error("[ML 예측] 실패:", err);
+      setMlPredictError(err?.message || "예측 호출 실패");
+      setMlPredictions(null);
+    } finally {
+      setMlPredictLoading(false);
+    }
+  };
+
+  // 예측 결과를 메모로 자동 입력
+  const handleInsertPredictionToMemo = (predictions: MlPredictionItem[]) => {
+    if (!predictions || predictions.length === 0) return;
+    const lines = predictions
+      .filter((p) => p.expected_amount != null || p.approval_probability != null)
+      .map((p) => {
+        const prob = p.approval_probability != null ? `승인확률 ${(p.approval_probability * 100).toFixed(1)}%` : "";
+        const amt = p.expected_amount != null ? `예상한도 ${Number(p.expected_amount).toLocaleString()}만원` : "";
+        const low = p.amount_range?.low ?? p.amount_low;
+        const high = p.amount_range?.high ?? p.amount_high;
+        const range = (low != null && high != null)
+          ? ` (${Number(low).toLocaleString()}~${Number(high).toLocaleString()})`
+          : "";
+        return `· ${p.org} | ${[prob, amt + range].filter(Boolean).join(" | ")}`;
+      });
+    if (lines.length === 0) return;
+    const text = `[ML 한도 예측]\n${lines.join("\n")}`;
+    setNewMemo((prev) => (prev ? `${prev}\n${text}` : text));
+    setMlPredictOpen(false);
+  };
+
   // 자격판정 호출 (외부 자금판정 API 프록시)
   // answers: 역질문에 대한 사용자 입력 답변 (auto-answers와 병합되어 쿼리스트링으로 전달)
   // 캐시된 결과가 있고 answers가 없으면 (= 단순 모달 오픈) API 호출 없이 캐시만 표시
@@ -2841,6 +2897,184 @@ export function CustomerDetailModal({
                   </Badge>
                 ))}
               </div>
+            )}
+            {customer?.id && !isNewCustomer && (
+              <Popover
+                open={mlPredictOpen}
+                onOpenChange={(open) => {
+                  setMlPredictOpen(open);
+                  if (open && !mlPredictions && !mlPredictLoading) {
+                    handleMlPredict();
+                  }
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs border-purple-500/40 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+                    data-testid="button-ml-predict"
+                  >
+                    {mlPredictLoading ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3 h-3 mr-1" />
+                    )}
+                    예측결과
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[420px] max-h-[500px] overflow-y-auto p-0"
+                  align="start"
+                  data-testid="popover-ml-predict"
+                >
+                  <div className="p-3 border-b bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                        <span className="text-sm font-semibold">ML 한도 예측</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={handleMlPredict}
+                          disabled={mlPredictLoading}
+                          data-testid="button-ml-predict-refresh"
+                        >
+                          <RefreshCw className={`w-3 h-3 mr-1 ${mlPredictLoading ? "animate-spin" : ""}`} />
+                          재호출
+                        </Button>
+                        {mlPredictions && mlPredictions.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs"
+                            onClick={() => handleInsertPredictionToMemo(mlPredictions)}
+                            data-testid="button-ml-predict-to-memo"
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            메모입력
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    {mlPredictLoading && (
+                      <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        예측 모델 호출 중...
+                      </div>
+                    )}
+                    {!mlPredictLoading && mlPredictError && (
+                      <div className="py-3 text-sm text-destructive" data-testid="text-ml-predict-error">
+                        {mlPredictError}
+                      </div>
+                    )}
+                    {!mlPredictLoading && !mlPredictError && mlPredictions && mlPredictions.length === 0 && (
+                      <div className="py-6 text-center text-sm text-muted-foreground">
+                        예측 가능한 자금이 없습니다.
+                      </div>
+                    )}
+                    {!mlPredictLoading && mlPredictions && mlPredictions.length > 0 && (
+                      <div className="space-y-2">
+                        {mlPredictions.map((p, idx) => {
+                          const prob = p.approval_probability;
+                          const probPct = prob != null ? (prob * 100).toFixed(1) : null;
+                          const probColor = prob == null ? "text-muted-foreground"
+                            : prob >= 0.7 ? "text-emerald-600 dark:text-emerald-400"
+                            : prob >= 0.4 ? "text-amber-600 dark:text-amber-400"
+                            : "text-rose-600 dark:text-rose-400";
+                          const low = p.amount_range?.low ?? p.amount_low;
+                          const high = p.amount_range?.high ?? p.amount_high;
+                          const cases = Array.isArray(p.similar_cases) ? p.similar_cases : [];
+                          const isExpanded = mlExpandedCases.has(idx);
+                          return (
+                            <div
+                              key={idx}
+                              className="border rounded-md p-2.5 bg-card"
+                              data-testid={`card-ml-prediction-${idx}`}
+                            >
+                              <div className="flex items-center justify-between flex-wrap gap-1">
+                                <div className="flex items-center gap-1.5 text-sm font-medium">
+                                  <Building className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span data-testid={`text-ml-org-${idx}`}>{p.org}</span>
+                                </div>
+                                {probPct != null && (
+                                  <div className={`text-sm font-semibold ${probColor}`} data-testid={`text-ml-prob-${idx}`}>
+                                    승인확률 {probPct}%
+                                  </div>
+                                )}
+                              </div>
+                              {p.expected_amount != null && (
+                                <div className="mt-1.5 flex items-center gap-1.5 text-sm">
+                                  <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span className="font-medium" data-testid={`text-ml-amount-${idx}`}>
+                                    예상 한도 {Number(p.expected_amount).toLocaleString()}만원
+                                  </span>
+                                  {low != null && high != null && (
+                                    <span className="text-xs text-muted-foreground">
+                                      ({Number(low).toLocaleString()}~{Number(high).toLocaleString()})
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {cases.length > 0 && (
+                                <div className="mt-2">
+                                  <button
+                                    type="button"
+                                    aria-expanded={isExpanded}
+                                    aria-controls={`ml-cases-panel-${idx}`}
+                                    onClick={() => {
+                                      setMlExpandedCases((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(idx)) next.delete(idx); else next.add(idx);
+                                        return next;
+                                      });
+                                    }}
+                                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                    data-testid={`button-ml-cases-toggle-${idx}`}
+                                  >
+                                    <ChevronDown
+                                      className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                    />
+                                    유사 케이스 {cases.length}건
+                                  </button>
+                                  {isExpanded && (
+                                    <div id={`ml-cases-panel-${idx}`} className="mt-1.5 space-y-1 border-t pt-1.5">
+                                      {cases.slice(0, 5).map((c, ci) => {
+                                        const applied = c.applied_amount;
+                                        const approved = c.approved_amount ?? c.execution_amount;
+                                        const sim = c.similarity != null ? `${(c.similarity * 100).toFixed(0)}%` : null;
+                                        return (
+                                          <div
+                                            key={ci}
+                                            className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap"
+                                            data-testid={`text-ml-case-${idx}-${ci}`}
+                                          >
+                                            {sim && <span className="text-purple-600 dark:text-purple-400">유사도 {sim}</span>}
+                                            {applied != null && <span>신청 {Number(applied).toLocaleString()}만원</span>}
+                                            {approved != null && (
+                                              <span>→ {c.status || "승인"} {Number(approved).toLocaleString()}만원</span>
+                                            )}
+                                            {applied == null && approved == null && c.status && <span>{c.status}</span>}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             )}
             {customer?.id && !isNewCustomer && (
               <Button
