@@ -2067,11 +2067,20 @@ export function CustomerDetailModal({
       const y2 = Number(formData.sales_y2) || 0;
       const y3 = Number(formData.sales_y3) || 0;
       // 매출 2년 연속 10% 이상 증가
+      // y1=직전년도(가장 최근), y2=전전년도, y3=전전전년도
+      // - 3년치 모두 있으면 정확히 판정
+      // - 2년치만 있어도 한 번이라도 10% 미만이면 "아니오" (확실한 부정)
+      // - 데이터가 1개 이하면 판정 불가 → 사용자 입력
       const computeGrowth10 = (): string | undefined => {
-        if (!(y1 > 0 && y2 > 0 && y3 > 0)) return undefined;
-        const grow1 = (y1 - y2) / y2;
-        const grow2 = (y2 - y3) / y3;
-        return grow1 >= 0.1 && grow2 >= 0.1 ? "예" : "아니오";
+        if (y1 > 0 && y2 > 0 && y3 > 0) {
+          const grow1 = (y1 - y2) / y2;
+          const grow2 = (y2 - y3) / y3;
+          return grow1 >= 0.1 && grow2 >= 0.1 ? "예" : "아니오";
+        }
+        // 부분 데이터: 한 구간이라도 10% 미만 성장이면 2년 연속 성장 불가능 → "아니오"
+        if (y1 > 0 && y2 > 0 && (y1 - y2) / y2 < 0.1) return "아니오";
+        if (y2 > 0 && y3 > 0 && (y2 - y3) / y3 < 0.1) return "아니오";
+        return undefined;
       };
       const growth10 = computeGrowth10();
       if (growth10) ans["매출_2년연속_10퍼센트신장"] = growth10;
