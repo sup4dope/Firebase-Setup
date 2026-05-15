@@ -101,6 +101,7 @@ export async function mlPredictFunding(customerId: string): Promise<{
   success: boolean;
   predictions: MlPredictionItem[];
   raw?: any;
+  logId?: string | null;
 }> {
   const res = await authFetch(`/api/ml-predict/${encodeURIComponent(customerId)}`);
   const json = await res.json().catch(() => ({}));
@@ -165,7 +166,38 @@ export async function mlPredictFunding(customerId: string): Promise<{
       similar_cases,
     };
   });
-  return { success: true, predictions, raw: json.data };
+  return { success: true, predictions, raw: json.data, logId: json.log_id ?? null };
+}
+
+// 예측 로그 PATCH (행동 추적/최종 결과 기록) — 컨설턴트 행동 기반 implicit feedback
+export async function patchPredictLog(
+  logId: string,
+  body: { taken_action?: string; final_status?: string; final_amount_10k?: number | null; rejection_reason?: string | null },
+): Promise<{ success: boolean }> {
+  const res = await authFetch(`/api/admin/predict-logs/${encodeURIComponent(logId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) throw new Error(json?.error || `predict-log PATCH 실패 (${res.status})`);
+  return { success: true };
+}
+
+// 고객별 최신 예측 로그 PATCH — 상태 변경 자동 동기화용 (404는 정상 케이스로 무시)
+export async function patchPredictLogByCustomer(
+  customerId: string,
+  body: { taken_action?: string; final_status?: string; final_amount_10k?: number | null; rejection_reason?: string | null },
+): Promise<{ success: boolean; skipped?: boolean }> {
+  const res = await authFetch(`/api/admin/predict-logs/by-customer/${encodeURIComponent(customerId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 404) return { success: true, skipped: true };
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) throw new Error(json?.error || `predict-log by-customer PATCH 실패 (${res.status})`);
+  return { success: true };
 }
 
 export async function streamAIChat(opts: StreamAIChatOptions): Promise<void> {

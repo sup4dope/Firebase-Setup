@@ -210,6 +210,8 @@ export interface ProcessingOrgSnapshot {
   financial_institution_count?: number; // 거래 금융기관 수
   loans_within_7days_count?: number; // 7일 이내 신규 발생 페어 건수 (다중채무 신호)
   nearest_maturity_days?: number; // 가장 가까운 미래 만기까지 잔여일
+  debt_to_sales_ratio?: number | null; // (loan+guarantee 잔액) / (sales_y1 * 1억) — 차입금초과 핵심 정의
+  // 산출 불가 (sales_y1 누락/0/음수)일 때 null. 채무 0원이면 0.0.
   // 자가/주거
   is_home_owned?: boolean;
   is_business_owned?: boolean;
@@ -252,6 +254,15 @@ export function buildProcessingOrgSnapshot(customer: Partial<Customer>): Process
   const nearestMaturityDays = futureMaturities.length > 0
     ? Math.round((Math.min(...futureMaturities) - kstTodayStartMs) / 86400000)
     : undefined;
+  const totalLoanBalance = loans.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0);
+  const totalGuaranteeBalance = guarantees.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0);
+  // 매출 대비 총채무 비율: (loan+guarantee 원) / (sales_y1 억원 * 1e8)
+  // sales_y1 누락/0/음수 → null (모델 학습에서 missing으로 처리)
+  const salesY1 = Number(customer.sales_y1);
+  // 결측 표현은 export 경로(server/routes.ts)와 동일하게 null 사용 (ML 파이프라인 일관성)
+  const debtToSalesRatio: number | null = (Number.isFinite(salesY1) && salesY1 > 0)
+    ? (totalLoanBalance + totalGuaranteeBalance) / (salesY1 * 1e8)
+    : null;
   return {
     captured_at: new Date().toISOString(),
     credit_score: customer.credit_score,
@@ -265,12 +276,13 @@ export function buildProcessingOrgSnapshot(customer: Partial<Customer>): Process
     sales_y3: customer.sales_y3,
     avg_revenue_3y: customer.avg_revenue_3y,
     // ML 학습 일관성을 위해 0도 명시적으로 보존 (export 경로와 동일 정책)
-    total_loan_balance: loans.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0),
-    total_guarantee_balance: guarantees.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0),
+    total_loan_balance: totalLoanBalance,
+    total_guarantee_balance: totalGuaranteeBalance,
     obligation_count: obligations.length,
     financial_institution_count: institutionSet.size,
     loans_within_7days_count: loansWithin7DaysCount,
     nearest_maturity_days: nearestMaturityDays,
+    debt_to_sales_ratio: debtToSalesRatio,
     is_home_owned: customer.is_home_owned,
     is_business_owned: customer.is_business_owned,
     entry_source: customer.entry_source,

@@ -253,6 +253,7 @@ export async function registerRoutes(
         });
       }
       // ─── implicit-feedback용 호출 로그 (best-effort, 실패해도 응답은 나감) ───
+      let logId: string | null = null;
       try {
         const adminApp = getAdminApp();
         const dbLog = adminApp.firestore();
@@ -264,7 +265,7 @@ export async function registerRoutes(
               (Number(a?.approval_probability ?? a?.승인확률) || 0)
             )[0]
           : null;
-        await dbLog.collection('ml_predict_logs').add({
+        const logRef = await dbLog.collection('ml_predict_logs').add({
           customer_id: customerId,
           called_at: new Date().toISOString(),
           called_by_uid: req.user?.uid || null,
@@ -278,10 +279,11 @@ export async function registerRoutes(
           final_status: null,    // 최종 결과 (PATCH로 업데이트)
           final_amount_10k: null,
         });
+        logId = logRef.id;
       } catch (logErr: any) {
         console.error('[/api/ml-predict] 로그 기록 실패(무시):', logErr?.message);
       }
-      res.json({ success: true, data: body });
+      res.json({ success: true, data: body, log_id: logId });
     } catch (error: any) {
       console.error("[/api/ml-predict] 호출 실패:", error?.message);
       res.status(502).json({ success: false, error: `예측 API 호출 실패: ${error?.message || "unknown"}` });
@@ -359,11 +361,11 @@ export async function registerRoutes(
           by_status: {} as Record<string, number>,
           by_org: {} as Record<string, number>,
           by_org_status: {} as Record<string, number>,
-          export_schema_version: 'v2-2026-05-15',  // 매퍼 버전 (배포 식별용)
+          export_schema_version: 'v2.1-2026-05-15',  // 매퍼 버전 (배포 식별용)
           derived_fields: [
             'total_loan_balance', 'total_guarantee_balance',
             'financial_institution_count', 'loans_within_7days_count',
-            'nearest_maturity_days',
+            'nearest_maturity_days', 'debt_to_sales_ratio',
           ],
         };
         customersSnap.forEach((doc: any) => {
@@ -402,7 +404,7 @@ export async function registerRoutes(
           }
           if (hasBurst) stats.customers_with_loans_within_7days++;
         });
-        res.setHeader('X-ML-Schema-Version', 'v2-2026-05-15');
+        res.setHeader('X-ML-Schema-Version', 'v2.1-2026-05-15');
         return res.json({ success: true, exported_at: new Date().toISOString(), stats });
       }
 
@@ -524,6 +526,12 @@ export async function registerRoutes(
           financial_institution_count: institutionSet.size,
           loans_within_7days_count: loansWithin7DaysCount,
           nearest_maturity_days: nearestMaturityDays,
+          // 매출 대비 총채무 비율 (차입금초과 핵심 정의) — sales_y1 누락/0/음수 → null
+          debt_to_sales_ratio: (() => {
+            const s = Number(c.sales_y1);
+            if (!Number.isFinite(s) || s <= 0) return null;
+            return (totalLoanBalance + totalGuaranteeBalance) / (s * 1e8);
+          })(),
         };
 
         const isCustomerRejected = REJECTION_STATUSES.has(String(c.status_code || ''));
@@ -596,17 +604,18 @@ export async function registerRoutes(
         }
       }
 
-      res.setHeader('X-ML-Schema-Version', 'v2-2026-05-15');
+      res.setHeader('X-ML-Schema-Version', 'v2.1-2026-05-15');
       res.json({
         success: true,
         exported_at: new Date().toISOString(),
-        export_schema_version: 'v2-2026-05-15',
+        export_schema_version: 'v2.1-2026-05-15',
         unit_policy: {
           balance: 'KRW',           // financial_obligations.balance, total_loan_balance, total_guarantee_balance
           sales: '100M_KRW',        // sales_y1/y2/y3, recent_sales, avg_revenue_3y (억원)
           amount: '10K_KRW',        // applied_amount, approved_amount, executed_amount (만원)
           duration: 'days',         // nearest_maturity_days
           score: 'NCB_raw',         // credit_score (NCB 원점수)
+          ratio: 'unitless',        // debt_to_sales_ratio (예: 0.5 = 매출 대비 채무 50%)
         },
         total_records: records.length,
         page_customers: customersSnap.size,
@@ -693,13 +702,13 @@ export async function registerRoutes(
     try {
       const id = req.params.id;
       if (!id) return res.status(400).json({ success: false, error: 'id 필요' });
-      const allowed = ['taken_action', 'final_status', 'final_amount_10k'];
+      const allowed = ['taken_action', 'final_status', 'final_amount_10k', 'rejection_reason'];
       const update: Record<string, any> = { updated_at: new Date().toISOString() };
       for (const k of allowed) {
         if (k in (req.body || {})) update[k] = req.body[k];
       }
       if (Object.keys(update).length === 1) {
-        return res.status(400).json({ success: false, error: '업데이트할 필드 없음 (taken_action/final_status/final_amount_10k)' });
+        return res.status(400).json({ success: false, error: '업데이트할 필드 없음 (taken_action/final_status/final_amount_10k/rejection_reason)' });
       }
       const adminApp = getAdminApp();
       await adminApp.firestore().collection('ml_predict_logs').doc(id).update(update);
@@ -707,6 +716,48 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('[/api/admin/predict-logs PATCH] 실패:', error);
       res.status(500).json({ success: false, error: error?.message || 'predict-logs PATCH 실패' });
+    }
+  });
+
+  // ─── 고객별 최신 예측 로그 PATCH (상태 변경 자동 동기화용) ───
+  // 같은 고객에 대한 가장 최근 ml_predict_logs 1건을 찾아 업데이트.
+  // 사용처: 상태 변경(집행완료/거절)시 final_status·final_amount_10k·rejection_reason 자동 기록.
+  // 로그가 없으면 404 (no-op으로 무시 가능).
+  // 권한: 일반 인증 유저 허용 (staff/team_leader가 상태 변경할 때 학습 라벨 누락 방지).
+  // 필드 화이트리스트로 보호하므로 임의 데이터 주입 위험 없음.
+  app.patch("/api/admin/predict-logs/by-customer/:customerId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const customerId = req.params.customerId;
+      if (!customerId) return res.status(400).json({ success: false, error: 'customerId 필요' });
+      const allowed = ['taken_action', 'final_status', 'final_amount_10k', 'rejection_reason'];
+      const update: Record<string, any> = { updated_at: new Date().toISOString() };
+      for (const k of allowed) {
+        if (k in (req.body || {})) update[k] = req.body[k];
+      }
+      if (Object.keys(update).length === 1) {
+        return res.status(400).json({ success: false, error: '업데이트할 필드 없음' });
+      }
+      const adminApp = getAdminApp();
+      const dbAdmin = adminApp.firestore();
+      // 복합 인덱스(customer_id+called_at) 회피: customer_id 단일 필터로 가져와 메모리 정렬
+      // (한 고객의 ml_predict_logs는 보통 매우 적어 부담 없음)
+      const snap = await dbAdmin.collection('ml_predict_logs')
+        .where('customer_id', '==', customerId)
+        .get();
+      if (snap.empty) {
+        return res.status(404).json({ success: false, error: '해당 고객의 예측 로그 없음', skipped: true });
+      }
+      const docs = snap.docs.slice().sort((a, b) => {
+        const ta = String(a.data()?.called_at || '');
+        const tb = String(b.data()?.called_at || '');
+        return tb.localeCompare(ta);
+      });
+      const docRef = docs[0].ref;
+      await docRef.update(update);
+      res.json({ success: true, id: docRef.id, updated: update });
+    } catch (error: any) {
+      console.error('[/api/admin/predict-logs/by-customer PATCH] 실패:', error);
+      res.status(500).json({ success: false, error: error?.message || 'by-customer PATCH 실패' });
     }
   });
 

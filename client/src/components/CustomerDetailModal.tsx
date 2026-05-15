@@ -35,7 +35,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
 import { compressImage, validateFileSize, formatFileSize } from "@/lib/imageCompressor";
-import { startAIConversation, streamAIChat, predictFunding as apiPredictFunding, mlPredictFunding, type MlPredictionItem } from "@/lib/aiClient";
+import { startAIConversation, streamAIChat, predictFunding as apiPredictFunding, mlPredictFunding, patchPredictLog, patchPredictLogByCustomer, type MlPredictionItem } from "@/lib/aiClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   extractBusinessRegistration, 
@@ -420,6 +420,10 @@ export function CustomerDetailModal({
   const [mlPredictError, setMlPredictError] = useState<string | null>(null);
   const [mlPredictOpen, setMlPredictOpen] = useState(false);
   const [mlExpandedCases, setMlExpandedCases] = useState<Set<number>>(new Set());
+  // implicit feedback — 직전 예측 호출의 log_id (행동 PATCH 대상)
+  const [mlPredictLogId, setMlPredictLogId] = useState<string | null>(null);
+  const [mlActionTaken, setMlActionTaken] = useState<string | null>(null);
+  const [mlActionPatching, setMlActionPatching] = useState(false);
   const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
   // 마지막으로 외부 API에 제출(rerun)한 답변 스냅샷 — UI 필터링 기준
   // (followupAnswers로 필터링하면 타이핑 중간에 질문이 사라져 사용자가 입력을 끝낼 수 없음)
@@ -2273,6 +2277,8 @@ export function CustomerDetailModal({
     setMlPredictError(null);
     setMlExpandedCases(new Set());
     setMlPredictOpen(false);
+    setMlPredictLogId(null);
+    setMlActionTaken(null);
   }, [customer?.id]);
 
   // ML 한도 예측 호출 (yieumapi /predict 프록시)
@@ -2283,7 +2289,9 @@ export function CustomerDetailModal({
     try {
       const result = await mlPredictFunding(customer.id);
       setMlPredictions(result.predictions || []);
-      console.log("[ML 예측] ✅ 결과:", result.predictions);
+      setMlPredictLogId(result.logId || null);
+      setMlActionTaken(null);
+      console.log("[ML 예측] ✅ 결과:", result.predictions, "logId:", result.logId);
     } catch (err: any) {
       console.error("[ML 예측] 실패:", err);
       setMlPredictError(err?.message || "예측 호출 실패");
@@ -2976,6 +2984,51 @@ export function CustomerDetailModal({
                     {!mlPredictLoading && !mlPredictError && mlPredictions && mlPredictions.length === 0 && (
                       <div className="py-6 text-center text-sm text-muted-foreground">
                         예측 가능한 자금이 없습니다.
+                      </div>
+                    )}
+                    {/* 행동 추적 4-버튼 (예측결과 본 직후 실행될 행동을 implicit feedback으로 수집) */}
+                    {!mlPredictLoading && mlPredictions && mlPredictions.length > 0 && mlPredictLogId && (
+                      <div className="mb-2 p-2 rounded-md border border-purple-500/30 bg-purple-500/5">
+                        <div className="text-[11px] text-muted-foreground mb-1.5">예측 본 후 어떻게 처리하시나요? (모델 학습용)</div>
+                        <div className="grid grid-cols-2 gap-1">
+                          {[
+                            { value: 'apply_predicted', label: '이 자금 신청', cls: 'border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10' },
+                            { value: 'apply_other', label: '다른 자금', cls: 'border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10' },
+                            { value: 'pending_followup', label: '보류(추후)', cls: 'border-blue-500/40 text-blue-700 dark:text-blue-300 hover:bg-blue-500/10' },
+                            { value: 'no_apply', label: '신청 안 함', cls: 'border-rose-500/40 text-rose-700 dark:text-rose-300 hover:bg-rose-500/10' },
+                          ].map((act) => {
+                            const isSelected = mlActionTaken === act.value;
+                            return (
+                              <button
+                                key={act.value}
+                                type="button"
+                                disabled={mlActionPatching}
+                                onClick={async () => {
+                                  if (!mlPredictLogId || mlActionPatching) return;
+                                  setMlActionPatching(true);
+                                  try {
+                                    await patchPredictLog(mlPredictLogId, { taken_action: act.value });
+                                    setMlActionTaken(act.value);
+                                    toast({ description: `행동 기록 완료: ${act.label}`, duration: 1500 });
+                                  } catch (err: any) {
+                                    console.error('[ML 예측] 행동 기록 실패:', err);
+                                    toast({ description: `기록 실패: ${err?.message || ''}`, variant: 'destructive', duration: 2500 });
+                                  } finally {
+                                    setMlActionPatching(false);
+                                  }
+                                }}
+                                className={cn(
+                                  'h-7 text-[11px] rounded border bg-card transition-colors disabled:opacity-50',
+                                  act.cls,
+                                  isSelected && 'ring-1 ring-offset-0',
+                                )}
+                                data-testid={`button-ml-action-${act.value}`}
+                              >
+                                {isSelected ? '✓ ' : ''}{act.label}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                     {!mlPredictLoading && mlPredictions && mlPredictions.length > 0 && (
@@ -4727,6 +4780,31 @@ export function CustomerDetailModal({
                                             id: customer.id,
                                             status_code: option.value,
                                           });
+
+                                          // ─── ML 예측 로그 자동 동기화 (fire-and-forget, UX 비차단) ───
+                                          // 집행완료 → final_status='executed' + final_amount_10k
+                                          // 거절 카테고리 → final_status='rejected' + rejection_reason
+                                          // await 하지 않음: 네트워크 지연이 정산 동기화/UI 업데이트를 차단하지 않도록.
+                                          (() => {
+                                            const REJECT_SET = new Set([
+                                              '단박거절','매출없음','신용점수 미달','차입금초과','세금체납',
+                                              '재상담','쓰레기통','미진행','거절',
+                                            ]);
+                                            const newStatus = option.value;
+                                            const cid = customer.id!;
+                                            if (typeof newStatus === 'string' && newStatus.includes('집행완료')) {
+                                              const amt = Number((formData as any).execution_amount) || null;
+                                              patchPredictLogByCustomer(cid, {
+                                                final_status: 'executed',
+                                                final_amount_10k: amt,
+                                              }).catch((mlErr) => console.warn('[ML 예측 로그 동기화 실패(무시)]', mlErr));
+                                            } else if (REJECT_SET.has(String(newStatus))) {
+                                              patchPredictLogByCustomer(cid, {
+                                                final_status: 'rejected',
+                                                rejection_reason: String(newStatus),
+                                              }).catch((mlErr) => console.warn('[ML 예측 로그 동기화 실패(무시)]', mlErr));
+                                            }
+                                          })();
 
                                           // 정산 영향 상태 전환 시 정산 동기화 (채무조정 잔존 정산 정리 포함)
                                           const oldAffectsSettlement = !!oldStatus && (
