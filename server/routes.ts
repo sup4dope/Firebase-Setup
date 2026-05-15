@@ -79,6 +79,76 @@ function formatContractAmountServer(manWon: number): string {
   return `${formatted} (금 ${korean} 원)`;
 }
 
+// ============================================================
+// ML 학습/추론 공유: financial_obligations 파생 피처 계산기
+// — train/serve skew 영구 차단을 위해 ml-export · /api/customer/:id 양쪽에서 동일 함수 사용
+// — 단위 정책: balance(원), duration(일), ratio(unitless)
+// — 결측 표현: 산출 불가 시 null (모델 측에서 missing으로 일관 처리)
+// ============================================================
+export function computeObligationDerived(c: any): {
+  total_loan_balance: number;
+  total_guarantee_balance: number;
+  financial_obligations_count: number;
+  financial_institution_count: number;
+  loans_within_7days_count: number;
+  nearest_maturity_days: number | null;
+  debt_to_sales_ratio: number | null;
+} {
+  const obligations: any[] = Array.isArray(c?.financial_obligations) ? c.financial_obligations : [];
+  const total_loan_balance = obligations
+    .filter(o => o?.type === 'loan')
+    .reduce((sum, o) => sum + (Number(o?.balance) || 0), 0);
+  const total_guarantee_balance = obligations
+    .filter(o => o?.type === 'guarantee')
+    .reduce((sum, o) => sum + (Number(o?.balance) || 0), 0);
+  const institutionSet = new Set(
+    obligations.map(o => String(o?.institution ?? '').trim()).filter(Boolean)
+  );
+  const occurredMs = obligations
+    .map(o => o?.occurred_at)
+    .filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .map(d => new Date(d + 'T00:00:00+09:00').getTime());
+  // 본인 제외, 7일 이내 다른 채무가 1건 이상 있는 obligation 건수 (다중채무 burst)
+  const SEVEN_DAYS_MS = 7 * 86400000;
+  let loans_within_7days_count = 0;
+  for (let i = 0; i < occurredMs.length; i++) {
+    for (let j = 0; j < occurredMs.length; j++) {
+      if (i === j) continue;
+      if (Math.abs(occurredMs[i] - occurredMs[j]) <= SEVEN_DAYS_MS) {
+        loans_within_7days_count++;
+        break;
+      }
+    }
+  }
+  // KST 오늘 자정 기준 — 가장 가까운 미래 만기까지 잔여일
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 3600000);
+  const ymd = kst.toISOString().slice(0, 10);
+  const kstTodayStartMs = new Date(ymd + 'T00:00:00+09:00').getTime();
+  const futureMaturities = obligations
+    .map(o => o?.maturity_date)
+    .filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .map(d => new Date(d + 'T00:00:00+09:00').getTime())
+    .filter(t => t >= kstTodayStartMs);
+  const nearest_maturity_days = futureMaturities.length > 0
+    ? Math.round((Math.min(...futureMaturities) - kstTodayStartMs) / 86400000)
+    : null;
+  // 매출 대비 총채무 비율 — sales_y1 누락/0/음수 → null
+  const salesY1 = Number(c?.sales_y1);
+  const debt_to_sales_ratio: number | null = (Number.isFinite(salesY1) && salesY1 > 0)
+    ? (total_loan_balance + total_guarantee_balance) / (salesY1 * 1e8)
+    : null;
+  return {
+    total_loan_balance,
+    total_guarantee_balance,
+    financial_obligations_count: obligations.length,
+    financial_institution_count: institutionSet.size,
+    loans_within_7days_count,
+    nearest_maturity_days,
+    debt_to_sales_ratio,
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -161,6 +231,9 @@ export async function registerRoutes(
         return Math.round(n * 100_000_000);
       };
 
+      // ML 추론 파이프라인용 채무 파생 피처 (ml-export와 동일 함수 — train/serve skew 차단)
+      const obligationDerived = computeObligationDerived(c);
+
       const payload = {
         customer_id: docSnap.id,
         readable_id: c.readable_id ?? null,
@@ -174,6 +247,8 @@ export async function registerRoutes(
         representative_birthdate: representativeBirthdate,               // YYYY-MM-DD | null
         sales_prev_year_won: okrwToWon(c.sales_y1),                      // 직전년도 매출액 (원)
         sales_two_years_ago_won: okrwToWon(c.sales_y2),                  // 전전년도 매출액 (원)
+        // ───── ML 학습 매퍼와 공유되는 파생 피처 (단위: 잔액=원, 비율=unitless, 일수=days) ─────
+        ...obligationDerived,
         // 참고용 원본 값(억원 단위) — 매핑 검증 편의를 위해 함께 제공
         _raw: {
           sales_y1_okrw: c.sales_y1 ?? null,
@@ -181,6 +256,8 @@ export async function registerRoutes(
           ssn_front: c.ssn_front ?? null,
         },
       };
+
+      res.setHeader('X-ML-Schema-Version', 'v2.1-2026-05-15');
 
       res.json({ success: true, data: payload });
     } catch (error: any) {
@@ -245,48 +322,96 @@ export async function registerRoutes(
       const text = await upstream.text();
       let body: any = null;
       try { body = JSON.parse(text); } catch { body = { raw: text }; }
+      // ─── 헬퍼: 호출 결과를 ml_predict_logs에 기록 (성공/실패 공통, best-effort) ───
+      const writeLog = async (logFields: Record<string, any>): Promise<string | null> => {
+        try {
+          const adminApp = getAdminApp();
+          const dbLog = adminApp.firestore();
+          const ref = await dbLog.collection('ml_predict_logs').add({
+            customer_id: customerId,
+            called_at: new Date().toISOString(),
+            called_by_uid: req.user?.uid || null,
+            called_by_email: req.user?.email || null,
+            model_version: null,
+            predicted_top_org: null,
+            predicted_prob: null,
+            predicted_p50_amount_10k: null,
+            predicted_full: null,
+            taken_action: null,
+            final_status: null,
+            final_amount_10k: null,
+            error_code: null,
+            error_message: null,
+            http_status: null,
+            ...logFields,
+          });
+          return ref.id;
+        } catch (logErr: any) {
+          console.error('[/api/ml-predict] 로그 기록 실패(무시):', logErr?.message);
+          return null;
+        }
+      };
+
       if (!upstream.ok) {
+        // 업스트림 오류도 학습/모니터링용으로 기록 (드리프트·재현성 추적)
+        const errCode = body?.error_code || body?.code || `upstream_${upstream.status}`;
+        const errMsg = body?.error || body?.detail || body?.message || `예측 API 오류 (${upstream.status})`;
+        const failLogId = await writeLog({
+          http_status: upstream.status,
+          error_code: errCode,
+          error_message: errMsg,
+          predicted_full: body,
+        });
         return res.status(upstream.status).json({
           success: false, status: upstream.status,
-          error: body?.error || body?.detail || `예측 API 오류 (${upstream.status})`,
+          error_code: errCode,
+          error: errMsg,
           data: body,
+          log_id: failLogId,
         });
       }
-      // ─── implicit-feedback용 호출 로그 (best-effort, 실패해도 응답은 나감) ───
-      let logId: string | null = null;
+      // ─── 정상 응답 로깅 (implicit-feedback용) ───
+      // 한글 키와 영문 키 둘 다 케어 (aiClient가 정규화하기 전 raw 응답)
+      const fundings = (body?.fundings || body?.자금 || []) as any[];
+      const top = Array.isArray(fundings) && fundings.length > 0
+        ? [...fundings].sort((a, b) =>
+            (Number(b?.approval_probability ?? b?.승인확률) || 0) -
+            (Number(a?.approval_probability ?? a?.승인확률) || 0)
+          )[0]
+        : null;
+      const logId = await writeLog({
+        http_status: upstream.status,
+        model_version: body?.model_version || body?.meta?.model_version || null,
+        predicted_top_org: top?.funding_name || top?.자금 || null,
+        predicted_prob: Number(top?.approval_probability ?? top?.승인확률) || null,
+        predicted_p50_amount_10k: Number(top?.expected_limit ?? top?.예상한도 ?? top?.p50_amount_10k) || null,
+        predicted_full: body, // raw 응답 보존 (재학습용 ground-truth)
+      });
+      res.json({ success: true, data: body, log_id: logId });
+    } catch (error: any) {
+      console.error("[/api/ml-predict] 호출 실패:", error?.message);
+      // 네트워크/서버 예외도 로깅 (드리프트·장애 추적)
       try {
         const adminApp = getAdminApp();
-        const dbLog = adminApp.firestore();
-        // 한글 키와 영문 키 둘 다 케어 (aiClient가 정규화하기 전 raw 응답)
-        const fundings = (body?.fundings || body?.자금 || []) as any[];
-        const top = Array.isArray(fundings) && fundings.length > 0
-          ? [...fundings].sort((a, b) =>
-              (Number(b?.approval_probability ?? b?.승인확률) || 0) -
-              (Number(a?.approval_probability ?? a?.승인확률) || 0)
-            )[0]
-          : null;
-        const logRef = await dbLog.collection('ml_predict_logs').add({
+        await adminApp.firestore().collection('ml_predict_logs').add({
           customer_id: customerId,
           called_at: new Date().toISOString(),
           called_by_uid: req.user?.uid || null,
           called_by_email: req.user?.email || null,
-          model_version: body?.model_version || body?.meta?.model_version || null,
-          predicted_top_org: top?.funding_name || top?.자금 || null,
-          predicted_prob: Number(top?.approval_probability ?? top?.승인확률) || null,
-          predicted_p50_amount_10k: Number(top?.expected_limit ?? top?.예상한도 ?? top?.p50_amount_10k) || null,
-          predicted_full: body, // raw 응답 보존 (재학습용 ground-truth)
-          taken_action: null,    // 컨설턴트 행동 추적 (PATCH로 업데이트)
-          final_status: null,    // 최종 결과 (PATCH로 업데이트)
+          http_status: 502,
+          error_code: error?.code || 'fetch_failed',
+          error_message: error?.message || 'unknown',
+          predicted_full: null,
+          taken_action: null,
+          final_status: null,
           final_amount_10k: null,
         });
-        logId = logRef.id;
-      } catch (logErr: any) {
-        console.error('[/api/ml-predict] 로그 기록 실패(무시):', logErr?.message);
-      }
-      res.json({ success: true, data: body, log_id: logId });
-    } catch (error: any) {
-      console.error("[/api/ml-predict] 호출 실패:", error?.message);
-      res.status(502).json({ success: false, error: `예측 API 호출 실패: ${error?.message || "unknown"}` });
+      } catch { /* swallow */ }
+      res.status(502).json({
+        success: false,
+        error_code: error?.code || 'fetch_failed',
+        error: `예측 API 호출 실패: ${error?.message || "unknown"}`,
+      });
     }
   });
 
@@ -453,56 +578,9 @@ export async function registerRoutes(
         if (updatedSinceDate && c.updated_at) lastUpdatedAt = c.updated_at;
         const orgs: any[] = Array.isArray(c.processing_orgs) ? c.processing_orgs : [];
 
-        // ───── financial_obligations 파생 피처 (ML 모델용) ─────
-        // 정의:
-        //  - total_loan_balance / total_guarantee_balance: 잔액 합 (원)
-        //  - financial_institution_count: 거래 금융기관 distinct count
-        //  - loans_within_7days_count: occurred_at 기준 본인 외 7일 이내 발생한 다른 채무가
-        //    1건 이상 존재하는 채무의 건수 (다중채무 burst 신호, loan+guarantee 통합)
-        //  - nearest_maturity_days: KST 오늘 이후 만기 중 최소 잔여일 (오늘 만기 = 0)
-        const obligations: any[] = Array.isArray(c.financial_obligations) ? c.financial_obligations : [];
-        const totalLoanBalance = obligations
-          .filter(o => o?.type === 'loan')
-          .reduce((sum, o) => sum + (Number(o?.balance) || 0), 0);
-        const totalGuaranteeBalance = obligations
-          .filter(o => o?.type === 'guarantee')
-          .reduce((sum, o) => sum + (Number(o?.balance) || 0), 0);
-        const institutionSet = new Set(
-          obligations
-            .map(o => String(o?.institution ?? '').trim())
-            .filter(Boolean)
-        );
-        const occurredMs = obligations
-          .map(o => o?.occurred_at)
-          .filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
-          .map(d => new Date(d + 'T00:00:00+09:00').getTime());
-        // 본인 제외, 7일 이내 다른 채무가 1건 이상 있는 obligation 건수
-        const SEVEN_DAYS_MS = 7 * 86400000;
-        let loansWithin7DaysCount = 0;
-        for (let i = 0; i < occurredMs.length; i++) {
-          for (let j = 0; j < occurredMs.length; j++) {
-            if (i === j) continue;
-            if (Math.abs(occurredMs[i] - occurredMs[j]) <= SEVEN_DAYS_MS) {
-              loansWithin7DaysCount++;
-              break;
-            }
-          }
-        }
-        // KST 오늘 자정 기준
-        const kstTodayStartMs = (() => {
-          const now = new Date();
-          const kst = new Date(now.getTime() + 9 * 3600000);
-          const ymd = kst.toISOString().slice(0, 10);
-          return new Date(ymd + 'T00:00:00+09:00').getTime();
-        })();
-        const futureMaturities = obligations
-          .map(o => o?.maturity_date)
-          .filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
-          .map(d => new Date(d + 'T00:00:00+09:00').getTime())
-          .filter(t => t >= kstTodayStartMs);
-        const nearestMaturityDays = futureMaturities.length > 0
-          ? Math.round((Math.min(...futureMaturities) - kstTodayStartMs) / 86400000)
-          : null;
+        // ───── financial_obligations 파생 피처 (ML 모델용 — 공유 함수 사용) ─────
+        // 정의는 computeObligationDerived 참조. /api/customer/:id와 동일 매퍼 = train/serve skew 차단.
+        const obligationDerived = computeObligationDerived(c);
 
         // 현재 프로필 (PII 제외) — 스냅샷 없는 레코드의 fallback용
         const currentProfile = {
@@ -519,19 +597,8 @@ export async function registerRoutes(
           is_home_owned: c.is_home_owned ?? null,
           is_business_owned: c.is_business_owned ?? null,
           entry_source: c.entry_source ?? null,
-          // ───── 채무 관련 파생 피처 (잔액 단위: 원) ─────
-          financial_obligations_count: obligations.length,
-          total_loan_balance: totalLoanBalance,
-          total_guarantee_balance: totalGuaranteeBalance,
-          financial_institution_count: institutionSet.size,
-          loans_within_7days_count: loansWithin7DaysCount,
-          nearest_maturity_days: nearestMaturityDays,
-          // 매출 대비 총채무 비율 (차입금초과 핵심 정의) — sales_y1 누락/0/음수 → null
-          debt_to_sales_ratio: (() => {
-            const s = Number(c.sales_y1);
-            if (!Number.isFinite(s) || s <= 0) return null;
-            return (totalLoanBalance + totalGuaranteeBalance) / (s * 1e8);
-          })(),
+          // ───── 채무 관련 파생 피처 (공유 함수 결과 그대로 — train/serve skew 차단) ─────
+          ...obligationDerived,
         };
 
         const isCustomerRejected = REJECTION_STATUSES.has(String(c.status_code || ''));

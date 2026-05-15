@@ -97,6 +97,20 @@ export interface MlPredictionItem {
   [k: string]: any;
 }
 
+// 예측 호출 실패 시 error_code/HTTP status도 던져 UI에서 노출 가능하도록
+export class MlPredictError extends Error {
+  code: string | null;
+  status: number;
+  logId: string | null;
+  constructor(message: string, opts: { code?: string | null; status: number; logId?: string | null }) {
+    super(message);
+    this.name = 'MlPredictError';
+    this.code = opts.code ?? null;
+    this.status = opts.status;
+    this.logId = opts.logId ?? null;
+  }
+}
+
 export async function mlPredictFunding(customerId: string): Promise<{
   success: boolean;
   predictions: MlPredictionItem[];
@@ -106,7 +120,10 @@ export async function mlPredictFunding(customerId: string): Promise<{
   const res = await authFetch(`/api/ml-predict/${encodeURIComponent(customerId)}`);
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json?.success) {
-    throw new Error(json?.error || `예측 호출 실패 (${res.status})`);
+    throw new MlPredictError(
+      json?.error || `예측 호출 실패 (${res.status})`,
+      { code: json?.error_code ?? null, status: res.status, logId: json?.log_id ?? null },
+    );
   }
   // 응답 언랩: {data:{predictions:[...]}} / {data:[...]} 변형 대응
   let data = json.data;

@@ -35,7 +35,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
 import { compressImage, validateFileSize, formatFileSize } from "@/lib/imageCompressor";
-import { startAIConversation, streamAIChat, predictFunding as apiPredictFunding, mlPredictFunding, patchPredictLog, patchPredictLogByCustomer, type MlPredictionItem } from "@/lib/aiClient";
+import { startAIConversation, streamAIChat, predictFunding as apiPredictFunding, mlPredictFunding, patchPredictLog, patchPredictLogByCustomer, MlPredictError, type MlPredictionItem } from "@/lib/aiClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   extractBusinessRegistration, 
@@ -417,7 +417,7 @@ export function CustomerDetailModal({
   // ML 한도 예측 (yieumapi /predict 프록시)
   const [mlPredictions, setMlPredictions] = useState<MlPredictionItem[] | null>(null);
   const [mlPredictLoading, setMlPredictLoading] = useState(false);
-  const [mlPredictError, setMlPredictError] = useState<string | null>(null);
+  const [mlPredictError, setMlPredictError] = useState<{ message: string; code: string | null; status?: number } | null>(null);
   const [mlPredictOpen, setMlPredictOpen] = useState(false);
   const [mlExpandedCases, setMlExpandedCases] = useState<Set<number>>(new Set());
   // implicit feedback — 직전 예측 호출의 log_id (행동 PATCH 대상)
@@ -2294,7 +2294,14 @@ export function CustomerDetailModal({
       console.log("[ML 예측] ✅ 결과:", result.predictions, "logId:", result.logId);
     } catch (err: any) {
       console.error("[ML 예측] 실패:", err);
-      setMlPredictError(err?.message || "예측 호출 실패");
+      const isMlErr = err instanceof MlPredictError;
+      setMlPredictError({
+        message: err?.message || "예측 호출 실패",
+        code: isMlErr ? err.code : null,
+        status: isMlErr ? err.status : undefined,
+      });
+      // 실패 시에도 log_id가 있으면 보존 (재현/디버깅용)
+      if (isMlErr && err.logId) setMlPredictLogId(err.logId);
       setMlPredictions(null);
     } finally {
       setMlPredictLoading(false);
@@ -2977,8 +2984,15 @@ export function CustomerDetailModal({
                       </div>
                     )}
                     {!mlPredictLoading && mlPredictError && (
-                      <div className="py-3 text-sm text-destructive" data-testid="text-ml-predict-error">
-                        {mlPredictError}
+                      <div className="py-3 text-sm text-destructive space-y-1" data-testid="text-ml-predict-error">
+                        <div>{mlPredictError.message}</div>
+                        {(mlPredictError.code || mlPredictError.status) && (
+                          <div className="text-xs text-muted-foreground font-mono" data-testid="text-ml-predict-error-code">
+                            {mlPredictError.code ? `code: ${mlPredictError.code}` : ''}
+                            {mlPredictError.code && mlPredictError.status ? ' · ' : ''}
+                            {mlPredictError.status ? `HTTP ${mlPredictError.status}` : ''}
+                          </div>
+                        )}
                       </div>
                     )}
                     {!mlPredictLoading && !mlPredictError && mlPredictions && mlPredictions.length === 0 && (
