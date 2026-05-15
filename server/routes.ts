@@ -250,7 +250,11 @@ export async function registerRoutes(
 
       // ───── 쿼리 파라미터 ─────
       // limit: 1~5000 (기본: 무제한). cursor: 마지막 customer doc id (다음 페이지 시작점)
-      // since: YYYY-MM-DD — customers.updated_at >= since 필터 (증분 조회)
+      // since: YYYY-MM-DD — customers.entry_date >= since 필터 (신규 고객 증분)
+      // TODO(추후 운영): 기존 고객의 상태 변경(진행중→집행완료 등)을 catch하려면
+      //   `updated_since` 파라미터 추가 필요. customers.updated_at 또는
+      //   processing_orgs[].applied_at/approved_at/execution_date 중 max 기준으로 필터.
+      //   현재 since는 entry_date 기준이라 신규 고객만 반영됨.
       // stats: 'true' → 레코드 없이 분포 통계만 반환
       const limitParam = req.query.limit ? Math.min(Math.max(Number(req.query.limit), 1), 5000) : null;
       const cursor = (req.query.cursor as string | undefined) || null;
