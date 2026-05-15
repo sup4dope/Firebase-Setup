@@ -29,6 +29,7 @@ import {
   RefreshCw,
   Eye,
   Stethoscope,
+  FileSearch,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import debounce from "lodash/debounce";
@@ -414,6 +415,9 @@ export function CustomerDetailModal({
   const [submittedFollowupAnswers, setSubmittedFollowupAnswers] = useState<Record<string, string>>({});
   // 자금별 판정 카드 펼침 상태
   const [expandedFunds, setExpandedFunds] = useState<Set<number>>(new Set());
+  // 수동 확인: 서류 미반영 개인대출(7%↑ + Y-1.06.30 이전 실행) 보유 여부
+  // "예" 선택 시 고금리대출_7퍼센트이상_보유 + 대출_25_6_30_이전_실행을 모두 "예"로 오버라이드
+  const [manualPersonalLoan, setManualPersonalLoan] = useState<"yes" | "no" | null>(null);
   const [aiInput, setAiInput] = useState("");
   const aiScrollRef = useRef<HTMLDivElement>(null);
   const [aiConversationId, setAiConversationId] = useState<string | null>(null);
@@ -2162,11 +2166,17 @@ export function CustomerDetailModal({
       setFollowupAnswers({});
       setSubmittedFollowupAnswers({});
       setExpandedFunds(new Set());
+      // 주의: manualPersonalLoan은 재판정 시에도 유지 (사용자가 직접 토글로 해제)
     }
     try {
       const { authFetch } = await import('@/lib/firebase');
       // 자동 응답 + 사용자 답변 병합 (사용자 답변 우선)
       const merged: Record<string, string> = { ...autoFollowupAnswers, ...(answers || {}) };
+      // 수동 개인대출 확인이 "예"이면 두 관련 필드를 "예"로 강제 (OCR 미반영 분 반영)
+      if (manualPersonalLoan === "yes") {
+        merged["고금리대출_7퍼센트이상_보유"] = "예";
+        merged["대출_25_6_30_이전_실행"] = "예";
+      }
       // 빈 값 제거
       const cleanAnswers: Record<string, string> = {};
       for (const [k, v] of Object.entries(merged)) {
@@ -2315,6 +2325,7 @@ export function CustomerDetailModal({
       setFollowupAnswers({});
       setSubmittedFollowupAnswers({});
       setExpandedFunds(new Set());
+      setManualPersonalLoan(null);
       aiPredictedSignatureRef.current = "";
       aiPredictingRef.current = false;
       aiPredictAbortRef.current?.abort();
@@ -5710,6 +5721,67 @@ export function CustomerDetailModal({
                   </div>
                 )}
 
+                {/* 수동 확인 질문: 서류로 확인되지 않는 개인대출 (OCR 미반영) */}
+                {(() => {
+                  const cutoffYear = new Date().getFullYear() - 1;
+                  return (
+                    <div className="space-y-2 p-3 rounded-md border border-blue-500/30 bg-blue-500/5">
+                      <div className="text-sm font-semibold flex items-center gap-1.5">
+                        <FileSearch className="w-4 h-4 text-blue-500" />
+                        직접 확인 질문
+                        <span className="text-xs text-muted-foreground font-normal">
+                          — 서류로 확인이 어려운 항목입니다
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-2 items-center">
+                        <div className="text-sm text-foreground/90">
+                          서류 미반영 개인대출 중 <strong>금리 7% 이상</strong>이면서{" "}
+                          <strong>{cutoffYear}.06.30. 이전</strong> 실행된 대출이 있나요?
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            "예" 선택 시 대환 가능 조건으로 자격판정에 반영됩니다.
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={manualPersonalLoan === "yes" ? "default" : "outline"}
+                            className={cn(
+                              "flex-1 h-8",
+                              manualPersonalLoan === "yes" &&
+                                "bg-blue-600 hover:bg-blue-700 text-white",
+                            )}
+                            onClick={() =>
+                              setManualPersonalLoan((prev) => (prev === "yes" ? null : "yes"))
+                            }
+                            disabled={diagnoseLoading}
+                            data-testid="button-manual-personal-loan-yes"
+                          >
+                            예
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={manualPersonalLoan === "no" ? "default" : "outline"}
+                            className={cn(
+                              "flex-1 h-8",
+                              manualPersonalLoan === "no" &&
+                                "bg-muted-foreground/80 hover:bg-muted-foreground text-white",
+                            )}
+                            onClick={() =>
+                              setManualPersonalLoan((prev) => (prev === "no" ? null : "no"))
+                            }
+                            disabled={diagnoseLoading}
+                            data-testid="button-manual-personal-loan-no"
+                          >
+                            아니오
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* 추가 확인 질문(역질문) — 자동 응답되었거나 이미 사용자가 답한 항목은 숨김 */}
                 {(() => {
                   const allQuestions = Array.isArray(diagnoseResult.followup_questions)
@@ -5803,7 +5875,8 @@ export function CustomerDetailModal({
                         }}
                         disabled={
                           diagnoseLoading ||
-                          Object.values(followupAnswers).every((v) => !v || !String(v).trim())
+                          (manualPersonalLoan == null &&
+                            Object.values(followupAnswers).every((v) => !v || !String(v).trim()))
                         }
                         className="bg-purple-600 hover:bg-purple-700 text-white gap-1"
                         data-testid="button-diagnose-rerun-with-answers"
