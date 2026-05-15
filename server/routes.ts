@@ -371,20 +371,31 @@ export async function registerRoutes(
         });
       }
       // ─── 정상 응답 로깅 (implicit-feedback용) ───
-      // 한글 키와 영문 키 둘 다 케어 (aiClient가 정규화하기 전 raw 응답)
+      // v2.3+ : 업스트림이 top_prediction을 직접 제공 (자금/승인확률/p50_한도_만원/model_version/confidence)
+      // 그 외 : fundings/자금 배열에서 승인확률 최댓값으로 fallback
+      const predictSchema = upstream.headers.get('x-predict-schema-version') || null;
+      const tp = body?.top_prediction || body?.topPrediction || null;
       const fundings = (body?.fundings || body?.자금 || []) as any[];
-      const top = Array.isArray(fundings) && fundings.length > 0
+      const fallbackTop = Array.isArray(fundings) && fundings.length > 0
         ? [...fundings].sort((a, b) =>
             (Number(b?.approval_probability ?? b?.승인확률) || 0) -
             (Number(a?.approval_probability ?? a?.승인확률) || 0)
           )[0]
         : null;
+      const top = tp || fallbackTop;
+      const topP50Raw = tp?.p50_한도_만원 ?? tp?.p50_amount_10k
+        ?? top?.expected_limit ?? top?.p50_amount_10k;
+      const expectedObj = top?.예상한도 ?? top?.expected_amount;
+      const topP50FromObj = (expectedObj && typeof expectedObj === 'object')
+        ? (expectedObj.p50 ?? expectedObj.중앙값 ?? expectedObj.median)
+        : (typeof expectedObj === 'number' ? expectedObj : null);
       const logId = await writeLog({
         http_status: upstream.status,
-        model_version: body?.model_version || body?.meta?.model_version || null,
-        predicted_top_org: top?.funding_name || top?.자금 || null,
-        predicted_prob: Number(top?.approval_probability ?? top?.승인확률) || null,
-        predicted_p50_amount_10k: Number(top?.expected_limit ?? top?.예상한도 ?? top?.p50_amount_10k) || null,
+        model_version: tp?.model_version || body?.model_version || body?.meta?.model_version || null,
+        predict_schema_version: predictSchema,
+        predicted_top_org: tp?.자금 || tp?.funding_name || top?.funding_name || top?.자금 || null,
+        predicted_prob: Number(tp?.승인확률 ?? tp?.approval_probability ?? top?.approval_probability ?? top?.승인확률) || null,
+        predicted_p50_amount_10k: Number(topP50Raw ?? topP50FromObj) || null,
         predicted_full: body, // raw 응답 보존 (재학습용 ground-truth)
       });
       res.json({ success: true, data: body, log_id: logId });
