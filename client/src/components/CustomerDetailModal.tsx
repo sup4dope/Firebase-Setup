@@ -2086,11 +2086,12 @@ export function CustomerDetailModal({
       };
       const growth10 = computeGrowth10();
       if (growth10) ans["매출_2년연속_10퍼센트신장"] = growth10;
-      // 매출 추이 응답 텍스트 (직전년도/전전년도 합산)
+      // 매출 추이 응답 텍스트 — y1이 입력되어 있으면 y2/y3 공란은 0으로 치환해서 AI에 전달
+      // (외부 자격판정 API가 매출감소율 등을 자체 계산할 때 누락 처리되지 않도록)
       const salesTrendText = (() => {
-        if (y1 > 0 && y2 > 0) return `직전년도 ${y1}억, 전전년도 ${y2}억`;
-        if (y1 > 0) return `직전년도 ${y1}억`;
-        return undefined;
+        const hasAny = y1 > 0 || y2 > 0 || y3 > 0;
+        if (!hasAny) return undefined;
+        return `직전년도 ${y1}억, 전전년도 ${y2}억, 전전전년도 ${y3}억`;
       })();
       // 질문 텍스트 패턴 매칭으로 동적 키 처리
       for (const q of questions) {
