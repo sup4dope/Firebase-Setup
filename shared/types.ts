@@ -207,6 +207,9 @@ export interface ProcessingOrgSnapshot {
   total_loan_balance?: number; // 대출 잔액 합계 (원)
   total_guarantee_balance?: number; // 보증 잔액 합계 (원)
   obligation_count?: number; // 채무 건수
+  financial_institution_count?: number; // 거래 금융기관 수
+  loans_within_7days_count?: number; // 7일 이내 신규 발생 페어 건수 (다중채무 신호)
+  nearest_maturity_days?: number; // 가장 가까운 미래 만기까지 잔여일
   // 자가/주거
   is_home_owned?: boolean;
   is_business_owned?: boolean;
@@ -219,6 +222,36 @@ export function buildProcessingOrgSnapshot(customer: Partial<Customer>): Process
   const obligations = customer.financial_obligations || [];
   const loans = obligations.filter((o: any) => o?.type === 'loan');
   const guarantees = obligations.filter((o: any) => o?.type === 'guarantee');
+  const institutionSet = new Set(
+    obligations.map((o: any) => String(o?.institution ?? '').trim()).filter(Boolean)
+  );
+  const occurredMs: number[] = obligations
+    .map((o: any) => o?.occurred_at)
+    .filter((d: any): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .map((d: string) => new Date(d + 'T00:00:00+09:00').getTime());
+  const SEVEN_DAYS_MS = 7 * 86400000;
+  let loansWithin7DaysCount = 0;
+  for (let i = 0; i < occurredMs.length; i++) {
+    for (let j = 0; j < occurredMs.length; j++) {
+      if (i === j) continue;
+      if (Math.abs(occurredMs[i] - occurredMs[j]) <= SEVEN_DAYS_MS) {
+        loansWithin7DaysCount++;
+        break;
+      }
+    }
+  }
+  // KST 오늘 자정 기준
+  const _now = new Date();
+  const _kst = new Date(_now.getTime() + 9 * 3600000);
+  const kstTodayStartMs = new Date(_kst.toISOString().slice(0, 10) + 'T00:00:00+09:00').getTime();
+  const futureMaturities = obligations
+    .map((o: any) => o?.maturity_date)
+    .filter((d: any): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .map((d: string) => new Date(d + 'T00:00:00+09:00').getTime())
+    .filter((t: number) => t >= kstTodayStartMs);
+  const nearestMaturityDays = futureMaturities.length > 0
+    ? Math.round((Math.min(...futureMaturities) - kstTodayStartMs) / 86400000)
+    : undefined;
   return {
     captured_at: new Date().toISOString(),
     credit_score: customer.credit_score,
@@ -231,9 +264,13 @@ export function buildProcessingOrgSnapshot(customer: Partial<Customer>): Process
     sales_y2: customer.sales_y2,
     sales_y3: customer.sales_y3,
     avg_revenue_3y: customer.avg_revenue_3y,
-    total_loan_balance: loans.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0) || undefined,
-    total_guarantee_balance: guarantees.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0) || undefined,
-    obligation_count: obligations.length || undefined,
+    // ML 학습 일관성을 위해 0도 명시적으로 보존 (export 경로와 동일 정책)
+    total_loan_balance: loans.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0),
+    total_guarantee_balance: guarantees.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0),
+    obligation_count: obligations.length,
+    financial_institution_count: institutionSet.size,
+    loans_within_7days_count: loansWithin7DaysCount,
+    nearest_maturity_days: nearestMaturityDays,
     is_home_owned: customer.is_home_owned,
     is_business_owned: customer.is_business_owned,
     entry_source: customer.entry_source,

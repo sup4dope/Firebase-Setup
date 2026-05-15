@@ -387,6 +387,57 @@ export async function registerRoutes(
         if (updatedSinceDate && c.updated_at) lastUpdatedAt = c.updated_at;
         const orgs: any[] = Array.isArray(c.processing_orgs) ? c.processing_orgs : [];
 
+        // ───── financial_obligations 파생 피처 (ML 모델용) ─────
+        // 정의:
+        //  - total_loan_balance / total_guarantee_balance: 잔액 합 (원)
+        //  - financial_institution_count: 거래 금융기관 distinct count
+        //  - loans_within_7days_count: occurred_at 기준 본인 외 7일 이내 발생한 다른 채무가
+        //    1건 이상 존재하는 채무의 건수 (다중채무 burst 신호, loan+guarantee 통합)
+        //  - nearest_maturity_days: KST 오늘 이후 만기 중 최소 잔여일 (오늘 만기 = 0)
+        const obligations: any[] = Array.isArray(c.financial_obligations) ? c.financial_obligations : [];
+        const totalLoanBalance = obligations
+          .filter(o => o?.type === 'loan')
+          .reduce((sum, o) => sum + (Number(o?.balance) || 0), 0);
+        const totalGuaranteeBalance = obligations
+          .filter(o => o?.type === 'guarantee')
+          .reduce((sum, o) => sum + (Number(o?.balance) || 0), 0);
+        const institutionSet = new Set(
+          obligations
+            .map(o => String(o?.institution ?? '').trim())
+            .filter(Boolean)
+        );
+        const occurredMs = obligations
+          .map(o => o?.occurred_at)
+          .filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+          .map(d => new Date(d + 'T00:00:00+09:00').getTime());
+        // 본인 제외, 7일 이내 다른 채무가 1건 이상 있는 obligation 건수
+        const SEVEN_DAYS_MS = 7 * 86400000;
+        let loansWithin7DaysCount = 0;
+        for (let i = 0; i < occurredMs.length; i++) {
+          for (let j = 0; j < occurredMs.length; j++) {
+            if (i === j) continue;
+            if (Math.abs(occurredMs[i] - occurredMs[j]) <= SEVEN_DAYS_MS) {
+              loansWithin7DaysCount++;
+              break;
+            }
+          }
+        }
+        // KST 오늘 자정 기준
+        const kstTodayStartMs = (() => {
+          const now = new Date();
+          const kst = new Date(now.getTime() + 9 * 3600000);
+          const ymd = kst.toISOString().slice(0, 10);
+          return new Date(ymd + 'T00:00:00+09:00').getTime();
+        })();
+        const futureMaturities = obligations
+          .map(o => o?.maturity_date)
+          .filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+          .map(d => new Date(d + 'T00:00:00+09:00').getTime())
+          .filter(t => t >= kstTodayStartMs);
+        const nearestMaturityDays = futureMaturities.length > 0
+          ? Math.round((Math.min(...futureMaturities) - kstTodayStartMs) / 86400000)
+          : null;
+
         // 현재 프로필 (PII 제외) — 스냅샷 없는 레코드의 fallback용
         const currentProfile = {
           credit_score: c.credit_score ?? null,
@@ -402,7 +453,13 @@ export async function registerRoutes(
           is_home_owned: c.is_home_owned ?? null,
           is_business_owned: c.is_business_owned ?? null,
           entry_source: c.entry_source ?? null,
-          financial_obligations_count: Array.isArray(c.financial_obligations) ? c.financial_obligations.length : 0,
+          // ───── 채무 관련 파생 피처 (잔액 단위: 원) ─────
+          financial_obligations_count: obligations.length,
+          total_loan_balance: totalLoanBalance,
+          total_guarantee_balance: totalGuaranteeBalance,
+          financial_institution_count: institutionSet.size,
+          loans_within_7days_count: loansWithin7DaysCount,
+          nearest_maturity_days: nearestMaturityDays,
         };
 
         const isCustomerRejected = REJECTION_STATUSES.has(String(c.status_code || ''));
