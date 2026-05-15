@@ -149,10 +149,18 @@ export async function mlPredictFunding(customerId: string): Promise<{
     let high: number | undefined;
     let basis: string | undefined;
     if (expectedRaw && typeof expectedRaw === "object") {
-      expected = expectedRaw.중앙값 ?? expectedRaw.median ?? expectedRaw.value ?? expectedRaw.amount;
-      const rng = expectedRaw.범위 ?? expectedRaw.range;
-      if (Array.isArray(rng) && rng.length >= 2) { low = rng[0]; high = rng[1]; }
-      else if (rng && typeof rng === "object") { low = rng.low ?? rng[0]; high = rng.high ?? rng[1]; }
+      // 분위수 객체 응답 (v3+ 모델, 분위수 단조 후처리): { p10, p25, p50, p75, p90, 근거 }
+      // 중앙값 = p50 우선, 그 외 fallback
+      expected = expectedRaw.p50 ?? expectedRaw.중앙값 ?? expectedRaw.median ?? expectedRaw.value ?? expectedRaw.amount;
+      // 범위: p25~p75를 IQR로 사용 (없으면 명시적 범위 객체로 fallback)
+      if (expectedRaw.p25 != null && expectedRaw.p75 != null) {
+        low = expectedRaw.p25;
+        high = expectedRaw.p75;
+      } else {
+        const rng = expectedRaw.범위 ?? expectedRaw.range;
+        if (Array.isArray(rng) && rng.length >= 2) { low = rng[0]; high = rng[1]; }
+        else if (rng && typeof rng === "object") { low = rng.low ?? rng[0]; high = rng.high ?? rng[1]; }
+      }
       basis = expectedRaw.근거 ?? expectedRaw.basis;
     } else if (typeof expectedRaw === "number") {
       expected = expectedRaw;
