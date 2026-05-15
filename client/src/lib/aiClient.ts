@@ -81,6 +81,9 @@ export interface MlPredictionItem {
   amount_range?: { low?: number; high?: number } | null;
   amount_low?: number;                  // 변형 대응
   amount_high?: number;
+  basis?: string;                       // 예상한도 산출 근거
+  avg_approval_rate?: number;           // 자금별 평균 승인률 (베이스라인)
+  meta?: { ml_AUC?: number; ml_사용?: boolean; ml_학습건수?: number; 고객_NCB구간?: string; 고객_업력구간?: string; [k: string]: any } | null;
   similar_cases?: Array<{
     customer_id?: string;
     applied_amount?: number;
@@ -113,19 +116,41 @@ export async function mlPredictFunding(customerId: string): Promise<{
     if (data.result && typeof data.result === "object") { data = data.result; continue; }
     break;
   }
-  const rawList: any[] = Array.isArray(data?.predictions) ? data.predictions : [];
-  // 필드명/스케일 정규화 (업스트림 스키마 변동 대응)
+  const rawList: any[] = Array.isArray(data?.predictions) ? data.predictions : Array.isArray(data?.예측) ? data.예측 : [];
+  // 필드명/스케일 정규화 (업스트림 스키마 변동 대응 — 영/한글 키 모두 지원)
   const predictions: MlPredictionItem[] = rawList.map((r: any) => {
-    const org = r.org ?? r.organization ?? r.institution ?? r.fund ?? r.fund_name ?? "(미상)";
+    const org = r.org ?? r.organization ?? r.institution ?? r.fund ?? r.fund_name ?? r.자금 ?? r.자금종류 ?? "(미상)";
     let prob: number | undefined =
       r.approval_probability ?? r.approvalProbability ?? r.probability ??
-      r.approval_rate ?? r.approvalRate ?? r.prob;
-    if (typeof prob === "number" && prob > 1.5) prob = prob / 100; // 0~100 스케일이면 0~1로 변환
-    const expected = r.expected_amount ?? r.expectedAmount ?? r.predicted_amount ?? r.predictedAmount ?? r.amount;
-    const range = r.amount_range ?? r.range ?? null;
-    const low = range?.low ?? r.amount_low ?? r.amountLow ?? r.low ?? r.lower;
-    const high = range?.high ?? r.amount_high ?? r.amountHigh ?? r.high ?? r.upper;
-    const cases = r.similar_cases ?? r.similarCases ?? r.neighbors ?? r.cases ?? [];
+      r.approval_rate ?? r.approvalRate ?? r.prob ?? r.승인확률;
+    if (typeof prob === "number" && prob > 1.5) prob = prob / 100;
+    // 예상한도: 객체({중앙값, 범위:[low,high], 근거}) 또는 단순 숫자 모두 지원
+    const expectedRaw = r.expected_amount ?? r.expectedAmount ?? r.predicted_amount ?? r.predictedAmount ?? r.amount ?? r.예상한도;
+    let expected: number | undefined;
+    let low: number | undefined;
+    let high: number | undefined;
+    let basis: string | undefined;
+    if (expectedRaw && typeof expectedRaw === "object") {
+      expected = expectedRaw.중앙값 ?? expectedRaw.median ?? expectedRaw.value ?? expectedRaw.amount;
+      const rng = expectedRaw.범위 ?? expectedRaw.range;
+      if (Array.isArray(rng) && rng.length >= 2) { low = rng[0]; high = rng[1]; }
+      else if (rng && typeof rng === "object") { low = rng.low ?? rng[0]; high = rng.high ?? rng[1]; }
+      basis = expectedRaw.근거 ?? expectedRaw.basis;
+    } else if (typeof expectedRaw === "number") {
+      expected = expectedRaw;
+    }
+    if (low == null) low = r.amount_low ?? r.amountLow ?? r.low ?? r.lower ?? r.amount_range?.low;
+    if (high == null) high = r.amount_high ?? r.amountHigh ?? r.high ?? r.upper ?? r.amount_range?.high;
+    const casesRaw = r.similar_cases ?? r.similarCases ?? r.neighbors ?? r.cases ?? r.유사_케이스 ?? r["유사_케이스"] ?? [];
+    const similar_cases = (Array.isArray(casesRaw) ? casesRaw : []).map((c: any) => ({
+      ...c,
+      customer_id: c.customer_id ?? c.id,
+      approved_amount: c.approved_amount ?? c.execution_amount ?? c.승인한도,
+      applied_amount: c.applied_amount ?? c.신청한도,
+      similarity: c.similarity ?? c.similarityScore ?? c.유사도점수,
+      org: c.org ?? c.자금종류,
+      status: c.status ?? c.상태,
+    }));
     return {
       ...r,
       org,
@@ -134,7 +159,10 @@ export async function mlPredictFunding(customerId: string): Promise<{
       amount_range: (low != null || high != null) ? { low, high } : null,
       amount_low: low,
       amount_high: high,
-      similar_cases: Array.isArray(cases) ? cases : [],
+      basis,
+      avg_approval_rate: r.자금_평균_승인률 ?? r.avg_approval_rate ?? r.fund_avg_approval_rate,
+      meta: r._meta ?? r.meta ?? null,
+      similar_cases,
     };
   });
   return { success: true, predictions, raw: json.data };

@@ -2991,6 +2991,8 @@ export function CustomerDetailModal({
                           const high = p.amount_range?.high ?? p.amount_high;
                           const cases = Array.isArray(p.similar_cases) ? p.similar_cases : [];
                           const isExpanded = mlExpandedCases.has(idx);
+                          const avgPct = p.avg_approval_rate != null ? (p.avg_approval_rate * 100).toFixed(1) : null;
+                          const meta = p.meta;
                           return (
                             <div
                               key={idx}
@@ -3005,6 +3007,11 @@ export function CustomerDetailModal({
                                 {probPct != null && (
                                   <div className={`text-sm font-semibold ${probColor}`} data-testid={`text-ml-prob-${idx}`}>
                                     승인확률 {probPct}%
+                                    {avgPct && (
+                                      <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                                        (자금평균 {avgPct}%)
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -3017,6 +3024,35 @@ export function CustomerDetailModal({
                                   {low != null && high != null && (
                                     <span className="text-xs text-muted-foreground">
                                       ({Number(low).toLocaleString()}~{Number(high).toLocaleString()})
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {p.basis && (
+                                <div className="mt-1 text-[10px] text-muted-foreground pl-5">
+                                  · {p.basis}
+                                </div>
+                              )}
+                              {meta && (
+                                <div className="mt-1.5 flex items-center gap-1 flex-wrap text-[10px]">
+                                  {meta.ml_사용 && meta.ml_AUC != null && (
+                                    <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                      ML AUC {Number(meta.ml_AUC).toFixed(2)}
+                                    </span>
+                                  )}
+                                  {meta.ml_학습건수 != null && (
+                                    <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                      학습 {meta.ml_학습건수}건
+                                    </span>
+                                  )}
+                                  {meta.고객_NCB구간 && (
+                                    <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                      {meta.고객_NCB구간}
+                                    </span>
+                                  )}
+                                  {meta.고객_업력구간 && (
+                                    <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                      업력 {meta.고객_업력구간}
                                     </span>
                                   )}
                                 </div>
@@ -3044,22 +3080,31 @@ export function CustomerDetailModal({
                                   </button>
                                   {isExpanded && (
                                     <div id={`ml-cases-panel-${idx}`} className="mt-1.5 space-y-1 border-t pt-1.5">
-                                      {cases.slice(0, 5).map((c, ci) => {
+                                      {cases.slice(0, 5).map((c: any, ci: number) => {
                                         const applied = c.applied_amount;
                                         const approved = c.approved_amount ?? c.execution_amount;
                                         const sim = c.similarity != null ? `${(c.similarity * 100).toFixed(0)}%` : null;
+                                        const ncb = c.ncb ?? c.NCB;
+                                        const months = c.업력_개월 ?? c.tenure_months;
+                                        const industry = c.업종 ?? c.industry;
                                         return (
                                           <div
                                             key={ci}
-                                            className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap"
+                                            className="text-[11px] text-muted-foreground flex items-center gap-1 flex-wrap"
                                             data-testid={`text-ml-case-${idx}-${ci}`}
                                           >
-                                            {sim && <span className="text-purple-600 dark:text-purple-400">유사도 {sim}</span>}
-                                            {applied != null && <span>신청 {Number(applied).toLocaleString()}만원</span>}
+                                            {sim && <span className="text-purple-600 dark:text-purple-400 font-medium">유사도 {sim}</span>}
+                                            {ncb != null && <span>· NCB {ncb}</span>}
+                                            {months != null && <span>· {months}개월</span>}
+                                            {industry && <span>· {industry}</span>}
                                             {approved != null && (
-                                              <span>→ {c.status || "승인"} {Number(approved).toLocaleString()}만원</span>
+                                              <span className="text-emerald-600 dark:text-emerald-400">
+                                                → 승인 {Number(approved).toLocaleString()}만원
+                                              </span>
                                             )}
-                                            {applied == null && approved == null && c.status && <span>{c.status}</span>}
+                                            {applied != null && approved == null && (
+                                              <span>· 신청 {Number(applied).toLocaleString()}만원</span>
+                                            )}
                                           </div>
                                         );
                                       })}
