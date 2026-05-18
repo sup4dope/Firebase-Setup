@@ -2335,8 +2335,54 @@ export function CustomerDetailModal({
   // ML 한도 예측 호출 (yieumapi /predict 프록시)
   // force=false (기본): 캐시 유효시 API 호출 건너뜀 → 학습로그 중복 방지
   // force=true ('재호출' 버튼): 무조건 새로 호출 + 캐시 덮어쓰기 + 행동기록 초기화
+  // ML 예측에 필수인 필드 검증 (재도전/혁신/자가/자택동일 체크박스 제외)
+  // 누락 항목이 있으면 라벨 배열을 반환, 모두 채워졌으면 빈 배열 반환
+  const getMissingMlPredictFields = (): string[] => {
+    const missing: string[] = [];
+    const fd: any = formData || {};
+    const isBlank = (v: any) => v === undefined || v === null || v === "" || (typeof v === "number" && Number.isNaN(v));
+    const isZeroOrBlank = (v: any) => isBlank(v) || Number(v) === 0;
+
+    // 고객 정보
+    if (isBlank(fd.name)) missing.push("이름");
+    if (isZeroOrBlank(fd.credit_score)) missing.push("신용점수");
+    if (isBlank(fd.ssn_front) || String(fd.ssn_front).length < 6) missing.push("주민번호(앞)");
+    if (isBlank(fd.ssn_back) || String(fd.ssn_back).length < 7) missing.push("주민번호(뒤)");
+    if (isBlank(fd.phone_part1) || isBlank(fd.phone_part2) || isBlank(fd.phone_part3)) missing.push("연락처");
+    if (isBlank(fd.carrier)) missing.push("통신사");
+    if (isBlank(fd.home_address)) missing.push("자택주소");
+    if (isBlank(fd.home_address_detail)) missing.push("자택 상세주소");
+
+    // 사업자 정보
+    if (isBlank(fd.company_name)) missing.push("상호명");
+    if (isBlank(fd.founding_date)) missing.push("개업일");
+    if (isBlank(fd.business_type)) missing.push("업종");
+    if (isBlank(fd.business_item)) missing.push("종목");
+    if (isBlank(fd.business_registration_number)) missing.push("사업자번호");
+    if (isBlank(fd.business_address)) missing.push("사업장 소재지");
+    if (isBlank(fd.business_address_detail)) missing.push("사업장 상세주소");
+    if (isZeroOrBlank(fd.recent_sales)) missing.push("최근 매출");
+    if (isZeroOrBlank(fd.sales_y1)) missing.push("Y-1 매출");
+    if (isZeroOrBlank(fd.sales_y2)) missing.push("Y-2 매출");
+    if (isZeroOrBlank(fd.sales_y3)) missing.push("Y-3 매출");
+
+    return missing;
+  };
+
   const handleMlPredict = async (force: boolean = false) => {
     if (!customer?.id || mlPredictLoading) return;
+    // 필수 필드 검증 (재도전/혁신 드롭다운 제외) — 누락 시 API/캐시 모두 스킵하고 안내 표시
+    const missing = getMissingMlPredictFields();
+    if (missing.length > 0) {
+      setMlPredictions(null);
+      setMlPredictLogId(null);
+      setMlPredictError(new MlPredictError(
+        `예측할 수 없습니다. 다음 항목을 입력해주세요:\n${missing.join(", ")}`,
+        { code: "MISSING_REQUIRED_FIELDS", status: 0 }
+      ));
+      console.log("[ML 예측] 🚫 필수 필드 누락:", missing);
+      return;
+    }
     // 캐시 hit 시 처리 (단, fingerprint 일치 + 강제호출 아님)
     // 정책:
     //  - cache.action_taken !== null (이미 처리된 건) → API 호출 완전 스킵 (학습 노이즈 최소화)
@@ -3125,7 +3171,7 @@ export function CustomerDetailModal({
                     )}
                     {!mlPredictLoading && mlPredictError && (
                       <div className="py-3 text-sm text-destructive space-y-1" data-testid="text-ml-predict-error">
-                        <div>{mlPredictError.message}</div>
+                        <div className="whitespace-pre-line">{mlPredictError.message}</div>
                         {(mlPredictError.code || mlPredictError.status) && (
                           <div className="text-xs text-muted-foreground font-mono" data-testid="text-ml-predict-error-code">
                             {mlPredictError.code ? `code: ${mlPredictError.code}` : ''}
