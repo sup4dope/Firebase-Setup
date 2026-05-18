@@ -1037,29 +1037,50 @@ export async function registerRoutes(
           byCust.delete(cid);
         }
       }
-      // 고객명 + 현재 상태 보강 → 종결 상태(집행완료/거절/쓰레기통 등) 고객은 자동 제외
-      // (기존 미라벨 로그 소급 처리: 이미 종결된 고객은 더 이상 컨설턴트가 처리할 것이 없음)
-      const cids = Array.from(byCust.keys()).slice(0, 50);
-      const customerDocs = await Promise.all(cids.map(id => dbAdmin.collection('customers').doc(id).get()));
+      // 시간상 최신 순으로 정렬
+      const sortedEntries = Array.from(byCust.entries()).sort((a, b) => {
+        const ta = String(a[1].data()?.called_at || '');
+        const tb = String(b[1].data()?.called_at || '');
+        return tb.localeCompare(ta); // DESC
+      });
+      // 종결 상태(쓰레기통 그룹 + 집행완료/최종부결/민원처리): 명시적 enum 집합 — 부분일치보다 정확
+      const TERMINAL_STATUSES = new Set<string>([
+        '쓰레기통', '단박거절', '본인아님', '사업자아님', '정부기관 오인',
+        '기타자금 오인', '인증불가', '불가업종', '매출없음', '신용점수 미달',
+        '차입금초과', '세금체납', '이중계약', '거절사유 미파악', '정체성 의심', '잘못 신청',
+        '집행완료', '집행완료(선불)', '집행완료(후불)', '집행완료(외주)', '집행완료(채무조정)',
+        '최종부결', '민원처리',
+      ]);
+      // 종결 필터를 50건 컷 이전에 적용 — 배치(100건)로 fetch, 비종결 50건 모이면 중단
+      // (만약 상위 50건 중 다수가 종결이면 그 뒤에 있는 실제 미처리 건이 잘리는 버그 방지)
+      const BATCH = 100;
+      const TARGET = 50;
+      const MAX_SCAN = 500; // 안전 상한
       const nameMap = new Map<string, string>();
-      const TERMINAL_KEYWORDS = ['집행완료', '쓰레기통', '단박거절', '거절', '미진행', '재상담'];
-      for (const cd of customerDocs) {
-        if (!cd.exists) {
-          byCust.delete(cd.id);
-          continue;
+      const acceptedCids: string[] = [];
+      let excludedCount = 0;
+      let scanned = 0;
+      for (let i = 0; i < sortedEntries.length && acceptedCids.length < TARGET && scanned < MAX_SCAN; i += BATCH) {
+        const batch = sortedEntries.slice(i, i + BATCH);
+        scanned += batch.length;
+        const batchCids = batch.map(([cid]) => cid);
+        const batchDocs = await Promise.all(batchCids.map(id => dbAdmin.collection('customers').doc(id).get()));
+        for (let j = 0; j < batchDocs.length; j++) {
+          if (acceptedCids.length >= TARGET) break;
+          const cd = batchDocs[j];
+          const cid = batchCids[j];
+          if (!cd.exists) { excludedCount++; continue; }
+          const cdata = cd.data() as any;
+          const status = String(cdata?.status_code || '');
+          if (TERMINAL_STATUSES.has(status)) { excludedCount++; continue; }
+          nameMap.set(cid, String(cdata?.name || cdata?.company_name || ''));
+          acceptedCids.push(cid);
         }
-        const cdata = cd.data() as any;
-        const status = String(cdata?.status_code || '');
-        const isTerminal = TERMINAL_KEYWORDS.some(k => status.includes(k));
-        if (isTerminal) {
-          byCust.delete(cd.id);
-          continue;
-        }
-        nameMap.set(cd.id, String(cdata?.name || cdata?.company_name || ''));
       }
-      // 종결 고객 제외 후 cids 재구성
-      const filteredCids = Array.from(byCust.keys());
-      const items = filteredCids.map(cid => {
+      if (excludedCount > 0) {
+        console.log(`[unresolved] 종결상태 제외: ${excludedCount}건, 스캔 ${scanned}건, 최종 ${acceptedCids.length}건`);
+      }
+      const items = acceptedCids.map(cid => {
         const doc = byCust.get(cid)!;
         return {
           log_id: doc.id,

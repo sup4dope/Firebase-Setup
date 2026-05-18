@@ -429,7 +429,16 @@ export function CustomerDetailModal({
   const [mlExpandedCases, setMlExpandedCases] = useState<Set<number>>(new Set());
   // implicit feedback — 직전 예측 호출의 log_id (행동 PATCH 대상)
   const [mlPredictLogId, setMlPredictLogId] = useState<string | null>(null);
-  const [mlActionTaken, setMlActionTaken] = useState<string | null>(null);
+  const [mlActionTaken, _setMlActionTaken] = useState<string | null>(null);
+  // race-condition 방지: 백그라운드 호출 종료 시점에 "현재 모달의 고객"과 "최신 행동"을 즉시 확인용 ref
+  // (closure의 customer는 호출 시점에 바인딩되어 A→B 전환을 감지 못함 → 별도 ref 필요)
+  const mlActionTakenRef = useRef<{ customerId: string | null; action: string | null }>({ customerId: null, action: null });
+  const currentCustomerIdRef = useRef<string | null>(null);
+  // setter 래퍼 — state와 ref를 항상 동기화 (백그라운드 closure에서 최신값 참조)
+  const setMlActionTaken = (v: string | null) => {
+    mlActionTakenRef.current = { customerId: currentCustomerIdRef.current, action: v };
+    _setMlActionTaken(v);
+  };
   const [mlActionPatching, setMlActionPatching] = useState(false);
   const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
   // 마지막으로 외부 API에 제출(rerun)한 답변 스냅샷 — UI 필터링 기준
@@ -2306,6 +2315,8 @@ export function CustomerDetailModal({
 
   // 고객 변경 시 ML 예측 상태 초기화 + 캐시 복원 (자동 호출 차단)
   useEffect(() => {
+    // 고객 전환 즉시 ref 갱신 — 진행 중인 백그라운드 호출의 stale 가드 기준점
+    currentCustomerIdRef.current = customer?.id ?? null;
     setMlPredictError(null);
     setMlExpandedCases(new Set());
     setMlPredictOpen(false);
@@ -2326,7 +2337,11 @@ export function CustomerDetailModal({
   // force=true ('재호출' 버튼): 무조건 새로 호출 + 캐시 덮어쓰기 + 행동기록 초기화
   const handleMlPredict = async (force: boolean = false) => {
     if (!customer?.id || mlPredictLoading) return;
-    // 캐시 hit 시 API 호출 스킵 (단, fingerprint 일치 + 강제호출 아님)
+    // 캐시 hit 시 처리 (단, fingerprint 일치 + 강제호출 아님)
+    // 정책:
+    //  - cache.action_taken !== null (이미 처리된 건) → API 호출 완전 스킵 (학습 노이즈 최소화)
+    //  - cache.action_taken === null (미처리 건) → 캐시는 즉시 화면 표시하되, **백그라운드로 API 호출**
+    //    하여 새 unresolved 학습 로그를 생성 (미처리 알림 추적 + 사용자 인게이지먼트 기록)
     if (!force) {
       const cache = (customer as any)?.ml_predict_cache;
       if (cache && Array.isArray(cache.predictions) && cache.predictions.length > 0
@@ -2334,7 +2349,61 @@ export function CustomerDetailModal({
         setMlPredictions(cache.predictions);
         setMlPredictLogId(cache.log_id || null);
         setMlActionTaken(cache.action_taken || null);
-        console.log("[ML 예측] 💾 캐시 사용 (API 호출 없음)");
+        if (cache.action_taken) {
+          console.log("[ML 예측] 💾 캐시 사용 (이미 처리됨, API 호출 없음)");
+          return;
+        }
+        // 미처리 캐시 → 백그라운드 호출로 fall-through (로딩 표시 없이 진행)
+        // ⚠ cross-customer race 가드: 호출 시점 customer.id를 캡처해두고, 응답 도착 시점에
+        //   현재 모달의 고객과 다르면 모든 post-processing(setState/patch/cache write)을 스킵.
+        //   (사용자가 A 모달에서 캐시 fall-through 시작 → B로 전환 → B에서 행동 → A 응답 도착
+        //    시나리오에서 B의 action이 A에 잘못 패치되는 것 방지)
+        const requestCustomerId = customer.id;
+        const requestFingerprint = currentMlFingerprint;
+        console.log("[ML 예측] 💾 캐시 즉시 표시 + 백그라운드 재호출 (미처리 추적)");
+        try {
+          const result = await mlPredictFunding(requestCustomerId);
+          // 가드: 응답 도착 시점 currentCustomerIdRef(useEffect로 실시간 동기화)와 비교
+          //   closure의 customer는 A에 바인딩되어 A→B 전환을 감지 못함 → ref 사용 필수
+          if (currentCustomerIdRef.current !== requestCustomerId) {
+            console.log("[ML 예측] 🚫 stale 응답 폐기 (customer 변경됨):", requestCustomerId, "→", currentCustomerIdRef.current);
+            return;
+          }
+          setMlPredictLogId(result.logId || null);
+          // race 방지: 백그라운드 호출이 끝나는 동안 사용자가 행동 버튼을 눌렀다면
+          //   새로 생성된 서버 로그(action_taken=null)가 미처리로 남아 있음 → 즉시 백필.
+          //   ⚠ pendingAction은 동일 고객의 행동인 경우에만 사용 (cross-customer 오염 방지)
+          const ref = mlActionTakenRef.current;
+          const pendingAction = (ref.customerId === requestCustomerId) ? ref.action : null;
+          let finalAction: string | null = null;
+          if (pendingAction && currentCustomerIdRef.current === requestCustomerId) {
+            try {
+              await patchPredictLogByCustomer(requestCustomerId, { taken_action: pendingAction });
+              finalAction = pendingAction;
+              console.log("[ML 예측] 🛡 race 백필: 새 logId에 사용자 행동 즉시 패치:", pendingAction);
+            } catch (patchErr: any) {
+              console.warn("[ML 예측] race 백필 실패(무시):", patchErr?.message);
+            }
+          }
+          // 캐시 갱신 — finalAction이 null인 경우 기존 cache.action_taken 보존(부분 업데이트)
+          // (전체 객체 overwrite 시 narrow interleaving으로 ✓ 사라지는 것 방지)
+          try {
+            const sanitizedPredictions = JSON.parse(JSON.stringify(result.predictions || []));
+            const cacheUpdate: Record<string, any> = {
+              'ml_predict_cache.predictions': sanitizedPredictions,
+              'ml_predict_cache.log_id': result.logId || null,
+              'ml_predict_cache.fingerprint': requestFingerprint,
+              'ml_predict_cache.cached_at': new Date().toISOString(),
+            };
+            // action_taken은 새로 확정된 경우에만 명시적으로 기록 (null이면 기존 값 유지)
+            if (finalAction) cacheUpdate['ml_predict_cache.action_taken'] = finalAction;
+            await updateDoc(doc(db, "customers", requestCustomerId), cacheUpdate);
+          } catch (cacheErr: any) {
+            console.warn("[ML 예측] 백그라운드 캐시 갱신 실패(무시):", cacheErr?.message);
+          }
+        } catch (bgErr: any) {
+          console.warn("[ML 예측] 백그라운드 호출 실패(무시):", bgErr?.message);
+        }
         return;
       }
     }
