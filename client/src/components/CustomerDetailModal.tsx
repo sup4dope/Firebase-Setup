@@ -2446,7 +2446,6 @@ export function CustomerDetailModal({
   useEffect(() => {
     const customerId = formData.id;
     if (!isOpen || !customerId || isNewCustomer) return;
-    if (currentUser?.role !== "super_admin") return;
     if (aiStartedForCustomerRef.current === customerId) return;
     aiStartedForCustomerRef.current = customerId;
     setAiInitError(null);
@@ -2498,7 +2497,6 @@ export function CustomerDetailModal({
       Number(formData.sales_y3 || 0);
     const obligations = financialObligations || [];
 
-    if (currentUser?.role !== "super_admin") return; // AI 기능은 super_admin 전용
     if (creditScore <= 0) return;
     if (!brn) return;
     if (sales <= 0) return;
@@ -5906,8 +5904,7 @@ export function CustomerDetailModal({
               </div>
             </div>
 
-            {/* 하단 50%: AI 채팅 (super_admin 전용 — AI 기능 미완성) */}
-            {currentUser?.role === "super_admin" && (
+            {/* 하단 50%: AI 채팅 (전 직원 공개) */}
             <div className="h-1/2 flex flex-col bg-muted/20 dark:bg-gray-950/30">
               {/* AI Header */}
               <div className="h-10 shrink-0 border-b px-3 flex items-center justify-between gap-2">
@@ -6012,7 +6009,6 @@ export function CustomerDetailModal({
                 </Button>
               </div>
             </div>
-            )}
           </div>
         </div>
       </DialogContent>
