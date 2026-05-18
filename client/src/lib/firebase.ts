@@ -1,7 +1,7 @@
 // Firebase configuration and initialization
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, Timestamp } from "firebase/firestore";
+import { initializeFirestore, collection, addDoc, query, where, orderBy, getDocs, Timestamp } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { CustomerHistoryLog } from "@shared/types";
 
@@ -16,7 +16,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// ignoreUndefinedProperties: 스냅샷/업데이트 객체에 undefined 값이 섞여도 Firestore가 invalid-argument로
+// 거부하지 않고 해당 필드만 누락(omit)하여 저장. buildProcessingOrgSnapshot처럼 선택적 필드가 많은
+// 객체를 안전하게 쓰기 위한 전역 설정. 반드시 getFirestore 호출 이전에 initializeFirestore로 설정.
+export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
