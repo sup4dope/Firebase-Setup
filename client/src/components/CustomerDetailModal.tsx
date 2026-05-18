@@ -2350,8 +2350,7 @@ export function CustomerDetailModal({
     if (isBlank(fd.ssn_back) || String(fd.ssn_back).length < 7) missing.push("주민번호(뒤)");
     if (isBlank(fd.phone_part1) || isBlank(fd.phone_part2) || isBlank(fd.phone_part3)) missing.push("연락처");
     if (isBlank(fd.carrier)) missing.push("통신사");
-    if (isBlank(fd.home_address)) missing.push("자택주소");
-    if (isBlank(fd.home_address_detail)) missing.push("자택 상세주소");
+    // 자택주소/자택 상세주소: ML 모델이 사용하지 않으므로 누락 허용 (검증 제외)
 
     // 사업자 정보
     if (isBlank(fd.company_name)) missing.push("상호명");
