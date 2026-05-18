@@ -1075,9 +1075,33 @@ export async function registerRoutes(
       const BATCH = 100;
       const TARGET = 50;
       const MAX_SCAN = 500; // 안전 상한
+
+      // ML 예측 필수 필드 검증 (클라이언트 getMissingMlPredictFields와 동일 규칙).
+      // 데이터 불완전 고객은 더 이상 예측 불가 → 미처리 목록에서도 제외.
+      const isBlank = (v: any) => v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v));
+      const isZeroOrBlank = (v: any) => isBlank(v) || Number(v) === 0;
+      const hasMlRequiredFields = (cdata: any): boolean => {
+        if (!cdata) return false;
+        if (isBlank(cdata.name)) return false;
+        if (isZeroOrBlank(cdata.credit_score)) return false;
+        if (isBlank(cdata.ssn_front) || String(cdata.ssn_front).length < 6) return false;
+        if (isBlank(cdata.ssn_back) || String(cdata.ssn_back).length < 7) return false;
+        if (isBlank(cdata.phone)) return false;
+        if (isBlank(cdata.carrier)) return false;
+        if (isBlank(cdata.company_name)) return false;
+        if (isBlank(cdata.founding_date)) return false;
+        if (isBlank(cdata.business_type)) return false;
+        if (isBlank(cdata.business_item)) return false;
+        if (isBlank(cdata.business_registration_number)) return false;
+        if (isBlank(cdata.business_address)) return false;
+        if (isZeroOrBlank(cdata.recent_sales) && isZeroOrBlank(cdata.sales_y1)) return false;
+        return true;
+      };
+
       const nameMap = new Map<string, string>();
       const acceptedCids: string[] = [];
       let excludedCount = 0;
+      let excludedIncomplete = 0;
       let scanned = 0;
       for (let i = 0; i < sortedEntries.length && acceptedCids.length < TARGET && scanned < MAX_SCAN; i += BATCH) {
         const batch = sortedEntries.slice(i, i + BATCH);
@@ -1092,12 +1116,14 @@ export async function registerRoutes(
           const cdata = cd.data() as any;
           const status = String(cdata?.status_code || '');
           if (TERMINAL_STATUSES.has(status)) { excludedCount++; continue; }
+          // 데이터 불완전 고객 제외 — 더 이상 예측 호출 불가하므로 미처리 의미 없음
+          if (!hasMlRequiredFields(cdata)) { excludedIncomplete++; continue; }
           nameMap.set(cid, String(cdata?.name || cdata?.company_name || ''));
           acceptedCids.push(cid);
         }
       }
-      if (excludedCount > 0) {
-        console.log(`[unresolved] 종결상태 제외: ${excludedCount}건, 스캔 ${scanned}건, 최종 ${acceptedCids.length}건`);
+      if (excludedCount > 0 || excludedIncomplete > 0) {
+        console.log(`[unresolved] 종결상태 제외: ${excludedCount}건, 필수필드 누락 제외: ${excludedIncomplete}건, 스캔 ${scanned}건, 최종 ${acceptedCids.length}건`);
       }
       const items = acceptedCids.map(cid => {
         const doc = byCust.get(cid)!;

@@ -2321,7 +2321,36 @@ export function CustomerDetailModal({
     setMlExpandedCases(new Set());
     setMlPredictOpen(false);
     const cache = (customer as any)?.ml_predict_cache;
-    if (cache && Array.isArray(cache.predictions) && cache.predictions.length > 0) {
+    // ★ 캐시 로드 전 현재 필수 필드 검증 — 누락 시 캐시(과거 예측) 표시 차단.
+    //   formData가 아직 hydrate되지 않은 시점이라 customer 원본을 직접 검증한다.
+    const c: any = customer || {};
+    const isBlank = (v: any) => v === undefined || v === null || v === "" || (typeof v === "number" && Number.isNaN(v));
+    const isZeroOrBlank = (v: any) => isBlank(v) || Number(v) === 0;
+    const cacheMissing: string[] = [];
+    if (isBlank(c.name)) cacheMissing.push("이름");
+    if (isZeroOrBlank(c.credit_score)) cacheMissing.push("신용점수");
+    if (isBlank(c.ssn_front) || String(c.ssn_front).length < 6) cacheMissing.push("주민번호(앞)");
+    if (isBlank(c.ssn_back) || String(c.ssn_back).length < 7) cacheMissing.push("주민번호(뒤)");
+    if (isBlank(c.phone)) cacheMissing.push("연락처");
+    if (isBlank(c.carrier)) cacheMissing.push("통신사");
+    if (isBlank(c.company_name)) cacheMissing.push("상호명");
+    if (isBlank(c.founding_date)) cacheMissing.push("개업일");
+    if (isBlank(c.business_type)) cacheMissing.push("업종");
+    if (isBlank(c.business_item)) cacheMissing.push("종목");
+    if (isBlank(c.business_registration_number)) cacheMissing.push("사업자번호");
+    if (isBlank(c.business_address)) cacheMissing.push("사업장 소재지");
+    if (isZeroOrBlank(c.recent_sales) && isZeroOrBlank(c.sales_y1)) cacheMissing.push("최근 매출 또는 Y-1 매출");
+
+    if (cacheMissing.length > 0) {
+      // 데이터 불완전 — 캐시(과거 예측) 표시하지 않고 안내 에러로 대체
+      setMlPredictions(null);
+      setMlPredictLogId(null);
+      setMlActionTaken(null);
+      setMlPredictError(new MlPredictError(
+        `예측할 수 없습니다. 다음 항목을 입력해주세요:\n${cacheMissing.join(", ")}`,
+        { code: "MISSING_REQUIRED_FIELDS", status: 0 }
+      ));
+    } else if (cache && Array.isArray(cache.predictions) && cache.predictions.length > 0) {
       setMlPredictions(cache.predictions);
       setMlPredictLogId(cache.log_id || null);
       setMlActionTaken(cache.action_taken || null);
