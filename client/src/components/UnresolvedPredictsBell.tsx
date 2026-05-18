@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Brain, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/contexts/AuthContext';
@@ -106,7 +105,10 @@ export function UnresolvedPredictsBell() {
             ML 학습 라벨이 누락되지 않도록 처리해주세요.
           </p>
         </div>
-        <ScrollArea className="max-h-80">
+        <div
+          className="max-h-[60vh] overflow-y-auto overscroll-contain"
+          data-testid="scroll-unresolved-list"
+        >
           {loading && items.length === 0 ? (
             <div className="p-4 text-center text-sm text-muted-foreground">불러오는 중...</div>
           ) : items.length === 0 ? (
@@ -147,7 +149,7 @@ export function UnresolvedPredictsBell() {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
