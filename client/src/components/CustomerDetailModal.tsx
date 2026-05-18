@@ -2347,10 +2347,12 @@ export function CustomerDetailModal({
       setMlActionTaken(null);
       console.log("[ML 예측] ✅ 결과:", result.predictions, "logId:", result.logId);
       // Firestore 캐시 저장 (재호출 차단용) — best-effort
+      // Firestore는 undefined 값을 거부하므로 JSON round-trip으로 sanitize
       try {
+        const sanitizedPredictions = JSON.parse(JSON.stringify(result.predictions || []));
         await updateDoc(doc(db, "customers", customer.id), {
           ml_predict_cache: {
-            predictions: result.predictions || [],
+            predictions: sanitizedPredictions,
             log_id: result.logId || null,
             fingerprint: currentMlFingerprint,
             cached_at: new Date().toISOString(),

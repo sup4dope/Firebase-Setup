@@ -1037,14 +1037,29 @@ export async function registerRoutes(
           byCust.delete(cid);
         }
       }
-      // 고객명 보강
+      // 고객명 + 현재 상태 보강 → 종결 상태(집행완료/거절/쓰레기통 등) 고객은 자동 제외
+      // (기존 미라벨 로그 소급 처리: 이미 종결된 고객은 더 이상 컨설턴트가 처리할 것이 없음)
       const cids = Array.from(byCust.keys()).slice(0, 50);
       const customerDocs = await Promise.all(cids.map(id => dbAdmin.collection('customers').doc(id).get()));
       const nameMap = new Map<string, string>();
+      const TERMINAL_KEYWORDS = ['집행완료', '쓰레기통', '단박거절', '거절', '미진행', '재상담'];
       for (const cd of customerDocs) {
-        if (cd.exists) nameMap.set(cd.id, String((cd.data() as any)?.name || (cd.data() as any)?.company_name || ''));
+        if (!cd.exists) {
+          byCust.delete(cd.id);
+          continue;
+        }
+        const cdata = cd.data() as any;
+        const status = String(cdata?.status_code || '');
+        const isTerminal = TERMINAL_KEYWORDS.some(k => status.includes(k));
+        if (isTerminal) {
+          byCust.delete(cd.id);
+          continue;
+        }
+        nameMap.set(cd.id, String(cdata?.name || cdata?.company_name || ''));
       }
-      const items = cids.map(cid => {
+      // 종결 고객 제외 후 cids 재구성
+      const filteredCids = Array.from(byCust.keys());
+      const items = filteredCids.map(cid => {
         const doc = byCust.get(cid)!;
         return {
           log_id: doc.id,
