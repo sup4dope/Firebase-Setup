@@ -2360,10 +2360,11 @@ export function CustomerDetailModal({
     if (isBlank(fd.business_registration_number)) missing.push("사업자번호");
     if (isBlank(fd.business_address)) missing.push("사업장 소재지");
     if (isBlank(fd.business_address_detail)) missing.push("사업장 상세주소");
-    if (isZeroOrBlank(fd.recent_sales)) missing.push("최근 매출");
-    if (isZeroOrBlank(fd.sales_y1)) missing.push("Y-1 매출");
-    if (isZeroOrBlank(fd.sales_y2)) missing.push("Y-2 매출");
-    if (isZeroOrBlank(fd.sales_y3)) missing.push("Y-3 매출");
+    // 매출: 최근매출 또는 Y-1매출 중 하나만 있어도 호출 허용. 둘 다 비어있을 때만 차단.
+    // (Y-2/Y-3은 단독으로는 차단 사유가 되지 않음)
+    if (isZeroOrBlank(fd.recent_sales) && isZeroOrBlank(fd.sales_y1)) {
+      missing.push("최근 매출 또는 Y-1 매출");
+    }
 
     return missing;
   };
