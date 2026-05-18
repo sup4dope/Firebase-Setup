@@ -991,18 +991,16 @@ export async function registerRoutes(
       const snap = await dbAdmin.collection('ml_predict_logs')
         .where('called_by_uid', '==', uid)
         .get();
-      // taken_action도 final_status도 없는 로그 = 미처리
-      const unresolved = snap.docs.filter(d => {
-        const data = d.data() || {};
-        return !data.taken_action && !data.final_status;
-      });
       // 최근 30일 이내만 (오래된 로그는 노이즈)
       const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      const recent = unresolved.filter(d => {
+      const recent = snap.docs.filter(d => {
         const t = Date.parse(String(d.data()?.called_at || ''));
         return !isNaN(t) && t >= cutoff;
       });
-      // 고객별 가장 최근 1건만 추출
+      // ★ 고객별 "가장 최근 로그 1건"만 추출 (전체 로그에서)
+      //   → 가장 최근 호출의 행동기록이 있으면 그 고객은 처리 완료로 간주.
+      //   과거에 처리하지 않은 호출이 있어도 최신 호출이 해결됐으면 무시한다
+      //   (재호출=새로운 의사결정 시작으로 본다).
       const byCust = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
       for (const doc of recent) {
         const cid = String(doc.data()?.customer_id || '');
@@ -1010,6 +1008,13 @@ export async function registerRoutes(
         const existing = byCust.get(cid);
         if (!existing || String(doc.data()?.called_at) > String(existing.data()?.called_at)) {
           byCust.set(cid, doc);
+        }
+      }
+      // 최신 로그가 여전히 미처리인 고객만 남김
+      for (const [cid, doc] of Array.from(byCust.entries())) {
+        const data = doc.data() || {};
+        if (data.taken_action || data.final_status) {
+          byCust.delete(cid);
         }
       }
       // 고객명 보강
