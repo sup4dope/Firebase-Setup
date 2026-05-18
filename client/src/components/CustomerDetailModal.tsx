@@ -2278,19 +2278,66 @@ export function CustomerDetailModal({
     return () => clearTimeout(timer);
   }, [followupAnswers, manualPersonalLoan, diagnoseResult, displayedFollowupQuestions, customer?.id, isNewCustomer]);
 
-  // 고객 변경 시 ML 예측 상태 초기화 (이전 고객 결과가 잔존하지 않도록)
+  // ─── ML 예측 캐시 fingerprint 헬퍼 ───
+  // 심사에 영향을 주는 핵심 필드만 포함. 변경 시 캐시 invalidate.
+  const computeMlFingerprint = (c: Partial<Customer> | undefined | null): string => {
+    if (!c) return '';
+    const fo = Array.isArray(c.financial_obligations) ? c.financial_obligations : [];
+    const foCount = fo.length;
+    const foBalanceSum = fo.reduce((s: number, o: any) => s + (Number(o?.balance) || 0), 0);
+    const parts = {
+      cs: c.credit_score ?? null,
+      s1: c.sales_y1 ?? null,
+      s2: c.sales_y2 ?? null,
+      s3: c.sales_y3 ?? null,
+      fd: c.founding_date ?? null,
+      bi: c.business_item ?? null,
+      bt: c.business_type ?? null,
+      ih: c.is_home_owned ?? null,
+      ib: c.is_business_owned ?? null,
+      foc: foCount,
+      fos: foBalanceSum,
+    };
+    return JSON.stringify(parts);
+  };
+  const currentMlFingerprint = computeMlFingerprint(customer);
+  const cachedMlFingerprint: string | null = (customer as any)?.ml_predict_cache?.fingerprint ?? null;
+  const mlCacheStale = !!cachedMlFingerprint && cachedMlFingerprint !== currentMlFingerprint;
+
+  // 고객 변경 시 ML 예측 상태 초기화 + 캐시 복원 (자동 호출 차단)
   useEffect(() => {
-    setMlPredictions(null);
     setMlPredictError(null);
     setMlExpandedCases(new Set());
     setMlPredictOpen(false);
-    setMlPredictLogId(null);
-    setMlActionTaken(null);
+    const cache = (customer as any)?.ml_predict_cache;
+    if (cache && Array.isArray(cache.predictions) && cache.predictions.length > 0) {
+      setMlPredictions(cache.predictions);
+      setMlPredictLogId(cache.log_id || null);
+      setMlActionTaken(cache.action_taken || null);
+    } else {
+      setMlPredictions(null);
+      setMlPredictLogId(null);
+      setMlActionTaken(null);
+    }
   }, [customer?.id]);
 
   // ML 한도 예측 호출 (yieumapi /predict 프록시)
-  const handleMlPredict = async () => {
+  // force=false (기본): 캐시 유효시 API 호출 건너뜀 → 학습로그 중복 방지
+  // force=true ('재호출' 버튼): 무조건 새로 호출 + 캐시 덮어쓰기 + 행동기록 초기화
+  const handleMlPredict = async (force: boolean = false) => {
     if (!customer?.id || mlPredictLoading) return;
+    // 캐시 hit 시 API 호출 스킵 (단, fingerprint 일치 + 강제호출 아님)
+    if (!force) {
+      const cache = (customer as any)?.ml_predict_cache;
+      if (cache && Array.isArray(cache.predictions) && cache.predictions.length > 0
+          && cache.fingerprint === currentMlFingerprint) {
+        setMlPredictions(cache.predictions);
+        setMlPredictLogId(cache.log_id || null);
+        setMlActionTaken(cache.action_taken || null);
+        console.log("[ML 예측] 💾 캐시 사용 (API 호출 없음)");
+        return;
+      }
+    }
     setMlPredictLoading(true);
     setMlPredictError(null);
     try {
@@ -2299,6 +2346,20 @@ export function CustomerDetailModal({
       setMlPredictLogId(result.logId || null);
       setMlActionTaken(null);
       console.log("[ML 예측] ✅ 결과:", result.predictions, "logId:", result.logId);
+      // Firestore 캐시 저장 (재호출 차단용) — best-effort
+      try {
+        await updateDoc(doc(db, "customers", customer.id), {
+          ml_predict_cache: {
+            predictions: result.predictions || [],
+            log_id: result.logId || null,
+            fingerprint: currentMlFingerprint,
+            cached_at: new Date().toISOString(),
+            action_taken: null,
+          },
+        });
+      } catch (cacheErr: any) {
+        console.warn("[ML 예측] 캐시 저장 실패(무시):", cacheErr?.message);
+      }
     } catch (err: any) {
       console.error("[ML 예측] 실패:", err);
       const isMlErr = err instanceof MlPredictError;
@@ -2923,8 +2984,10 @@ export function CustomerDetailModal({
                 open={mlPredictOpen}
                 onOpenChange={(open) => {
                   setMlPredictOpen(open);
-                  if (open && !mlPredictions && !mlPredictLoading) {
-                    handleMlPredict();
+                  // 자동 호출 차단: 캐시(또는 결과)가 없는 최초 열람일 때만 호출
+                  // 이후로는 '재호출' 버튼으로만 새 호출 가능 → 학습로그 중복 방지
+                  if (open && !mlPredictions && !mlPredictLoading && !mlPredictError) {
+                    handleMlPredict(false);
                   }
                 }}
               >
@@ -2959,12 +3022,13 @@ export function CustomerDetailModal({
                           variant="ghost"
                           size="sm"
                           className="h-6 text-xs"
-                          onClick={handleMlPredict}
+                          onClick={() => handleMlPredict(true)}
                           disabled={mlPredictLoading}
                           data-testid="button-ml-predict-refresh"
+                          title={mlCacheStale ? "심사 영향 정보가 변경되었습니다. 새로 호출하세요." : "강제 재호출 (학습로그 새로 생성)"}
                         >
-                          <RefreshCw className={`w-3 h-3 mr-1 ${mlPredictLoading ? "animate-spin" : ""}`} />
-                          재호출
+                          <RefreshCw className={`w-3 h-3 mr-1 ${mlPredictLoading ? "animate-spin" : ""} ${mlCacheStale ? "text-amber-500" : ""}`} />
+                          재호출{mlCacheStale ? " ⚠️" : ""}
                         </Button>
                         {mlPredictions && mlPredictions.length > 0 && (
                           <Button
@@ -3006,7 +3070,7 @@ export function CustomerDetailModal({
                       </div>
                     )}
                     {/* 행동 추적 4-버튼 (예측결과 본 직후 실행될 행동을 implicit feedback으로 수집) */}
-                    {!mlPredictLoading && mlPredictions && mlPredictions.length > 0 && mlPredictLogId && (
+                    {!mlPredictLoading && mlPredictions && mlPredictions.length > 0 && (
                       <div className="mb-2 p-2 rounded-md border border-purple-500/30 bg-purple-500/5">
                         <div className="text-[11px] text-muted-foreground mb-1.5">예측 본 후 어떻게 처리하시나요? (모델 학습용)</div>
                         <div className="grid grid-cols-2 gap-1">
@@ -3023,11 +3087,20 @@ export function CustomerDetailModal({
                                 type="button"
                                 disabled={mlActionPatching}
                                 onClick={async () => {
-                                  if (!mlPredictLogId || mlActionPatching) return;
+                                  if (!customer?.id || mlActionPatching) return;
                                   setMlActionPatching(true);
                                   try {
-                                    await patchPredictLog(mlPredictLogId, { taken_action: act.value });
+                                    // 서버 측 '고객별 최신 로그'를 패치 → 클라이언트 logId가 stale이어도 정확히 동작
+                                    await patchPredictLogByCustomer(customer.id, { taken_action: act.value });
                                     setMlActionTaken(act.value);
+                                    // 캐시에도 행동기록 반영 (모달 재오픈 시 ✓ 표시 보존)
+                                    try {
+                                      await updateDoc(doc(db, "customers", customer.id), {
+                                        'ml_predict_cache.action_taken': act.value,
+                                      });
+                                    } catch (cacheErr: any) {
+                                      console.warn('[ML 예측] 캐시 action 저장 실패(무시):', cacheErr?.message);
+                                    }
                                     toast({ description: `행동 기록 완료: ${act.label}`, duration: 1500 });
                                   } catch (err: any) {
                                     console.error('[ML 예측] 행동 기록 실패:', err);

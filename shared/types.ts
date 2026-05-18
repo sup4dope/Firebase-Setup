@@ -166,6 +166,17 @@ export interface Customer {
   diagnose_result?: any; // 마지막 자격판정 결과 캐시 (적합/부적합 판정 이력 보존)
   diagnose_result_at?: any; // 마지막 자격판정 시각 (Firestore Timestamp)
   diagnose_displayed_questions?: any[]; // 지금까지 본 follow-up 질문 누적 (재판정 후 사라지지 않도록)
+
+  // ML 한도 예측 캐시 (모달 재오픈 시 자동 재호출 차단 + 행동기록 보존)
+  // 심사에 영향을 주는 필드(credit_score/sales_y1·y2/founding_date/business_item/financial_obligations)가
+  // 바뀌면 fingerprint가 달라져 캐시가 stale로 표시되며, 사용자가 '재호출' 버튼을 눌러야 새로 호출함.
+  ml_predict_cache?: {
+    predictions: any[]; // MlPredictionItem[] (직렬화 가능 형태)
+    log_id: string | null;
+    fingerprint: string; // 예측 입력 필드의 해시 (변경 감지용)
+    cached_at: any; // Firestore Timestamp | ISO string
+    action_taken?: string | null; // 'apply_predicted' | 'apply_other' | 'pending_followup' | 'no_apply' | null
+  };
 }
 
 // 진행기관 상태

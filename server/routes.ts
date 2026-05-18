@@ -882,9 +882,29 @@ export async function registerRoutes(
         const tb = String(b.data()?.called_at || '');
         return tb.localeCompare(ta);
       });
-      const docRef = docs[0].ref;
-      await docRef.update(update);
-      res.json({ success: true, id: docRef.id, updated: update });
+      const latestRef = docs[0].ref;
+      await latestRef.update(update);
+      // ─── 같은 고객의 sibling 미처리 로그 정리(backfill) ───
+      // taken_action을 새로 기록할 때, 같은 고객의 다른 미처리 로그(중복 자동호출 산물)도
+      // 같은 값으로 채워 unresolved 목록에서 일괄 제거. final_status는 사용자가 명시한 라벨만 보존.
+      let siblingsUpdated = 0;
+      if ('taken_action' in update && update.taken_action) {
+        const writeBatch = dbAdmin.batch();
+        for (let i = 1; i < docs.length; i++) {
+          const d = docs[i];
+          const data = d.data() || {};
+          if (!data.taken_action && !data.final_status) {
+            writeBatch.update(d.ref, {
+              taken_action: update.taken_action,
+              updated_at: update.updated_at,
+              backfilled_from_latest: true,
+            });
+            siblingsUpdated++;
+          }
+        }
+        if (siblingsUpdated > 0) await writeBatch.commit();
+      }
+      res.json({ success: true, id: latestRef.id, updated: update, siblings_updated: siblingsUpdated });
     } catch (error: any) {
       console.error('[/api/admin/predict-logs/by-customer PATCH] 실패:', error);
       res.status(500).json({ success: false, error: error?.message || 'by-customer PATCH 실패' });
