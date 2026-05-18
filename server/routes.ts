@@ -257,7 +257,7 @@ export async function registerRoutes(
         },
       };
 
-      res.setHeader('X-ML-Schema-Version', 'v2.1-2026-05-15');
+      res.setHeader('X-ML-Schema-Version', 'v2.2-2026-05-18');
 
       res.json({ success: true, data: payload });
     } catch (error: any) {
@@ -497,7 +497,7 @@ export async function registerRoutes(
           by_status: {} as Record<string, number>,
           by_org: {} as Record<string, number>,
           by_org_status: {} as Record<string, number>,
-          export_schema_version: 'v2.1-2026-05-15',  // 매퍼 버전 (배포 식별용)
+          export_schema_version: 'v2.2-2026-05-18',  // 매퍼 버전 (배포 식별용)
           derived_fields: [
             'total_loan_balance', 'total_guarantee_balance',
             'financial_institution_count', 'loans_within_7days_count',
@@ -540,7 +540,7 @@ export async function registerRoutes(
           }
           if (hasBurst) stats.customers_with_loans_within_7days++;
         });
-        res.setHeader('X-ML-Schema-Version', 'v2.1-2026-05-15');
+        res.setHeader('X-ML-Schema-Version', 'v2.2-2026-05-18');
         return res.json({ success: true, exported_at: new Date().toISOString(), stats });
       }
 
@@ -643,8 +643,12 @@ export async function registerRoutes(
             상태: isCustomerRejected ? '거절' : (c.status_code || '미진행'),
             거절사유: isCustomerRejected ? c.status_code : (c.rejection_reason ?? null),
             // ─── ML 학습용 분리 라벨 (v2.4) ───
-            상담거절사유: isCustomerRejected ? (c.status_code ?? null) : null,
+            // 한글/영문 키 병기 (외부 학습 코드 호환). 상담거절사유는 기존 단일값 c.rejection_reason도 fallback 마이그레이션.
+            // 상세 사유(c.rejection_reason)가 있으면 우선, 없으면 status_code 라벨로 fallback (정보 손실 방지)
+            상담거절사유: isCustomerRejected ? (c.rejection_reason ?? c.status_code ?? null) : (c.rejection_reason ?? null),
+            consultation_rejection_reason: isCustomerRejected ? (c.rejection_reason ?? c.status_code ?? null) : (c.rejection_reason ?? null),
             심사부결사유: [], // 신청 전 단계라 심사 부결사유 없음
+            rejection_reasons: [],
             재집행여부: null,
             정산_건수: 0,
             entry_date: c.entry_date ?? null,
@@ -678,10 +682,18 @@ export async function registerRoutes(
             상태,
             거절사유: org.status === '부결' ? (org.rejection_reason ?? c.status_code ?? null) : null,
             // ─── ML 학습용 분리 라벨 (v2.4) ───
-            // 상담거절사유: 신청 전 단계 (상담 단계에서 차단된 케이스)
+            // 상담거절사유: 신청 전 단계 (상담 단계에서 차단된 케이스). 기존 c.rejection_reason 단일값 fallback 마이그레이션.
             // 심사부결사유: 신청 후 기관 부결 — 멀티라벨 string[] (표준 5종 + 자유 텍스트 혼용)
-            상담거절사유: isCustomerRejected ? (c.status_code ?? null) : null,
+            // 한글/영문 키 병기 (외부 학습 코드 호환)
+            // 상세 사유(c.rejection_reason) 우선, 없으면 status_code 라벨 fallback
+            상담거절사유: isCustomerRejected ? (c.rejection_reason ?? c.status_code ?? null) : (c.rejection_reason ?? null),
+            consultation_rejection_reason: isCustomerRejected ? (c.rejection_reason ?? c.status_code ?? null) : (c.rejection_reason ?? null),
             심사부결사유: org.status === '부결'
+              ? (Array.isArray(org.rejection_reasons) && org.rejection_reasons.length > 0
+                  ? org.rejection_reasons
+                  : (org.rejection_reason ? [org.rejection_reason] : []))
+              : [],
+            rejection_reasons: org.status === '부결'
               ? (Array.isArray(org.rejection_reasons) && org.rejection_reasons.length > 0
                   ? org.rejection_reasons
                   : (org.rejection_reason ? [org.rejection_reason] : []))
@@ -712,11 +724,11 @@ export async function registerRoutes(
         }
       }
 
-      res.setHeader('X-ML-Schema-Version', 'v2.1-2026-05-15');
+      res.setHeader('X-ML-Schema-Version', 'v2.2-2026-05-18');
       res.json({
         success: true,
         exported_at: new Date().toISOString(),
-        export_schema_version: 'v2.1-2026-05-15',
+        export_schema_version: 'v2.2-2026-05-18',
         unit_policy: {
           balance: 'KRW',           // financial_obligations.balance, total_loan_balance, total_guarantee_balance
           sales: '100M_KRW',        // sales_y1/y2/y3, recent_sales, avg_revenue_3y (억원)
@@ -783,7 +795,14 @@ export async function registerRoutes(
       let lastDocId: string | null = null;
       snap.forEach(doc => {
         const data = doc.data();
-        records.push({ id: doc.id, ...data });
+        // 외부 학습 코드가 backfill 행을 split 할 수 있도록 두 키를 항상 명시적으로 노출
+        // (Firestore 문서에 필드가 없어도 기본값 채워서 키 존재 보장)
+        records.push({
+          id: doc.id,
+          backfilled: data.backfilled === true,
+          predict_schema_version: data.predict_schema_version ?? null,
+          ...data,
+        });
         if (data.called_at) lastCalledAt = data.called_at;
         lastDocId = doc.id;
       });
@@ -791,7 +810,7 @@ export async function registerRoutes(
       const nextCursor = hasMore && lastCalledAt && lastDocId
         ? `${lastCalledAt}__${lastDocId}`
         : null;
-      res.setHeader('X-ML-Schema-Version', 'v2-2026-05-15');
+      res.setHeader('X-ML-Schema-Version', 'v2.2-2026-05-18');
       res.json({
         success: true,
         exported_at: new Date().toISOString(),
@@ -1148,6 +1167,10 @@ export async function registerRoutes(
         return s;
       };
 
+      // 마스킹 진단용 글로벌 카운터
+      let totalMemosScanned = 0;
+      let totalMemosMaskedEmpty = 0;
+
       const items = picked.map(doc => {
         const c = doc.data() as any;
         const memos = Array.isArray(c?.memo_history) ? c.memo_history : [];
@@ -1156,20 +1179,40 @@ export async function registerRoutes(
           entry_date: c?.entry_date ?? null,
           status_code: c?.status_code ?? null,
           memo_count: memos.length,
-          memos: memos.map((m: any) => ({
-            author_name: '[MASKED_NAME]', // 작성자도 마스킹
-            content_masked: maskPII(String(m?.content || '')),
-            created_at: m?.created_at?._seconds
-              ? new Date(m.created_at._seconds * 1000).toISOString()
-              : (m?.created_at?.seconds
-                ? new Date(m.created_at.seconds * 1000).toISOString()
-                : (typeof m?.created_at === 'string' ? m.created_at : null)),
-          })),
+          memos: memos.map((m: any) => {
+            const raw = String(m?.content || '');
+            const masked = maskPII(raw);
+            totalMemosScanned++;
+            if (raw.trim().length > 0 && masked.replace(/\[MASKED_[A-Z]+\]/g, '').trim().length === 0) {
+              totalMemosMaskedEmpty++;
+            }
+            return {
+              author_name: '[MASKED_NAME]', // 작성자도 마스킹
+              content_masked: masked,
+              raw_length: raw.length,
+              masked_length: masked.length,
+              created_at: m?.created_at?._seconds
+                ? new Date(m.created_at._seconds * 1000).toISOString()
+                : (m?.created_at?.seconds
+                  ? new Date(m.created_at.seconds * 1000).toISOString()
+                  : (typeof m?.created_at === 'string' ? m.created_at : null)),
+            };
+          }),
         };
       });
 
       res.setHeader('X-Memo-Mask-Version', 'v1.0-2026-05-18');
-      res.json({ success: true, count: items.length, sampled_from: withMemos.length, items });
+      res.json({
+        success: true,
+        count: items.length,
+        sampled_from: withMemos.length,
+        // 진단용 글로벌 통계 (마스킹 공격성 판단)
+        total_customers_with_memos: withMemos.length,
+        total_customers_scanned: allSnap.size,
+        sample_total_memos: totalMemosScanned,
+        sample_memos_masked_to_empty: totalMemosMaskedEmpty,
+        items,
+      });
     } catch (error: any) {
       console.error('[/api/admin/ml-export-memos] 실패:', error);
       res.status(500).json({ success: false, error: error?.message || 'memos export 실패' });
