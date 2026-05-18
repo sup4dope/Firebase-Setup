@@ -642,6 +642,9 @@ export async function registerRoutes(
             집행일자: null,
             상태: isCustomerRejected ? '거절' : (c.status_code || '미진행'),
             거절사유: isCustomerRejected ? c.status_code : (c.rejection_reason ?? null),
+            // ─── ML 학습용 분리 라벨 (v2.4) ───
+            상담거절사유: isCustomerRejected ? (c.status_code ?? null) : null,
+            심사부결사유: [], // 신청 전 단계라 심사 부결사유 없음
             재집행여부: null,
             정산_건수: 0,
             entry_date: c.entry_date ?? null,
@@ -674,6 +677,15 @@ export async function registerRoutes(
             집행일자: org.execution_date ?? null,
             상태,
             거절사유: org.status === '부결' ? (org.rejection_reason ?? c.status_code ?? null) : null,
+            // ─── ML 학습용 분리 라벨 (v2.4) ───
+            // 상담거절사유: 신청 전 단계 (상담 단계에서 차단된 케이스)
+            // 심사부결사유: 신청 후 기관 부결 — 멀티라벨 string[] (표준 5종 + 자유 텍스트 혼용)
+            상담거절사유: isCustomerRejected ? (c.status_code ?? null) : null,
+            심사부결사유: org.status === '부결'
+              ? (Array.isArray(org.rejection_reasons) && org.rejection_reasons.length > 0
+                  ? org.rejection_reasons
+                  : (org.rejection_reason ? [org.rejection_reason] : []))
+              : [],
             재집행여부: !!org.is_re_execution,
             정산_건수: settlements.length,
             정산_총집행액: totalSettlementAmount || null,
@@ -798,13 +810,13 @@ export async function registerRoutes(
     try {
       const id = req.params.id;
       if (!id) return res.status(400).json({ success: false, error: 'id 필요' });
-      const allowed = ['taken_action', 'final_status', 'final_amount_10k', 'rejection_reason'];
+      const allowed = ['taken_action', 'final_status', 'final_amount_10k', 'rejection_reason', 'rejection_reasons'];
       const update: Record<string, any> = { updated_at: new Date().toISOString() };
       for (const k of allowed) {
         if (k in (req.body || {})) update[k] = req.body[k];
       }
       if (Object.keys(update).length === 1) {
-        return res.status(400).json({ success: false, error: '업데이트할 필드 없음 (taken_action/final_status/final_amount_10k/rejection_reason)' });
+        return res.status(400).json({ success: false, error: '업데이트할 필드 없음 (taken_action/final_status/final_amount_10k/rejection_reason/rejection_reasons)' });
       }
       const adminApp = getAdminApp();
       await adminApp.firestore().collection('ml_predict_logs').doc(id).update(update);
@@ -825,7 +837,7 @@ export async function registerRoutes(
     try {
       const customerId = req.params.customerId;
       if (!customerId) return res.status(400).json({ success: false, error: 'customerId 필요' });
-      const allowed = ['taken_action', 'final_status', 'final_amount_10k', 'rejection_reason'];
+      const allowed = ['taken_action', 'final_status', 'final_amount_10k', 'rejection_reason', 'rejection_reasons'];
       const update: Record<string, any> = { updated_at: new Date().toISOString() };
       for (const k of allowed) {
         if (k in (req.body || {})) update[k] = req.body[k];
@@ -835,6 +847,28 @@ export async function registerRoutes(
       }
       const adminApp = getAdminApp();
       const dbAdmin = adminApp.firestore();
+      // ─── 권한 검증: super_admin은 전체 가능, team_leader는 팀원 고객만,
+      //     staff는 본인 담당 고객만. 라벨 데이터 무결성 보호.
+      const callerUid = req.user?.uid;
+      const callerRole = (req.user?.role || '') as string;
+      if (callerRole !== 'super_admin') {
+        const custDoc = await dbAdmin.collection('customers').doc(customerId).get();
+        if (!custDoc.exists) {
+          return res.status(404).json({ success: false, error: '고객 없음' });
+        }
+        const custData = custDoc.data() as any;
+        const managerId = String(custData?.manager_id || '');
+        let allowedScope = managerId && callerUid && managerId === callerUid;
+        if (!allowedScope && callerRole === 'team_leader' && req.user?.team_id) {
+          // 같은 팀의 다른 staff가 담당하는 고객도 허용
+          const mgrDoc = managerId ? await dbAdmin.collection('users').doc(managerId).get() : null;
+          const mgrTeam = String((mgrDoc?.data() as any)?.team_id || '');
+          if (mgrTeam && mgrTeam === req.user.team_id) allowedScope = true;
+        }
+        if (!allowedScope) {
+          return res.status(403).json({ success: false, error: '해당 고객의 ML 로그를 수정할 권한이 없습니다.' });
+        }
+      }
       // 복합 인덱스(customer_id+called_at) 회피: customer_id 단일 필터로 가져와 메모리 정렬
       // (한 고객의 ml_predict_logs는 보통 매우 적어 부담 없음)
       const snap = await dbAdmin.collection('ml_predict_logs')
@@ -854,6 +888,230 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('[/api/admin/predict-logs/by-customer PATCH] 실패:', error);
       res.status(500).json({ success: false, error: error?.message || 'by-customer PATCH 실패' });
+    }
+  });
+
+  // ─── 예측 로그 일괄 소급 적용 (backfill) ───
+  // 기존 집행완료/거절 고객의 ml_predict_logs에 final_status가 비어 있는 것을 채워줌.
+  // 사용 시점: 신규 로그 라벨링 도입 직후 (과거 데이터 소급).
+  // POST /api/admin/predict-logs/backfill  → { success, scanned, updated, by_status }
+  app.post("/api/admin/predict-logs/backfill", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const adminApp = getAdminApp();
+      const dbAdmin = adminApp.firestore();
+      const REJECT_SET = new Set([
+        '단박거절','매출없음','신용점수 미달','차입금초과','세금체납',
+        '재상담','쓰레기통','미진행','거절',
+      ]);
+      // 1) 미라벨링된 ml_predict_logs만 가져오기 (final_status가 null/없는 것)
+      const logsSnap = await dbAdmin.collection('ml_predict_logs').get();
+      const unlabeled = logsSnap.docs.filter(d => {
+        const data = d.data() || {};
+        return !data.final_status;
+      });
+      const byCustomer = new Map<string, FirebaseFirestore.QueryDocumentSnapshot[]>();
+      for (const doc of unlabeled) {
+        const cid = String((doc.data() as any)?.customer_id || '');
+        if (!cid) continue;
+        if (!byCustomer.has(cid)) byCustomer.set(cid, []);
+        byCustomer.get(cid)!.push(doc);
+      }
+      // 2) 각 고객의 현재 상태 조회 후 소급 적용
+      let updated = 0;
+      const byStatus: Record<string, number> = { executed: 0, rejected: 0, skipped: 0 };
+      const customerIds = Array.from(byCustomer.keys());
+      // 고객 문서 병렬 조회 (50개씩 청크, 부하 제어)
+      const chunkSize = 50;
+      for (let i = 0; i < customerIds.length; i += chunkSize) {
+        const chunk = customerIds.slice(i, i + chunkSize);
+        const customerDocs = await Promise.all(
+          chunk.map(id => dbAdmin.collection('customers').doc(id).get())
+        );
+        for (const cdoc of customerDocs) {
+          if (!cdoc.exists) continue;
+          const c = cdoc.data() as any;
+          const cid = cdoc.id;
+          const status = String(c?.status_code || '');
+          const logs = byCustomer.get(cid) || [];
+          // 가장 최근 로그 1건만 patch (called_at 내림차순)
+          const latest = logs.sort((a, b) => {
+            const ta = String(a.data()?.called_at || '');
+            const tb = String(b.data()?.called_at || '');
+            return tb.localeCompare(ta);
+          })[0];
+          if (!latest) continue;
+          let patch: Record<string, any> | null = null;
+          if (status.includes('집행완료')) {
+            // approved_amount(만원) 또는 processing_orgs의 execution_amount 합산
+            const orgs: any[] = Array.isArray(c?.processing_orgs) ? c.processing_orgs : [];
+            const execSum = orgs
+              .filter(o => o?.status === '승인' && o?.execution_amount)
+              .reduce((s, o) => s + (Number(o.execution_amount) || 0), 0);
+            patch = {
+              final_status: 'executed',
+              final_amount_10k: execSum || Number(c?.approved_amount) || null,
+              backfilled: true,
+              updated_at: new Date().toISOString(),
+            };
+            byStatus.executed++;
+          } else if (REJECT_SET.has(status)) {
+            patch = {
+              final_status: 'rejected',
+              rejection_reason: status,
+              backfilled: true,
+              updated_at: new Date().toISOString(),
+            };
+            byStatus.rejected++;
+          } else {
+            byStatus.skipped++;
+          }
+          if (patch) {
+            // 이 고객의 모든 미라벨링 로그에 동일 패치 적용 (idempotent — final_status 없는 것만)
+            const writes = logs.map(l => l.ref.update(patch!));
+            await Promise.all(writes);
+            updated += logs.length;
+          }
+        }
+      }
+      res.json({ success: true, scanned: unlabeled.length, customers_examined: customerIds.length, updated, by_status: byStatus });
+    } catch (error: any) {
+      console.error('[/api/admin/predict-logs/backfill] 실패:', error);
+      res.status(500).json({ success: false, error: error?.message || 'backfill 실패' });
+    }
+  });
+
+  // ─── 미처리 예측 로그 카운트 (이번 사용자 본인의 호출 중 final_status가 없는 것) ───
+  // GET /api/admin/predict-logs/unresolved-count  → { success, count, items: [{log_id, customer_id, customer_name, called_at}] }
+  app.get("/api/admin/predict-logs/unresolved", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return res.status(401).json({ success: false, error: 'auth required' });
+      const adminApp = getAdminApp();
+      const dbAdmin = adminApp.firestore();
+      const snap = await dbAdmin.collection('ml_predict_logs')
+        .where('called_by_uid', '==', uid)
+        .get();
+      // taken_action도 final_status도 없는 로그 = 미처리
+      const unresolved = snap.docs.filter(d => {
+        const data = d.data() || {};
+        return !data.taken_action && !data.final_status;
+      });
+      // 최근 30일 이내만 (오래된 로그는 노이즈)
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const recent = unresolved.filter(d => {
+        const t = Date.parse(String(d.data()?.called_at || ''));
+        return !isNaN(t) && t >= cutoff;
+      });
+      // 고객별 가장 최근 1건만 추출
+      const byCust = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+      for (const doc of recent) {
+        const cid = String(doc.data()?.customer_id || '');
+        if (!cid) continue;
+        const existing = byCust.get(cid);
+        if (!existing || String(doc.data()?.called_at) > String(existing.data()?.called_at)) {
+          byCust.set(cid, doc);
+        }
+      }
+      // 고객명 보강
+      const cids = Array.from(byCust.keys()).slice(0, 50);
+      const customerDocs = await Promise.all(cids.map(id => dbAdmin.collection('customers').doc(id).get()));
+      const nameMap = new Map<string, string>();
+      for (const cd of customerDocs) {
+        if (cd.exists) nameMap.set(cd.id, String((cd.data() as any)?.name || (cd.data() as any)?.company_name || ''));
+      }
+      const items = cids.map(cid => {
+        const doc = byCust.get(cid)!;
+        return {
+          log_id: doc.id,
+          customer_id: cid,
+          customer_name: nameMap.get(cid) || '(고객명 없음)',
+          called_at: doc.data()?.called_at || null,
+        };
+      });
+      res.json({ success: true, count: items.length, items });
+    } catch (error: any) {
+      console.error('[/api/admin/predict-logs/unresolved] 실패:', error);
+      res.status(500).json({ success: false, error: error?.message || 'unresolved 조회 실패' });
+    }
+  });
+
+  // ─── 메모 export (PII 마스킹, ML 견적 학습용) ───
+  // GET /api/admin/ml-export-memos?sample=10
+  // 응답: { success, count, items: [{customer_id, memos: [{author_name, content_masked, created_at}]}] }
+  // PII 마스킹: 전화/주민/사업자번호/한국이름(2~4자) → [MASKED_PHONE]/[MASKED_RRN]/[MASKED_BRN]/[MASKED_NAME]
+  app.get("/api/admin/ml-export-memos", requireMlExportAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const sample = req.query.sample ? Math.min(Math.max(Number(req.query.sample), 1), 500) : 10;
+      const adminApp = getAdminApp();
+      const dbAdmin = adminApp.firestore();
+      // 메모가 있는 고객 중 랜덤 샘플
+      const allSnap = await dbAdmin.collection('customers').get();
+      const withMemos = allSnap.docs.filter(d => {
+        const data = d.data() as any;
+        return Array.isArray(data?.memo_history) && data.memo_history.length > 0;
+      });
+      // Fisher-Yates shuffle 후 상위 sample 건
+      const arr = withMemos.slice();
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      const picked = arr.slice(0, sample);
+
+      // PII 마스킹 함수
+      // 1) 전화번호: 010-1234-5678 / 010 1234 5678 / 01012345678
+      // 2) 주민번호: 6자리-7자리
+      // 3) 사업자번호: 10자리 (123-45-67890)
+      // 4) 한국이름: 2~4자 한글 (단, 일반 어휘 보호 위해 호칭 패턴만 — 'XX 대표', 'XX 사장', 'XX 사모', 'XX 부장', 'XX 과장', 'XX 차장', 'XX 사원', 'XX 팀장', 'XX 이사', 'XX 회장')
+      //    + 동업자/가족 키워드 + 한글 이름 (동업자 김XX, 와이프 박XX 등)
+      const maskPII = (text: string): string => {
+        if (!text) return text;
+        let s = text;
+        // RRN
+        s = s.replace(/\b\d{6}\s*-?\s*\d{7}\b/g, '[MASKED_RRN]');
+        // 사업자번호
+        s = s.replace(/\b\d{3}\s*-\s*\d{2}\s*-\s*\d{5}\b/g, '[MASKED_BRN]');
+        s = s.replace(/\b\d{10}\b/g, (m) => {
+          // 사업자번호 후보(10자리 연속숫자) — 전화번호와 충돌 회피: 앞자리가 01/02/03/04/05/06/07/08/09로 시작하면 전화로 간주
+          if (/^0[1-9]/.test(m)) return m; // 전화일 가능성 — 별도 패턴이 처리
+          return '[MASKED_BRN]';
+        });
+        // 전화번호
+        s = s.replace(/\b01[016789][\s-]?\d{3,4}[\s-]?\d{4}\b/g, '[MASKED_PHONE]');
+        s = s.replace(/\b0\d{1,2}[\s-]?\d{3,4}[\s-]?\d{4}\b/g, '[MASKED_PHONE]');
+        // 한국 이름 (호칭 동반)
+        s = s.replace(/[가-힣]{2,4}\s*(대표|사장|사모님|사모|부장|과장|차장|사원|팀장|이사|회장|소장|원장|실장|본부장|상무|전무|선생님|선생|님)/g, '[MASKED_NAME]');
+        // 가족/동업자 키워드 + 한글 이름 (앞뒤 한글 이름 2~4자)
+        s = s.replace(/(동업자|공동대표|배우자|와이프|남편|부인|아들|딸|아버지|어머니|부친|모친|형|형님|동생|친구)\s*[가-힣]{2,4}/g, '$1 [MASKED_NAME]');
+        s = s.replace(/[가-힣]{2,4}\s*(동업자|공동대표|배우자|와이프|남편)/g, '[MASKED_NAME] $1');
+        return s;
+      };
+
+      const items = picked.map(doc => {
+        const c = doc.data() as any;
+        const memos = Array.isArray(c?.memo_history) ? c.memo_history : [];
+        return {
+          customer_id: doc.id,
+          entry_date: c?.entry_date ?? null,
+          status_code: c?.status_code ?? null,
+          memo_count: memos.length,
+          memos: memos.map((m: any) => ({
+            author_name: '[MASKED_NAME]', // 작성자도 마스킹
+            content_masked: maskPII(String(m?.content || '')),
+            created_at: m?.created_at?._seconds
+              ? new Date(m.created_at._seconds * 1000).toISOString()
+              : (m?.created_at?.seconds
+                ? new Date(m.created_at.seconds * 1000).toISOString()
+                : (typeof m?.created_at === 'string' ? m.created_at : null)),
+          })),
+        };
+      });
+
+      res.setHeader('X-Memo-Mask-Version', 'v1.0-2026-05-18');
+      res.json({ success: true, count: items.length, sampled_from: withMemos.length, items });
+    } catch (error: any) {
+      console.error('[/api/admin/ml-export-memos] 실패:', error);
+      res.status(500).json({ success: false, error: error?.message || 'memos export 실패' });
     }
   });
 

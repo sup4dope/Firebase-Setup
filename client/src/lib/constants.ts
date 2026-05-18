@@ -491,6 +491,17 @@ export function getStatusStyle(status: string): { bg: string; text: string; bord
 // 진행기관 목록
 export const PROCESSING_ORGS = ['신용취약', '재도전', '혁신', '일시적', '상생', '지역재단', '미소금융', '신보', '기보', '중진공', '농신보', '기업인증', '기타'];
 
+// 심사 부결사유 표준 코드 (체크박스용, 멀티라벨)
+// 신청 후 기관(재단/신보/기보 등)이 부결한 사유 — ML 학습용 정규화 라벨.
+// 표준 5종 + 현장 수기 추가(자유 텍스트) 혼용 가능.
+export const REJECTION_REASONS = [
+  '신용평점미달',
+  '차입금과다',
+  '사업장권리침해',
+  '매출감소',
+  '보증한도초과',
+];
+
 // 진행기관 상태 타입
 export type ProcessingOrgStatus = '진행중' | '부결' | '승인';
 

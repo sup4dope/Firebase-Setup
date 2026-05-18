@@ -75,7 +75,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { STATUS_OPTIONS, getStatusStyle, PROCESSING_ORGS, ORG_STATUS_COLORS, type ProcessingOrgStatus, getStatusTransitionAllowed } from "@/lib/constants";
+import { STATUS_OPTIONS, getStatusStyle, PROCESSING_ORGS, REJECTION_REASONS, ORG_STATUS_COLORS, type ProcessingOrgStatus, getStatusTransitionAllowed } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
   Customer,
@@ -417,6 +417,13 @@ export function CustomerDetailModal({
   // ML 한도 예측 (yieumapi /predict 프록시)
   const [mlPredictions, setMlPredictions] = useState<MlPredictionItem[] | null>(null);
   const [mlPredictLoading, setMlPredictLoading] = useState(false);
+  // 진행기관 부결 사유 입력 다이얼로그 (멀티라벨)
+  const [rejectDialog, setRejectDialog] = useState<{
+    open: boolean;
+    orgName: string;
+    reasons: string[];
+    customReason: string;
+  }>({ open: false, orgName: '', reasons: [], customReason: '' });
   const [mlPredictError, setMlPredictError] = useState<{ message: string; code: string | null; status?: number } | null>(null);
   const [mlPredictOpen, setMlPredictOpen] = useState(false);
   const [mlExpandedCases, setMlExpandedCases] = useState<Set<number>>(new Set());
@@ -4259,45 +4266,15 @@ export function CustomerDetailModal({
                                     size="sm"
                                     variant="ghost"
                                     className="h-6 w-6 p-0 text-red-600 hover:bg-red-100"
-                                    onClick={async () => {
+                                    onClick={() => {
                                       if (!formData.id) return;
-                                      const today = format(new Date(), 'yyyy-MM-dd');
-                                      const updatedOrgs = (formData.processing_orgs || []).map(o =>
-                                        o.org === org.org ? { ...o, status: '부결' as ProcessingOrgStatus, rejected_at: today } : o
-                                      );
-                                      
-                                      try {
-                                        const customerRef = doc(db, "customers", formData.id);
-                                        await updateDoc(customerRef, {
-                                          processing_orgs: updatedOrgs,
-                                          updated_at: new Date(),
-                                        });
-                                        
-                                        setFormData(prev => ({ ...prev, processing_orgs: updatedOrgs }));
-                                        
-                                        await addDoc(collection(db, "customer_history_logs"), {
-                                          customer_id: formData.id,
-                                          action_type: "org_change",
-                                          description: `진행기관 부결: ${org.org}`,
-                                          changed_by: currentUser?.uid || "",
-                                          changed_by_name: currentUser?.name || "",
-                                          old_value: '진행중',
-                                          new_value: '부결',
-                                          changed_at: new Date(),
-                                        });
-                                        
-                                        onSave?.({
-                                          id: formData.id,
-                                          processing_orgs: updatedOrgs,
-                                        });
-                                        
-                                        toast({
-                                          title: "부결 처리",
-                                          description: `${org.org} 기관이 부결 처리되었습니다.`,
-                                        });
-                                      } catch (error) {
-                                        console.error("부결 처리 실패:", error);
-                                      }
+                                      // 부결 사유 입력 다이얼로그 오픈 (체크박스 + 자유 텍스트)
+                                      setRejectDialog({
+                                        open: true,
+                                        orgName: org.org,
+                                        reasons: [],
+                                        customReason: '',
+                                      });
                                     }}
                                     data-testid={`btn-detail-reject-${org.org}`}
                                   >
@@ -4814,6 +4791,8 @@ export function CustomerDetailModal({
                                               patchPredictLogByCustomer(cid, {
                                                 final_status: 'rejected',
                                                 rejection_reason: String(newStatus),
+                                                // 상담 단계 거절도 rejection_reasons 배열에 같이 기록(단일값)
+                                                rejection_reasons: [String(newStatus)],
                                               }).catch((mlErr) => console.warn('[ML 예측 로그 동기화 실패(무시)]', mlErr));
                                             }
                                           })();
@@ -7439,6 +7418,147 @@ export function CustomerDetailModal({
               data-testid="button-confirm-detail-org-approval"
             >
               {orgApprovalModal.isLoading ? "처리 중..." : "확인"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 진행기관 부결 사유 입력 (멀티라벨 + 자유 텍스트) */}
+      <Dialog
+        open={rejectDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setRejectDialog({ open: false, orgName: '', reasons: [], customReason: '' });
+        }}
+      >
+        <DialogContent className="max-w-md" data-testid="dialog-reject-reasons">
+          <DialogHeader>
+            <DialogTitle>부결 사유 입력 — {rejectDialog.orgName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              해당되는 사유를 모두 선택해 주세요. ML 학습 데이터로 활용됩니다.
+            </p>
+            <div className="space-y-2">
+              {REJECTION_REASONS.map((reason) => {
+                const checked = rejectDialog.reasons.includes(reason);
+                return (
+                  <label
+                    key={reason}
+                    className="flex items-center gap-2 cursor-pointer text-sm"
+                    data-testid={`label-reject-reason-${reason}`}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(v) => {
+                        setRejectDialog((prev) => ({
+                          ...prev,
+                          reasons: v
+                            ? Array.from(new Set([...prev.reasons, reason]))
+                            : prev.reasons.filter((r) => r !== reason),
+                        }));
+                      }}
+                      data-testid={`checkbox-reject-reason-${reason}`}
+                    />
+                    <span>{reason}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">기타 사유 (자유 입력)</label>
+              <Textarea
+                value={rejectDialog.customReason}
+                onChange={(e) =>
+                  setRejectDialog((prev) => ({ ...prev, customReason: e.target.value }))
+                }
+                placeholder="추가 사유가 있다면 입력해주세요 (선택)"
+                className="min-h-[60px]"
+                data-testid="textarea-reject-custom-reason"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() =>
+                setRejectDialog({ open: false, orgName: '', reasons: [], customReason: '' })
+              }
+              data-testid="btn-reject-cancel"
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!formData.id || !rejectDialog.orgName) return;
+                const customTrim = rejectDialog.customReason.trim();
+                const allReasons = [
+                  ...rejectDialog.reasons,
+                  ...(customTrim ? [customTrim] : []),
+                ];
+                if (allReasons.length === 0) {
+                  toast({
+                    title: '사유를 입력해주세요',
+                    description: '최소 하나 이상의 부결 사유가 필요합니다.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                const today = format(new Date(), 'yyyy-MM-dd');
+                const targetOrgName = rejectDialog.orgName;
+                const updatedOrgs = (formData.processing_orgs || []).map((o) =>
+                  o.org === targetOrgName
+                    ? {
+                        ...o,
+                        status: '부결' as ProcessingOrgStatus,
+                        rejected_at: today,
+                        rejection_reasons: allReasons,
+                      }
+                    : o,
+                );
+                try {
+                  const customerRef = doc(db, 'customers', formData.id);
+                  await updateDoc(customerRef, {
+                    processing_orgs: updatedOrgs,
+                    updated_at: new Date(),
+                  });
+                  setFormData((prev) => ({ ...prev, processing_orgs: updatedOrgs }));
+                  await addDoc(collection(db, 'customer_history_logs'), {
+                    customer_id: formData.id,
+                    action_type: 'org_change',
+                    description: `진행기관 부결: ${targetOrgName} (${allReasons.join(', ')})`,
+                    changed_by: currentUser?.uid || '',
+                    changed_by_name: currentUser?.name || '',
+                    old_value: '진행중',
+                    new_value: '부결',
+                    changed_at: new Date(),
+                  });
+                  onSave?.({ id: formData.id, processing_orgs: updatedOrgs });
+                  // ML 예측 로그에 심사부결사유 멀티라벨 동기화 (무시 가능)
+                  patchPredictLogByCustomer(formData.id, {
+                    final_status: 'rejected',
+                    rejection_reason: allReasons[0],
+                    rejection_reasons: allReasons,
+                  }).catch((mlErr) =>
+                    console.warn('[ML 예측 로그 동기화 실패(무시)]', mlErr),
+                  );
+                  toast({
+                    title: '부결 처리 완료',
+                    description: `${targetOrgName}: ${allReasons.join(', ')}`,
+                  });
+                  setRejectDialog({ open: false, orgName: '', reasons: [], customReason: '' });
+                } catch (error) {
+                  console.error('부결 처리 실패:', error);
+                  toast({
+                    title: '부결 처리 실패',
+                    description: '잠시 후 다시 시도해주세요.',
+                    variant: 'destructive',
+                  });
+                }
+              }}
+              data-testid="btn-reject-confirm"
+            >
+              부결 확정
             </Button>
           </div>
         </DialogContent>

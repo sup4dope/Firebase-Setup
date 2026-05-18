@@ -1577,6 +1577,44 @@ export default function Dashboard() {
     }
   };
 
+  // UnresolvedPredictsBell의 "처리하러가기" 처리:
+  // (a) Dashboard에 이미 있을 때 → CustomEvent 즉시 수신
+  // (b) 타 페이지에서 이동해온 경우 → sessionStorage('pendingOpenCustomerId') drain
+  useEffect(() => {
+    const tryOpen = (cid: string) => {
+      if (!cid) return false;
+      const target = customers.find((c) => c.id === cid);
+      if (target) {
+        handleCustomerClick(target);
+        return true;
+      }
+      return false;
+    };
+    // (b) mount 시 sessionStorage drain (customers 로드 완료 후)
+    if (customers.length > 0) {
+      try {
+        const pending = sessionStorage.getItem('pendingOpenCustomerId');
+        if (pending && tryOpen(pending)) {
+          sessionStorage.removeItem('pendingOpenCustomerId');
+        }
+      } catch {/* ignore */}
+    }
+    // (a) 실시간 이벤트 리스너
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { customerId?: string } | undefined;
+      const cid = detail?.customerId;
+      if (!cid) return;
+      if (tryOpen(cid)) {
+        try { sessionStorage.removeItem('pendingOpenCustomerId'); } catch {}
+      } else {
+        // 아직 customers 미로드 — sessionStorage에 남겨두면 다음 effect 사이클에서 drain됨
+        console.warn('[openCustomerById] 고객 미발견(대기):', cid);
+      }
+    };
+    window.addEventListener('openCustomerById', handler);
+    return () => window.removeEventListener('openCustomerById', handler);
+  }, [customers]);
+
   // Open detail modal for new customer
   const handleNewCustomerModal = () => {
     setSelectedCustomer(null);

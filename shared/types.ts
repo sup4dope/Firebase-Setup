@@ -182,7 +182,8 @@ export interface ProcessingOrg {
   execution_amount?: number; // 집행금액 (만원)
   applied_amount?: number; // 신청한도 (만원) - 고객이 신청한 금액. 승인 vs 신청 갭 학습용
   is_re_execution?: boolean; // 재집행 여부 (첫 자금 이후 추가 자금)
-  rejection_reason?: string; // 자금별 거절 사유 (자유 텍스트)
+  rejection_reason?: string; // 자금별 거절 사유 (자유 텍스트, deprecated - rejection_reasons 사용 권장)
+  rejection_reasons?: string[]; // 심사 부결사유 (멀티라벨) — 표준 코드 + 자유 텍스트 혼용 가능. ML 학습 라벨로 직접 사용.
   snapshot?: ProcessingOrgSnapshot; // 신청 시점 프로필 스냅샷 (ML 학습 정확도 보장)
 }
 

@@ -197,7 +197,7 @@ export async function mlPredictFunding(customerId: string): Promise<{
 // 예측 로그 PATCH (행동 추적/최종 결과 기록) — 컨설턴트 행동 기반 implicit feedback
 export async function patchPredictLog(
   logId: string,
-  body: { taken_action?: string; final_status?: string; final_amount_10k?: number | null; rejection_reason?: string | null },
+  body: { taken_action?: string; final_status?: string; final_amount_10k?: number | null; rejection_reason?: string | null; rejection_reasons?: string[] | null },
 ): Promise<{ success: boolean }> {
   const res = await authFetch(`/api/admin/predict-logs/${encodeURIComponent(logId)}`, {
     method: 'PATCH',
@@ -212,7 +212,7 @@ export async function patchPredictLog(
 // 고객별 최신 예측 로그 PATCH — 상태 변경 자동 동기화용 (404는 정상 케이스로 무시)
 export async function patchPredictLogByCustomer(
   customerId: string,
-  body: { taken_action?: string; final_status?: string; final_amount_10k?: number | null; rejection_reason?: string | null },
+  body: { taken_action?: string; final_status?: string; final_amount_10k?: number | null; rejection_reason?: string | null; rejection_reasons?: string[] | null },
 ): Promise<{ success: boolean; skipped?: boolean }> {
   const res = await authFetch(`/api/admin/predict-logs/by-customer/${encodeURIComponent(customerId)}`, {
     method: 'PATCH',

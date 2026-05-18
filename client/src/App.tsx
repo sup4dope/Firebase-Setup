@@ -12,6 +12,7 @@ import { TodoForm } from '@/components/TodoForm';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { HeaderRankings } from '@/components/HeaderRankings';
 import { NotificationBell } from '@/components/NotificationBell';
+import { UnresolvedPredictsBell } from '@/components/UnresolvedPredictsBell';
 import { LandingPageListener } from '@/components/LandingPageListener';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -286,6 +287,7 @@ function AuthenticatedApp() {
                 onAddTodo={() => setTodoFormOpen(true)}
                 todoRefreshTrigger={todoRefreshTrigger}
               />
+              <UnresolvedPredictsBell />
               <Button
                 variant="ghost"
                 size="icon"
