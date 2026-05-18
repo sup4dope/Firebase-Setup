@@ -279,7 +279,7 @@ export async function registerRoutes(
     return h;
   };
 
-  app.get("/api/diagnose/:customerId", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/diagnose/:customerId", requireAuth, async (req: AuthenticatedRequest, res) => {
     const customerId = req.params.customerId;
     if (!customerId) return res.status(400).json({ success: false, error: "customerId가 필요합니다." });
     try {
@@ -310,7 +310,7 @@ export async function registerRoutes(
   // - DIAGNOSE_API_KEY를 클라이언트에 노출하지 않기 위해 서버 중계
   // - 응답: { predictions: [{ org, approval_probability, expected_amount, ... }] }
   // ============================================================
-  app.get("/api/ml-predict/:customerId", requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/ml-predict/:customerId", requireAuth, async (req: AuthenticatedRequest, res) => {
     const customerId = req.params.customerId;
     if (!customerId) return res.status(400).json({ success: false, error: "customerId가 필요합니다." });
     try {
@@ -1280,7 +1280,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/diagnose", requireAuth, requireSuperAdmin, async (req, res) => {
+  app.post("/api/diagnose", requireAuth, async (req, res) => {
     try {
       const url = `${getDiagnoseBase()}/diagnose`;
       const upstream = await fetch(url, {
