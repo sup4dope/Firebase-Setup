@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "67zRhgGLCM0fAiYFhxRNS"
+uri = "file://docs/재분배풀_사용가이드.md"
+type = "text"
+title = "재분배 풀 사용 가이드 (직원 배포용)"
