@@ -3893,7 +3893,13 @@ export async function registerRoutes(
         '수납대기',
       ];
 
-      const [contractsSnap, paymentsSnap, legacyCustomersSnap] = await Promise.all([
+      // 상태 자체가 "계약서/청구서 발송됨"을 의미하는 상태 집합 (이력 검증 면제)
+      const STATUS_IMPLIES_SEND = new Set<string>([
+        '계약서발송완료', '계약서발송완료(선불)', '계약서발송완료(후불)', '계약서발송완료(외주)',
+        '수납대기',
+      ]);
+
+      const [contractsSnap, paymentsSnap, legacyCustomersSnap, allContractsSnap, allPaymentsSnap] = await Promise.all([
         firestore.collection('contracts_eformsign')
           .where('status', 'in', ['발송완료', '서명대기', '작성완료', '수납대기'])
           .get(),
@@ -3902,7 +3908,21 @@ export async function registerRoutes(
         firestore.collection('customers')
           .where('status_code', 'in', LEGACY_ACTIVE_STATUSES)
           .get(),
+        // 발송 이력 검증용: 전체 contracts/payments customer_id 집합 (status 무관)
+        firestore.collection('contracts_eformsign').select('customer_id').get(),
+        firestore.collection('payments_paymint').select('customer_id').get(),
       ]);
+
+      // 한 번이라도 계약서/청구서가 발송된 적 있는 customer_id 집합
+      const customersWithSendHistory = new Set<string>();
+      for (const d of allContractsSnap.docs) {
+        const cid = String((d.data() as any).customer_id || '');
+        if (cid) customersWithSendHistory.add(cid);
+      }
+      for (const d of allPaymentsSnap.docs) {
+        const cid = String((d.data() as any).customer_id || '');
+        if (cid) customersWithSendHistory.add(cid);
+      }
 
       type Trig = { sourceType: 'contract' | 'paymint' | 'legacy'; sourceId: string; sentAtMs: number; sentAt: string; templateName?: string; amountManWon?: number };
       const triggerByCust = new Map<string, Trig>();
@@ -3911,7 +3931,7 @@ export async function registerRoutes(
       const dropReasons = {
         contract_no_cid: 0, contract_no_sentAt: 0, contract_too_recent: 0, contract_added: 0,
         paymint_no_cid: 0, paymint_no_sentAt: 0, paymint_too_recent: 0, paymint_added: 0,
-        legacy_no_log_no_fallback: 0, legacy_too_recent: 0, legacy_added: 0,
+        legacy_no_send_history: 0, legacy_no_log_no_fallback: 0, legacy_too_recent: 0, legacy_added: 0,
       };
 
       // Firestore Timestamp → ms 변환 헬퍼
@@ -3979,7 +3999,15 @@ export async function registerRoutes(
       const legacyCandidates: Array<{ cid: string; data: any }> = [];
       for (const doc of legacyCustomersSnap.docs) {
         if (triggerByCust.has(doc.id)) continue; // 이미 contract/paymint로 잡힘
-        legacyCandidates.push({ cid: doc.id, data: doc.data() });
+        const data = doc.data() as any;
+        const status = String(data.status_code || '');
+        // 발송 이력 검증: 계약서/청구서가 한 번이라도 발송된 적 있거나,
+        //                  상태 자체가 발송을 함의하는 경우(계약서발송완료(*)/수납대기)만 통과
+        if (!customersWithSendHistory.has(doc.id) && !STATUS_IMPLIES_SEND.has(status)) {
+          dropReasons.legacy_no_send_history++;
+          continue;
+        }
+        legacyCandidates.push({ cid: doc.id, data });
       }
 
       // 각 후보의 진입 시각을 병렬로 조회 (제한: 한 번에 최대 20개씩 처리)
