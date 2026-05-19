@@ -3927,20 +3927,38 @@ export async function registerRoutes(
         firestore.collection('customers')
           .where('status_code', 'in', LEGACY_ACTIVE_STATUSES)
           .get(),
-        // 발송 이력 검증용: 전체 contracts/payments customer_id 집합 (status 무관)
-        firestore.collection('contracts_eformsign').select('customer_id').get(),
-        firestore.collection('payments_paymint').select('customer_id').get(),
+        // 발송 이력 검증용: 전체 contracts/payments customer_id 및 최초 발송 시각 수집
+        firestore.collection('contracts_eformsign').select('customer_id', 'sent_at', 'created_at').get(),
+        firestore.collection('payments_paymint').select('customer_id', 'created_at').get(),
       ]);
 
-      // 한 번이라도 계약서/청구서가 발송된 적 있는 customer_id 집합
+      // 한 번이라도 계약서/청구서가 발송된 적 있는 customer_id 집합 + 최초 발송 시각 맵
       const customersWithSendHistory = new Set<string>();
+      const customerFirstSendMs = new Map<string, number>();
+      const recordSend = (cid: string, ms: number) => {
+        if (!cid) return;
+        customersWithSendHistory.add(cid); // customer_id만 있으면 발송이력 인정 (timestamp 무관)
+        if (!ms) return;
+        const prev = customerFirstSendMs.get(cid);
+        if (prev === undefined || ms < prev) customerFirstSendMs.set(cid, ms);
+      };
+      const earlyToMs = (raw: any): number => {
+        if (!raw) return 0;
+        if (raw?.toDate && typeof raw.toDate === 'function') return raw.toDate().getTime();
+        if (raw?._seconds !== undefined) return raw._seconds * 1000 + Math.floor((raw._nanoseconds || 0) / 1e6);
+        if (typeof raw === 'number') return raw;
+        const p = Date.parse(String(raw));
+        return isNaN(p) ? 0 : p;
+      };
       for (const d of allContractsSnap.docs) {
-        const cid = String((d.data() as any).customer_id || '');
-        if (cid) customersWithSendHistory.add(cid);
+        const x = d.data() as any;
+        const cid = String(x.customer_id || '');
+        recordSend(cid, earlyToMs(x.sent_at || x.created_at));
       }
       for (const d of allPaymentsSnap.docs) {
-        const cid = String((d.data() as any).customer_id || '');
-        if (cid) customersWithSendHistory.add(cid);
+        const x = d.data() as any;
+        const cid = String(x.customer_id || '');
+        recordSend(cid, earlyToMs(x.created_at));
       }
 
       type Trig = { sourceType: 'contract' | 'paymint' | 'legacy'; sourceId: string; sentAtMs: number; sentAt: string; templateName?: string; amountManWon?: number };
@@ -4057,8 +4075,17 @@ export async function registerRoutes(
           } catch {
             // status_logs 인덱스 미설정 시 폴백
           }
+          // 폴백 1: 계약서/청구서의 최초 발송 시각 (실제 트리거 시점에 가장 가까움)
           if (!enteredAtMs) {
-            const raw = data.updated_at || data.created_at;
+            const sendMs = customerFirstSendMs.get(cid);
+            if (sendMs) {
+              enteredAtMs = sendMs;
+              enteredAtIso = new Date(sendMs).toISOString();
+            }
+          }
+          // 폴백 2: customer.created_at (updated_at은 메모 갱신 등으로 변동성이 커서 제외)
+          if (!enteredAtMs) {
+            const raw = data.created_at;
             if (raw) {
               if (raw?.toDate) {
                 const dt = raw.toDate();

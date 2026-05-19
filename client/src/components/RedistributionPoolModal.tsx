@@ -6,7 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/lib/firebase';
-import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw, History } from 'lucide-react';
+import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw, History, Search, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 interface PoolItem {
   customer_id: string;
@@ -116,11 +117,22 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
 
   const myUid = user?.uid || '';
   const [tab, setTab] = useState<'all' | 'mine'>('all');
+  const [search, setSearch] = useState('');
 
   // 본인이 픽업한 임시배정 건 (만료된 건 서버에서 이미 null 처리되어 옴)
   const myPickups = items.filter(it => it.temp_assignment && it.temp_assignment.picker_uid === myUid);
   // 표시 목록: 탭별 필터. 락된 건이 다른 직원 화면에서도 사라지지 않도록 '전체' 탭은 모두 보존.
-  const visibleItems = tab === 'mine' ? myPickups : items;
+  const baseItems = tab === 'mine' ? myPickups : items;
+  // 검색 필터 (이름/상호명/전화번호) — 공백·하이픈 제거 후 부분일치
+  const normalize = (s: string) => (s || '').toLowerCase().replace(/[\s-]/g, '');
+  const q = normalize(search);
+  const visibleItems = q
+    ? baseItems.filter(it =>
+        normalize(it.customer_name).includes(q) ||
+        normalize(it.company_name).includes(q) ||
+        normalize(it.phone).includes(q)
+      )
+    : baseItems;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -165,6 +177,29 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
           >
             내 임시배정 <Badge variant="secondary" className="ml-1.5">{myPickups.length}</Badge>
           </Button>
+          <div className="ml-auto relative w-64">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              type="search"
+              placeholder="이름·상호명·전화번호 검색"
+              aria-label="재분배 풀 검색 (이름, 상호명, 전화번호)"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-8 h-8 text-sm"
+              data-testid="input-pool-search"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                data-testid="button-pool-search-clear"
+                aria-label="검색어 지우기"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1 space-y-2">
@@ -177,7 +212,12 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
           {!loading && visibleItems.length === 0 && (
             <div className="text-center py-12 text-muted-foreground" data-testid="empty-pool">
               <AlertCircle className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              {tab === 'mine' ? (
+              {q ? (
+                <>
+                  <p>'{search}' 검색 결과가 없습니다.</p>
+                  <p className="text-sm mt-1">다른 검색어로 시도해보세요.</p>
+                </>
+              ) : tab === 'mine' ? (
                 <>
                   <p>본인이 픽업한 임시배정 건이 없습니다.</p>
                   <p className="text-sm mt-1">'전체' 탭에서 픽업하면 여기에 표시됩니다.</p>
