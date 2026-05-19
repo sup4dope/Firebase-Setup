@@ -741,24 +741,34 @@ export default function AnnualLeave() {
                         {leavesOnSelected.map(req => (
                           <div
                             key={req.id}
-                            className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50 border"
+                            className="p-2.5 rounded-lg bg-muted/50 border space-y-1.5"
                             data-testid={`leave-info-${req.id}`}
                           >
-                            <div className="flex items-center gap-3">
-                              <div className={cn(
-                                'w-2 h-2 rounded-full',
-                                req.status === 'approved' && 'bg-green-500',
-                                req.status === 'pending_leader' && 'bg-yellow-500',
-                                req.status === 'pending_admin' && 'bg-blue-500'
-                              )} />
-                              <span className="font-medium text-sm">{req.user_name}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {LEAVE_TYPE_LABELS[req.leave_type]}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className={cn(
+                                  'w-2 h-2 rounded-full flex-shrink-0',
+                                  req.status === 'approved' && 'bg-green-500',
+                                  req.status === 'pending_leader' && 'bg-yellow-500',
+                                  req.status === 'pending_admin' && 'bg-blue-500'
+                                )} />
+                                <span className="font-medium text-sm truncate">{req.user_name}</span>
+                                <Badge variant="outline" className="text-xs flex-shrink-0">
+                                  {LEAVE_TYPE_LABELS[req.leave_type]}
+                                </Badge>
+                              </div>
+                              <Badge className={cn('text-xs flex-shrink-0', STATUS_COLORS[req.status])}>
+                                {STATUS_LABELS[req.status]}
                               </Badge>
                             </div>
-                            <Badge className={cn('text-xs', STATUS_COLORS[req.status])}>
-                              {STATUS_LABELS[req.status]}
-                            </Badge>
+                            {req.reason?.trim() && (
+                              <div
+                                className="text-xs text-muted-foreground pl-5 whitespace-pre-wrap break-words"
+                                data-testid={`leave-reason-${req.id}`}
+                              >
+                                <span className="font-medium">사유:</span> {req.reason.trim()}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
