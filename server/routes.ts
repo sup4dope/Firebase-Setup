@@ -44,6 +44,101 @@ function getContractTypeLabel(contractType: ContractType): string {
   }
 }
 
+// ─── 재분배 풀 (공동영업 풀) ──────────────────────────────────────────────────
+// 계약서 발송 또는 결제선생 청구서 발송 후 14일 경과한 미수납 건을 모든 직원이
+// 픽업하여 마무리할 수 있도록 한다. 픽업은 '임시배정' 형태로 3일간 잠금되며,
+// 해당 기간 내 수납완료/계약완료 발생 시 manager_id를 임시배정자로 확정 이동.
+const REDISTRIBUTION_TRIGGER_DAYS = 14;
+const TEMP_ASSIGNMENT_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
+
+async function tryConfirmRedistribution(
+  firestore: FirebaseFirestore.Firestore,
+  customerId: string,
+  now: Date,
+  sourceLabel: string
+): Promise<{ confirmed: boolean; pickerName?: string; originalManagerName?: string }> {
+  try {
+    const customerRef = firestore.collection('customers').doc(customerId);
+
+    // 트랜잭션으로 temp_assignment 읽기 → manager_id 교체를 원자적으로 처리
+    // (동시 pickup/release/콜백 중복 호출 시 데이터 정합성 보장)
+    const result = await firestore.runTransaction(async (tx) => {
+      const snap = await tx.get(customerRef);
+      if (!snap.exists) return { kind: 'no_customer' as const };
+      const cd = snap.data() as any;
+      const ta = cd.temp_assignment;
+      if (!ta || !ta.picker_uid) return { kind: 'no_assignment' as const };
+
+      // 만료된 임시배정 → 확정 불가, 트랜잭션 내에서 cleanup만
+      const expiresAt = ta.expires_at ? Date.parse(String(ta.expires_at)) : 0;
+      if (!expiresAt || expiresAt < now.getTime()) {
+        tx.update(customerRef, { temp_assignment: FieldValue.delete() });
+        return { kind: 'expired_cleanup' as const };
+      }
+      // 이미 본인 담당이면 의미 없음 (cleanup만)
+      if (ta.picker_uid === cd.manager_id) {
+        tx.update(customerRef, { temp_assignment: FieldValue.delete() });
+        return { kind: 'self_cleanup' as const };
+      }
+
+      const originalManagerName = cd.manager_name || ta.original_manager_name || '(미지정)';
+      const originalManagerId = cd.manager_id || ta.original_manager_id || '';
+      const memoContent = `[재분배 확정] 원담당자: ${originalManagerName} → 새 담당자: ${ta.picker_name} (트리거: ${sourceLabel})`;
+      const memoEntry = {
+        content: memoContent,
+        author_id: 'system',
+        author_name: '시스템(재분배)',
+        created_at: now.toISOString(),
+      };
+
+      tx.update(customerRef, {
+        manager_id: ta.picker_uid,
+        manager_name: ta.picker_name,
+        temp_assignment: FieldValue.delete(),
+        memo_history: FieldValue.arrayUnion(memoEntry),
+        recent_memo: memoContent,
+        latest_memo: memoContent,
+        last_memo_date: now.toISOString(),
+        updated_at: now.toISOString(),
+      });
+
+      return {
+        kind: 'confirmed' as const,
+        pickerUid: ta.picker_uid,
+        pickerName: ta.picker_name,
+        originalManagerId,
+        originalManagerName,
+        pickedAt: ta.picked_at || '',
+        customerName: cd.name || cd.company_name || '',
+      };
+    });
+
+    if (result.kind !== 'confirmed') {
+      return { confirmed: false };
+    }
+
+    // 트랜잭션 밖에서 로그 add (실패해도 본 작업에 영향 X)
+    await firestore.collection('redistribution_logs').add({
+      customer_id: customerId,
+      customer_name: result.customerName,
+      action: 'confirm',
+      source: sourceLabel,
+      original_manager_id: result.originalManagerId,
+      original_manager_name: result.originalManagerName,
+      new_manager_id: result.pickerUid,
+      new_manager_name: result.pickerName,
+      picked_at: result.pickedAt,
+      confirmed_at: now.toISOString(),
+    });
+
+    console.log(`[Redistribution] 확정: customer=${customerId}, ${result.originalManagerName} → ${result.pickerName} (${sourceLabel})`);
+    return { confirmed: true, pickerName: result.pickerName, originalManagerName: result.originalManagerName };
+  } catch (err: any) {
+    console.error(`[Redistribution] tryConfirmRedistribution 실패 (customer=${customerId}):`, err?.message || err);
+    return { confirmed: false };
+  }
+}
+
 function numberToKorean(num: number): string {
   const digits = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
   const smallUnits = ['', '십', '백', '천'];
@@ -2594,6 +2689,12 @@ export async function registerRoutes(
                 await customerRef.update(customerUpdateData);
                 console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → ${targetStatus} (${typeLabel}), 계약금: ${contractAmountManWon}만원, 자문료율: ${commissionRateNum}%`);
 
+                // 재분배 풀: 계약완료(후불)/(외주) 진입 시 임시배정자로 확정 이동
+                // 선불(pre)은 '수납대기' 단계라 결제선생 콜백에서 처리
+                if (targetStatus.startsWith('계약완료')) {
+                  await tryConfirmRedistribution(firestore, customerId, now, `전자계약 서명완료(${typeLabel})`);
+                }
+
                 await firestore.collection('status_logs').add({
                   customer_id: customerId,
                   customer_name: contractData.customer_name || '',
@@ -2704,6 +2805,11 @@ export async function registerRoutes(
           await customerRef.update(customerUpdateData);
           console.log(`[eformsign Sync] 고객 상태 변경: ${customerId} → ${targetStatus} (${typeLabel}), 계약금: ${contractAmountManWon}만원, 자문료율: ${commissionRateNum}%`);
 
+          // 재분배 풀: 계약완료(후불)/(외주) 진입 시 임시배정자로 확정 이동
+          if (targetStatus.startsWith('계약완료')) {
+            await tryConfirmRedistribution(firestore, customerId, now, `전자계약 서명완료(${typeLabel})`);
+          }
+
           await firestore.collection('status_logs').add({
             customer_id: customerId,
             customer_name: contractData.customer_name || '',
@@ -2799,6 +2905,11 @@ export async function registerRoutes(
 
             await customerRef.update(customerUpdateData);
             console.log(`[eformsign Webhook] 고객 상태 변경: ${customerId} → ${targetStatus} (${typeLabel}), 계약금=${contractAmountManWon}만원, 자문료율=${commissionRateNum}%`);
+
+            // 재분배 풀: 계약완료(후불)/(외주) 진입 시 임시배정자로 확정 이동
+            if (targetStatus.startsWith('계약완료')) {
+              await tryConfirmRedistribution(firestore, customerId, now, `전자계약 서명완료(${typeLabel})`);
+            }
 
             await firestore.collection('status_logs').add({
               customer_id: customerId,
@@ -3136,6 +3247,9 @@ export async function registerRoutes(
           await firestore.collection('payments_paymint').doc(paymentDoc.id).update({
             payment_completed_notified: false,
           });
+
+          // 재분배 풀: 임시배정 중인 고객이면 manager_id를 새 담당자로 확정 이동
+          await tryConfirmRedistribution(firestore, customerId, now, '결제선생 수납완료');
 
           console.log(`[PayMint Callback] 고객 상태 변경: ${customerId} → 계약완료(선불)`);
         }
@@ -3741,6 +3855,276 @@ export async function registerRoutes(
       gongmun_loaded_chars: gongmun.length,
       model: process.env.OLLAMA_MODEL || 'qwen2.5:14b-instruct (default)',
     });
+  });
+
+  // =========================================================================
+  // 재분배 풀 (공동영업 풀) API
+  // =========================================================================
+
+  // 계약완료/집행완료/터미널 등 풀에서 제외할 상태
+  const REDISTRIBUTION_EXCLUDED_STATUSES = new Set<string>([
+    '쓰레기통','단박거절','본인아님','사업자아님','정부기관 오인','기타자금 오인',
+    '인증불가','불가업종','매출없음','신용점수 미달','차입금초과','세금체납',
+    '이중계약','거절사유 미파악','정체성 의심','잘못 신청',
+    '계약완료','계약완료(선불)','계약완료(후불)','계약완료(외주)','계약완료(채무조정)',
+    '집행완료','집행완료(선불)','집행완료(후불)','집행완료(외주)','집행완료(채무조정)',
+    '최종부결','민원처리',
+  ]);
+
+  // GET /api/redistribution-pool — 14일 경과 미수납 건 목록 (모든 로그인 사용자)
+  app.get("/api/redistribution-pool", requireAuth, async (_req: AuthenticatedRequest, res) => {
+    try {
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const nowMs = Date.now();
+      const cutoffMs = nowMs - REDISTRIBUTION_TRIGGER_DAYS * 24 * 60 * 60 * 1000;
+
+      const [contractsSnap, paymentsSnap] = await Promise.all([
+        firestore.collection('contracts_eformsign')
+          .where('status', 'in', ['발송완료', '서명대기', '작성완료', '수납대기'])
+          .get(),
+        firestore.collection('payments_paymint').where('state', '==', 'W').get(),
+      ]);
+
+      type Trig = { sourceType: 'contract' | 'paymint'; sourceId: string; sentAtMs: number; sentAt: string; templateName?: string; amountManWon?: number };
+      const triggerByCust = new Map<string, Trig>();
+
+      for (const doc of contractsSnap.docs) {
+        const d = doc.data() as any;
+        const cid = String(d.customer_id || '');
+        if (!cid) continue;
+        const sentAtRaw = d.sent_at || d.created_at;
+        if (!sentAtRaw) continue;
+        const sentMs = Date.parse(String(sentAtRaw));
+        if (isNaN(sentMs) || sentMs > cutoffMs) continue;
+        const existing = triggerByCust.get(cid);
+        if (!existing || sentMs < existing.sentAtMs) {
+          triggerByCust.set(cid, {
+            sourceType: 'contract',
+            sourceId: doc.id,
+            sentAtMs: sentMs,
+            sentAt: String(sentAtRaw),
+            templateName: d.template_name,
+            amountManWon: d.amount_man_won,
+          });
+        }
+      }
+      for (const doc of paymentsSnap.docs) {
+        const d = doc.data() as any;
+        const cid = String(d.customer_id || '');
+        if (!cid) continue;
+        const sentAtRaw = d.created_at;
+        if (!sentAtRaw) continue;
+        const sentMs = Date.parse(String(sentAtRaw));
+        if (isNaN(sentMs) || sentMs > cutoffMs) continue;
+        const existing = triggerByCust.get(cid);
+        if (!existing || sentMs < existing.sentAtMs) {
+          triggerByCust.set(cid, {
+            sourceType: 'paymint',
+            sourceId: doc.id,
+            sentAtMs: sentMs,
+            sentAt: String(sentAtRaw),
+            amountManWon: d.contract_amount_manwon || d.amount_manwon,
+          });
+        }
+      }
+
+      const cids = Array.from(triggerByCust.keys());
+      if (cids.length === 0) return res.json({ success: true, count: 0, items: [] });
+
+      // Firestore documentId IN 쿼리는 10개 제한 → batch
+      const customerDocs: FirebaseFirestore.DocumentSnapshot[] = [];
+      const BATCH = 30;
+      for (let i = 0; i < cids.length; i += BATCH) {
+        const slice = cids.slice(i, i + BATCH);
+        const docs = await firestore.getAll(...slice.map(id => firestore.collection('customers').doc(id)));
+        customerDocs.push(...docs);
+      }
+
+      const items: any[] = [];
+      for (let i = 0; i < customerDocs.length; i++) {
+        const cd = customerDocs[i];
+        if (!cd.exists) continue;
+        const c = cd.data() as any;
+        const status = String(c.status_code || '');
+        if (REDISTRIBUTION_EXCLUDED_STATUSES.has(status)) continue;
+        const trig = triggerByCust.get(cids[i])!;
+
+        let tempAssignment = c.temp_assignment;
+        if (tempAssignment && tempAssignment.expires_at) {
+          const exp = Date.parse(String(tempAssignment.expires_at));
+          if (isNaN(exp) || exp < nowMs) tempAssignment = null;
+        }
+
+        items.push({
+          customer_id: cids[i],
+          customer_name: c.name || '',
+          company_name: c.company_name || '',
+          readable_id: c.readable_id || '',
+          phone: c.phone || '',
+          current_status: status,
+          original_manager_id: c.manager_id || '',
+          original_manager_name: c.manager_name || '',
+          team_id: c.team_id || '',
+          team_name: c.team_name || '',
+          trigger: {
+            type: trig.sourceType,
+            sent_at: trig.sentAt,
+            days_since: Math.floor((nowMs - trig.sentAtMs) / 86400000),
+            template_name: trig.templateName || null,
+            amount_man_won: trig.amountManWon || null,
+          },
+          temp_assignment: tempAssignment || null,
+        });
+      }
+
+      // 임시배정 없는 건 우선 → 가장 오래된 트리거 순
+      items.sort((a, b) => {
+        const aLocked = a.temp_assignment ? 1 : 0;
+        const bLocked = b.temp_assignment ? 1 : 0;
+        if (aLocked !== bLocked) return aLocked - bLocked;
+        return b.trigger.days_since - a.trigger.days_since;
+      });
+
+      res.json({ success: true, count: items.length, items });
+    } catch (error: any) {
+      console.error('[/api/redistribution-pool] 실패:', error?.message || error);
+      res.status(500).json({ success: false, error: error?.message || '풀 조회 실패' });
+    }
+  });
+
+  // POST /api/redistribution-pool/pickup/:customerId — 임시배정 (트랜잭션 잠금)
+  app.post("/api/redistribution-pool/pickup/:customerId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return res.status(401).json({ success: false, error: '인증 필요' });
+      const { customerId } = req.params;
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const now = new Date();
+      const nowMs = now.getTime();
+
+      const customerRef = firestore.collection('customers').doc(customerId);
+
+      const result = await firestore.runTransaction(async (tx) => {
+        const snap = await tx.get(customerRef);
+        if (!snap.exists) throw new Error('고객을 찾을 수 없습니다.');
+        const c = snap.data() as any;
+
+        if (REDISTRIBUTION_EXCLUDED_STATUSES.has(String(c.status_code || ''))) {
+          throw new Error('해당 고객은 이미 종결된 상태입니다.');
+        }
+
+        const ta = c.temp_assignment;
+        if (ta && ta.picker_uid) {
+          const exp = ta.expires_at ? Date.parse(String(ta.expires_at)) : 0;
+          if (exp && exp >= nowMs && ta.picker_uid !== uid) {
+            throw new Error(`이미 ${ta.picker_name || '다른 직원'}님이 임시배정 중입니다.`);
+          }
+        }
+
+        const newAssignment = {
+          picker_uid: uid,
+          picker_name: req.user?.name || '',
+          picked_at: now.toISOString(),
+          expires_at: new Date(nowMs + TEMP_ASSIGNMENT_DURATION_MS).toISOString(),
+          original_manager_id: c.manager_id || '',
+          original_manager_name: c.manager_name || '',
+        };
+
+        const memoContent = `[재분배 임시배정] ${req.user?.name || ''}님이 픽업 (D-3, 만료: ${newAssignment.expires_at.slice(0, 10)})`;
+        const memoEntry = {
+          content: memoContent,
+          author_id: 'system',
+          author_name: '시스템(재분배)',
+          created_at: now.toISOString(),
+        };
+
+        tx.update(customerRef, {
+          temp_assignment: newAssignment,
+          memo_history: FieldValue.arrayUnion(memoEntry),
+          recent_memo: memoContent,
+          latest_memo: memoContent,
+          last_memo_date: now.toISOString(),
+          updated_at: now.toISOString(),
+        });
+
+        return { newAssignment };
+      });
+
+      await firestore.collection('redistribution_logs').add({
+        customer_id: customerId,
+        action: 'pickup',
+        picker_uid: uid,
+        picker_name: req.user?.name || '',
+        original_manager_id: result.newAssignment.original_manager_id,
+        original_manager_name: result.newAssignment.original_manager_name,
+        picked_at: result.newAssignment.picked_at,
+        expires_at: result.newAssignment.expires_at,
+      });
+
+      res.json({ success: true, temp_assignment: result.newAssignment });
+    } catch (error: any) {
+      console.error('[/api/redistribution-pool/pickup] 실패:', error?.message || error);
+      res.status(400).json({ success: false, error: error?.message || '픽업 실패' });
+    }
+  });
+
+  // POST /api/redistribution-pool/release/:customerId — 임시배정 해제 (본인 또는 super_admin)
+  app.post("/api/redistribution-pool/release/:customerId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return res.status(401).json({ success: false, error: '인증 필요' });
+      const role = (req.user as any)?.role || '';
+      const { customerId } = req.params;
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const now = new Date();
+
+      const customerRef = firestore.collection('customers').doc(customerId);
+      const snap = await customerRef.get();
+      if (!snap.exists) return res.status(404).json({ success: false, error: '고객을 찾을 수 없습니다.' });
+      const c = snap.data() as any;
+      const ta = c.temp_assignment;
+      if (!ta || !ta.picker_uid) {
+        return res.json({ success: true, message: '이미 임시배정이 없습니다.' });
+      }
+      if (ta.picker_uid !== uid && role !== 'super_admin') {
+        return res.status(403).json({ success: false, error: '본인 임시배정만 해제할 수 있습니다.' });
+      }
+
+      const memoContent = `[재분배 임시배정 해제] ${ta.picker_name || ''}님의 임시배정 해제 (해제자: ${req.user?.name || ''})`;
+      const memoEntry = {
+        content: memoContent,
+        author_id: 'system',
+        author_name: '시스템(재분배)',
+        created_at: now.toISOString(),
+      };
+
+      await customerRef.update({
+        temp_assignment: FieldValue.delete(),
+        memo_history: FieldValue.arrayUnion(memoEntry),
+        recent_memo: memoContent,
+        latest_memo: memoContent,
+        last_memo_date: now.toISOString(),
+        updated_at: now.toISOString(),
+      });
+
+      await firestore.collection('redistribution_logs').add({
+        customer_id: customerId,
+        action: 'release',
+        released_by_uid: uid,
+        released_by_name: req.user?.name || '',
+        picker_uid: ta.picker_uid,
+        picker_name: ta.picker_name,
+        released_at: now.toISOString(),
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[/api/redistribution-pool/release] 실패:', error?.message || error);
+      res.status(500).json({ success: false, error: error?.message || '해제 실패' });
+    }
   });
 
   return httpServer;

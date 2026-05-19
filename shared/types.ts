@@ -177,6 +177,18 @@ export interface Customer {
     cached_at: any; // Firestore Timestamp | ISO string
     action_taken?: string | null; // 'apply_predicted' | 'apply_other' | 'pending_followup' | 'no_apply' | null
   };
+
+  // 재분배 풀 임시배정 — 계약서 발송/결제 청구 후 14일 경과한 미수납 건을
+  // 다른 직원이 마무리할 수 있도록 잠깐 잡아두는 상태. picker_uid 1명만 가능(선착순),
+  // expires_at(picked_at+3d)까지 유효. 수납완료(계약완료) 시점에 manager_id로 확정 이동.
+  temp_assignment?: {
+    picker_uid: string;
+    picker_name: string;
+    picked_at: string; // ISO
+    expires_at: string; // ISO (picked_at + 3 days)
+    original_manager_id: string;
+    original_manager_name: string;
+  } | null;
 }
 
 // 진행기관 상태

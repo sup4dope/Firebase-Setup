@@ -12,6 +12,7 @@ import { CustomerDetailModal } from '@/components/CustomerDetailModal';
 import { CustomerInfoEditModal } from '@/components/CustomerInfoEditModal';
 import { CustomerInfoHistoryModal } from '@/components/CustomerInfoHistoryModal';
 import { ConsultationsPreviewModal } from '@/components/ConsultationsPreviewModal';
+import { RedistributionPoolModal } from '@/components/RedistributionPoolModal';
 import { useToast } from '@/hooks/use-toast';
 import { calculateKPI } from '@/lib/kpi';
 import { fetchYearlyHolidays } from '@/lib/publicHolidays';
@@ -34,7 +35,7 @@ import {
   getSettlementItems,
   normalizeEntrySource,
 } from '@/lib/firestore';
-import { Plus, Search, RefreshCw, CalendarIcon, Download, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Plus, Search, RefreshCw, CalendarIcon, Download, CheckCircle, XCircle, Trash2, Hand } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DataExport } from '@/components/DataExport';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -105,6 +106,28 @@ export default function Dashboard() {
   // 미처리 상담 유입 관련 상태 (super_admin 전용)
   const [pendingConsultationsCount, setPendingConsultationsCount] = useState(0);
   const [consultationsPreviewOpen, setConsultationsPreviewOpen] = useState(false);
+  // 재분배 풀 (공동영업 풀)
+  const [redistributionPoolCount, setRedistributionPoolCount] = useState(0);
+  const [redistributionPoolOpen, setRedistributionPoolOpen] = useState(false);
+
+  const fetchRedistributionPoolCount = async () => {
+    try {
+      const { authFetch } = await import('@/lib/firebase');
+      const res = await authFetch('/api/redistribution-pool');
+      if (!res.ok) return;
+      const data = await res.json();
+      setRedistributionPoolCount(Number(data?.count || 0));
+    } catch {
+      // silent
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    fetchRedistributionPoolCount();
+    const interval = setInterval(fetchRedistributionPoolCount, 60_000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // 경과 TODO 고객 ID 추적
   const [overdueTodoCustomerIds, setOverdueTodoCustomerIds] = useState<Set<string>>(new Set());
@@ -1953,6 +1976,21 @@ export default function Dashboard() {
                 {`${pendingConsultationsCount}건 DB유입`}
               </Button>
             )}
+
+            {/* 재분배 풀 버튼 (전체 사용자) */}
+            <Button
+              variant="outline"
+              onClick={() => setRedistributionPoolOpen(true)}
+              data-testid="button-open-redistribution-pool"
+            >
+              <Hand className="w-4 h-4 mr-2" />
+              재분배 풀
+              {redistributionPoolCount > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 px-1.5" data-testid="badge-redistribution-pool-count">
+                  {redistributionPoolCount}
+                </Badge>
+              )}
+            </Button>
             
             <Button onClick={handleNewCustomerModal} data-testid="button-add-customer">
               <Plus className="w-4 h-4 mr-2" />
@@ -2445,6 +2483,26 @@ export default function Dashboard() {
         open={consultationsPreviewOpen}
         onOpenChange={setConsultationsPreviewOpen}
         onImportComplete={handleImportComplete}
+      />
+
+      {/* 재분배 풀 (공동영업 풀) Modal */}
+      <RedistributionPoolModal
+        open={redistributionPoolOpen}
+        onOpenChange={setRedistributionPoolOpen}
+        onOpenCustomer={(customerId) => {
+          const target = customersRef.current.find(c => c.id === customerId);
+          if (target) {
+            handleCustomerClick(target);
+          } else {
+            // 다른 담당 고객이라 목록에 없을 수 있음 → sessionStorage 후 새로고침 트리거
+            try { sessionStorage.setItem('pendingOpenCustomerId', customerId); } catch {}
+            handleRefreshAll();
+          }
+        }}
+        onPoolChanged={() => {
+          fetchRedistributionPoolCount();
+          handleRefreshAll();
+        }}
       />
 
       {contractNotifications.length > 0 && (
