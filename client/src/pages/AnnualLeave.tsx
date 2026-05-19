@@ -49,6 +49,7 @@ import {
   Clock,
   AlertCircle,
   Loader2,
+  Cake,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -105,6 +106,7 @@ export default function AnnualLeave() {
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [publicHolidays, setPublicHolidays] = useState<Map<string, string>>(new Map());
+  const [birthdays, setBirthdays] = useState<Map<string, string[]>>(new Map());
   const [leaveSummary, setLeaveSummary] = useState<LeaveSummary | null>(null);
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
@@ -158,6 +160,23 @@ export default function AnnualLeave() {
       setMyRequests(myReqs);
       setPendingRequests(roleData.pending);
       setAllRequests(roleData.all);
+
+      // 전 직원 생일 정보 로드 (PII 최소화: 서버에서 이름+MMDD만 수신)
+      try {
+        const resp = await authFetch('/api/users/birthdays');
+        if (resp.ok) {
+          const data = await resp.json();
+          const bMap = new Map<string, string[]>();
+          for (const item of (data.birthdays || []) as { name: string; birth_mmdd: string }[]) {
+            const list = bMap.get(item.birth_mmdd) || [];
+            list.push(item.name);
+            bMap.set(item.birth_mmdd, list);
+          }
+          setBirthdays(bMap);
+        }
+      } catch (e) {
+        console.warn('[AnnualLeave] 생일 정보 로드 실패:', e);
+      }
 
       if (isSuperAdmin || (isTeamLeader && user.team_id)) {
         const allUsers = await getAllUsers();
@@ -594,6 +613,8 @@ export default function AnnualLeave() {
                   const dayOfWeek = date.getDay();
                   const isSelected = selectedDate === dateStr;
                   const leaveOnDate = approvedLeaveDates.get(dateStr);
+                  const mmdd = format(date, 'MM-dd');
+                  const birthdayNames = birthdays.get(mmdd);
 
                   return (
                     <button
@@ -625,6 +646,16 @@ export default function AnnualLeave() {
                       {isHoliday && (
                         <div className="text-[10px] text-red-500 truncate">
                           {holidayName}
+                        </div>
+                      )}
+                      {birthdayNames && birthdayNames.length > 0 && (
+                        <div
+                          className="flex items-center gap-0.5 text-[10px] text-pink-600 dark:text-pink-400 truncate"
+                          title={`🎂 ${birthdayNames.join(', ')} 생일`}
+                          data-testid={`birthday-${dateStr}`}
+                        >
+                          <Cake className="w-2.5 h-2.5 flex-shrink-0" />
+                          <span className="truncate">{birthdayNames.join(', ')}</span>
                         </div>
                       )}
                       {leaveOnDate && leaveOnDate.length > 0 && (
@@ -663,6 +694,10 @@ export default function AnnualLeave() {
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded bg-red-100 dark:bg-red-950" />
                   <span>공휴일</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Cake className="h-3 w-3 text-pink-600 dark:text-pink-400" />
+                  <span>직원 생일</span>
                 </div>
               </div>
 

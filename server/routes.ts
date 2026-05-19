@@ -1822,6 +1822,34 @@ export async function registerRoutes(
   });
 
   // 사용자 Custom Claims 조회 (super_admin 전용)
+  // 직원 생일 목록 (PII 최소화: 이름+MMDD만 반환)
+  app.get("/api/users/birthdays", requireAuth, async (_req: AuthenticatedRequest, res) => {
+    try {
+      const db = admin.firestore();
+      const snap = await db.collection('users').select('name', 'ssn_front', 'status').get();
+      const list: { name: string; birth_mmdd: string }[] = [];
+      snap.forEach(doc => {
+        const d = doc.data() as any;
+        if (d.status === '퇴사') return;
+        const s = String(d.ssn_front || '').replace(/\D/g, '');
+        if (s.length < 6) return;
+        const mm = s.slice(2, 4);
+        const dd = s.slice(4, 6);
+        const mmN = parseInt(mm, 10);
+        const ddN = parseInt(dd, 10);
+        if (!(mmN >= 1 && mmN <= 12)) return;
+        const maxDay = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mmN - 1];
+        if (!(ddN >= 1 && ddN <= maxDay)) return;
+        if (!d.name) return;
+        list.push({ name: String(d.name), birth_mmdd: `${mm}-${dd}` });
+      });
+      res.json({ success: true, birthdays: list });
+    } catch (err: any) {
+      console.error('[birthdays] error:', err);
+      res.status(500).json({ success: false, error: err?.message || 'failed' });
+    }
+  });
+
   app.get("/api/admin/get-custom-claims/:uid", requireAuth, requireSuperAdmin, async (req, res) => {
     console.log("📥 [Admin] Custom Claims 조회 요청");
     
