@@ -109,6 +109,7 @@ export default function Dashboard() {
   // 재분배 풀 (공동영업 풀)
   const [redistributionPoolCount, setRedistributionPoolCount] = useState(0);
   const [redistributionPoolOpen, setRedistributionPoolOpen] = useState(false);
+  const [reopenPoolAfterDetail, setReopenPoolAfterDetail] = useState(false);
 
   const fetchRedistributionPoolCount = async () => {
     try {
@@ -2085,7 +2086,11 @@ export default function Dashboard() {
           setSelectedCustomer(null);
           setIsNewCustomerModal(false);
           setDetailModalInitialTab('memo');
-          // 모달 내에서 onSave를 통해 로컬 상태가 이미 업데이트되므로 전체 새로고침 불필요
+          // 풀에서 진입한 경우: 상세 닫히면 풀로 복귀
+          if (reopenPoolAfterDetail) {
+            setReopenPoolAfterDetail(false);
+            setTimeout(() => setRedistributionPoolOpen(true), 50);
+          }
         }}
         customer={selectedCustomer}
         isNewCustomer={isNewCustomerModal}
@@ -2490,11 +2495,14 @@ export default function Dashboard() {
         open={redistributionPoolOpen}
         onOpenChange={setRedistributionPoolOpen}
         onOpenCustomer={(customerId) => {
+          // 풀에서 상세 진입: target을 찾은 경우에만 플래그 세팅 (못 찾으면 새로고침 후 풀로 안 돌아옴)
           const target = customersRef.current.find(c => c.id === customerId);
           if (target) {
+            setReopenPoolAfterDetail(true);
+            setRedistributionPoolOpen(false);
             handleCustomerClick(target);
           } else {
-            // 다른 담당 고객이라 목록에 없을 수 있음 → sessionStorage 후 새로고침 트리거
+            // 다른 담당 고객이라 목록에 없음 → 새로고침만, 풀은 닫지 않음
             try { sessionStorage.setItem('pendingOpenCustomerId', customerId); } catch {}
             handleRefreshAll();
           }

@@ -51,6 +51,15 @@ function getContractTypeLabel(contractType: ContractType): string {
 const REDISTRIBUTION_TRIGGER_DAYS = 14;
 const TEMP_ASSIGNMENT_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
 
+// 재분배 풀 응답 캐시 (모듈 레벨) — tryConfirmRedistribution 등 다른 경로에서도 무효화 가능
+let redistributionPoolCache: { at: number; payload: any; gen: number } | null = null;
+let redistributionPoolGen = 0;
+const REDISTRIBUTION_POOL_TTL_MS = 30 * 1000;
+function invalidateRedistributionPoolCache() {
+  redistributionPoolCache = null;
+  redistributionPoolGen++;
+}
+
 async function tryConfirmRedistribution(
   firestore: FirebaseFirestore.Firestore,
   customerId: string,
@@ -131,6 +140,7 @@ async function tryConfirmRedistribution(
       confirmed_at: now.toISOString(),
     });
 
+    invalidateRedistributionPoolCache();
     console.log(`[Redistribution] 확정: customer=${customerId}, ${result.originalManagerName} → ${result.pickerName} (${sourceLabel})`);
     return { confirmed: true, pickerName: result.pickerName, originalManagerName: result.originalManagerName };
   } catch (err: any) {
@@ -3878,6 +3888,15 @@ export async function registerRoutes(
       const firestore = adminApp.firestore();
       const nowMs = Date.now();
       const cutoffMs = nowMs - REDISTRIBUTION_TRIGGER_DAYS * 24 * 60 * 60 * 1000;
+      const wantDebugEarly = !!((_req as any).query?.debug);
+
+      // 캐시 히트: 30초 이내 응답 재사용 (debug 요청은 캐시 무시)
+      if (!wantDebugEarly && redistributionPoolCache && (nowMs - redistributionPoolCache.at) < REDISTRIBUTION_POOL_TTL_MS) {
+        return res.json(redistributionPoolCache.payload);
+      }
+
+      // 동시 GET 시 늦게 끝난 응답이 캐시를 덮어쓰지 않도록 generation 스냅샷
+      const startGen = redistributionPoolGen;
 
       // 소급(legacy) 풀 대상 상태 — 계약 마무리 전 단계이면서 EXCLUDED에 없는 상태들.
       // 희망타겟(미동의류) + 계약서발송완료 그룹 + 수납대기 포함.
@@ -4010,11 +4029,9 @@ export async function registerRoutes(
         legacyCandidates.push({ cid: doc.id, data });
       }
 
-      // 각 후보의 진입 시각을 병렬로 조회 (제한: 한 번에 최대 20개씩 처리)
-      const LEGACY_BATCH = 20;
-      for (let i = 0; i < legacyCandidates.length; i += LEGACY_BATCH) {
-        const slice = legacyCandidates.slice(i, i + LEGACY_BATCH);
-        await Promise.all(slice.map(async ({ cid, data }) => {
+      // 각 후보의 진입 시각을 전부 병렬 조회 (Firestore가 자체 컨커런시 제한 처리)
+      {
+        await Promise.all(legacyCandidates.map(async ({ cid, data }) => {
           const currentStatus = String(data.status_code || '');
           let enteredAtMs = 0;
           let enteredAtIso = '';
@@ -4082,7 +4099,12 @@ export async function registerRoutes(
       const cids = Array.from(triggerByCust.keys());
       if (cids.length === 0) {
         console.log('[/api/redistribution-pool] stats:', JSON.stringify(debugPayload()));
-        return res.json({ success: true, count: 0, items: [], ...(wantDebug ? { debug: debugPayload() } : {}) });
+        const emptyPayload = { success: true, count: 0, items: [], ...(wantDebug ? { debug: debugPayload() } : {}) };
+        // generation 변경 없을 때만 캐시 저장 (도중 invalidate가 일어났다면 폐기)
+        if (!wantDebug && redistributionPoolGen === startGen) {
+          redistributionPoolCache = { at: Date.now(), payload: emptyPayload, gen: startGen };
+        }
+        return res.json(emptyPayload);
       }
 
       // Firestore documentId IN 쿼리는 10개 제한 → batch
@@ -4135,16 +4157,21 @@ export async function registerRoutes(
         });
       }
 
-      // 임시배정 없는 건 우선 → 가장 오래된 트리거 순
+      // 임시배정 없는 건 우선 → 트리거 최근순 (sentAtMs DESC, days_since ASC)
       items.sort((a, b) => {
         const aLocked = a.temp_assignment ? 1 : 0;
         const bLocked = b.temp_assignment ? 1 : 0;
         if (aLocked !== bLocked) return aLocked - bLocked;
-        return b.trigger.days_since - a.trigger.days_since;
+        return a.trigger.days_since - b.trigger.days_since;
       });
 
       console.log('[/api/redistribution-pool] stats:', JSON.stringify(debugPayload()));
-      res.json({ success: true, count: items.length, items, ...(wantDebug ? { debug: debugPayload() } : {}) });
+      const payload = { success: true, count: items.length, items, ...(wantDebug ? { debug: debugPayload() } : {}) };
+      // generation 가드: 계산 도중 invalidate 발생 시 캐시 저장 스킵 (오래된 결과 덮어쓰기 방지)
+      if (!wantDebug && redistributionPoolGen === startGen) {
+        redistributionPoolCache = { at: Date.now(), payload, gen: startGen };
+      }
+      res.json(payload);
     } catch (error: any) {
       console.error('[/api/redistribution-pool] 실패:', error?.message || error);
       res.status(500).json({ success: false, error: error?.message || '풀 조회 실패' });
@@ -4221,6 +4248,7 @@ export async function registerRoutes(
         expires_at: result.newAssignment.expires_at,
       });
 
+      invalidateRedistributionPoolCache();
       res.json({ success: true, temp_assignment: result.newAssignment });
     } catch (error: any) {
       console.error('[/api/redistribution-pool/pickup] 실패:', error?.message || error);
@@ -4278,6 +4306,7 @@ export async function registerRoutes(
         released_at: now.toISOString(),
       });
 
+      invalidateRedistributionPoolCache();
       res.json({ success: true });
     } catch (error: any) {
       console.error('[/api/redistribution-pool/release] 실패:', error?.message || error);

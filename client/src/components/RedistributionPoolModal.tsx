@@ -181,7 +181,7 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                     <div className="flex items-center gap-2 flex-wrap">
                       <button
                         className="font-semibold text-base hover:underline text-left"
-                        onClick={() => { onOpenCustomer?.(item.customer_id); onOpenChange(false); }}
+                        onClick={() => { onOpenCustomer?.(item.customer_id); }}
                         data-testid={`button-open-customer-${item.customer_id}`}
                       >
                         {item.customer_name || '(이름 없음)'}
