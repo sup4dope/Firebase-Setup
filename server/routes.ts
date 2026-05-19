@@ -3879,17 +3879,28 @@ export async function registerRoutes(
       const nowMs = Date.now();
       const cutoffMs = nowMs - REDISTRIBUTION_TRIGGER_DAYS * 24 * 60 * 60 * 1000;
 
-      // 계약서발송완료 그룹 (소급 포함 대상 상태)
-      const LEGACY_PREPAY_STATUSES = ['계약서발송완료', '계약서발송완료(선불)', '계약서발송완료(후불)', '계약서발송완료(외주)'];
+      // 소급(legacy) 풀 대상 상태 — 계약 마무리 전 단계이면서 EXCLUDED에 없는 상태들.
+      // 희망타겟(미동의류) + 계약서발송완료 그룹 + 수납대기 포함.
+      const LEGACY_ACTIVE_STATUSES = [
+        // 희망타겟
+        '업력미달', '최근대출',
+        '인증미동의(국세청)', '인증미동의(공여내역)',
+        '진행기간 미동의', '자문료 미동의',
+        '계약금미동의(선불)', '계약금미동의(후불)',
+        // 계약서발송완료
+        '계약서발송완료', '계약서발송완료(선불)', '계약서발송완료(후불)', '계약서발송완료(외주)',
+        // 수납대기
+        '수납대기',
+      ];
 
       const [contractsSnap, paymentsSnap, legacyCustomersSnap] = await Promise.all([
         firestore.collection('contracts_eformsign')
           .where('status', 'in', ['발송완료', '서명대기', '작성완료', '수납대기'])
           .get(),
         firestore.collection('payments_paymint').where('state', '==', 'W').get(),
-        // 기존(소급) 건: 현재 계약서발송완료 상태인 모든 고객
+        // 기존(소급) 건: 활성 단계 상태에 있는 모든 고객
         firestore.collection('customers')
-          .where('status_code', 'in', LEGACY_PREPAY_STATUSES)
+          .where('status_code', 'in', LEGACY_ACTIVE_STATUSES)
           .get(),
       ]);
 
@@ -4027,19 +4038,7 @@ export async function registerRoutes(
         }));
       }
 
-      const cids = Array.from(triggerByCust.keys());
-      if (cids.length === 0) return res.json({ success: true, count: 0, items: [] });
-
-      // Firestore documentId IN 쿼리는 10개 제한 → batch
-      const customerDocs: FirebaseFirestore.DocumentSnapshot[] = [];
-      const BATCH = 30;
-      for (let i = 0; i < cids.length; i += BATCH) {
-        const slice = cids.slice(i, i + BATCH);
-        const docs = await firestore.getAll(...slice.map(id => firestore.collection('customers').doc(id)));
-        customerDocs.push(...docs);
-      }
-
-      // 디버그용 통계
+      // 디버그용 통계 (cids.length === 0인 경우에도 노출되도록 미리 선언)
       const debugStats = {
         contracts_total: contractsSnap.size,
         paymints_total: paymentsSnap.size,
@@ -4049,6 +4048,23 @@ export async function registerRoutes(
         excluded_by_status: {} as Record<string, number>,
         included_by_source: { contract: 0, paymint: 0, legacy: 0 },
       };
+      const debugPayload = () => ({ ...debugStats, dropReasons });
+      const wantDebug = !!((_req as any).query?.debug);
+
+      const cids = Array.from(triggerByCust.keys());
+      if (cids.length === 0) {
+        console.log('[/api/redistribution-pool] stats:', JSON.stringify(debugPayload()));
+        return res.json({ success: true, count: 0, items: [], ...(wantDebug ? { debug: debugPayload() } : {}) });
+      }
+
+      // Firestore documentId IN 쿼리는 10개 제한 → batch
+      const customerDocs: FirebaseFirestore.DocumentSnapshot[] = [];
+      const BATCH = 30;
+      for (let i = 0; i < cids.length; i += BATCH) {
+        const slice = cids.slice(i, i + BATCH);
+        const docs = await firestore.getAll(...slice.map(id => firestore.collection('customers').doc(id)));
+        customerDocs.push(...docs);
+      }
 
       const items: any[] = [];
       for (let i = 0; i < customerDocs.length; i++) {
@@ -4099,8 +4115,8 @@ export async function registerRoutes(
         return b.trigger.days_since - a.trigger.days_since;
       });
 
-      console.log('[/api/redistribution-pool] stats:', JSON.stringify({ ...debugStats, dropReasons }));
-      res.json({ success: true, count: items.length, items, ...(((_req as any).query?.debug) ? { debug: debugStats } : {}) });
+      console.log('[/api/redistribution-pool] stats:', JSON.stringify(debugPayload()));
+      res.json({ success: true, count: items.length, items, ...(wantDebug ? { debug: debugPayload() } : {}) });
     } catch (error: any) {
       console.error('[/api/redistribution-pool] 실패:', error?.message || error);
       res.status(500).json({ success: false, error: error?.message || '풀 조회 실패' });
