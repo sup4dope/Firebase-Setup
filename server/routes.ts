@@ -3872,7 +3872,7 @@ export async function registerRoutes(
   ]);
 
   // GET /api/redistribution-pool — 14일 경과 미수납 건 목록 (모든 로그인 사용자)
-  app.get("/api/redistribution-pool", requireAuth, async (_req: AuthenticatedRequest, res) => {
+  app.get("/api/redistribution-pool", requireAuth, async (_req: AuthenticatedRequest & { query: any }, res) => {
     try {
       const adminApp = getAdminApp();
       const firestore = adminApp.firestore();
@@ -3896,43 +3896,70 @@ export async function registerRoutes(
       type Trig = { sourceType: 'contract' | 'paymint' | 'legacy'; sourceId: string; sentAtMs: number; sentAt: string; templateName?: string; amountManWon?: number };
       const triggerByCust = new Map<string, Trig>();
 
+      // 드롭 사유 카운터
+      const dropReasons = {
+        contract_no_cid: 0, contract_no_sentAt: 0, contract_too_recent: 0, contract_added: 0,
+        paymint_no_cid: 0, paymint_no_sentAt: 0, paymint_too_recent: 0, paymint_added: 0,
+        legacy_no_log_no_fallback: 0, legacy_too_recent: 0, legacy_added: 0,
+      };
+
+      // Firestore Timestamp → ms 변환 헬퍼
+      const toMs = (raw: any): number => {
+        if (!raw) return 0;
+        if (raw?.toDate && typeof raw.toDate === 'function') {
+          return raw.toDate().getTime();
+        }
+        if (raw?._seconds !== undefined) {
+          return raw._seconds * 1000 + Math.floor((raw._nanoseconds || 0) / 1e6);
+        }
+        if (typeof raw === 'number') return raw;
+        const parsed = Date.parse(String(raw));
+        return isNaN(parsed) ? 0 : parsed;
+      };
+      const toIso = (raw: any): string => {
+        const ms = toMs(raw);
+        return ms ? new Date(ms).toISOString() : '';
+      };
+
       for (const doc of contractsSnap.docs) {
         const d = doc.data() as any;
         const cid = String(d.customer_id || '');
-        if (!cid) continue;
+        if (!cid) { dropReasons.contract_no_cid++; continue; }
         const sentAtRaw = d.sent_at || d.created_at;
-        if (!sentAtRaw) continue;
-        const sentMs = Date.parse(String(sentAtRaw));
-        if (isNaN(sentMs) || sentMs > cutoffMs) continue;
+        const sentMs = toMs(sentAtRaw);
+        if (!sentMs) { dropReasons.contract_no_sentAt++; continue; }
+        if (sentMs > cutoffMs) { dropReasons.contract_too_recent++; continue; }
         const existing = triggerByCust.get(cid);
         if (!existing || sentMs < existing.sentAtMs) {
           triggerByCust.set(cid, {
             sourceType: 'contract',
             sourceId: doc.id,
             sentAtMs: sentMs,
-            sentAt: String(sentAtRaw),
+            sentAt: toIso(sentAtRaw) || String(sentAtRaw),
             templateName: d.template_name,
             amountManWon: d.amount_man_won,
           });
+          if (!existing) dropReasons.contract_added++;
         }
       }
       for (const doc of paymentsSnap.docs) {
         const d = doc.data() as any;
         const cid = String(d.customer_id || '');
-        if (!cid) continue;
+        if (!cid) { dropReasons.paymint_no_cid++; continue; }
         const sentAtRaw = d.created_at;
-        if (!sentAtRaw) continue;
-        const sentMs = Date.parse(String(sentAtRaw));
-        if (isNaN(sentMs) || sentMs > cutoffMs) continue;
+        const sentMs = toMs(sentAtRaw);
+        if (!sentMs) { dropReasons.paymint_no_sentAt++; continue; }
+        if (sentMs > cutoffMs) { dropReasons.paymint_too_recent++; continue; }
         const existing = triggerByCust.get(cid);
         if (!existing || sentMs < existing.sentAtMs) {
           triggerByCust.set(cid, {
             sourceType: 'paymint',
             sourceId: doc.id,
             sentAtMs: sentMs,
-            sentAt: String(sentAtRaw),
+            sentAt: toIso(sentAtRaw) || String(sentAtRaw),
             amountManWon: d.contract_amount_manwon || d.amount_manwon,
           });
+          if (!existing) dropReasons.paymint_added++;
         }
       }
 
@@ -3987,7 +4014,8 @@ export async function registerRoutes(
               }
             }
           }
-          if (!enteredAtMs || isNaN(enteredAtMs) || enteredAtMs > cutoffMs) return;
+          if (!enteredAtMs || isNaN(enteredAtMs)) { dropReasons.legacy_no_log_no_fallback++; return; }
+          if (enteredAtMs > cutoffMs) { dropReasons.legacy_too_recent++; return; }
           triggerByCust.set(cid, {
             sourceType: 'legacy',
             sourceId: '',
@@ -3995,6 +4023,7 @@ export async function registerRoutes(
             sentAt: enteredAtIso,
             amountManWon: data.contract_amount || data.deposit_amount,
           });
+          dropReasons.legacy_added++;
         }));
       }
 
@@ -4010,14 +4039,29 @@ export async function registerRoutes(
         customerDocs.push(...docs);
       }
 
+      // 디버그용 통계
+      const debugStats = {
+        contracts_total: contractsSnap.size,
+        paymints_total: paymentsSnap.size,
+        legacy_candidates: legacyCandidates.length,
+        triggers_collected: triggerByCust.size,
+        customer_not_found: 0,
+        excluded_by_status: {} as Record<string, number>,
+        included_by_source: { contract: 0, paymint: 0, legacy: 0 },
+      };
+
       const items: any[] = [];
       for (let i = 0; i < customerDocs.length; i++) {
         const cd = customerDocs[i];
-        if (!cd.exists) continue;
+        if (!cd.exists) { debugStats.customer_not_found++; continue; }
         const c = cd.data() as any;
         const status = String(c.status_code || '');
-        if (REDISTRIBUTION_EXCLUDED_STATUSES.has(status)) continue;
+        if (REDISTRIBUTION_EXCLUDED_STATUSES.has(status)) {
+          debugStats.excluded_by_status[status] = (debugStats.excluded_by_status[status] || 0) + 1;
+          continue;
+        }
         const trig = triggerByCust.get(cids[i])!;
+        debugStats.included_by_source[trig.sourceType]++;
 
         let tempAssignment = c.temp_assignment;
         if (tempAssignment && tempAssignment.expires_at) {
@@ -4055,7 +4099,8 @@ export async function registerRoutes(
         return b.trigger.days_since - a.trigger.days_since;
       });
 
-      res.json({ success: true, count: items.length, items });
+      console.log('[/api/redistribution-pool] stats:', JSON.stringify({ ...debugStats, dropReasons }));
+      res.json({ success: true, count: items.length, items, ...(((_req as any).query?.debug) ? { debug: debugStats } : {}) });
     } catch (error: any) {
       console.error('[/api/redistribution-pool] 실패:', error?.message || error);
       res.status(500).json({ success: false, error: error?.message || '풀 조회 실패' });
