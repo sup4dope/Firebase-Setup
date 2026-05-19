@@ -766,7 +766,7 @@ export default function AnnualLeave() {
                                 className="text-xs text-muted-foreground pl-5 whitespace-pre-wrap break-words"
                                 data-testid={`leave-reason-${req.id}`}
                               >
-                                <span className="font-medium">사유:</span> {req.reason.trim()}
+                                <span className="font-medium">사유:</span> {req.reason?.trim()}
                               </div>
                             )}
                           </div>

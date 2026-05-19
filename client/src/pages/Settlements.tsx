@@ -295,9 +295,14 @@ export default function Settlements() {
         const originalItems = managerItems.filter(item => !item.is_clawback);
         const clawbackItems = managerItems.filter(item => item.is_clawback);
         
-        // 계약 건수: 고유 고객 수로 계산 (같은 고객의 중복 승인/재집행은 1건으로 처리)
-        const uniqueCustomerIds = new Set(originalItems.map(item => item.customer_id));
-        const totalContracts = uniqueCustomerIds.size;
+        // 계약 건수: 계약금이 실제 발생한(>0) 고유 고객 수만 카운트
+        // 후불/외주 등 계약금 0원 건은 집행 건수에서만 카운트되고 계약 건수에는 포함되지 않음
+        const contractCustomerIds = new Set(
+          originalItems
+            .filter(item => (item.contract_amount || 0) > 0)
+            .map(item => item.customer_id)
+        );
+        const totalContracts = contractCustomerIds.size;
         // 집행 건수: execution_amount > 0 또는 채무조정 정산 (채무조정은 집행으로 간주)
         const executedItems = originalItems.filter(item => item.execution_amount > 0 || item.is_debt_adjustment);
         const executionCount = executedItems.length;
@@ -364,8 +369,13 @@ export default function Settlements() {
     const clawbackItems = items.filter(item => item.is_clawback);
     
     const contractAmount = originalItems.reduce((sum, item) => sum + Math.round(toWon(item.contract_amount) * (item.deposit_commission_rate ?? item.commission_rate) / 100), 0);
-    const uniqueCustomerIds = new Set(originalItems.map(item => item.customer_id));
-    const uniqueCustomerCount = uniqueCustomerIds.size;
+    // 평균 계약금액 분모: 계약금이 실제 발생한 고유 고객 수 (계약 건수 정의와 일치)
+    const contractCustomerIds = new Set(
+      originalItems
+        .filter(item => (item.contract_amount || 0) > 0)
+        .map(item => item.customer_id)
+    );
+    const uniqueCustomerCount = contractCustomerIds.size;
     const rawContractAmount = originalItems.reduce((sum, item) => sum + toWon(item.contract_amount), 0);
     const avgContractAmount = uniqueCustomerCount > 0 ? Math.round(rawContractAmount / uniqueCustomerCount) : 0;
     // 집행 건수: execution_amount > 0 또는 채무조정 정산 (채무조정은 집행으로 간주)
