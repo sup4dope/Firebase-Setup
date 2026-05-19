@@ -70,6 +70,29 @@ import { authFetch } from '@/lib/firebase';
 import { fetchYearlyHolidays, isWeekend } from '@/lib/publicHolidays';
 import type { LeaveRequest, LeaveType, LeaveStatus, LeaveSummary, InsertLeaveRequest, User } from '@shared/types';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
+function ReasonCell({ reason, testId }: { reason?: string; testId?: string }) {
+  const text = reason?.trim() || '-';
+  if (text === '-') {
+    return <span className="text-muted-foreground">-</span>;
+  }
+  return (
+    <Tooltip delayDuration={200}>
+      <TooltipTrigger asChild>
+        <div
+          className="max-w-[200px] truncate cursor-help"
+          data-testid={testId}
+        >
+          {text}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-sm whitespace-pre-wrap break-words">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 const LEAVE_TYPE_LABELS: Record<LeaveType, string> = {
   full: '전일 (1.0일)',
@@ -871,7 +894,9 @@ export default function AnnualLeave() {
                           <TableCell className="hidden md:table-cell">{format(req.created_at, 'yyyy-MM-dd')}</TableCell>
                           <TableCell>{req.leave_date}</TableCell>
                           <TableCell>{LEAVE_TYPE_LABELS[req.leave_type]}</TableCell>
-                          <TableCell className="max-w-[200px] truncate hidden md:table-cell">{req.reason}</TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <ReasonCell reason={req.reason} testId={`reason-my-${req.id}`} />
+                          </TableCell>
                           <TableCell>
                             <Badge className={STATUS_COLORS[req.status]}>
                               {STATUS_LABELS[req.status]}
@@ -938,7 +963,9 @@ export default function AnnualLeave() {
                               <TableCell className="hidden md:table-cell">{req.team_name || '-'}</TableCell>
                               <TableCell>{req.leave_date}</TableCell>
                               <TableCell>{LEAVE_TYPE_LABELS[req.leave_type]}</TableCell>
-                              <TableCell className="max-w-[200px] truncate hidden md:table-cell">{req.reason}</TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                <ReasonCell reason={req.reason} testId={`reason-pending-${req.id}`} />
+                              </TableCell>
                               <TableCell>
                                 <Badge className={STATUS_COLORS[req.status]}>
                                   {STATUS_LABELS[req.status]}
@@ -999,6 +1026,7 @@ export default function AnnualLeave() {
                           <TableHead className="whitespace-nowrap hidden md:table-cell">팀</TableHead>
                           <TableHead className="whitespace-nowrap">사용일</TableHead>
                           <TableHead className="whitespace-nowrap">유형</TableHead>
+                          <TableHead className="whitespace-nowrap hidden md:table-cell">사유</TableHead>
                           <TableHead className="whitespace-nowrap">상태</TableHead>
                           <TableHead className="whitespace-nowrap hidden md:table-cell">1차 승인</TableHead>
                           <TableHead className="whitespace-nowrap hidden md:table-cell">최종 승인</TableHead>
@@ -1012,6 +1040,9 @@ export default function AnnualLeave() {
                             <TableCell className="hidden md:table-cell">{req.team_name || '-'}</TableCell>
                             <TableCell>{req.leave_date}</TableCell>
                             <TableCell>{LEAVE_TYPE_LABELS[req.leave_type]}</TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              <ReasonCell reason={req.reason} testId={`reason-all-${req.id}`} />
+                            </TableCell>
                             <TableCell>
                               <Badge className={STATUS_COLORS[req.status]}>
                                 {STATUS_LABELS[req.status]}
