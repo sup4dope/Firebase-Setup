@@ -104,7 +104,7 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
       const res = await authFetch(`/api/redistribution-pool/release/${item.customer_id}`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || '해제 실패');
-      toast({ title: '임시배정 해제', description: `${item.customer_name || item.company_name} 해제됨` });
+      toast({ title: '임시배정 취소', description: `${item.customer_name || item.company_name} 취소됨` });
       await fetchPool();
       onPoolChanged?.();
     } catch (err: any) {
@@ -115,6 +115,12 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
   };
 
   const myUid = user?.uid || '';
+  const [tab, setTab] = useState<'all' | 'mine'>('all');
+
+  // 본인이 픽업한 임시배정 건 (만료된 건 서버에서 이미 null 처리되어 옴)
+  const myPickups = items.filter(it => it.temp_assignment && it.temp_assignment.picker_uid === myUid);
+  // 표시 목록: 탭별 필터. 락된 건이 다른 직원 화면에서도 사라지지 않도록 '전체' 탭은 모두 보존.
+  const visibleItems = tab === 'mine' ? myPickups : items;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -141,6 +147,26 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
           </DialogDescription>
         </DialogHeader>
 
+        {/* 탭: 전체 / 내 임시배정 */}
+        <div className="flex items-center gap-2 border-b pb-2">
+          <Button
+            variant={tab === 'all' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setTab('all')}
+            data-testid="tab-pool-all"
+          >
+            전체 <Badge variant="secondary" className="ml-1.5">{items.length}</Badge>
+          </Button>
+          <Button
+            variant={tab === 'mine' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setTab('mine')}
+            data-testid="tab-pool-mine"
+          >
+            내 임시배정 <Badge variant="secondary" className="ml-1.5">{myPickups.length}</Badge>
+          </Button>
+        </div>
+
         <div className="flex-1 overflow-y-auto pr-1 space-y-2">
           {loading && items.length === 0 && (
             <div className="space-y-2">
@@ -148,15 +174,24 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
             </div>
           )}
 
-          {!loading && items.length === 0 && (
+          {!loading && visibleItems.length === 0 && (
             <div className="text-center py-12 text-muted-foreground" data-testid="empty-pool">
               <AlertCircle className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              <p>현재 재분배 풀에 표시할 건이 없습니다.</p>
-              <p className="text-sm mt-1">계약서/청구서 발송 후 14일이 지난 미수납 건이 자동으로 표시됩니다.</p>
+              {tab === 'mine' ? (
+                <>
+                  <p>본인이 픽업한 임시배정 건이 없습니다.</p>
+                  <p className="text-sm mt-1">'전체' 탭에서 픽업하면 여기에 표시됩니다.</p>
+                </>
+              ) : (
+                <>
+                  <p>현재 재분배 풀에 표시할 건이 없습니다.</p>
+                  <p className="text-sm mt-1">계약서/청구서 발송 후 14일이 지난 미수납 건이 자동으로 표시됩니다.</p>
+                </>
+              )}
             </div>
           )}
 
-          {items.map(item => {
+          {visibleItems.map(item => {
             const ta = item.temp_assignment;
             const isMine = ta && ta.picker_uid === myUid;
             const lockedByOther = ta && !isMine;
@@ -246,7 +281,7 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                         data-testid={`button-release-${item.customer_id}`}
                       >
                         <Unlock className="w-4 h-4 mr-1" />
-                        임시배정 해제
+                        임시배정 취소
                       </Button>
                     )}
                     {lockedByOther && isSuperAdmin && (
@@ -258,7 +293,7 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                         data-testid={`button-admin-release-${item.customer_id}`}
                       >
                         <Unlock className="w-4 h-4 mr-1" />
-                        관리자 강제 해제
+                        관리자 강제 취소
                       </Button>
                     )}
                   </div>
