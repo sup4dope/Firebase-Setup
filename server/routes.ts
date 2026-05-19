@@ -4083,11 +4083,41 @@ export async function registerRoutes(
         }));
       }
 
+      // 4) 임시배정이 활성인 고객은 트리거 조건과 무관하게 무조건 풀에 포함 (소급/예외 케이스)
+      //    - 다른 트리거(계약/결제/legacy)에 안 잡혀도 본인 '내 임시배정' 탭과 다른 직원 '전체' 탭에 모두 노출됨
+      let tempAssignedAdded = 0;
+      try {
+        const nowIso = new Date(nowMs).toISOString();
+        const tempAssignedSnap = await firestore.collection('customers')
+          .where('temp_assignment.expires_at', '>', nowIso)
+          .get();
+        for (const doc of tempAssignedSnap.docs) {
+          if (triggerByCust.has(doc.id)) continue;
+          const d = doc.data() as any;
+          const ta = d.temp_assignment || {};
+          const pickedAtMs = ta.picked_at ? Date.parse(String(ta.picked_at))
+            : (d.updated_at?.toDate ? d.updated_at.toDate().getTime()
+              : (d.updated_at ? Date.parse(String(d.updated_at)) : nowMs));
+          const pickedAtIso = ta.picked_at || new Date(pickedAtMs || nowMs).toISOString();
+          triggerByCust.set(doc.id, {
+            sourceType: 'legacy',
+            sourceId: '',
+            sentAtMs: pickedAtMs || nowMs,
+            sentAt: pickedAtIso,
+            amountManWon: d.contract_amount || d.deposit_amount,
+          });
+          tempAssignedAdded++;
+        }
+      } catch (e: any) {
+        console.warn('[/api/redistribution-pool] 임시배정 활성 조회 실패 (인덱스 미설정 가능):', e?.message || e);
+      }
+
       // 디버그용 통계 (cids.length === 0인 경우에도 노출되도록 미리 선언)
       const debugStats = {
         contracts_total: contractsSnap.size,
         paymints_total: paymentsSnap.size,
         legacy_candidates: legacyCandidates.length,
+        temp_assigned_added: tempAssignedAdded,
         triggers_collected: triggerByCust.size,
         customer_not_found: 0,
         excluded_by_status: {} as Record<string, number>,
