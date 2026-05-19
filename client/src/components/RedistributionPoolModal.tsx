@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/lib/firebase';
-import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw } from 'lucide-react';
+import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw, History } from 'lucide-react';
 
 interface PoolItem {
   customer_id: string;
@@ -20,7 +20,7 @@ interface PoolItem {
   team_id: string;
   team_name: string;
   trigger: {
-    type: 'contract' | 'paymint';
+    type: 'contract' | 'paymint' | 'legacy';
     sent_at: string;
     days_since: number;
     template_name: string | null;
@@ -161,8 +161,14 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
             const isMine = ta && ta.picker_uid === myUid;
             const lockedByOther = ta && !isMine;
             const busy = busyIds.has(item.customer_id);
-            const trigLabel = item.trigger.type === 'contract' ? '계약서 발송' : '청구서 발송';
-            const TrigIcon = item.trigger.type === 'contract' ? FileText : CreditCard;
+            const trigLabel =
+              item.trigger.type === 'contract' ? '계약서 발송'
+              : item.trigger.type === 'paymint' ? '청구서 발송'
+              : '계약서발송완료 진입 (소급)';
+            const TrigIcon =
+              item.trigger.type === 'contract' ? FileText
+              : item.trigger.type === 'paymint' ? CreditCard
+              : History;
 
             return (
               <div

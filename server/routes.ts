@@ -3879,14 +3879,21 @@ export async function registerRoutes(
       const nowMs = Date.now();
       const cutoffMs = nowMs - REDISTRIBUTION_TRIGGER_DAYS * 24 * 60 * 60 * 1000;
 
-      const [contractsSnap, paymentsSnap] = await Promise.all([
+      // 계약서발송완료 그룹 (소급 포함 대상 상태)
+      const LEGACY_PREPAY_STATUSES = ['계약서발송완료', '계약서발송완료(선불)', '계약서발송완료(후불)', '계약서발송완료(외주)'];
+
+      const [contractsSnap, paymentsSnap, legacyCustomersSnap] = await Promise.all([
         firestore.collection('contracts_eformsign')
           .where('status', 'in', ['발송완료', '서명대기', '작성완료', '수납대기'])
           .get(),
         firestore.collection('payments_paymint').where('state', '==', 'W').get(),
+        // 기존(소급) 건: 현재 계약서발송완료 상태인 모든 고객
+        firestore.collection('customers')
+          .where('status_code', 'in', LEGACY_PREPAY_STATUSES)
+          .get(),
       ]);
 
-      type Trig = { sourceType: 'contract' | 'paymint'; sourceId: string; sentAtMs: number; sentAt: string; templateName?: string; amountManWon?: number };
+      type Trig = { sourceType: 'contract' | 'paymint' | 'legacy'; sourceId: string; sentAtMs: number; sentAt: string; templateName?: string; amountManWon?: number };
       const triggerByCust = new Map<string, Trig>();
 
       for (const doc of contractsSnap.docs) {
@@ -3927,6 +3934,68 @@ export async function registerRoutes(
             amountManWon: d.contract_amount_manwon || d.amount_manwon,
           });
         }
+      }
+
+      // 3) 소급(legacy) 건: 계약서발송완료 상태인데 위 두 소스에 없는 고객
+      //    트리거 시각은 status_logs에서 해당 상태로 진입한 가장 최근 시각을 사용 (없으면 customer.updated_at 또는 created_at 폴백)
+      const legacyCandidates: Array<{ cid: string; data: any }> = [];
+      for (const doc of legacyCustomersSnap.docs) {
+        if (triggerByCust.has(doc.id)) continue; // 이미 contract/paymint로 잡힘
+        legacyCandidates.push({ cid: doc.id, data: doc.data() });
+      }
+
+      // 각 후보의 진입 시각을 병렬로 조회 (제한: 한 번에 최대 20개씩 처리)
+      const LEGACY_BATCH = 20;
+      for (let i = 0; i < legacyCandidates.length; i += LEGACY_BATCH) {
+        const slice = legacyCandidates.slice(i, i + LEGACY_BATCH);
+        await Promise.all(slice.map(async ({ cid, data }) => {
+          const currentStatus = String(data.status_code || '');
+          let enteredAtMs = 0;
+          let enteredAtIso = '';
+          try {
+            const logSnap = await firestore.collection('status_logs')
+              .where('customer_id', '==', cid)
+              .where('new_status', '==', currentStatus)
+              .orderBy('changed_at', 'desc')
+              .limit(1)
+              .get();
+            if (!logSnap.empty) {
+              const log = logSnap.docs[0].data() as any;
+              const raw = log.changed_at;
+              if (raw?.toDate) {
+                const dt = raw.toDate();
+                enteredAtMs = dt.getTime();
+                enteredAtIso = dt.toISOString();
+              } else if (raw) {
+                enteredAtMs = Date.parse(String(raw));
+                enteredAtIso = String(raw);
+              }
+            }
+          } catch {
+            // status_logs 인덱스 미설정 시 폴백
+          }
+          if (!enteredAtMs) {
+            const raw = data.updated_at || data.created_at;
+            if (raw) {
+              if (raw?.toDate) {
+                const dt = raw.toDate();
+                enteredAtMs = dt.getTime();
+                enteredAtIso = dt.toISOString();
+              } else {
+                enteredAtMs = Date.parse(String(raw));
+                enteredAtIso = String(raw);
+              }
+            }
+          }
+          if (!enteredAtMs || isNaN(enteredAtMs) || enteredAtMs > cutoffMs) return;
+          triggerByCust.set(cid, {
+            sourceType: 'legacy',
+            sourceId: '',
+            sentAtMs: enteredAtMs,
+            sentAt: enteredAtIso,
+            amountManWon: data.contract_amount || data.deposit_amount,
+          });
+        }));
       }
 
       const cids = Array.from(triggerByCust.keys());
