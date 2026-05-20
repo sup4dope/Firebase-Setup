@@ -3530,6 +3530,21 @@ export async function registerRoutes(
         payments = payments.slice(0, queryLimit);
       }
 
+      // 발송자/담당자 이름을 users 컬렉션의 최신 name으로 덮어쓰기 (개명/표기변경 대응)
+      const uidsToResolve = new Set<string>();
+      for (const p of payments as any[]) {
+        if (p.sent_by) uidsToResolve.add(p.sent_by);
+        if (p.manager_id) uidsToResolve.add(p.manager_id);
+      }
+      if (uidsToResolve.size > 0) {
+        const nameMap = await fetchUserNamesByUid(firestore, Array.from(uidsToResolve));
+        payments = (payments as any[]).map(p => ({
+          ...p,
+          sent_by_name: (p.sent_by && nameMap[p.sent_by]) || p.sent_by_name || '',
+          manager_name: (p.manager_id && nameMap[p.manager_id]) || p.manager_name || '',
+        }));
+      }
+
       res.json(payments);
     } catch (error: any) {
       console.error('[PayMint Payments] 오류:', error.message);
