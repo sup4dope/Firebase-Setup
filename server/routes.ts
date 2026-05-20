@@ -54,6 +54,25 @@ const TEMP_ASSIGNMENT_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
 // 재분배 풀 통계 캐시 (super_admin 전용, days별)
 const redistributionStatsCache = new Map<number, { at: number; payload: any }>();
 const REDISTRIBUTION_STATS_TTL_MS = 30_000;
+// 여러 uid에 대해 users 컬렉션에서 최신 이름을 일괄 조회 → Map<uid, name> 반환.
+// 개명·표기변경 시 로그에 박제된 picker_name 대신 전산 등록 이름을 노출하기 위함.
+async function fetchUserNamesByUid(
+  firestore: FirebaseFirestore.Firestore,
+  uids: string[]
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const unique = Array.from(new Set(uids.filter(Boolean)));
+  if (unique.length === 0) return map;
+  const results = await Promise.all(unique.map(uid => firestore.collection('users').doc(uid).get()));
+  for (const snap of results) {
+    if (!snap.exists) continue;
+    const u = snap.data() as any;
+    const name = String(u?.name || u?.display_name || '').trim();
+    if (name) map.set(snap.id, name);
+  }
+  return map;
+}
+
 function invalidateRedistributionStatsCache() {
   redistributionStatsCache.clear();
 }
@@ -4489,6 +4508,61 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/redistribution-pool/history/:customerId — 고객별 픽업 이력 (전 직원 조회 가능)
+  // redistribution_logs에서 customer_id별 모든 액션(pickup/release/confirm/exclude/exclude_undo)을 시간순 반환
+  app.get("/api/redistribution-pool/history/:customerId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { customerId } = req.params;
+      if (!customerId) return res.status(400).json({ success: false, error: 'customerId 필요' });
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+
+      const snap = await firestore.collection('redistribution_logs')
+        .where('customer_id', '==', customerId)
+        .get();
+
+      // users 컬렉션에서 최신 이름 매핑 (퇴사·개명 등 반영)
+      const uids = new Set<string>();
+      const docs = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+      for (const l of docs) {
+        if (l.picker_uid) uids.add(String(l.picker_uid));
+        if (l.actor_uid) uids.add(String(l.actor_uid));
+        if (l.new_manager_id) uids.add(String(l.new_manager_id));
+        if (l.original_manager_id) uids.add(String(l.original_manager_id));
+      }
+      const uidArr = Array.from(uids).filter(Boolean);
+      const nameByUid = await fetchUserNamesByUid(firestore, uidArr);
+      const resolveName = (uid: string, fallback: string) => (uid && nameByUid.get(uid)) || fallback || '';
+
+      // 시각 필드 통합 (action별로 다름)
+      const items = docs.map((l: any) => {
+        const at = l.picked_at || l.released_at || l.confirmed_at || l.at || '';
+        return {
+          id: l.id,
+          action: l.action || '',
+          at,
+          picker_uid: l.picker_uid || '',
+          picker_name: resolveName(l.picker_uid || '', l.picker_name || ''),
+          actor_uid: l.actor_uid || '',
+          actor_name: resolveName(l.actor_uid || '', l.actor_name || ''),
+          new_manager_id: l.new_manager_id || '',
+          new_manager_name: resolveName(l.new_manager_id || '', l.new_manager_name || ''),
+          original_manager_id: l.original_manager_id || '',
+          original_manager_name: resolveName(l.original_manager_id || '', l.original_manager_name || ''),
+          source: l.source || '',
+          expires_at: l.expires_at || '',
+        };
+      })
+      .filter(it => !!it.at)
+      .sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+
+      res.json({ success: true, count: items.length, items });
+    } catch (error: any) {
+      console.error('[/api/redistribution-pool/history] 실패:', error?.message || error);
+      res.status(500).json({ success: false, error: error?.message || '이력 조회 실패' });
+    }
+  });
+
   // GET /api/redistribution-pool/stats — 관리자 통계 (super_admin 전용)
   // 활성 임시배정, 픽업 통계, 메이드(확정) 통계를 집계해서 반환
   app.get("/api/redistribution-pool/stats", requireAuth, async (req: AuthenticatedRequest, res) => {
@@ -4598,6 +4672,24 @@ export async function registerRoutes(
       const pickupsByUser = aggregateByUser(pickupLogs, 'picker_uid', 'picker_name');
       const confirmsByUser = aggregateByUser(confirmLogs, 'new_manager_id', 'new_manager_name');
 
+      // users 컬렉션에서 최신 이름으로 덮어쓰기 (개명/표기변경 반영, 로그의 picker_name은 박제된 값)
+      const allUids = new Set<string>();
+      for (const u of pickupsByUser) allUids.add(u.uid);
+      for (const u of confirmsByUser) allUids.add(u.uid);
+      for (const a of activeAssignments) { if (a.picker_uid) allUids.add(a.picker_uid); }
+      for (const l of confirmLogs) { if (l.new_manager_id) allUids.add(String(l.new_manager_id)); if (l.picker_uid) allUids.add(String(l.picker_uid)); }
+      for (const l of pickupLogs) { if (l.picker_uid) allUids.add(String(l.picker_uid)); }
+      const nameByUid = await fetchUserNamesByUid(firestore, Array.from(allUids));
+      const applyName = (uid: string, fallback: string) => (uid && nameByUid.get(uid)) || fallback || '';
+      for (const u of pickupsByUser) u.name = applyName(u.uid, u.name);
+      for (const u of confirmsByUser) u.name = applyName(u.uid, u.name);
+      for (const a of activeAssignments) a.picker_name = applyName(a.picker_uid, a.picker_name);
+      const remapLog = (l: any) => ({
+        ...l,
+        picker_name: applyName(String(l.picker_uid || ''), String(l.picker_name || '')),
+        new_manager_name: applyName(String(l.new_manager_id || ''), String(l.new_manager_name || '')),
+      });
+
       const payload = {
         success: true,
         period_days: days,
@@ -4611,8 +4703,8 @@ export async function registerRoutes(
         active_assignments: activeAssignments,
         pickups_by_user: pickupsByUser,
         confirms_by_user: confirmsByUser,
-        recent_confirms: confirmLogs.slice(0, 20),
-        recent_pickups: pickupLogs.slice(0, 20),
+        recent_confirms: confirmLogs.slice(0, 20).map(remapLog),
+        recent_pickups: pickupLogs.slice(0, 20).map(remapLog),
       };
       redistributionStatsCache.set(days, { at: nowMs, payload });
       res.json(payload);

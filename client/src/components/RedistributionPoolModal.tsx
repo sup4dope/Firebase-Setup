@@ -86,6 +86,59 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
     });
   };
 
+  // 픽업 이력 (전 직원 조회 가능) — 고객별 lazy fetch, 토글 expand
+  interface HistoryItem {
+    id: string;
+    action: string;
+    at: string;
+    picker_name: string;
+    actor_name: string;
+    new_manager_name: string;
+    original_manager_name: string;
+    source: string;
+    expires_at: string;
+  }
+  const [historyByCustomer, setHistoryByCustomer] = useState<Record<string, HistoryItem[] | 'loading' | 'error'>>({});
+  const [historyOpen, setHistoryOpen] = useState<Set<string>>(new Set());
+
+  const toggleHistory = async (customerId: string) => {
+    setHistoryOpen(prev => {
+      const next = new Set(prev);
+      if (next.has(customerId)) next.delete(customerId); else next.add(customerId);
+      return next;
+    });
+    if (historyByCustomer[customerId] && historyByCustomer[customerId] !== 'error') return;
+    setHistoryByCustomer(prev => ({ ...prev, [customerId]: 'loading' }));
+    try {
+      const res = await authFetch(`/api/redistribution-pool/history/${customerId}`);
+      if (!res.ok) throw new Error('이력 조회 실패');
+      const data = await res.json();
+      setHistoryByCustomer(prev => ({ ...prev, [customerId]: Array.isArray(data.items) ? data.items : [] }));
+    } catch (err: any) {
+      setHistoryByCustomer(prev => ({ ...prev, [customerId]: 'error' }));
+      toast({ title: '오류', description: err?.message || '이력을 불러오지 못했습니다.', variant: 'destructive' });
+    }
+  };
+
+  const formatHistoryAt = (iso: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const actionLabel = (action: string) => {
+    switch (action) {
+      case 'pickup': return { text: '픽업', cls: 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300' };
+      case 'release': return { text: '임시배정 해제', cls: 'bg-gray-100 dark:bg-gray-800/40 text-gray-700 dark:text-gray-300' };
+      case 'confirm': return { text: '메이드(확정)', cls: 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300' };
+      case 'exclude': return { text: '풀 영구 제외', cls: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300' };
+      case 'exclude_undo': return { text: '제외 해제', cls: 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300' };
+      default: return { text: action || '-', cls: 'bg-muted text-muted-foreground' };
+    }
+  };
+
   const handlePickup = async (item: PoolItem) => {
     if (!user) return;
     setBusy(item.customer_id, true);
@@ -589,6 +642,16 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => toggleHistory(item.customer_id)}
+                      data-testid={`button-history-${item.customer_id}`}
+                      title="이 고객의 픽업/확정/해제 이력 보기"
+                    >
+                      <History className="w-4 h-4 mr-1" />
+                      이력
+                    </Button>
                     {!ta && (
                       <Button
                         size="sm"
@@ -640,6 +703,63 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                     )}
                   </div>
                 </div>
+
+                {/* 픽업 이력 (토글 expand) — 전 직원 조회 가능 */}
+                {historyOpen.has(item.customer_id) && (
+                  <div className="mt-3 border-t pt-2.5" data-testid={`history-panel-${item.customer_id}`}>
+                    <div className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
+                      <History className="w-3.5 h-3.5" />
+                      재분배 이력
+                    </div>
+                    {historyByCustomer[item.customer_id] === 'loading' && (
+                      <div className="space-y-1">
+                        <Skeleton className="h-6 w-full" />
+                        <Skeleton className="h-6 w-2/3" />
+                      </div>
+                    )}
+                    {historyByCustomer[item.customer_id] === 'error' && (
+                      <div className="text-sm text-destructive flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> 이력을 불러오지 못했습니다.
+                        <button className="underline ml-1" onClick={() => toggleHistory(item.customer_id)}>다시 시도</button>
+                      </div>
+                    )}
+                    {Array.isArray(historyByCustomer[item.customer_id]) && (
+                      (historyByCustomer[item.customer_id] as HistoryItem[]).length === 0 ? (
+                        <div className="text-sm text-muted-foreground">이력이 없습니다.</div>
+                      ) : (
+                        <ul className="space-y-1">
+                          {(historyByCustomer[item.customer_id] as HistoryItem[]).map(h => {
+                            const lab = actionLabel(h.action);
+                            // 액션별로 강조 표시할 사람: pickup/release는 picker, confirm은 new_manager, exclude는 actor
+                            const who =
+                              h.action === 'confirm' ? (h.new_manager_name || h.picker_name)
+                              : (h.action === 'exclude' || h.action === 'exclude_undo') ? (h.actor_name || h.picker_name)
+                              : (h.picker_name || h.actor_name);
+                            return (
+                              <li
+                                key={h.id}
+                                className="flex items-center gap-2 text-sm flex-wrap"
+                                data-testid={`history-entry-${h.id}`}
+                              >
+                                <span className="text-xs text-muted-foreground font-mono w-32 flex-shrink-0">{formatHistoryAt(h.at)}</span>
+                                <Badge variant="outline" className={`text-xs px-1.5 py-0 ${lab.cls}`}>{lab.text}</Badge>
+                                <span className="font-medium" data-testid={`history-actor-${h.id}`}>{who || '-'}</span>
+                                {h.action === 'confirm' && h.original_manager_name && h.original_manager_name !== h.new_manager_name && (
+                                  <span className="text-xs text-muted-foreground">
+                                    (원담당: {h.original_manager_name})
+                                  </span>
+                                )}
+                                {h.source && (
+                                  <span className="text-xs text-muted-foreground">· {h.source}</span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
