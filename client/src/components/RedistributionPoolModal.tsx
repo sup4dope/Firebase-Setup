@@ -99,26 +99,26 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
     expires_at: string;
   }
   const [historyByCustomer, setHistoryByCustomer] = useState<Record<string, HistoryItem[] | 'loading' | 'error'>>({});
-  const [historyOpen, setHistoryOpen] = useState<Set<string>>(new Set());
 
-  const toggleHistory = async (customerId: string) => {
-    setHistoryOpen(prev => {
-      const next = new Set(prev);
-      if (next.has(customerId)) next.delete(customerId); else next.add(customerId);
-      return next;
-    });
-    if (historyByCustomer[customerId] && historyByCustomer[customerId] !== 'error') return;
+  const fetchHistory = useCallback(async (customerId: string) => {
     setHistoryByCustomer(prev => ({ ...prev, [customerId]: 'loading' }));
     try {
       const res = await authFetch(`/api/redistribution-pool/history/${customerId}`);
       if (!res.ok) throw new Error('이력 조회 실패');
       const data = await res.json();
       setHistoryByCustomer(prev => ({ ...prev, [customerId]: Array.isArray(data.items) ? data.items : [] }));
-    } catch (err: any) {
+    } catch {
       setHistoryByCustomer(prev => ({ ...prev, [customerId]: 'error' }));
-      toast({ title: '오류', description: err?.message || '이력을 불러오지 못했습니다.', variant: 'destructive' });
     }
-  };
+  }, []);
+
+  // 풀 항목이 갱신될 때마다 각 고객의 이력을 병렬 fetch (모달 오픈 시 자동 로딩)
+  useEffect(() => {
+    if (!open || items.length === 0) return;
+    const targets = items.map(it => it.customer_id).filter(id => !historyByCustomer[id]);
+    if (targets.length === 0) return;
+    targets.forEach(id => { void fetchHistory(id); });
+  }, [open, items, fetchHistory]); // historyByCustomer는 의존성 제외 (자기 자신 업데이트 루프 방지)
 
   const formatHistoryAt = (iso: string) => {
     if (!iso) return '';
@@ -642,16 +642,6 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => toggleHistory(item.customer_id)}
-                      data-testid={`button-history-${item.customer_id}`}
-                      title="이 고객의 픽업/확정/해제 이력 보기"
-                    >
-                      <History className="w-4 h-4 mr-1" />
-                      이력
-                    </Button>
                     {!ta && (
                       <Button
                         size="sm"
@@ -704,14 +694,13 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                   </div>
                 </div>
 
-                {/* 픽업 이력 (토글 expand) — 전 직원 조회 가능 */}
-                {historyOpen.has(item.customer_id) && (
-                  <div className="mt-3 border-t pt-2.5" data-testid={`history-panel-${item.customer_id}`}>
+                {/* 픽업 이력 — 전 직원 항상 노출 (모달 열릴 때 자동 로딩) */}
+                <div className="mt-3 border-t pt-2.5" data-testid={`history-panel-${item.customer_id}`}>
                     <div className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
                       <History className="w-3.5 h-3.5" />
                       재분배 이력
                     </div>
-                    {historyByCustomer[item.customer_id] === 'loading' && (
+                    {(!historyByCustomer[item.customer_id] || historyByCustomer[item.customer_id] === 'loading') && (
                       <div className="space-y-1">
                         <Skeleton className="h-6 w-full" />
                         <Skeleton className="h-6 w-2/3" />
@@ -720,7 +709,7 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                     {historyByCustomer[item.customer_id] === 'error' && (
                       <div className="text-sm text-destructive flex items-center gap-1">
                         <AlertCircle className="w-3.5 h-3.5" /> 이력을 불러오지 못했습니다.
-                        <button className="underline ml-1" onClick={() => toggleHistory(item.customer_id)}>다시 시도</button>
+                        <button className="underline ml-1" onClick={() => fetchHistory(item.customer_id)}>다시 시도</button>
                       </div>
                     )}
                     {Array.isArray(historyByCustomer[item.customer_id]) && (
@@ -759,7 +748,6 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                       )
                     )}
                   </div>
-                )}
               </div>
             );
           })}
