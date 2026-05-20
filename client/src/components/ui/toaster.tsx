@@ -13,7 +13,7 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
+      {toasts.map(function ({ id, title, description, action, persistent, ...props }) {
         return (
           <Toast key={id} {...props}>
             <div className="grid gap-1">
@@ -23,7 +23,8 @@ export function Toaster() {
               )}
             </div>
             {action}
-            <ToastClose />
+            {/* persistent 토스트는 닫기 버튼을 노출하지 않음 (강제 새로고침 유도) */}
+            {!persistent && <ToastClose />}
           </Toast>
         )
       })}

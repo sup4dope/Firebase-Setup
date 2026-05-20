@@ -13,6 +13,8 @@ type ToasterToast = ToastProps & {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  // persistent=true 인 경우 X 닫기 버튼/스와이프 닫기를 비활성화 (예: 새 버전 새로고침 안내)
+  persistent?: boolean
 }
 
 const actionTypes = {
@@ -156,6 +158,8 @@ function toast({ ...props }: Toast) {
       id,
       open: true,
       onOpenChange: (open) => {
+        // persistent 토스트는 닫힘 이벤트를 무시 (스와이프/Esc 등으로 닫히지 않음)
+        if (props.persistent) return
         if (!open) dismiss()
       },
     },

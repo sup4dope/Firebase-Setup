@@ -128,6 +128,7 @@ function AuthenticatedApp() {
             title: '새 버전이 배포되었습니다',
             description: '업데이트 반영을 위해 새로고침(F5) 해주세요.',
             duration: Infinity as unknown as number,
+            persistent: true,
             action: (
               <ToastAction
                 altText="새로고침"
