@@ -267,6 +267,16 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // ============================================================
+  // 빌드/배포 버전 (서버 부팅 시각). 재배포되면 새 프로세스 = 새 BOOT_ID.
+  // 클라이언트가 폴링하여 변경 감지 시 새로고침 안내 토스트 표시.
+  // ============================================================
+  const BOOT_ID = String(Date.now());
+  app.get("/api/version", (_req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.json({ boot_id: BOOT_ID });
+  });
+
+  // ============================================================
   // 외부 자격판정 시스템용 고객 단건 조회 API
   // 인증: x-api-key 헤더 (env CUSTOMER_API_KEY) 또는 Firebase ID 토큰(requireAuth)
   // 응답: 자격판정에 필요한 최소 필드만 정규화하여 반환

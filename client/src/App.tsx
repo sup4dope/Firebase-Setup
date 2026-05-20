@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import Teams from '@/pages/Teams';
@@ -97,6 +98,62 @@ function AuthenticatedApp() {
 
     fetchData();
   }, [user, isSuperAdmin, isTeamLeader]);
+
+  // ============================================================
+  // 배포 버전 변경 감지 → 새로고침 안내 sticky 토스트
+  // 서버 BOOT_ID(부팅 시각)를 60초마다 폴링. 최초 응답을 기준값으로 저장하고,
+  // 이후 값이 달라지면(=재배포) 닫히지 않는 토스트로 F5 새로고침 안내.
+  // ============================================================
+  const versionShownRef = useRef(false);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    let baseline: string | null = null;
+
+    const check = async () => {
+      if (cancelled || versionShownRef.current) return;
+      try {
+        const res = await fetch('/api/version', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const bootId = String(data?.boot_id || '');
+        if (!bootId) return;
+        if (baseline === null) {
+          baseline = bootId;
+          return;
+        }
+        if (bootId !== baseline && !versionShownRef.current) {
+          versionShownRef.current = true;
+          toast({
+            title: '새 버전이 배포되었습니다',
+            description: '업데이트 반영을 위해 새로고침(F5) 해주세요.',
+            duration: Infinity as unknown as number,
+            action: (
+              <ToastAction
+                altText="새로고침"
+                onClick={() => window.location.reload()}
+                data-testid="button-toast-reload"
+              >
+                새로고침
+              </ToastAction>
+            ),
+          });
+        }
+      } catch {
+        // 네트워크 일시 오류 무시 — 다음 사이클에 재시도
+      }
+    };
+
+    check();
+    const id = window.setInterval(check, 60_000);
+    const onFocus = () => check();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [user, toast]);
 
   // users는 ref로 보관해 폴러 useEffect를 재시작시키지 않음 (재시작 시 seenIds 리셋·isInitial 스킵으로 신규 결제 누락 방지)
   const usersRef = useRef<User[]>([]);
