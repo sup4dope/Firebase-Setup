@@ -51,6 +51,13 @@ function getContractTypeLabel(contractType: ContractType): string {
 const REDISTRIBUTION_TRIGGER_DAYS = 14;
 const TEMP_ASSIGNMENT_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
 
+// 재분배 풀 통계 캐시 (super_admin 전용, days별)
+const redistributionStatsCache = new Map<number, { at: number; payload: any }>();
+const REDISTRIBUTION_STATS_TTL_MS = 30_000;
+function invalidateRedistributionStatsCache() {
+  redistributionStatsCache.clear();
+}
+
 // 재분배 풀 응답 캐시 (모듈 레벨) — tryConfirmRedistribution 등 다른 경로에서도 무효화 가능
 let redistributionPoolCache: { at: number; payload: any; gen: number } | null = null;
 let redistributionPoolGen = 0;
@@ -58,6 +65,7 @@ const REDISTRIBUTION_POOL_TTL_MS = 30 * 1000;
 function invalidateRedistributionPoolCache() {
   redistributionPoolCache = null;
   redistributionPoolGen++;
+  invalidateRedistributionStatsCache();
 }
 
 async function tryConfirmRedistribution(
@@ -4396,6 +4404,139 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('[/api/redistribution-pool/release] 실패:', error?.message || error);
       res.status(500).json({ success: false, error: error?.message || '해제 실패' });
+    }
+  });
+
+  // GET /api/redistribution-pool/stats — 관리자 통계 (super_admin 전용)
+  // 활성 임시배정, 픽업 통계, 메이드(확정) 통계를 집계해서 반환
+  app.get("/api/redistribution-pool/stats", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const role = (req.user as any)?.role || '';
+      if (role !== 'super_admin') {
+        return res.status(403).json({ success: false, error: 'super_admin 권한 필요' });
+      }
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const now = new Date();
+      const nowMs = now.getTime();
+      const days = Math.max(1, Math.min(365, parseInt(String((req.query?.days) || '30'), 10) || 30));
+      const sinceMs = nowMs - days * 86400000;
+      const sinceIso = new Date(sinceMs).toISOString();
+
+      // TTL 캐시 — 픽업/해제/확정 시점에 invalidateRedistributionStatsCache로 무효화됨
+      const cached = redistributionStatsCache.get(days);
+      if (cached && (nowMs - cached.at) < REDISTRIBUTION_STATS_TTL_MS) {
+        return res.json(cached.payload);
+      }
+
+      // 1) 활성 임시배정 — customers.temp_assignment.expires_at > now
+      const activeAssignments: any[] = [];
+      try {
+        const snap = await firestore.collection('customers')
+          .where('temp_assignment.expires_at', '>', new Date(nowMs).toISOString())
+          .get();
+        for (const doc of snap.docs) {
+          const d = doc.data() as any;
+          const ta = d.temp_assignment || {};
+          const expMs = ta.expires_at ? Date.parse(String(ta.expires_at)) : 0;
+          activeAssignments.push({
+            customer_id: doc.id,
+            customer_name: d.name || '',
+            company_name: d.company_name || '',
+            readable_id: d.readable_id || '',
+            phone: d.phone || '',
+            current_status: d.status_code || '',
+            picker_uid: ta.picker_uid || '',
+            picker_name: ta.picker_name || '',
+            picked_at: ta.picked_at || '',
+            expires_at: ta.expires_at || '',
+            days_left: Math.max(0, Math.ceil((expMs - nowMs) / 86400000)),
+            original_manager_id: ta.original_manager_id || d.manager_id || '',
+            original_manager_name: ta.original_manager_name || d.manager_name || '',
+          });
+        }
+      } catch (e: any) {
+        console.warn('[/api/redistribution-pool/stats] 활성 임시배정 조회 실패:', e?.message || e);
+      }
+      activeAssignments.sort((a, b) => (a.expires_at || '').localeCompare(b.expires_at || ''));
+
+      // 2) 기간 내 logs 조회 — action별 인덱스 쿼리(action + 시각 필드)
+      //    권장 Firestore 인덱스:
+      //      - redistribution_logs (action ASC, picked_at DESC)
+      //      - redistribution_logs (action ASC, confirmed_at DESC)
+      //      - redistribution_logs (action ASC, released_at DESC)
+      //    인덱스 미설정 시 첫 호출에서 콘솔에 인덱스 생성 링크가 표시됩니다.
+      const logsCol = firestore.collection('redistribution_logs');
+      const fetchLogs = async (action: string, tsField: string) => {
+        try {
+          const snap = await logsCol
+            .where('action', '==', action)
+            .where(tsField, '>=', sinceIso)
+            .orderBy(tsField, 'desc')
+            .get();
+          return snap.docs.map(d => ({ id: d.id, ...(d.data() as any), _ts: String((d.data() as any)[tsField] || '') }));
+        } catch (e: any) {
+          console.warn(`[/api/redistribution-pool/stats] ${action} 로그 쿼리 실패(인덱스 미설정 가능, 폴백 사용):`, e?.message || e);
+          // 폴백: action만 필터 (소량 가정), 메모리에서 기간 필터
+          const snap = await logsCol.where('action', '==', action).get();
+          return snap.docs
+            .map(d => {
+              const data = d.data() as any;
+              const ts = String(data[tsField] || '');
+              return { id: d.id, ...data, _ts: ts };
+            })
+            .filter(l => l._ts && l._ts >= sinceIso)
+            .sort((a, b) => (b._ts || '').localeCompare(a._ts || ''));
+        }
+      };
+      const [pickupLogs, confirmLogs, releaseLogs] = await Promise.all([
+        fetchLogs('pickup', 'picked_at'),
+        fetchLogs('confirm', 'confirmed_at'),
+        fetchLogs('release', 'released_at'),
+      ]);
+
+      // 3) 사용자별 집계
+      type UserAgg = { uid: string; name: string; count: number; recent: any[] };
+      const aggregateByUser = (logs: any[], uidField: string, nameField: string): UserAgg[] => {
+        const map = new Map<string, UserAgg>();
+        for (const l of logs) {
+          const uid = String(l[uidField] || '');
+          if (!uid) continue;
+          if (!map.has(uid)) {
+            map.set(uid, { uid, name: String(l[nameField] || ''), count: 0, recent: [] });
+          }
+          const agg = map.get(uid)!;
+          agg.count++;
+          if (agg.recent.length < 5) agg.recent.push(l);
+          if (!agg.name && l[nameField]) agg.name = String(l[nameField]);
+        }
+        return Array.from(map.values()).sort((a, b) => b.count - a.count);
+      };
+
+      const pickupsByUser = aggregateByUser(pickupLogs, 'picker_uid', 'picker_name');
+      const confirmsByUser = aggregateByUser(confirmLogs, 'new_manager_id', 'new_manager_name');
+
+      const payload = {
+        success: true,
+        period_days: days,
+        since: sinceIso,
+        totals: {
+          active_assignments: activeAssignments.length,
+          pickups: pickupLogs.length,
+          confirms: confirmLogs.length,
+          releases: releaseLogs.length,
+        },
+        active_assignments: activeAssignments,
+        pickups_by_user: pickupsByUser,
+        confirms_by_user: confirmsByUser,
+        recent_confirms: confirmLogs.slice(0, 20),
+        recent_pickups: pickupLogs.slice(0, 20),
+      };
+      redistributionStatsCache.set(days, { at: nowMs, payload });
+      res.json(payload);
+    } catch (error: any) {
+      console.error('[/api/redistribution-pool/stats] 실패:', error?.message || error);
+      res.status(500).json({ success: false, error: error?.message || '통계 조회 실패' });
     }
   });
 

@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/lib/firebase';
-import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw, History, Search, X } from 'lucide-react';
+import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw, History, Search, X, BarChart3, Trophy, Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 interface PoolItem {
@@ -116,8 +116,48 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
   };
 
   const myUid = user?.uid || '';
-  const [tab, setTab] = useState<'all' | 'mine'>('all');
+  const [tab, setTab] = useState<'all' | 'mine' | 'stats'>('all');
   const [search, setSearch] = useState('');
+
+  // 관리자 통계 (super_admin 전용)
+  interface StatsData {
+    period_days: number;
+    totals: { active_assignments: number; pickups: number; confirms: number; releases: number };
+    active_assignments: Array<{
+      customer_id: string; customer_name: string; company_name: string; readable_id: string;
+      picker_uid: string; picker_name: string; picked_at: string; expires_at: string;
+      days_left: number; original_manager_name: string; current_status: string;
+    }>;
+    pickups_by_user: Array<{ uid: string; name: string; count: number }>;
+    confirms_by_user: Array<{ uid: string; name: string; count: number }>;
+    recent_confirms: Array<{
+      customer_id: string; customer_name: string; original_manager_name: string;
+      new_manager_name: string; source: string; confirmed_at: string;
+    }>;
+  }
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [statsDays, setStatsDays] = useState(30);
+
+  const fetchStats = useCallback(async (days: number) => {
+    setStatsLoading(true);
+    try {
+      const res = await authFetch(`/api/redistribution-pool/stats?days=${days}`);
+      if (!res.ok) throw new Error('통계 조회 실패');
+      const data = await res.json();
+      setStats(data);
+    } catch (err: any) {
+      toast({ title: '오류', description: err?.message || '통계를 불러오지 못했습니다.', variant: 'destructive' });
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (open && tab === 'stats' && isSuperAdmin) {
+      fetchStats(statsDays);
+    }
+  }, [open, tab, statsDays, isSuperAdmin, fetchStats]);
 
   // 본인이 픽업한 임시배정 건 (만료된 건 서버에서 이미 null 처리되어 옴)
   const myPickups = items.filter(it => it.temp_assignment && it.temp_assignment.picker_uid === myUid);
@@ -177,6 +217,17 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
           >
             내 임시배정 <Badge variant="secondary" className="ml-1.5">{myPickups.length}</Badge>
           </Button>
+          {isSuperAdmin && (
+            <Button
+              variant={tab === 'stats' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setTab('stats')}
+              data-testid="tab-pool-stats"
+            >
+              <BarChart3 className="w-4 h-4 mr-1" />
+              관리자 통계
+            </Button>
+          )}
           <div className="ml-auto relative w-64">
             <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
@@ -203,13 +254,224 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1 space-y-2">
-          {loading && items.length === 0 && (
+          {tab === 'stats' && isSuperAdmin && (
+            <div className="space-y-4" data-testid="pool-stats-panel">
+              {/* 기간 선택 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">기간:</span>
+                {[7, 30, 90].map(d => (
+                  <Button
+                    key={d}
+                    size="sm"
+                    variant={statsDays === d ? 'default' : 'outline'}
+                    onClick={() => setStatsDays(d)}
+                    data-testid={`button-stats-days-${d}`}
+                  >
+                    최근 {d}일
+                  </Button>
+                ))}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => fetchStats(statsDays)}
+                  disabled={statsLoading}
+                  className="ml-auto"
+                  data-testid="button-stats-refresh"
+                >
+                  <RefreshCw className={`w-4 h-4 ${statsLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+
+              {statsLoading && !stats && (
+                <div className="space-y-2">
+                  {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+                </div>
+              )}
+
+              {stats && (
+                <>
+                  {/* 요약 카드 */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div className="border rounded-lg p-3 bg-blue-50 dark:bg-blue-950/30" data-testid="stat-active-count">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1"><Hand className="w-3.5 h-3.5" />활성 임시배정</div>
+                      <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{stats.totals.active_assignments}</div>
+                    </div>
+                    <div className="border rounded-lg p-3 bg-orange-50 dark:bg-orange-950/30" data-testid="stat-pickups-count">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3.5 h-3.5" />픽업 건수</div>
+                      <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">{stats.totals.pickups}</div>
+                    </div>
+                    <div className="border rounded-lg p-3 bg-green-50 dark:bg-green-950/30" data-testid="stat-confirms-count">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />메이드(확정) 건수</div>
+                      <div className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.totals.confirms}</div>
+                    </div>
+                    <div className="border rounded-lg p-3 bg-muted/40" data-testid="stat-releases-count">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1"><Unlock className="w-3.5 h-3.5" />해제 건수</div>
+                      <div className="text-2xl font-bold">{stats.totals.releases}</div>
+                    </div>
+                  </div>
+
+                  {/* 활성 임시배정 */}
+                  <section>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                      <Hand className="w-4 h-4" /> 현재 활성 임시배정 ({stats.active_assignments.length})
+                    </h3>
+                    {stats.active_assignments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">현재 활성 임시배정이 없습니다.</p>
+                    ) : (
+                      <div className="border rounded-md overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/40 text-xs text-muted-foreground">
+                            <tr>
+                              <th className="text-left px-2 py-1.5">고객</th>
+                              <th className="text-left px-2 py-1.5">픽업자</th>
+                              <th className="text-left px-2 py-1.5">원담당</th>
+                              <th className="text-left px-2 py-1.5">상태</th>
+                              <th className="text-left px-2 py-1.5">픽업일</th>
+                              <th className="text-left px-2 py-1.5">잔여</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stats.active_assignments.map(a => (
+                              <tr key={a.customer_id} className="border-t hover-elevate" data-testid={`stats-active-${a.customer_id}`}>
+                                <td className="px-2 py-1.5">
+                                  <button
+                                    className="hover:underline text-left"
+                                    onClick={() => onOpenCustomer?.(a.customer_id)}
+                                  >
+                                    <span className="font-medium">{a.customer_name || '(이름 없음)'}</span>
+                                    {a.company_name && <span className="text-xs text-muted-foreground ml-1">· {a.company_name}</span>}
+                                  </button>
+                                </td>
+                                <td className="px-2 py-1.5 font-medium">{a.picker_name}</td>
+                                <td className="px-2 py-1.5 text-muted-foreground">{a.original_manager_name || '-'}</td>
+                                <td className="px-2 py-1.5"><Badge variant="outline" className="text-xs">{a.current_status}</Badge></td>
+                                <td className="px-2 py-1.5 text-muted-foreground">{a.picked_at?.slice(0, 10) || '-'}</td>
+                                <td className="px-2 py-1.5">
+                                  <Badge variant={a.days_left <= 1 ? 'destructive' : 'secondary'} className="text-xs">D-{a.days_left}</Badge>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* 직원별 픽업 통계 */}
+                  <section>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                      <Users className="w-4 h-4" /> 직원별 픽업 순위 (최근 {stats.period_days}일)
+                    </h3>
+                    {stats.pickups_by_user.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">기간 내 픽업 이력이 없습니다.</p>
+                    ) : (
+                      <div className="border rounded-md overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/40 text-xs text-muted-foreground">
+                            <tr>
+                              <th className="text-left px-2 py-1.5 w-12">순위</th>
+                              <th className="text-left px-2 py-1.5">직원</th>
+                              <th className="text-right px-2 py-1.5">픽업 건수</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stats.pickups_by_user.map((u, idx) => (
+                              <tr key={u.uid} className="border-t" data-testid={`stats-pickup-row-${u.uid}`}>
+                                <td className="px-2 py-1.5">{idx + 1}</td>
+                                <td className="px-2 py-1.5 font-medium">{u.name || u.uid}</td>
+                                <td className="px-2 py-1.5 text-right font-semibold">{u.count}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* 직원별 메이드(확정) 통계 */}
+                  <section>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                      <Trophy className="w-4 h-4" /> 직원별 메이드(확정) 순위 (최근 {stats.period_days}일)
+                    </h3>
+                    {stats.confirms_by_user.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">기간 내 메이드 확정 이력이 없습니다.</p>
+                    ) : (
+                      <div className="border rounded-md overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/40 text-xs text-muted-foreground">
+                            <tr>
+                              <th className="text-left px-2 py-1.5 w-12">순위</th>
+                              <th className="text-left px-2 py-1.5">직원</th>
+                              <th className="text-right px-2 py-1.5">메이드 건수</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stats.confirms_by_user.map((u, idx) => (
+                              <tr key={u.uid} className="border-t" data-testid={`stats-confirm-row-${u.uid}`}>
+                                <td className="px-2 py-1.5">
+                                  {idx === 0 ? <Trophy className="w-4 h-4 text-yellow-500 inline" /> : idx + 1}
+                                </td>
+                                <td className="px-2 py-1.5 font-medium">{u.name || u.uid}</td>
+                                <td className="px-2 py-1.5 text-right font-semibold text-green-700 dark:text-green-400">{u.count}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* 최근 메이드 내역 */}
+                  {stats.recent_confirms.length > 0 && (
+                    <section>
+                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <History className="w-4 h-4" /> 최근 메이드 내역
+                      </h3>
+                      <div className="border rounded-md overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/40 text-xs text-muted-foreground">
+                            <tr>
+                              <th className="text-left px-2 py-1.5">고객</th>
+                              <th className="text-left px-2 py-1.5">원담당 → 새 담당</th>
+                              <th className="text-left px-2 py-1.5">트리거</th>
+                              <th className="text-left px-2 py-1.5">확정일시</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stats.recent_confirms.map(c => (
+                              <tr key={`${c.customer_id}-${c.confirmed_at}`} className="border-t hover-elevate">
+                                <td className="px-2 py-1.5">
+                                  <button
+                                    className="hover:underline text-left font-medium"
+                                    onClick={() => onOpenCustomer?.(c.customer_id)}
+                                  >
+                                    {c.customer_name || '(이름 없음)'}
+                                  </button>
+                                </td>
+                                <td className="px-2 py-1.5 text-muted-foreground">
+                                  {c.original_manager_name} → <span className="text-foreground font-medium">{c.new_manager_name}</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-xs text-muted-foreground">{c.source}</td>
+                                <td className="px-2 py-1.5 text-xs text-muted-foreground">{c.confirmed_at?.slice(0, 16).replace('T', ' ') || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {tab !== 'stats' && loading && items.length === 0 && (
             <div className="space-y-2">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
             </div>
           )}
 
-          {!loading && visibleItems.length === 0 && (
+          {tab !== 'stats' && !loading && visibleItems.length === 0 && (
             <div className="text-center py-12 text-muted-foreground" data-testid="empty-pool">
               <AlertCircle className="w-10 h-10 mx-auto mb-3 opacity-40" />
               {q ? (
@@ -231,7 +493,7 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
             </div>
           )}
 
-          {visibleItems.map(item => {
+          {tab !== 'stats' && visibleItems.map(item => {
             const ta = item.temp_assignment;
             const isMine = ta && ta.picker_uid === myUid;
             const lockedByOther = ta && !isMine;
