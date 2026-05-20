@@ -2494,17 +2494,37 @@ export default function Dashboard() {
       <RedistributionPoolModal
         open={redistributionPoolOpen}
         onOpenChange={setRedistributionPoolOpen}
-        onOpenCustomer={(customerId) => {
-          // 풀에서 상세 진입: target을 찾은 경우에만 플래그 세팅 (못 찾으면 새로고침 후 풀로 안 돌아옴)
+        onOpenCustomer={async (customerId) => {
+          // 풀에서 상세 진입: 본인 담당이면 로컬 목록에서, 아니면(staff/team_leader가 타 담당) Firestore에서 단건 조회
           const target = customersRef.current.find(c => c.id === customerId);
           if (target) {
             setReopenPoolAfterDetail(true);
             setRedistributionPoolOpen(false);
             handleCustomerClick(target);
-          } else {
-            // 다른 담당 고객이라 목록에 없음 → 새로고침만, 풀은 닫지 않음
-            try { sessionStorage.setItem('pendingOpenCustomerId', customerId); } catch {}
-            handleRefreshAll();
+            return;
+          }
+          // 타 담당 고객: 직접 조회해서 모달 열기 (풀 진입 경로에서는 모든 사용자에게 가시)
+          try {
+            const { getCustomerById } = await import('@/lib/firestore');
+            const fetched = await getCustomerById(customerId);
+            if (fetched) {
+              setReopenPoolAfterDetail(true);
+              setRedistributionPoolOpen(false);
+              handleCustomerClick(fetched);
+            } else {
+              toast({
+                title: '고객 정보를 불러올 수 없습니다',
+                description: '권한이 없거나 삭제된 고객입니다.',
+                variant: 'destructive',
+              });
+            }
+          } catch (err) {
+            console.error('[RedistributionPool] 고객 단건 조회 실패:', err);
+            toast({
+              title: '고객 정보 조회 실패',
+              description: '잠시 후 다시 시도해주세요.',
+              variant: 'destructive',
+            });
           }
         }}
         onPoolChanged={() => {
