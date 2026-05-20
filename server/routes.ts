@@ -67,7 +67,9 @@ async function fetchUserNamesByUid(
   for (const snap of results) {
     if (!snap.exists) continue;
     const u = snap.data() as any;
-    const name = String(u?.name || u?.display_name || '').trim();
+    // 전산 등록명(users.name)만 사용. display_name(구글 계정명)은 폴백으로도 쓰지 않음.
+    // name이 비어있으면 매핑에서 제외하여 기존 박제 이름이 그대로 유지되도록 함.
+    const name = String(u?.name || '').trim();
     if (name) map.set(snap.id, name);
   }
   return map;
@@ -4530,13 +4532,16 @@ export async function registerRoutes(
       const adminApp = getAdminApp();
       const firestore = adminApp.firestore();
 
-      // 1) 전체 users 이름 맵 (한 번에 로드)
+      // 1) 전체 users 이름 맵 (한 번에 로드) — 전산 등록명(users.name)만 사용.
+      //    display_name(구글 계정명)은 폴백으로도 쓰지 않음. name이 비어있으면 갱신 대상에서 제외.
       const usersSnap = await firestore.collection('users').get();
       const nameByUid = new Map<string, string>();
+      let usersWithoutName = 0;
       for (const d of usersSnap.docs) {
         const u = d.data() as any;
-        const nm = String(u?.name || u?.display_name || '').trim();
+        const nm = String(u?.name || '').trim();
         if (nm) nameByUid.set(d.id, nm);
+        else usersWithoutName++;
       }
 
       const commitBatched = async (writes: Array<{ ref: FirebaseFirestore.DocumentReference; data: any }>) => {
@@ -4599,6 +4604,7 @@ export async function registerRoutes(
         payments: { scanned: payScanned, updated: payWrites.length },
         redistribution_logs: { scanned: logScanned, updated: logWrites.length },
         users_loaded: nameByUid.size,
+        users_without_name: usersWithoutName,
       };
       console.log('[/api/admin/backfill-user-names] 완료:', result);
       res.json(result);

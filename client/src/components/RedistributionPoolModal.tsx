@@ -228,7 +228,9 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
       if (!res.ok || !data.success) throw new Error(data?.error || '갱신 실패');
       toast({
         title: '소급 갱신 완료',
-        description: `결제 ${data.payments.updated}/${data.payments.scanned}건, 이력 ${data.redistribution_logs.updated}/${data.redistribution_logs.scanned}건 갱신`,
+        description:
+          `결제 ${data.payments.updated}/${data.payments.scanned}건, 이력 ${data.redistribution_logs.updated}/${data.redistribution_logs.scanned}건 갱신` +
+          (data.users_without_name ? ` · 전산 이름 미등록 ${data.users_without_name}명은 건너뜀` : ''),
       });
       // 캐시 무효화/재로딩
       setHistoryByCustomer({});
