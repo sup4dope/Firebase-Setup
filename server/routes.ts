@@ -4523,6 +4523,91 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/admin/backfill-user-names — payments_paymint와 redistribution_logs의 박제된 이름 필드를
+  // users 컬렉션의 최신 name으로 일괄 갱신 (super_admin 전용, 멱등 1회 작업)
+  app.post("/api/admin/backfill-user-names", requireAuth, requireSuperAdmin, async (_req: AuthenticatedRequest, res) => {
+    try {
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+
+      // 1) 전체 users 이름 맵 (한 번에 로드)
+      const usersSnap = await firestore.collection('users').get();
+      const nameByUid = new Map<string, string>();
+      for (const d of usersSnap.docs) {
+        const u = d.data() as any;
+        const nm = String(u?.name || u?.display_name || '').trim();
+        if (nm) nameByUid.set(d.id, nm);
+      }
+
+      const commitBatched = async (writes: Array<{ ref: FirebaseFirestore.DocumentReference; data: any }>) => {
+        const CHUNK = 400;
+        for (let i = 0; i < writes.length; i += CHUNK) {
+          const batch = firestore.batch();
+          for (const w of writes.slice(i, i + CHUNK)) batch.update(w.ref, w.data);
+          await batch.commit();
+        }
+      };
+
+      // 2) payments_paymint: sent_by_name, manager_name 소급 갱신
+      const paySnap = await firestore.collection('payments_paymint').get();
+      const payWrites: Array<{ ref: FirebaseFirestore.DocumentReference; data: any }> = [];
+      let payScanned = 0;
+      for (const d of paySnap.docs) {
+        payScanned++;
+        const p = d.data() as any;
+        const upd: any = {};
+        if (p.sent_by) {
+          const nm = nameByUid.get(String(p.sent_by));
+          if (nm && nm !== p.sent_by_name) upd.sent_by_name = nm;
+        }
+        if (p.manager_id) {
+          const nm = nameByUid.get(String(p.manager_id));
+          if (nm && nm !== p.manager_name) upd.manager_name = nm;
+        }
+        if (Object.keys(upd).length > 0) payWrites.push({ ref: d.ref, data: upd });
+      }
+      await commitBatched(payWrites);
+
+      // 3) redistribution_logs: picker_name, actor_name, new_manager_name, original_manager_name 소급 갱신
+      const logSnap = await firestore.collection('redistribution_logs').get();
+      const logWrites: Array<{ ref: FirebaseFirestore.DocumentReference; data: any }> = [];
+      let logScanned = 0;
+      for (const d of logSnap.docs) {
+        logScanned++;
+        const l = d.data() as any;
+        const upd: any = {};
+        const pairs: Array<[string, string]> = [
+          ['picker_uid', 'picker_name'],
+          ['actor_uid', 'actor_name'],
+          ['new_manager_id', 'new_manager_name'],
+          ['original_manager_id', 'original_manager_name'],
+        ];
+        for (const [uidField, nameField] of pairs) {
+          const u = l[uidField];
+          if (!u) continue;
+          const nm = nameByUid.get(String(u));
+          if (nm && nm !== l[nameField]) upd[nameField] = nm;
+        }
+        if (Object.keys(upd).length > 0) logWrites.push({ ref: d.ref, data: upd });
+      }
+      await commitBatched(logWrites);
+
+      invalidateRedistributionPoolCache();
+
+      const result = {
+        success: true,
+        payments: { scanned: payScanned, updated: payWrites.length },
+        redistribution_logs: { scanned: logScanned, updated: logWrites.length },
+        users_loaded: nameByUid.size,
+      };
+      console.log('[/api/admin/backfill-user-names] 완료:', result);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[/api/admin/backfill-user-names] 실패:', error?.message || error);
+      res.status(500).json({ success: false, error: error?.message || '소급 갱신 실패' });
+    }
+  });
+
   // GET /api/redistribution-pool/history/:customerId — 고객별 픽업 이력 (전 직원 조회 가능)
   // redistribution_logs에서 customer_id별 모든 액션(pickup/release/confirm/exclude/exclude_undo)을 시간순 반환
   app.get("/api/redistribution-pool/history/:customerId", requireAuth, async (req: AuthenticatedRequest, res) => {

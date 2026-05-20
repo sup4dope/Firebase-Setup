@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/lib/firebase';
-import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw, History, Search, X, BarChart3, Trophy, Users, Trash2 } from 'lucide-react';
+import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw, History, Search, X, BarChart3, Trophy, Users, Trash2, Loader2 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -217,6 +217,28 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
   const [statsLoading, setStatsLoading] = useState(false);
   const [stats, setStats] = useState<StatsData | null>(null);
   const [statsDays, setStatsDays] = useState(30);
+  const [backfillBusy, setBackfillBusy] = useState(false);
+
+  const runBackfill = useCallback(async () => {
+    if (!confirm('결제내역 발송자명/담당자명 및 재분배 풀 픽업자명을 현재 전산 등록명으로 일괄 갱신합니다. 진행할까요?')) return;
+    setBackfillBusy(true);
+    try {
+      const res = await authFetch('/api/admin/backfill-user-names', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data?.error || '갱신 실패');
+      toast({
+        title: '소급 갱신 완료',
+        description: `결제 ${data.payments.updated}/${data.payments.scanned}건, 이력 ${data.redistribution_logs.updated}/${data.redistribution_logs.scanned}건 갱신`,
+      });
+      // 캐시 무효화/재로딩
+      setHistoryByCustomer({});
+      await fetchStats(statsDays);
+    } catch (err: any) {
+      toast({ title: '오류', description: err?.message || '소급 갱신 실패', variant: 'destructive' });
+    } finally {
+      setBackfillBusy(false);
+    }
+  }, [statsDays]);
 
   const fetchStats = useCallback(async (days: number) => {
     setStatsLoading(true);
@@ -350,11 +372,22 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                   </Button>
                 ))}
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={runBackfill}
+                  disabled={backfillBusy}
+                  className="ml-auto gap-1.5"
+                  data-testid="button-backfill-names"
+                  title="기존 결제내역·재분배 이력의 이름을 전산 등록명으로 일괄 갱신합니다"
+                >
+                  {backfillBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                  이름 소급 갱신
+                </Button>
+                <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => fetchStats(statsDays)}
                   disabled={statsLoading}
-                  className="ml-auto"
                   data-testid="button-stats-refresh"
                 >
                   <RefreshCw className={`w-4 h-4 ${statsLoading ? 'animate-spin' : ''}`} />
