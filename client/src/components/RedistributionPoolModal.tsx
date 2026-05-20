@@ -6,7 +6,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { authFetch } from '@/lib/firebase';
-import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw, History, Search, X, BarChart3, Trophy, Users } from 'lucide-react';
+import { Hand, Unlock, Phone, Clock, FileText, CreditCard, AlertCircle, RefreshCw, History, Search, X, BarChart3, Trophy, Users, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 
 interface PoolItem {
@@ -96,6 +100,28 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
       toast({ title: '픽업 실패', description: err?.message || '', variant: 'destructive' });
     } finally {
       setBusy(item.customer_id, false);
+    }
+  };
+
+  // 영구 제외 (super_admin 전용) — 확인 다이얼로그 후 실행
+  const [excludeTarget, setExcludeTarget] = useState<PoolItem | null>(null);
+  const handleExclude = async (item: PoolItem) => {
+    setBusy(item.customer_id, true);
+    try {
+      const res = await authFetch(`/api/redistribution-pool/exclude/${item.customer_id}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || '제외 실패');
+      toast({
+        title: '풀에서 영구 제외 완료',
+        description: `${item.customer_name || item.company_name} — 더 이상 풀에 노출되지 않습니다.`,
+      });
+      await fetchPool();
+      onPoolChanged?.();
+    } catch (err: any) {
+      toast({ title: '제외 실패', description: err?.message || '', variant: 'destructive' });
+    } finally {
+      setBusy(item.customer_id, false);
+      setExcludeTarget(null);
     }
   };
 
@@ -598,6 +624,20 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
                         관리자 강제 취소
                       </Button>
                     )}
+                    {isSuperAdmin && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setExcludeTarget(item)}
+                        disabled={busy}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="이 고객을 재분배 풀에서 영구 제외 (super_admin)"
+                        data-testid={`button-exclude-${item.customer_id}`}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        영구 제외
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -605,6 +645,45 @@ export function RedistributionPoolModal({ open, onOpenChange, onOpenCustomer, on
           })}
         </div>
       </DialogContent>
+
+      {/* 영구 제외 확인 다이얼로그 (super_admin 전용) */}
+      <AlertDialog open={!!excludeTarget} onOpenChange={(o) => { if (!o) setExcludeTarget(null); }}>
+        <AlertDialogContent data-testid="dialog-exclude-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              재분배 풀에서 영구 제외
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  <strong className="text-foreground">{excludeTarget?.customer_name || excludeTarget?.company_name || '(이름 없음)'}</strong>
+                  {excludeTarget?.company_name && excludeTarget?.customer_name && (
+                    <span className="text-muted-foreground"> · {excludeTarget?.company_name}</span>
+                  )}
+                  {' '}고객을 재분배 풀에서 <strong className="text-destructive">영구적으로 제외</strong>합니다.
+                </p>
+                <ul className="text-sm list-disc list-inside text-muted-foreground space-y-1">
+                  <li>이 작업 후에는 이 고객이 풀 목록에 다시 나타나지 않습니다.</li>
+                  <li>현재 임시배정이 있다면 함께 해제됩니다.</li>
+                  <li>고객 자체는 삭제되지 않으며, 메모와 로그에 기록이 남습니다.</li>
+                  <li>해제하려면 관리자가 별도 처리해야 합니다(되돌리기 UI 미제공).</li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-exclude-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => excludeTarget && handleExclude(excludeTarget)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-exclude-confirm"
+            >
+              영구 제외하기
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

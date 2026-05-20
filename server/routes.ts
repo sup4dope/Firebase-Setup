@@ -4219,6 +4219,11 @@ export async function registerRoutes(
           debugStats.excluded_by_status[status] = (debugStats.excluded_by_status[status] || 0) + 1;
           continue;
         }
+        // super_admin이 영구 제외 처리한 고객은 풀에서 숨김
+        if (c.redistribution_excluded === true) {
+          debugStats.excluded_by_status['__manually_excluded__'] = (debugStats.excluded_by_status['__manually_excluded__'] || 0) + 1;
+          continue;
+        }
         const trig = triggerByCust.get(cids[i])!;
         debugStats.included_by_source[trig.sourceType]++;
 
@@ -4404,6 +4409,73 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('[/api/redistribution-pool/release] 실패:', error?.message || error);
       res.status(500).json({ success: false, error: error?.message || '해제 실패' });
+    }
+  });
+
+  // POST /api/redistribution-pool/exclude/:customerId — super_admin 전용: 풀에서 영구 제외
+  // 고객 문서에 redistribution_excluded=true 플래그를 설정하여 이후 풀 조회에서 영구히 숨김
+  app.post("/api/redistribution-pool/exclude/:customerId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const role = (req.user as any)?.role || '';
+      if (role !== 'super_admin') {
+        return res.status(403).json({ success: false, error: 'super_admin 권한 필요' });
+      }
+      const uid = req.user?.uid || '';
+      const { customerId } = req.params;
+      const undo = String(req.query?.undo || '') === '1';
+      const adminApp = getAdminApp();
+      const firestore = adminApp.firestore();
+      const now = new Date();
+
+      const customerRef = firestore.collection('customers').doc(customerId);
+      const snap = await customerRef.get();
+      if (!snap.exists) return res.status(404).json({ success: false, error: '고객을 찾을 수 없습니다.' });
+
+      const memoContent = undo
+        ? `[재분배 풀 제외 해제] ${req.user?.name || ''} (관리자)`
+        : `[재분배 풀 영구 제외] ${req.user?.name || ''} (관리자) — 이 고객은 더 이상 재분배 풀에 노출되지 않습니다.`;
+      const memoEntry = {
+        content: memoContent,
+        author_id: 'system',
+        author_name: '시스템(재분배)',
+        created_at: now.toISOString(),
+      };
+
+      const updateData: any = {
+        redistribution_excluded: !undo,
+        memo_history: FieldValue.arrayUnion(memoEntry),
+        recent_memo: memoContent,
+        latest_memo: memoContent,
+        last_memo_date: now.toISOString(),
+        updated_at: now.toISOString(),
+      };
+      if (!undo) {
+        updateData.redistribution_excluded_at = now.toISOString();
+        updateData.redistribution_excluded_by_uid = uid;
+        updateData.redistribution_excluded_by_name = req.user?.name || '';
+        // 영구 제외 시 활성 임시배정도 함께 해제 (혼선 방지)
+        updateData.temp_assignment = FieldValue.delete();
+      } else {
+        updateData.redistribution_excluded_at = FieldValue.delete();
+        updateData.redistribution_excluded_by_uid = FieldValue.delete();
+        updateData.redistribution_excluded_by_name = FieldValue.delete();
+      }
+
+      await customerRef.update(updateData);
+
+      await firestore.collection('redistribution_logs').add({
+        customer_id: customerId,
+        action: undo ? 'exclude_undo' : 'exclude',
+        actor_uid: uid,
+        actor_name: req.user?.name || '',
+        at: now.toISOString(),
+      });
+
+      invalidateRedistributionPoolCache();
+      res.json({ success: true, excluded: !undo });
+    } catch (error: any) {
+      console.error('[/api/redistribution-pool/exclude] 실패:', error?.message || error);
+      res.status(500).json({ success: false, error: error?.message || '제외 처리 실패' });
     }
   });
 
